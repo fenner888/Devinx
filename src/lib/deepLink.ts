@@ -6,8 +6,13 @@
 
 import { branding } from '@lib/branding';
 
-/** Devin session ID format: devin- + 32 hex chars (UUID without dashes). */
-const SESSION_ID_RE = /^devin-[a-f0-9]{32}$/i;
+/**
+ * Devin session ID: devin- prefix + URL-safe suffix. Real IDs come in more
+ * than one shape (32-hex, dashed UUIDs, older formats) — requiring exactly
+ * 32 hex chars rejected legitimate sessions returned by the API. The point
+ * of this check is path-segment safety (no /, ?, #, .), not format policing.
+ */
+const SESSION_ID_RE = /^devin-[A-Za-z0-9_-]{6,64}$/;
 
 export interface ParsedDeepLink {
   valid: boolean;
