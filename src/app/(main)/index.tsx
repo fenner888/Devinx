@@ -94,7 +94,15 @@ export default function BoardScreen() {
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
       {/* Header */}
       <View className="flex-row items-center justify-between px-5 py-3">
-        <Text className="text-text-hi text-text17">Sessions</Text>
+        <Pressable
+          onPress={() => router.push('/(main)/settings')}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+          accessibilityHint="Open settings to change theme, view usage, or disconnect"
+        >
+          <Text className="text-text-hi text-text17">Sessions</Text>
+        </Pressable>
         <View className="flex-row gap-2">
           <Pressable
             className={`rounded-button px-3 py-2 ${selectedTags.length > 0 ? 'bg-brand' : 'bg-tint-secondary'}`}
@@ -103,6 +111,14 @@ export default function BoardScreen() {
             <Text className={`text-text13 font-medium ${selectedTags.length > 0 ? 'text-text-always-white' : 'text-text-mid'}`}>
               Tags{selectedTags.length > 0 ? ` (${selectedTags.length})` : ''}
             </Text>
+          </Pressable>
+          <Pressable
+            className="bg-tint-secondary rounded-button px-3 py-2"
+            onPress={() => router.push('/(main)/settings')}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+          >
+            <Text className="text-text-mid text-text13">{'\u2699'}</Text>
           </Pressable>
           <Pressable
             className="bg-brand rounded-button px-buttonSecondaryX py-2"
