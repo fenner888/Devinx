@@ -1,0 +1,422 @@
+/**
+ * Devin API v3 TypeScript types — generated from live docs.devin.ai reference
+ * (crawled 2026-07-07). See /specs/api-deltas.md for divergences from the
+ * build spec's §2.3/§8.5 assumptions.
+ *
+ * Base URL: https://api.devin.ai
+ * Org-scoped paths: /v3/organizations/{org_id}/...
+ * Enterprise paths: /v3/enterprise/...
+ * Auth: `Authorization: Bearer cog_*` (service-user keys; PATs "coming soon").
+ */
+
+// ---------------------------------------------------------------------------
+// Primitives & enums
+// ---------------------------------------------------------------------------
+
+/** Service-user API key prefix. PATs not yet GA. */
+export type ApiKey = string;
+
+/** Organization ID with `org-` prefix. */
+export type OrgId = string;
+
+/** Session ID with `devin-` prefix. */
+export type DevinId = string;
+
+/** Cursor for pagination (opaque string). */
+export type Cursor = string;
+
+/** Unix timestamp (seconds). */
+export type UnixTimestamp = number;
+
+/** ACU (Agent Compute Unit) consumption figure. */
+export type AcuCount = number;
+
+export type SessionStatus =
+  | 'new'
+  | 'claimed'
+  | 'running'
+  | 'exit'
+  | 'error'
+  | 'suspended'
+  | 'resuming';
+
+export type SessionStatusDetail =
+  | 'working'
+  | 'waiting_for_user'
+  | 'waiting_for_approval'
+  | 'finished'
+  | 'inactivity'
+  | 'user_request'
+  | 'usage_limit_exceeded'
+  | 'out_of_credits'
+  | 'out_of_quota';
+
+export type SessionOrigin =
+  | 'webapp'
+  | 'slack'
+  | 'teams'
+  | 'api'
+  | 'linear'
+  | 'jira'
+  | 'automation'
+  | 'cli'
+  | 'desktop'
+  | 'code_scan'
+  | 'other';
+
+export type SessionCategory =
+  | 'bug_fixing'
+  | 'ci_cd_and_devops'
+  | 'code_quality_and_security'
+  | 'code_review'
+  | 'code_review_and_analysis'
+  | 'data_and_automation'
+  | 'documentation_and_content'
+  | 'feature_development'
+  | 'migrations_and_upgrades'
+  | 'other'
+  | 'refactoring_and_optimization'
+  | 'research_and_exploration'
+  | 'security'
+  | 'unit_test_generation';
+
+export type DevinMode = 'normal' | 'fast';
+
+export type SessionSize = 'xs' | 's' | 'm' | 'l' | 'xl';
+
+export type InsightSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export type SecretType = 'cookie' | 'key-value' | 'totp';
+
+export type AccessType = 'enterprise' | 'org' | 'personal';
+
+export type PrState = 'open' | 'merged' | 'closed' | 'draft';
+
+export type MessageSource = 'devin' | 'user';
+
+// ---------------------------------------------------------------------------
+// Pagination envelope
+// ---------------------------------------------------------------------------
+
+export interface PaginatedResponse<T> {
+  end_cursor: Cursor | null;
+  has_next_page: boolean;
+  items: T[];
+  total?: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+export interface PullRequest {
+  pr_state: string;
+  pr_url: string;
+  /** Present in some v3 responses (draft flag). */
+  draft?: boolean;
+  /** Internal state string: open | merged | closed. */
+  state?: PrState;
+  merged_at?: UnixTimestamp | null;
+  closed?: number;
+}
+
+export interface SessionSecretInput {
+  key: string;
+  value: string;
+}
+
+export interface SessionCreateRequest {
+  prompt: string;
+  attachment_urls?: string[];
+  bypass_approval?: boolean;
+  child_playbook_id?: string;
+  create_as_user_id?: string;
+  devin_mode?: DevinMode;
+  knowledge_ids?: string[];
+  max_acu_limit?: number;
+  playbook_id?: string;
+  secret_ids?: string[];
+  session_secrets?: SessionSecretInput[];
+  snapshot_id?: string;
+  structured_output_schema?: Record<string, unknown>;
+  tags?: string[];
+  title?: string;
+  unlisted?: boolean;
+}
+
+export interface SessionResponse {
+  acus_consumed: AcuCount;
+  category: SessionCategory | null;
+  child_session_ids: string[] | null;
+  created_at: UnixTimestamp;
+  is_archived: boolean;
+  org_id: string;
+  origin: SessionOrigin | null;
+  parent_session_id: string | null;
+  playbook_id: string | null;
+  pull_requests: PullRequest[];
+  service_user_id: string | null;
+  session_id: string;
+  status: SessionStatus;
+  status_detail: SessionStatusDetail | null;
+  tags: string[];
+  title: string | null;
+  updated_at: UnixTimestamp;
+  url: string;
+  /** v3 also exposes subcategory in some responses. */
+  subcategory?: string | null;
+  /** Web-app-only fields surfaced via the session detail endpoint. */
+  latest_status_contents?: {
+    enum?: 'working' | 'blocked' | 'finished' | string;
+    reason?: string;
+    user_action_required?: string;
+  } | null;
+  latest_status_event_at?: UnixTimestamp | null;
+  latest_permission_contents?: {
+    type?: 'permission_request';
+    tool_name?: string;
+    permission_type?: string;
+  } | null;
+  latest_permission_event_at?: UnixTimestamp | null;
+  latest_loop_contents?: { type?: 'pause' } | null;
+  latest_loop_event_at?: UnixTimestamp | null;
+  latest_approval_contents?: { type?: 'actions_request' } | null;
+  latest_approval_event_at?: UnixTimestamp | null;
+  current_activity_changed_at?: UnixTimestamp | null;
+  activity_status_changed_at?: UnixTimestamp | null;
+  is_unread?: boolean;
+}
+
+export interface SessionsQueryParams {
+  after?: Cursor | null;
+  category?: SessionCategory | null;
+  created_after?: UnixTimestamp | null;
+  created_before?: UnixTimestamp | null;
+  first?: number; // default 100, max 200
+  is_archived?: boolean | null;
+  origins?: SessionOrigin[] | null;
+  playbook_id?: string | null;
+  repo_names?: string[] | null;
+  pr_states?: string[] | null;
+  search?: string | null;
+  status?: SessionStatus | null;
+  tags?: string[] | null;
+  updated_after?: UnixTimestamp | null;
+  updated_before?: UnixTimestamp | null;
+  user_ids?: string[] | null;
+}
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+export interface SessionMessage {
+  created_at: UnixTimestamp;
+  event_id: string;
+  message: string;
+  source: MessageSource;
+}
+
+export interface SessionMessageCreateRequest {
+  message: string;
+  attachment_urls?: string[] | null;
+  message_as_user_id?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Tags
+// ---------------------------------------------------------------------------
+
+export interface SessionTagsUpdateRequest {
+  tags: string[]; // maxItems 50
+}
+
+export interface SessionTagsResponse {
+  tags: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Insights
+// ---------------------------------------------------------------------------
+
+export interface InsightsGenerateResponse {
+  status: 'already_exists' | 'started';
+}
+
+export interface InsightIssue {
+  description: string;
+  severity: InsightSeverity;
+  title: string;
+}
+
+export interface InsightPrompt {
+  description: string;
+  title: string;
+}
+
+export interface InsightTimelineEntry {
+  description: string;
+  title: string;
+}
+
+export interface SessionInsightsAnalysis {
+  action: string[];
+  classification: string;
+  issues: InsightIssue[];
+  prompts: InsightPrompt[] | null;
+  timeline: InsightTimelineEntry[];
+}
+
+export interface SessionInsightsResponse {
+  acus_consumed: AcuCount;
+  created_at: UnixTimestamp;
+  num_devin_messages: number;
+  num_user_messages: number;
+  org_id: string;
+  pull_requests: PullRequest[];
+  session_id: string;
+  session_size: SessionSize;
+  status: SessionStatus;
+  tags: string[];
+  updated_at: UnixTimestamp;
+  url: string;
+  analysis: SessionInsightsAnalysis;
+}
+
+// ---------------------------------------------------------------------------
+// Reference data
+// ---------------------------------------------------------------------------
+
+export interface PlaybookResponse {
+  access_type: AccessType;
+  body: string;
+  created_at: UnixTimestamp;
+  created_by: string;
+  macro: string | null;
+  org_id: string | null;
+  playbook_id: string;
+  structured_output_schema: Record<string, unknown> | null;
+  title: string;
+  updated_at: UnixTimestamp;
+  updated_by: string;
+}
+
+export interface KnowledgeNoteResponse {
+  access_type: AccessType;
+  body: string;
+  created_at: UnixTimestamp;
+  created_by: string;
+  folder_id: string | null;
+  is_enabled: boolean | null;
+  name: string;
+  note_id: string;
+  org_id: string | null;
+  pinned_repo: string | null;
+  trigger: string;
+  updated_at: UnixTimestamp;
+  updated_by: string;
+}
+
+export interface SecretResponse {
+  access_type: AccessType;
+  created_at: UnixTimestamp;
+  created_by: string;
+  is_sensitive: boolean;
+  key: string;
+  note: string | null;
+  org_id: string | null;
+  secret_id: string;
+  secret_type: SecretType;
+  updated_at: UnixTimestamp;
+  updated_by: string;
+  /** VALUES ARE NEVER RETURNED — only metadata. */
+}
+
+export interface User {
+  user_id: string;
+  email: string;
+  name?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Attachments
+// ---------------------------------------------------------------------------
+
+export interface AttachmentResponse {
+  attachment_id: string;
+  name: string;
+  url: string;
+}
+
+// ---------------------------------------------------------------------------
+// Consumption
+// ---------------------------------------------------------------------------
+
+export interface DailyConsumptionResponse {
+  acus: AcuCount;
+  acus_by_product: {
+    devin: AcuCount;
+    cascade: AcuCount;
+    terminal: AcuCount;
+  };
+  date: string; // YYYY-MM-DD
+}
+
+export interface ConsumptionCycle {
+  /** Cycle start timestamp. */
+  start: UnixTimestamp;
+  end: UnixTimestamp;
+  acus: AcuCount;
+  /** Org the cycle belongs to. */
+  org_id?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
+export interface ApiErrorDetail {
+  loc: string[];
+  msg: string;
+  type: string;
+}
+
+export interface ApiErrorResponse {
+  detail: ApiErrorDetail[] | string;
+}
+
+// ---------------------------------------------------------------------------
+// Endpoint path builders (kept here so types + paths travel together)
+// ---------------------------------------------------------------------------
+
+export const paths = {
+  sessions: (orgId: OrgId) => `/v3/organizations/${orgId}/sessions`,
+  session: (orgId: OrgId, devinId: DevinId) =>
+    `/v3/organizations/${orgId}/sessions/${devinId}`,
+  messages: (orgId: OrgId, devinId: DevinId) =>
+    `/v3/organizations/${orgId}/sessions/${devinId}/messages`,
+  archive: (orgId: OrgId, devinId: DevinId) =>
+    `/v3/organizations/${orgId}/sessions/${devinId}/archive`,
+  tags: (orgId: OrgId, devinId: DevinId) =>
+    `/v3/organizations/${orgId}/sessions/${devinId}/tags`,
+  insightsGenerate: (orgId: OrgId, devinId: DevinId) =>
+    `/v3/organizations/${orgId}/sessions/${devinId}/insights/generate`,
+  insights: (orgId: OrgId, devinId: DevinId) =>
+    `/v3/organizations/${orgId}/sessions/${devinId}/insights`,
+  playbooks: (orgId: OrgId) => `/v3/organizations/${orgId}/playbooks`,
+  knowledge: (orgId: OrgId) => `/v3/organizations/${orgId}/knowledge/notes`,
+  secrets: (orgId: OrgId) => `/v3/organizations/${orgId}/secrets`,
+  /** Enterprise-level (requires ViewAccountMembership). */
+  membersEnterprise: (orgId: OrgId) =>
+    `/v3/enterprise/organizations/${orgId}/members/users`,
+  /** Beta org-level (requires ViewOrgMembership). */
+  membersOrgBeta: (orgId: OrgId) =>
+    `/v3beta1/organizations/${orgId}/members/users`,
+  attachments: (orgId: OrgId) => `/v3/organizations/${orgId}/attachments`,
+  attachment: (orgId: OrgId, uuid: string, name: string) =>
+    `/v3/organizations/${orgId}/attachments/${uuid}/${name}`,
+  consumptionDaily: (orgId: OrgId) =>
+    `/v3/organizations/${orgId}/consumption/daily`,
+  /** Enterprise-level (requires ManageBilling). */
+  consumptionCycles: () => `/v3/enterprise/consumption/cycles`,
+} as const;

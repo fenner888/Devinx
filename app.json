@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "DevinX",
+    "slug": "devinx",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "devinx",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fenner888.devinx",
+      "infoPlist": {
+        "NSFileProtection": "NSFileProtectionComplete"
+      }
+    },
+    "android": {
+      "package": "com.fenner888.devinx",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#141414"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-font",
+      [
+        "@sentry/react-native",
+        {
+          "organization": "devinx",
+          "project": "devinx-mobile",
+          "setCommits": false,
+          "uploadNativeSymbols": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "newArchEnabled": true
+          },
+          "android": {
+            "newArchEnabled": true
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "tsconfigPaths": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": ""
+      },
+      "router": {
+        "origin": "devinx://"
+      }
+    },
+    "updates": {
+      "url": ""
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
+  }
+}

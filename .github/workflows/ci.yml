@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.4'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test -- --ci --reporters=default
+
+      - name: Build (typecheck gate)
+        run: npm run build
+
+      - name: npm audit (fail on high/critical)
+        run: npm audit --audit-level=high
+        continue-on-error: false
+
+      - name: Key-leak grep gate (§10.1)
+        run: |
+          # No real cog_ keys (cog_ followed by 8+ alphanumerics) anywhere in src.
+          # sentry.ts is allowlisted (it contains the scrubber regex, not a key).
+          if rg -n 'cog_[A-Za-z0-9]{8,}' src/ --glob '!src/lib/sentry.ts' ; then
+            echo "::error::Potential real API key found in src/"
+            exit 1
+          fi
+          # No key variable names outside /src/auth (with documented allowlist).
+          if rg -n '\b(apiKey|api_key|apiSecret|api_secret|password|passwd)\b\s*[=:(]' \
+              src/ --glob '!src/auth/**' --glob '!src/lib/branding.ts' \
+              --glob '!src/lib/sentry.ts' --glob '!src/api/devin/schemas.ts' \
+              --glob '!src/api/devin/types.ts' --glob '!src/store/preferences.ts' ; then
+            echo "::error::Secret-adjacent variable outside /src/auth"
+            exit 1
+          fi
+          echo "Key-leak gate passed."
