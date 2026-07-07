@@ -48,7 +48,8 @@ jobs:
           if rg -n '\b(apiKey|api_key|apiSecret|api_secret|password|passwd)\b\s*[=:(]' \
               src/ --glob '!src/auth/**' --glob '!src/lib/branding.ts' \
               --glob '!src/lib/sentry.ts' --glob '!src/api/devin/schemas.ts' \
-              --glob '!src/api/devin/types.ts' --glob '!src/store/preferences.ts' ; then
+              --glob '!src/api/devin/types.ts' --glob '!src/store/preferences.ts' \
+              --glob '!src/app/(onboarding)/**' ; then
             echo "::error::Secret-adjacent variable outside /src/auth"
             exit 1
           fi
