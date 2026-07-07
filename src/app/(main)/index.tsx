@@ -47,13 +47,6 @@ import type { DevinMode } from '@api/devin/types';
 
 type ContextAction = 'open' | 'copy_link' | 'archive' | 'terminate';
 
-const SUGGESTION_CHIPS = [
-  { label: 'Build a feature', prompt: 'Build a new feature: ' },
-  { label: 'Fix a bug', prompt: 'Fix this bug: ' },
-  { label: 'Review code', prompt: 'Review this code and suggest improvements: ' },
-  { label: 'Write tests', prompt: 'Write tests for: ' },
-];
-
 export default function MainScreen() {
   const router = useRouter();
   const { data, isLoading, error, refetch, isRefetching } = useSessions('board');
@@ -143,11 +136,6 @@ export default function MainScreen() {
     );
   }
 
-  function applySuggestion(suggestionPrompt: string) {
-    hapticLight();
-    setPrompt(suggestionPrompt);
-  }
-
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
       {/* Top bar */}
@@ -200,124 +188,122 @@ export default function MainScreen() {
       >
         <ScrollView
           className="flex-1"
-          contentContainerClassName="flex-1 items-center justify-center px-6 py-8"
+          contentContainerClassName="flex-1 justify-center px-4 py-8"
           keyboardShouldPersistTaps="handled"
         >
-          {/* Avatar with glow */}
-          <View className="relative mb-5 items-center">
-            <View className="absolute w-20 h-20 rounded-card opacity-30 bg-brand" />
-            <View className="w-20 h-20 rounded-card bg-brand items-center justify-center relative">
-              <Text className="text-text-always-white text-text17 font-mono">{'D'}</Text>
+          {/* Devin wordmark row */}
+          <View className="flex-row items-center justify-between mb-3 px-1">
+            <View className="flex-row items-center">
+              <Text className="text-text-hi text-text16 mr-2">{'\u2042'}</Text>
+              <Text className="text-text-hi text-text16 font-medium">Devin</Text>
+            </View>
+            <View className="flex-row bg-tint-secondary rounded-chip p-0.5">
+              <View className="bg-surface2 rounded-chip px-3 py-1">
+                <Text className="text-text-hi text-text12 font-medium">Agent</Text>
+              </View>
             </View>
           </View>
 
-          {/* Title */}
-          <Text className="text-text-hi text-text17 mb-2">Start a new session</Text>
-          <Text className="text-text-mid text-text13 text-center mb-6">
-            Describe what you want Devin to do. It'll work in the cloud and you can steer it here.
-          </Text>
-
-          {/* Prompt input */}
-          <View className="w-full max-w-sm mb-3">
-            <View className="bg-surface1 rounded-input border border-border-subtle px-4 py-3 min-h-[80px]">
-              <TextInput
-                className="text-text-hi text-text14"
-                value={prompt}
-                onChangeText={setPrompt}
-                placeholder="Ask Devin to build, fix, review, or research…"
-                placeholderTextColor="#FFFFFF66"
-                multiline
-                autoCapitalize="sentences"
-                autoCorrect
-                accessibilityLabel="Session prompt"
-                accessibilityHint="Describe what you want Devin to do"
-              />
-            </View>
-          </View>
-
-          {/* Option chips */}
-          <View className="flex-row flex-wrap gap-2 mb-4 w-full max-w-sm">
-            {/* Playbook picker */}
-            <Pressable
-              className={`flex-row items-center rounded-chip px-pillX py-pillY ${selectedPlaybook ? 'bg-tint-blue' : 'bg-tint-secondary'}`}
-              onPress={() => setShowPlaybookPicker(true)}
-            >
-              <Text className={`text-text13 ${selectedPlaybook ? 'text-brand' : 'text-text-mid'}`}>
-                {selectedPlaybook
-                  ? playbooks?.find((p) => p.playbook_id === selectedPlaybook)?.title ?? 'Playbook'
-                  : 'Playbook'}
-              </Text>
-              <Text className={`text-text13 ml-1 ${selectedPlaybook ? 'text-brand' : 'text-text-mid'}`}>{'\u25BE'}</Text>
-            </Pressable>
-
-            {/* Mode picker */}
-            <Pressable
-              className={`flex-row items-center rounded-chip px-pillX py-pillY ${mode !== 'normal' ? 'bg-tint-blue' : 'bg-tint-secondary'}`}
-              onPress={() => setShowModePicker(true)}
-            >
-              <Text className={`text-text13 ${mode !== 'normal' ? 'text-brand' : 'text-text-mid'}`}>
-                {mode === 'fast' ? 'Fast' : 'Normal'}
-              </Text>
-              <Text className={`text-text13 ml-1 ${mode !== 'normal' ? 'text-brand' : 'text-text-mid'}`}>{'\u25BE'}</Text>
-            </Pressable>
-          </View>
-
-          {/* Send button */}
-          <Pressable
-            className={`rounded-button px-buttonPrimaryX py-buttonPrimaryY w-full max-w-sm items-center ${prompt.trim() ? 'bg-brand' : 'bg-tint-secondary'}`}
-            onPress={handleSend}
-            disabled={!prompt.trim() || createSession.isPending}
-            accessibilityRole="button"
-            accessibilityLabel="Start session"
-          >
-            {createSession.isPending ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text className={`text-text14 font-medium ${prompt.trim() ? 'text-text-always-white' : 'text-text-mid'}`}>
-                Start session {'\u2192'}
-              </Text>
-            )}
-          </Pressable>
-
-          {/* Suggestion chips */}
-          <View className="flex-row flex-wrap gap-2 mt-6 justify-center w-full max-w-sm">
-            {SUGGESTION_CHIPS.map((chip) => (
-              <Pressable
-                key={chip.label}
-                className="bg-tint-secondary rounded-chip px-pillX py-pillY"
-                onPress={() => applySuggestion(chip.prompt)}
-              >
-                <Text className="text-text-mid text-text13">{chip.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {/* Recent sessions quick access */}
-          {recentSessions.length > 0 && (
-            <View className="mt-8 w-full max-w-sm">
-              <Text className="text-text-low text-text12 font-medium uppercase tracking-wider mb-3">
-                Recent
-              </Text>
-              {recentSessions.map((session) => (
+          {/* Composer card */}
+          <View className="bg-surface1 rounded-card border border-border-subtle mb-6">
+            <TextInput
+              className="text-text-hi text-text14 px-4 pt-4 pb-2 min-h-[72px]"
+              value={prompt}
+              onChangeText={setPrompt}
+              placeholder="Ask Devin to build features, fix bugs, or work on your code"
+              placeholderTextColor="#FFFFFF66"
+              multiline
+              autoCapitalize="sentences"
+              autoCorrect
+              textAlignVertical="top"
+              accessibilityLabel="Session prompt"
+              accessibilityHint="Describe what you want Devin to do"
+            />
+            {/* Composer bottom row */}
+            <View className="flex-row items-center justify-between px-3 pb-3">
+              <View className="flex-row items-center gap-1">
+                {/* + opens full compose */}
                 <Pressable
-                  key={session.session_id}
-                  className="flex-row items-center bg-surface1 rounded-card px-4 py-3 mb-2"
-                  onPress={() => router.push(`/(main)/session/${session.session_id}`)}
+                  className="w-8 h-8 rounded-button items-center justify-center"
+                  onPress={() => router.push('/(main)/compose')}
+                  accessibilityRole="button"
+                  accessibilityLabel="More options"
+                  accessibilityHint="Open full composer with title, tags, knowledge, and attachments"
                 >
-                  <View className={`w-2 h-2 rounded-full mr-3 ${statusDotClass(deriveStatusKey(session))}`} />
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-text-hi text-text14" numberOfLines={1}>
+                  <Text className="text-text-mid text-text16">{'+'}</Text>
+                </Pressable>
+                {/* Playbook picker */}
+                <Pressable
+                  className="flex-row items-center rounded-button px-2 py-1.5"
+                  onPress={() => setShowPlaybookPicker(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select playbook"
+                >
+                  <Text className={`text-text13 ${selectedPlaybook ? 'text-brand' : 'text-text-mid'}`}>
+                    {'\u2933'} {selectedPlaybook
+                      ? (playbooks?.find((p) => p.playbook_id === selectedPlaybook)?.title ?? 'Playbook')
+                      : ''}
+                  </Text>
+                </Pressable>
+                {/* Mode picker */}
+                <Pressable
+                  className="flex-row items-center rounded-button px-2 py-1.5"
+                  onPress={() => setShowModePicker(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Execution mode"
+                >
+                  <Text className="text-text-mid text-text13">
+                    {mode === 'fast' ? 'Fast' : 'Normal'}
+                  </Text>
+                </Pressable>
+              </View>
+              {/* Circular send button */}
+              <Pressable
+                className={`w-8 h-8 rounded-chip items-center justify-center ${prompt.trim() ? 'bg-brand' : 'bg-tint-secondary'}`}
+                onPress={handleSend}
+                disabled={!prompt.trim() || createSession.isPending}
+                accessibilityRole="button"
+                accessibilityLabel="Start session"
+              >
+                {createSession.isPending ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text className={`text-text14 ${prompt.trim() ? 'text-text-always-white' : 'text-text-low'}`}>
+                    {'\u2191'}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Recent sessions — compact Devin-desktop style */}
+          {recentSessions.length > 0 && (
+            <View>
+              <View className="flex-row items-center justify-between mb-2 px-1">
+                <Text className="text-text-mid text-text13">Recent sessions</Text>
+                <Pressable onPress={() => setDrawerOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text className="text-link text-text13">View all</Text>
+                </Pressable>
+              </View>
+              <View className="bg-surface1 rounded-card border border-border-subtle">
+                {recentSessions.map((session, i) => (
+                  <Pressable
+                    key={session.session_id}
+                    className={`flex-row items-center px-4 py-3 ${i < recentSessions.length - 1 ? 'border-b border-border-subtle' : ''}`}
+                    onPress={() => router.push(`/(main)/session/${session.session_id}`)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${session.title || 'Untitled session'}, ${statusLabel(session)}`}
+                  >
+                    <View className={`w-1.5 h-1.5 rounded-full mr-3 ${statusDotClass(deriveStatusKey(session))}`} />
+                    <Text className="text-text-hi text-text13 flex-1" numberOfLines={1}>
                       {session.title || 'Untitled session'}
                     </Text>
-                    <Text className={`text-text13 ${statusColorClass(deriveStatusKey(session))}`}>
-                      {statusLabel(session)} · {relativeTime(session.updated_at)}
+                    <Text className="text-text-low text-text12 ml-2">
+                      {relativeTime(session.updated_at)}
                     </Text>
-                  </View>
-                </Pressable>
-              ))}
-              <Pressable className="mt-2 py-2" onPress={() => setDrawerOpen(true)}>
-                <Text className="text-brand text-text13 text-center">View all sessions</Text>
-              </Pressable>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           )}
         </ScrollView>
