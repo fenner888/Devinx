@@ -17,8 +17,8 @@ jobs:
           node-version: '20.19.4'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
+      - name: Install dependencies (lockfile-enforced, spec §10.8)
+        run: npm ci --legacy-peer-deps
 
       - name: Lint
         run: npm run lint
@@ -38,19 +38,37 @@ jobs:
 
       - name: Key-leak grep gate (§10.1)
         run: |
-          # No real cog_ keys (cog_ followed by 8+ alphanumerics) anywhere in src.
-          # sentry.ts is allowlisted (it contains the scrubber regex, not a key).
-          if rg -n 'cog_[A-Za-z0-9]{8,}' src/ --glob '!src/lib/sentry.ts' ; then
-            echo "::error::Potential real API key found in src/"
-            exit 1
-          fi
+          # git grep exit codes: 0 = match (leak), 1 = clean, >=2 = scan error.
+          # Treat scan errors as failures — the gate must never fail open.
+          fail=0
+          scan() {
+            local desc="$1"; shift
+            local status=0
+            git grep -iEn "$@" || status=$?
+            if [ "$status" -eq 0 ]; then
+              echo "::error::$desc"
+              fail=1
+            elif [ "$status" -ge 2 ]; then
+              echo "::error::scan error (exit $status) while checking: $desc"
+              fail=1
+            fi
+          }
+
+          # No real cog_ keys (cog_ followed by 8+ alphanumerics) in ANY tracked
+          # file (src, tests, specs, config). Allowlisted: sentry.ts (scrubber
+          # regex) and two test files with deliberately fake cog_test fixtures.
+          scan "Potential real API key found in tracked files" \
+            'cog_[A-Za-z0-9]{8,}' -- '.' \
+            ':!src/lib/sentry.ts' \
+            ':!tests/auth/wipe.test.ts' \
+            ':!tests/lib/sentry-scrub.test.ts'
+
           # No key variable names outside /src/auth (with documented allowlist).
-          if rg -n '\b(apiKey|api_key|apiSecret|api_secret|password|passwd)\b\s*[=:(]' \
-              src/ --glob '!src/auth/**' --glob '!src/lib/branding.ts' \
-              --glob '!src/lib/sentry.ts' --glob '!src/api/devin/schemas.ts' \
-              --glob '!src/api/devin/types.ts' --glob '!src/store/preferences.ts' \
-              --glob '!src/app/(onboarding)/**' ; then
-            echo "::error::Secret-adjacent variable outside /src/auth"
-            exit 1
-          fi
+          scan "Secret-adjacent variable outside /src/auth" \
+            '\b(apiKey|api_key|apiSecret|api_secret|password|passwd)\b\s*[=:(]' -- 'src' \
+            ':!src/auth' ':!src/lib/branding.ts' ':!src/lib/sentry.ts' \
+            ':!src/api/devin/schemas.ts' ':!src/api/devin/types.ts' \
+            ':!src/store/preferences.ts' ':!src/app/(onboarding)'
+
+          if [ "$fail" -ne 0 ]; then exit 1; fi
           echo "Key-leak gate passed."

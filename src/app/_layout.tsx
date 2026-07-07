@@ -5,12 +5,15 @@
 
 import '../../global.css';
 import { useEffect } from 'react';
+import { AppState, Platform } from 'react-native';
 import { Stack, Redirect, useSegments, useRouter } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager, onlineManager } from '@tanstack/react-query';
+import NetInfo from '@react-native-community/netinfo';
 import { ThemeProvider, useTheme, loadThemePreference } from '@theme/index';
 import { initSentry } from '@lib/sentry';
+import { shouldRetryQuery } from '@api/devin/client';
 import { AuthProvider, useAuth } from '@auth/AuthContext';
 import { getPushToken, setupNotificationListener } from '@lib/notifications';
 import { ErrorBoundary } from '@components/ErrorBoundary';
@@ -18,13 +21,27 @@ import { ErrorBoundary } from '@components/ErrorBoundary';
 initSentry();
 loadThemePreference();
 
+// TanStack Query has no built-in focus/online detection on React Native —
+// without these, refetchOnWindowFocus/refetchOnReconnect are no-ops and
+// polling that stops in the background never restarts on foreground.
+onlineManager.setEventListener((setOnline) =>
+  NetInfo.addEventListener((state) => {
+    setOnline(state.isConnected !== false);
+  }),
+);
+if (Platform.OS !== 'web') {
+  AppState.addEventListener('change', (status) => {
+    focusManager.setFocused(status === 'active');
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: (failureCount, error) => {
-        if (error instanceof Error && /401|auth/i.test(error.message)) return false;
-        return failureCount < 3;
-      },
+      // The API client already retries transient failures internally —
+      // shouldRetryQuery adds at most ONE query-layer attempt and never
+      // retries deterministic failures (auth/permission/404/schema).
+      retry: shouldRetryQuery,
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30000),
       staleTime: 30_000,
       gcTime: 5 * 60_000,
@@ -34,7 +51,7 @@ const queryClient = new QueryClient({
 
 /** Initial route — declarative redirect based on auth state. */
 function InitialRoute() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -55,6 +72,10 @@ function InitialRoute() {
 
   const inOnboarding = segments[0] === '(onboarding)';
 
+  // Wait for the Keychain check before redirecting — otherwise every
+  // authenticated cold start flashes the onboarding screen.
+  if (isLoading) return null;
+
   if (!isAuthenticated && !inOnboarding) {
     return <Redirect href="/(onboarding)" />;
   }
@@ -65,14 +86,14 @@ function InitialRoute() {
 }
 
 function ThemedStack() {
-  const { name } = useTheme();
+  const { name, tokens } = useTheme();
   return (
     <>
       <StatusBar style={name === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: name === 'dark' ? '#141414' : '#FCFCFC' },
+          contentStyle: { backgroundColor: tokens.surface0.hex },
         }}
       >
         <Stack.Screen name="(onboarding)" />

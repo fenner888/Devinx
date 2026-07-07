@@ -1,16 +1,21 @@
 /**
- * Settings screen — theme toggle, auth status, about, disconnect.
+ * Settings screen — grouped card sections with icon tiles, matching the
+ * Devin settings design (specs/reference-ui/04-settings.png).
+ * Theme toggle, auth status, usage link, about, disconnect.
  */
-import { View, Text, Pressable, Alert, ScrollView, Linking } from 'react-native';
+import { View, Text, Pressable, ScrollView, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@auth/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { purgeCache } from '@cache/index';
 import { branding } from '@lib/branding';
+import { confirmAction } from '@lib/confirm';
+import { useAppPreferences, type PollingMode } from '@store/preferences';
 import {
   setThemePreference,
-  getThemePreference,
+  useThemePreference,
   useTheme,
   type ThemePreference,
 } from '@theme/index';
@@ -19,31 +24,29 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { disconnect, provider } = useAuth();
   const queryClient = useQueryClient();
-  const { name } = useTheme();
-  const currentPref = getThemePreference();
+  const { name, tokens } = useTheme();
+  const currentPref = useThemePreference();
+  const pollingMode = useAppPreferences((s) => s.pollingMode);
+  const setPollingMode = useAppPreferences((s) => s.setPollingMode);
+  const hapticsEnabled = useAppPreferences((s) => s.hapticsEnabled);
+  const setHaptics = useAppPreferences((s) => s.setHaptics);
 
-  async function handleDisconnect() {
-    Alert.alert(
-      'Disconnect?',
-      'This wipes your API key, org ID, and all cached session data from this device. Your Devin sessions are not affected.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Disconnect',
-          style: 'destructive',
-          onPress: async () => {
-            await disconnect();
-            await purgeCache();
-            queryClient.clear();
-            router.replace('/(onboarding)');
-          },
-        },
-      ],
+  function handleDisconnect() {
+    confirmAction(
+      {
+        title: 'Disconnect?',
+        message:
+          'This wipes your API key, org ID, and all cached session data from this device. Your Devin sessions are not affected.',
+        confirmLabel: 'Disconnect',
+        destructive: true,
+      },
+      async () => {
+        await disconnect();
+        await purgeCache();
+        queryClient.clear();
+        router.replace('/(onboarding)');
+      },
     );
-  }
-
-  function handleThemeChange(pref: ThemePreference) {
-    setThemePreference(pref);
   }
 
   const themeOptions: { key: ThemePreference; label: string }[] = [
@@ -54,22 +57,28 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
-      <View className="flex-row items-center px-5 py-3 border-b border-border-subtle">
-        <Pressable onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text className="text-brand text-text14 mr-3">{'\u2190'}</Text>
+      <View className="flex-row items-center px-4 py-3 border-b border-border-subtle">
+        <Pressable
+          className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center mr-3"
+          onPress={() => router.back()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={18} color={tokens.textMid.hex} />
         </Pressable>
         <Text className="text-text-hi text-text17">Settings</Text>
       </View>
 
-      <ScrollView className="flex-1 px-5 py-4">
-        {/* Theme */}
+      <ScrollView className="flex-1 px-4 py-4">
+        {/* Appearance */}
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">Appearance</Text>
         <View className="flex-row bg-tint-secondary rounded-button p-1 mb-6">
           {themeOptions.map(({ key, label }) => (
             <Pressable
               key={key}
               className={`flex-1 rounded-button py-2 ${currentPref === key ? 'bg-surface2' : ''}`}
-              onPress={() => handleThemeChange(key)}
+              onPress={() => setThemePreference(key)}
             >
               <Text className={`text-center text-text14 ${currentPref === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
                 {label}
@@ -78,29 +87,84 @@ export default function SettingsScreen() {
           ))}
         </View>
 
-        {/* Connection */}
-        <Text className="text-text-low text-text12 font-medium uppercase mb-2">Connection</Text>
-        <View className="bg-surface1 rounded-card px-4 py-3 mb-6">
-          <Text className="text-text-mid text-text13 mb-1">Connected as</Text>
-          <Text className="text-text-hi text-text14">
-            {provider?.kind === 'pat' ? 'Personal access token' : 'Service user key'}
-          </Text>
-          <Text className="text-text-low text-text12 mt-1">Active theme: {name}</Text>
+        {/* Behavior */}
+        <Text className="text-text-low text-text12 font-medium uppercase mb-2">Behavior</Text>
+        <View className="bg-surface1 rounded-2xl border border-border-subtle overflow-hidden mb-6">
+          <View className="px-4 py-3 border-b border-border-subtle">
+            <Text className="text-text-hi text-text14 mb-2">Polling</Text>
+            <View className="flex-row bg-tint-secondary rounded-button p-1">
+              {(
+                [
+                  { key: 'battery_saver', label: 'Battery saver' },
+                  { key: 'balanced', label: 'Balanced' },
+                  { key: 'fast', label: 'Fast' },
+                ] as { key: PollingMode; label: string }[]
+              ).map(({ key, label }) => (
+                <Pressable
+                  key={key}
+                  className={`flex-1 rounded-button py-2 ${pollingMode === key ? 'bg-surface2' : ''}`}
+                  onPress={() => setPollingMode(key)}
+                >
+                  <Text className={`text-center text-text13 ${pollingMode === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text className="text-text-low text-text12 mt-2">
+              How often the app refreshes sessions while open.
+            </Text>
+          </View>
+          <Pressable
+            className="flex-row items-center px-4 py-3"
+            onPress={() => setHaptics(!hapticsEnabled)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: hapticsEnabled }}
+            accessibilityLabel="Haptic feedback"
+          >
+            <View className="flex-1">
+              <Text className="text-text-hi text-text14">Haptic feedback</Text>
+              <Text className="text-text-low text-text12 mt-0.5">Vibrate on taps and status changes.</Text>
+            </View>
+            <View className={`w-12 h-7 rounded-chip p-0.5 ${hapticsEnabled ? 'bg-brand' : 'bg-tint-primary'}`}>
+              <View className={`w-6 h-6 rounded-chip bg-surface2 ${hapticsEnabled ? 'ml-auto' : ''}`} />
+            </View>
+          </Pressable>
         </View>
 
-        {/* Usage link */}
-        <Text className="text-text-low text-text12 font-medium uppercase mb-2">Usage</Text>
-        <Pressable
-          className="bg-surface1 rounded-card px-4 py-3 mb-6 flex-row items-center justify-between"
-          onPress={() => router.push('/(main)/usage')}
-        >
-          <Text className="text-text-hi text-text14">View ACU consumption</Text>
-          <Text className="text-text-mid text-text14">{'\u203A'}</Text>
-        </Pressable>
+        {/* Account */}
+        <Text className="text-text-low text-text12 font-medium uppercase mb-2">Account</Text>
+        <View className="bg-surface1 rounded-2xl border border-border-subtle overflow-hidden mb-6">
+          <View className="flex-row items-center px-4 py-3 border-b border-border-subtle">
+            <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
+              <Ionicons name="key-outline" size={15} color={tokens.brandText.hex} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-text-hi text-text14">
+                {provider?.kind === 'pat' ? 'Personal access token' : 'Service user key'}
+              </Text>
+              <Text className="text-text-low text-text12 mt-0.5">
+                Stored in the device Keychain · Active theme: {name}
+              </Text>
+            </View>
+          </View>
+          <Pressable
+            className="flex-row items-center px-4 py-3"
+            onPress={() => router.push('/(main)/usage')}
+            accessibilityRole="button"
+            accessibilityLabel="View ACU consumption"
+          >
+            <View className="w-8 h-8 rounded-button bg-tint-green items-center justify-center mr-3">
+              <Ionicons name="speedometer-outline" size={15} color={tokens.finished.hex} />
+            </View>
+            <Text className="text-text-hi text-text14 flex-1">Usage & limits</Text>
+            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+          </Pressable>
+        </View>
 
         {/* About */}
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">About</Text>
-        <View className="bg-surface1 rounded-card px-4 py-3 mb-6">
+        <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-3 mb-6">
           <Text className="text-text-hi text-text14 mb-1">{branding.name}</Text>
           <Text className="text-text-mid text-text13 mb-3">{branding.subtitle}</Text>
           <Text className="text-text-low text-text12 leading-4 mb-3">{branding.disclaimer}</Text>
@@ -111,10 +175,13 @@ export default function SettingsScreen() {
 
         {/* Disconnect */}
         <Pressable
-          className="bg-destructive rounded-button px-buttonPrimaryX py-buttonPrimaryY items-center mb-8"
+          className="flex-row items-center justify-center bg-destructive rounded-button px-buttonPrimaryX py-buttonPrimaryY mb-8"
           onPress={handleDisconnect}
+          accessibilityRole="button"
+          accessibilityLabel="Disconnect and wipe data"
         >
-          <Text className="text-text-always-white text-text14 font-medium">
+          <Ionicons name="log-out-outline" size={16} color={tokens.textAlwaysWhite.hex} />
+          <Text className="text-text-always-white text-text14 font-medium ml-2">
             Disconnect & wipe data
           </Text>
         </Pressable>

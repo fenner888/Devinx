@@ -3,7 +3,7 @@
  * Status derivation, sorting, sectioning, formatting.
  */
 
-import type { SessionResponse } from '@api/devin/types';
+import type { SessionResponse, DevinMode } from '@api/devin/types';
 import { statusLabels, type StatusLabelKey } from '@theme/tokens';
 
 /** Derive the status label key from a session (mirrors web app state machine). */
@@ -155,4 +155,20 @@ export function collectTags(sessions: SessionResponse[]): { tag: string; count: 
   return [...counts.entries()]
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Execution modes accepted by the v3 create-session API (`devin_mode`).
+ * Labels/descriptions shown in the composer mode pickers.
+ */
+export const MODE_OPTIONS: { key: DevinMode; label: string; description: string }[] = [
+  { key: 'normal', label: 'Normal', description: 'Default Agent mode — full capability' },
+  { key: 'fast', label: 'Fast', description: 'Quicker turnaround, lower cost' },
+  { key: 'lite', label: 'Lite', description: 'Lightweight — cheapest for simple tasks' },
+  { key: 'ultra', label: 'Ultra', description: 'Most capable — for complex work' },
+  { key: 'fusion', label: 'Fusion', description: 'Fusion mode' },
+];
+
+export function modeLabel(mode: DevinMode): string {
+  return MODE_OPTIONS.find((m) => m.key === mode)?.label ?? 'Normal';
 }

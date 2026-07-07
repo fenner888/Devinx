@@ -43,6 +43,16 @@ describe('deep-link validation (§10.9)', () => {
     expect(result.screen).toBeUndefined();
   });
 
+  it('strips query strings and fragments before validating', () => {
+    const id = 'devin-0a4d31d638894ec2b9d64338be35eb3b';
+    const withQuery = parseDeepLink(`devinx://session/${id}?src=push`);
+    expect(withQuery.valid).toBe(true);
+    expect(withQuery.sessionId).toBe(id);
+    const withFragment = parseDeepLink(`devinx://session/${id}#worklog`);
+    expect(withFragment.valid).toBe(true);
+    expect(withFragment.sessionId).toBe(id);
+  });
+
   it('isValidSessionId validates standalone IDs', () => {
     expect(isValidSessionId('devin-0a4d31d638894ec2b9d64338be35eb3b')).toBe(true);
     expect(isValidSessionId('devin-short')).toBe(false);

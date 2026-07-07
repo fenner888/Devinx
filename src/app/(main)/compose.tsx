@@ -19,9 +19,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { useCreateSession, usePlaybooks, useKnowledge, useSecrets, useUploadAttachment } from '@api/devin/queries';
+import { MODE_OPTIONS } from '@lib/session-utils';
 import type { DevinMode } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 
@@ -182,7 +184,7 @@ export default function ComposeScreen() {
   if (!loaded) {
     return (
       <SafeAreaView className="flex-1 bg-surface0 items-center justify-center" edges={['top']}>
-        <ActivityIndicator size="large" color="#4489FF" />
+        <ActivityIndicator size="large" color={tokens.brand.hex} />
       </SafeAreaView>
     );
   }
@@ -199,11 +201,16 @@ export default function ComposeScreen() {
       >
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 py-3 border-b border-border-subtle">
-          <Pressable onPress={() => router.back()}>
-            <Text className="text-brand text-text14">{'\u2190 Cancel'}</Text>
+          <Pressable
+            className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center"
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+          >
+            <Ionicons name="close" size={17} color={tokens.textMid.hex} />
           </Pressable>
           <Text className="text-text-hi text-text17">New Session</Text>
-          <View className="w-16" />
+          <View className="w-9" />
         </View>
 
         <ScrollView className="flex-1 px-4 py-4" keyboardShouldPersistTaps="handled">
@@ -240,19 +247,22 @@ export default function ComposeScreen() {
 
           {/* Mode toggle */}
           <Text className="text-text-low text-text12 font-medium uppercase mb-1 mt-4">Mode</Text>
-          <View className="flex-row bg-tint-secondary rounded-button p-1 mb-4">
-            {(['normal', 'fast'] as const).map((m) => (
+          <View className="flex-row bg-tint-secondary rounded-button p-1 mb-1">
+            {MODE_OPTIONS.map(({ key, label }) => (
               <Pressable
-                key={m}
-                className={`flex-1 rounded-button py-2 ${draft.mode === m ? 'bg-surface2' : ''}`}
-                onPress={() => updateDraft({ mode: m })}
+                key={key}
+                className={`flex-1 rounded-button py-2 ${draft.mode === key ? 'bg-surface2' : ''}`}
+                onPress={() => updateDraft({ mode: key })}
               >
-                <Text className={`text-center text-text14 capitalize ${draft.mode === m ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
-                  {m}
+                <Text className={`text-center text-text13 ${draft.mode === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
+                  {label}
                 </Text>
               </Pressable>
             ))}
           </View>
+          <Text className="text-text-low text-text12 mb-4">
+            {MODE_OPTIONS.find((m) => m.key === draft.mode)?.description}
+          </Text>
 
           {/* Playbook picker */}
           <Pressable
@@ -265,7 +275,7 @@ export default function ComposeScreen() {
                 {selectedPlaybook?.title ?? 'None'}
               </Text>
             </View>
-            <Text className="text-text-mid text-text14">{'\u203A'}</Text>
+            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
           </Pressable>
 
           {/* Knowledge attachments */}
@@ -281,7 +291,7 @@ export default function ComposeScreen() {
                   : 'None'}
               </Text>
             </View>
-            <Text className="text-text-mid text-text14">{'\u203A'}</Text>
+            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
           </Pressable>
 
           {/* Secrets */}
@@ -297,7 +307,7 @@ export default function ComposeScreen() {
                   : 'None'}
               </Text>
             </View>
-            <Text className="text-text-mid text-text14">{'\u203A'}</Text>
+            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
           </Pressable>
 
           {/* Attachments */}
@@ -317,9 +327,9 @@ export default function ComposeScreen() {
               </Text>
             </View>
             {uploadAttachment.isPending ? (
-              <ActivityIndicator size="small" color="#4489FF" />
+              <ActivityIndicator size="small" color={tokens.brand.hex} />
             ) : (
-              <Text className="text-text-mid text-text14">{'\u203A'}</Text>
+              <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
             )}
           </Pressable>
           {attachments.length > 0 && (
@@ -331,7 +341,7 @@ export default function ComposeScreen() {
                   onPress={() => removeAttachment(a.url)}
                 >
                   <Text className="text-text-mid text-text12 mr-1" numberOfLines={1}>{a.name}</Text>
-                  <Text className="text-text-low text-text12">{'\u00D7'}</Text>
+                  <Ionicons name="close" size={11} color={tokens.textLow.hex} />
                 </Pressable>
               ))}
             </View>
@@ -361,7 +371,7 @@ export default function ComposeScreen() {
                   onPress={() => removeTag(tag)}
                 >
                   <Text className="text-text-mid text-text12 mr-1">{tag}</Text>
-                  <Text className="text-text-low text-text12">{'\u00D7'}</Text>
+                  <Ionicons name="close" size={11} color={tokens.textLow.hex} />
                 </Pressable>
               ))}
             </View>
@@ -418,7 +428,7 @@ export default function ComposeScreen() {
             onPress={handleSubmit}
           >
             {createSession.isPending ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
             ) : (
               <Text className={`text-text14 font-medium ${canSubmit ? 'text-text-always-white' : 'text-text-low'}`}>
                 Start Session
@@ -439,7 +449,7 @@ export default function ComposeScreen() {
               </Pressable>
             </View>
             {playbooksLoading ? (
-              <ActivityIndicator size="small" color="#4489FF" />
+              <ActivityIndicator size="small" color={tokens.brand.hex} />
             ) : playbooks && playbooks.length > 0 ? (
               <ScrollView>
                 <Pressable

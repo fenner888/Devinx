@@ -13,7 +13,7 @@ Phase 0 (Foundation & Ground Truth) complete. See `/specs/000-build-spec.md` for
 - NativeWind (Tailwind for RN) wired to extracted Devin design tokens
 - TanStack Query (polling, cache, retry) + Zustand (UI state)
 - expo-secure-store (Keychain) + expo-sqlite (read cache)
-- Sentry (secret-scrubbing beforeSend) + PostHog (opt-in, events only)
+- Sentry (secret-scrubbing beforeSend)
 
 ## Getting started
 

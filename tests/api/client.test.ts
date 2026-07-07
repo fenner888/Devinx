@@ -4,7 +4,7 @@
  * Also verifies 5xx DOES retry, 429 sets cooldown, schema parsing works.
  */
 
-import { apiRequest, clearRateLimit } from '../../src/api/devin/client';
+import { apiRequest, clearRateLimit, isRateLimited } from '../../src/api/devin/client';
 import { ApiSchemaError } from '../../src/auth/AuthProvider';
 import { z } from 'zod';
 import type { AuthProvider } from '../../src/auth/AuthProvider';
@@ -35,13 +35,25 @@ const okResponse = (data: unknown) => ({
   ok: true,
   status: 200,
   headers: new Headers(),
+  text: async () => JSON.stringify(data),
   json: async () => data,
+});
+
+const emptyResponse = (status = 204) => ({
+  ok: true,
+  status,
+  headers: new Headers(),
+  text: async () => '',
+  json: async () => {
+    throw new SyntaxError('Unexpected end of JSON input');
+  },
 });
 
 const errResponse = (status: number, headers?: Headers) => ({
   ok: false,
   status,
   headers: headers ?? new Headers(),
+  text: async () => JSON.stringify({ detail: 'error' }),
   json: async () => ({ detail: 'error' }),
 });
 
@@ -91,5 +103,34 @@ describe('client error handling (§8.4)', () => {
     mockFetch.mockResolvedValue(okResponse({ wrong_field: true }));
     const schema = z.object({ tags: z.array(z.string()) }).passthrough();
     await expect(apiRequest(mockAuth, '/test', { schema })).rejects.toThrow(ApiSchemaError);
+  });
+
+  it('does NOT retry non-idempotent requests (POST) on 5xx', async () => {
+    mockFetch.mockResolvedValue(errResponse(503));
+    await expect(
+      apiRequest(mockAuth, '/test', { method: 'POST', body: { prompt: 'x' }, maxRetries: 3 }),
+    ).rejects.toThrow(/Server error/);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT retry POST on network error (may have succeeded server-side)', async () => {
+    mockFetch.mockRejectedValue(new Error('network request failed'));
+    await expect(
+      apiRequest(mockAuth, '/test', { method: 'POST', body: { prompt: 'x' }, maxRetries: 3 }),
+    ).rejects.toThrow(/Network error/);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a 204/empty body as success instead of a JSON error', async () => {
+    mockFetch.mockResolvedValue(emptyResponse());
+    await expect(apiRequest(mockAuth, '/test', { method: 'POST' })).resolves.toBeUndefined();
+  });
+
+  it('parses an HTTP-date Retry-After without producing a NaN cooldown', async () => {
+    const headers = new Headers();
+    headers.set('Retry-After', new Date(Date.now() + 30_000).toUTCString());
+    mockFetch.mockResolvedValue(errResponse(429, headers));
+    await expect(apiRequest(mockAuth, '/test', { maxRetries: 0 })).rejects.toThrow(/Rate limited/);
+    expect(isRateLimited()).toBe(true);
   });
 });

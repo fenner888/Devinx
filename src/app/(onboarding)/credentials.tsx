@@ -12,6 +12,7 @@ import { View, Text, TextInput, Pressable, Linking, ScrollView } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@auth/AuthContext';
+import { setPendingCredentials } from '@auth/pendingCredentials';
 import { branding } from '@lib/branding';
 import { useTheme } from '@theme/index';
 
@@ -40,11 +41,15 @@ export default function CredentialsScreen() {
       setError(`Org ID must start with ${branding.orgIdPrefix}`);
       return;
     }
-    // Pass credentials to the validate step via router params.
-    router.push({
-      pathname: '/(onboarding)/validate',
-      params: { mode, apiKey, orgId, attributionUserId },
+    // Hand credentials to the validate step in memory — never via router
+    // params (they serialize into the URL on web; spec §10.1).
+    setPendingCredentials({
+      kind: mode,
+      apiKey,
+      orgId,
+      attributionUserId: attributionUserId || undefined,
     });
+    router.push('/(onboarding)/validate');
   }
 
   return (

@@ -6,10 +6,22 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { AppState } from 'react-native';
 import { useAuth } from '@auth/AuthContext';
+import { shouldRetryQuery } from './client';
 import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment } from './endpoints';
 import { queryKeys } from './queryKeys';
-import { pollingPolicy, type ScreenContext } from '@lib/polling';
-import type { SessionCreateRequest, SessionResponse } from './types';
+import { pollingPolicy, scalePolling, type ScreenContext } from '@lib/polling';
+import { useAppPreferences } from '@store/preferences';
+import type { Cursor, SessionCreateRequest, SessionResponse } from './types';
+
+// Pagination caps — enough for any realistic board/timeline while bounding
+// worst-case request fan-out per refetch.
+const MAX_SESSION_PAGES = 5; // 500 sessions
+const MAX_MESSAGE_PAGES = 10; // 1000 messages
+
+/** Statuses in which a session can still produce updates. */
+function isActiveStatus(status: SessionResponse['status'] | undefined): boolean {
+  return status === 'running' || status === 'new' || status === 'claimed' || status === 'resuming';
+}
 
 export function useSessions(screen: ScreenContext = 'board') {
   const { provider, isAuthenticated } = useAuth();
@@ -18,8 +30,16 @@ export function useSessions(screen: ScreenContext = 'board') {
     queryKey: queryKeys.sessions,
     queryFn: async () => {
       if (!provider) throw new Error('Not authenticated');
-      const result = await listSessions(provider, { first: 100 });
-      return result.items;
+      // Follow pagination — a single page silently capped the board at 100.
+      const items: SessionResponse[] = [];
+      let cursor: Cursor | null = null;
+      for (let page = 0; page < MAX_SESSION_PAGES; page++) {
+        const result = await listSessions(provider, { first: 100, after: cursor });
+        items.push(...result.items);
+        if (!result.hasNextPage || !result.endCursor) break;
+        cursor = result.endCursor;
+      }
+      return items;
     },
     enabled: isAuthenticated && !!provider,
     placeholderData: keepPreviousData,
@@ -27,19 +47,17 @@ export function useSessions(screen: ScreenContext = 'board') {
     gcTime: 5 * 60_000,
     refetchInterval: (query) => {
       const data = query.state.data;
-      const anyRunning = data?.some((s) => s.status === 'running' || s.status === 'new' || s.status === 'claimed');
+      const anyRunning = data?.some((s) => isActiveStatus(s.status));
       const appState = AppState.currentState;
+      const mode = useAppPreferences.getState().pollingMode;
       if (anyRunning) {
-        return pollingPolicy('running', appState === 'active' ? 'active' : 'background', screen);
+        return pollingPolicy('running', appState === 'active' ? 'active' : 'background', screen, mode);
       }
-      return appState === 'active' ? 60_000 : false;
+      return appState === 'active' ? scalePolling(60_000, mode) : false;
     },
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
-      return failureCount < 3;
-    },
+    retry: shouldRetryQuery,
   });
 }
 
@@ -61,49 +79,56 @@ export function useSession(sessionId: string | undefined) {
       const data = query.state.data;
       if (!data) return 5_000;
       // Poll faster while session is active.
-      const isActive = data.status === 'running' || data.status === 'new' || data.status === 'claimed';
+      const isActive = isActiveStatus(data.status);
       const appState = AppState.currentState;
-      if (isActive) {
-        return pollingPolicy('running', appState === 'active' ? 'active' : 'background', 'session_detail');
+      if (isActive || data.status === 'suspended') {
+        return pollingPolicy(data.status, appState === 'active' ? 'active' : 'background', 'session_detail', useAppPreferences.getState().pollingMode);
       }
       // Session finished — stop polling.
       return false;
     },
     refetchOnWindowFocus: true,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
-      return failureCount < 3;
-    },
+    retry: shouldRetryQuery,
   });
 }
 
 export function useMessages(sessionId: string | undefined) {
   const { provider, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: sessionId ? queryKeys.messages(sessionId) : ['messages', 'none'],
     queryFn: async () => {
       if (!provider) throw new Error('Not authenticated');
       if (!sessionId) throw new Error('No session ID');
-      const result = await listMessages(provider, sessionId, { first: 100 });
-      return result.items;
+      // Follow pagination — long sessions have >100 messages, and the cursor
+      // is forward-only, so a single page would never show new messages.
+      const items = [];
+      let cursor: Cursor | null = null;
+      for (let page = 0; page < MAX_MESSAGE_PAGES; page++) {
+        const result = await listMessages(provider, sessionId, { first: 100, after: cursor });
+        items.push(...result.items);
+        if (!result.hasNextPage || !result.endCursor) break;
+        cursor = result.endCursor;
+      }
+      return items;
     },
     enabled: isAuthenticated && !!provider && !!sessionId,
     placeholderData: keepPreviousData,
     staleTime: 10_000,
     gcTime: 5 * 60_000,
     refetchInterval: () => {
-      const appState = AppState.currentState;
-      // Poll messages while session is likely active (we don't have session status here,
-      // but the session detail screen will invalidate this when the session finishes).
-      if (appState === 'active') return 5_000;
-      return false;
+      if (AppState.currentState !== 'active') return false;
+      // Read the session's cached status — finished/terminated sessions get
+      // no new messages, so polling them forever just burns battery and API.
+      const session = sessionId
+        ? queryClient.getQueryData<SessionResponse>(queryKeys.session(sessionId))
+        : undefined;
+      if (session && !isActiveStatus(session.status)) return false;
+      return scalePolling(5_000, useAppPreferences.getState().pollingMode);
     },
     refetchOnWindowFocus: true,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
-      return failureCount < 3;
-    },
+    retry: shouldRetryQuery,
   });
 }
 
@@ -137,10 +162,7 @@ export function usePlaybooks() {
     enabled: isAuthenticated && !!provider,
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
-      return failureCount < 3;
-    },
+    retry: shouldRetryQuery,
   });
 }
 
@@ -155,10 +177,7 @@ export function useKnowledge() {
     enabled: isAuthenticated && !!provider,
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
-      return failureCount < 3;
-    },
+    retry: shouldRetryQuery,
   });
 }
 
@@ -188,10 +207,7 @@ export function useDailyConsumption() {
     enabled: isAuthenticated && !!provider,
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
-      return failureCount < 3;
-    },
+    retry: shouldRetryQuery,
   });
 }
 
@@ -203,8 +219,9 @@ export function useArchiveSession() {
       if (!provider) throw new Error('Not authenticated');
       await archiveSession(provider, sessionId);
     },
-    onSuccess: () => {
+    onSuccess: (_data, sessionId) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
+      queryClient.invalidateQueries({ queryKey: queryKeys.session(sessionId) });
     },
   });
 }
@@ -217,8 +234,10 @@ export function useTerminateSession() {
       if (!provider) throw new Error('Not authenticated');
       await terminateSession(provider, sessionId);
     },
-    onSuccess: () => {
+    onSuccess: (_data, sessionId) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
+      queryClient.invalidateQueries({ queryKey: queryKeys.session(sessionId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.messages(sessionId) });
     },
   });
 }
@@ -234,10 +253,7 @@ export function useSecrets() {
     enabled: isAuthenticated && !!provider,
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
-      return failureCount < 3;
-    },
+    retry: shouldRetryQuery,
   });
 }
 
@@ -251,11 +267,7 @@ export function useInsights(sessionId: string | undefined) {
     },
     enabled: isAuthenticated && !!provider && !!sessionId,
     staleTime: 60_000,
-    retry: (failureCount, error) => {
-      // 404 means insights not generated yet — don't retry.
-      if (error instanceof Error && /404|not found|401|auth/i.test(error.message)) return false;
-      return failureCount < 2;
-    },
+    retry: shouldRetryQuery,
   });
 }
 

@@ -39,6 +39,13 @@ interface RequestOptions {
   maxRetries?: number;
   /** Skip auth (e.g. for the validate call which builds its own headers). */
   skipAuth?: boolean;
+  /**
+   * Whether transient failures (timeout/network/5xx/429) may be retried.
+   * Defaults to true for GET and false otherwise — a timed-out POST may have
+   * succeeded server-side, and retrying createSession/sendMessage would
+   * duplicate real sessions/messages (there is no idempotency key).
+   */
+  retryable?: boolean;
 }
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
@@ -61,8 +68,18 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Parse a Retry-After header: delta-seconds or HTTP-date. */
+function parseRetryAfterMs(retryAfter: string | null | undefined): number | undefined {
+  if (!retryAfter) return undefined;
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const dateMs = Date.parse(retryAfter);
+  if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
+  return undefined;
+}
+
 function classifyError(status: number, retryAfter?: string | null): ApiError {
-  const retryAfterMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : undefined;
+  const retryAfterMs = parseRetryAfterMs(retryAfter);
   switch (status) {
     case 401:
       return new ApiError('Authentication failed — key may be revoked or rotated', status, 'auth');
@@ -92,19 +109,38 @@ export function clearRateLimit(): void {
   rateLimitCooldownUntil = 0;
 }
 
+/**
+ * Shared TanStack Query retry predicate. The client already retries
+ * transient failures internally, so the query layer gets ONE extra attempt —
+ * and never for deterministic failures (auth, permission, 404, schema).
+ */
+export function shouldRetryQuery(failureCount: number, error: Error): boolean {
+  if (error instanceof ApiSchemaError) return false;
+  if (error instanceof ApiError) {
+    if (error.code === 'auth' || error.code === 'permission' || error.code === 'not_found' || error.code === 'schema') {
+      return false;
+    }
+    return failureCount < 1;
+  }
+  // Non-API errors (e.g. "Not authenticated" before a provider exists).
+  if (/401|auth/i.test(error.message)) return false;
+  return failureCount < 1;
+}
+
 export async function apiRequest<T = unknown>(
   auth: AuthProvider,
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
   const { method = 'GET', body, query, schema, maxRetries = MAX_RETRIES, skipAuth = false } = options;
+  const retryable = options.retryable ?? method === 'GET';
   const url = buildUrl(path, query);
 
   let lastError: ApiError | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    // Check rate-limit cooldown before each attempt.
-    if (isRateLimited() && attempt === 0) {
+    // Honor the global rate-limit cooldown before every attempt.
+    if (isRateLimited()) {
       const wait = rateLimitCooldownUntil - Date.now();
       if (wait > 0) await delay(wait);
     }
@@ -130,17 +166,16 @@ export async function apiRequest<T = unknown>(
         throw classifyError(401);
       }
 
-      // 429 — set cooldown, retry with backoff.
+      // 429 — set the global cooldown (spec §8.4), retry with backoff.
       if (res.status === 429) {
         const retryAfter = res.headers.get('Retry-After');
         const err = classifyError(429, retryAfter);
-        if (err.retryAfterMs) {
-          rateLimitCooldownUntil = Date.now() + err.retryAfterMs;
-        }
+        // Default 5s cooldown when the server sends no Retry-After; cap at 60s.
+        const cooldownMs = Math.min(err.retryAfterMs ?? 5_000, 60_000);
+        rateLimitCooldownUntil = Date.now() + cooldownMs;
         lastError = err;
-        if (attempt < maxRetries) {
-          const backoff = err.retryAfterMs ?? Math.min(1000 * 2 ** attempt, 60_000);
-          await delay(backoff + Math.floor(Math.random() * 500));
+        if (retryable && attempt < maxRetries) {
+          await delay(cooldownMs + Math.floor(Math.random() * 500));
           continue;
         }
         throw err;
@@ -149,7 +184,7 @@ export async function apiRequest<T = unknown>(
       // 5xx — retry with backoff.
       if (res.status >= 500) {
         lastError = classifyError(res.status);
-        if (attempt < maxRetries) {
+        if (retryable && attempt < maxRetries) {
           const backoff = Math.min(1000 * 2 ** attempt, 60_000);
           await delay(backoff + Math.floor(Math.random() * 500));
           continue;
@@ -162,8 +197,23 @@ export async function apiRequest<T = unknown>(
         throw classifyError(res.status);
       }
 
-      // Parse response.
-      const json = await res.json();
+      // Parse response. 204s and empty bodies are valid successes — treating
+      // them as JSON errors made successful sends/terminates report failure.
+      let json: unknown;
+      if (res.status === 204) {
+        json = undefined;
+      } else {
+        const text = await res.text();
+        if (text.length === 0) {
+          json = undefined;
+        } else {
+          try {
+            json = JSON.parse(text);
+          } catch {
+            throw new ApiError(`Invalid JSON in response from ${path}`, res.status, 'schema');
+          }
+        }
+      }
       if (schema) {
         const parsed = schema.safeParse(json);
         if (!parsed.success) {
@@ -184,7 +234,7 @@ export async function apiRequest<T = unknown>(
       const msg = e instanceof Error ? e.message : String(e);
       if (/timeout|abort|network|fetch/i.test(msg)) {
         lastError = new ApiError(`Network error: ${msg}`, 0, 'network');
-        if (attempt < maxRetries) {
+        if (retryable && attempt < maxRetries) {
           const backoff = Math.min(1000 * 2 ** attempt, 60_000);
           await delay(backoff + Math.floor(Math.random() * 500));
           continue;

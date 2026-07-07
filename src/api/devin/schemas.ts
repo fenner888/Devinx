@@ -75,7 +75,7 @@ export const sessionCategorySchema = z.enum([
   'unit_test_generation',
 ]);
 
-export const devinModeSchema = z.enum(['normal', 'fast']);
+export const devinModeSchema = z.enum(['normal', 'fast', 'lite', 'ultra', 'fusion']);
 export const sessionSizeSchema = z.enum(['xs', 's', 'm', 'l', 'xl']);
 export const insightSeveritySchema = z.enum(['low', 'medium', 'high', 'critical']);
 export const secretTypeSchema = z.enum(['cookie', 'key-value', 'totp']);
@@ -420,6 +420,18 @@ export const dailyConsumptionResponseSchema = z
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   })
   .passthrough();
+
+/**
+ * The daily-consumption endpoint returns a date-range of days — accept a bare
+ * array, a paginated `{items}` envelope, or a single object (defensively).
+ * Validating against the single-object schema alone rejected every real
+ * multi-day response and broke the Usage screen.
+ */
+export const dailyConsumptionListSchema = z.union([
+  z.array(dailyConsumptionResponseSchema),
+  z.object({ items: z.array(dailyConsumptionResponseSchema) }).passthrough(),
+  dailyConsumptionResponseSchema,
+]);
 
 export const consumptionCycleSchema = z
   .object({
