@@ -6,7 +6,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { AppState } from 'react-native';
 import { useAuth } from '@auth/AuthContext';
-import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge } from './endpoints';
+import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, archiveSession, terminateSession, getDailyConsumption } from './endpoints';
 import { queryKeys } from './queryKeys';
 import { pollingPolicy, type ScreenContext } from '@lib/polling';
 import type { SessionCreateRequest, SessionResponse } from './types';
@@ -170,6 +170,52 @@ export function useCreateSession() {
     mutationFn: async (body: SessionCreateRequest): Promise<SessionResponse> => {
       if (!provider) throw new Error('Not authenticated');
       return createSession(provider, body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
+    },
+  });
+}
+
+export function useDailyConsumption() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.consumption,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return getDailyConsumption(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (failureCount, error) => {
+      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export function useArchiveSession() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      await archiveSession(provider, sessionId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
+    },
+  });
+}
+
+export function useTerminateSession() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      await terminateSession(provider, sessionId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sessions });

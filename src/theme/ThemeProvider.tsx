@@ -6,12 +6,31 @@
 
 import { useEffect, useSyncExternalStore } from 'react';
 import { Appearance, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { themes, defaultTheme, type ThemeName, type ThemeTokens } from './tokens';
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
 let current: ThemeName = defaultTheme;
 let override: ThemeName | null = null;
+
+export type ThemePreference = 'system' | 'dark' | 'light';
+const THEME_PREF_KEY = '@devinx/theme-pref';
+let themePref: ThemePreference = 'system';
+
+/** Load saved theme preference on app start. */
+export async function loadThemePreference(): Promise<void> {
+  try {
+    const saved = await AsyncStorage.getItem(THEME_PREF_KEY);
+    if (saved === 'dark' || saved === 'light' || saved === 'system') {
+      themePref = saved;
+      if (saved !== 'system') {
+        override = saved;
+        emit();
+      }
+    }
+  } catch { /* ignore */ }
+}
 
 function emit() {
   for (const l of listeners) l();
@@ -35,6 +54,24 @@ const appearanceSubscription = Appearance.addChangeListener(({ colorScheme }) =>
 export function setThemeOverride(theme: ThemeName | null) {
   override = theme;
   emit();
+}
+
+/** Set and persist theme preference (system/dark/light). */
+export async function setThemePreference(pref: ThemePreference): Promise<void> {
+  themePref = pref;
+  try { await AsyncStorage.setItem(THEME_PREF_KEY, pref); } catch { /* ignore */ }
+  if (pref === 'system') {
+    override = null;
+    current = Appearance.getColorScheme() === 'light' ? 'light' : 'dark';
+  } else {
+    override = pref;
+  }
+  emit();
+}
+
+/** Get current theme preference. */
+export function getThemePreference(): ThemePreference {
+  return themePref;
 }
 
 export function useTheme(): { name: ThemeName; tokens: ThemeTokens } {

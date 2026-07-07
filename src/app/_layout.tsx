@@ -4,15 +4,18 @@
  */
 
 import '../../global.css';
-import { Stack, Redirect, useSegments } from 'expo-router';
+import { useEffect } from 'react';
+import { Stack, Redirect, useSegments, useRouter } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider, useTheme } from '@theme/index';
+import { ThemeProvider, useTheme, loadThemePreference } from '@theme/index';
 import { initSentry } from '@lib/sentry';
 import { AuthProvider, useAuth } from '@auth/AuthContext';
+import { getPushToken, setupNotificationListener } from '@lib/notifications';
 
 initSentry();
+loadThemePreference();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +35,23 @@ const queryClient = new QueryClient({
 function InitialRoute() {
   const { isAuthenticated } = useAuth();
   const segments = useSegments();
+  const router = useRouter();
+
+  // Register for push notifications when authenticated.
+  useEffect(() => {
+    if (isAuthenticated) {
+      getPushToken().catch(() => { /* ignore */ });
+    }
+  }, [isAuthenticated]);
+
+  // Listen for notification taps → navigate to session detail.
+  useEffect(() => {
+    const unsubscribe = setupNotificationListener((sessionId) => {
+      router.push(`/(main)/session/${sessionId}`);
+    });
+    return unsubscribe;
+  }, [router]);
+
   const inOnboarding = segments[0] === '(onboarding)';
 
   if (!isAuthenticated && !inOnboarding) {
