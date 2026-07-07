@@ -6,9 +6,10 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { AppState } from 'react-native';
 import { useAuth } from '@auth/AuthContext';
-import { listSessions, getSession, listMessages, sendMessage } from './endpoints';
+import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge } from './endpoints';
 import { queryKeys } from './queryKeys';
 import { pollingPolicy, type ScreenContext } from '@lib/polling';
+import type { SessionCreateRequest, SessionResponse } from './types';
 
 export function useSessions(screen: ScreenContext = 'board') {
   const { provider, isAuthenticated } = useAuth();
@@ -117,11 +118,61 @@ export function useSendMessage(sessionId: string | undefined) {
       await sendMessage(provider, sessionId, params.message, params.attachmentUrls);
     },
     onSuccess: () => {
-      // Invalidate messages so they refetch with the new message.
       if (sessionId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.messages(sessionId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.session(sessionId) });
       }
+    },
+  });
+}
+
+export function usePlaybooks() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.playbooks,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listPlaybooks(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (failureCount, error) => {
+      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export function useKnowledge() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.knowledge,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listKnowledge(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (failureCount, error) => {
+      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export function useCreateSession() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+
+  return useMutation({
+    mutationFn: async (body: SessionCreateRequest): Promise<SessionResponse> => {
+      if (!provider) throw new Error('Not authenticated');
+      return createSession(provider, body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
     },
   });
 }
