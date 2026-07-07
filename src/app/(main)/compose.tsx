@@ -23,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { useCreateSession, usePlaybooks, useKnowledge, useSecrets, useUploadAttachment } from '@api/devin/queries';
 import type { DevinMode } from '@api/devin/types';
+import { useTheme } from '@theme/index';
 
 const DRAFT_KEY = '@devinx/compose-draft';
 const MAX_PROMPT = 10000;
@@ -59,6 +60,7 @@ export default function ComposeScreen() {
   const { data: knowledge } = useKnowledge();
   const { data: secrets } = useSecrets();
   const uploadAttachment = useUploadAttachment();
+  const { tokens } = useTheme();
 
   const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -212,7 +214,7 @@ export default function ComposeScreen() {
             value={draft.title}
             onChangeText={(v) => updateDraft({ title: v.slice(0, MAX_TITLE) })}
             placeholder="Give your session a name…"
-            placeholderTextColor="#FFFFFF66"
+            placeholderTextColor={tokens.textLow.hex}
             maxLength={MAX_TITLE}
           />
 
@@ -225,7 +227,7 @@ export default function ComposeScreen() {
             value={draft.prompt}
             onChangeText={(v) => updateDraft({ prompt: v.slice(0, MAX_PROMPT) })}
             placeholder="Describe what you want Devin to do…"
-            placeholderTextColor="#FFFFFF66"
+            placeholderTextColor={tokens.textLow.hex}
             multiline
             textAlignVertical="top"
             maxLength={MAX_PROMPT}
@@ -343,7 +345,7 @@ export default function ComposeScreen() {
               value={tagInput}
               onChangeText={setTagInput}
               placeholder="Add a tag and press enter…"
-              placeholderTextColor="#FFFFFF66"
+              placeholderTextColor={tokens.textLow.hex}
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="done"
@@ -382,7 +384,7 @@ export default function ComposeScreen() {
                 value={draft.maxAcuLimit}
                 onChangeText={(v) => updateDraft({ maxAcuLimit: v.replace(/[^0-9.]/g, '') })}
                 placeholder="No limit"
-                placeholderTextColor="#FFFFFF66"
+                placeholderTextColor={tokens.textLow.hex}
                 keyboardType="decimal-pad"
               />
               <Text className="text-text-low text-text12 mb-4">

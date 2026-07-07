@@ -34,6 +34,7 @@ import {
   prNumber,
 } from '@lib/session-utils';
 import type { SessionMessage } from '@api/devin/types';
+import { useTheme } from '@theme/index';
 
 type Tab = 'timeline' | 'worklog' | 'changes' | 'insights';
 
@@ -51,6 +52,7 @@ export default function SessionDetailScreen() {
   const { data: messages } = useMessages(validId);
   const sendMessage = useSendMessage(validId);
   const updateTags = useUpdateTags(validId);
+  const { tokens } = useTheme();
 
   if (!validId) {
     return (
@@ -216,7 +218,7 @@ export default function SessionDetailScreen() {
               value={messageText}
               onChangeText={setMessageText}
               placeholder="Send a message…"
-              placeholderTextColor="#FFFFFF66"
+              placeholderTextColor={tokens.textLow.hex}
               multiline
             />
             <Pressable
@@ -266,7 +268,7 @@ export default function SessionDetailScreen() {
                 value={tagInput}
                 onChangeText={setTagInput}
                 placeholder="Add a tag…"
-                placeholderTextColor="#FFFFFF66"
+                placeholderTextColor={tokens.textLow.hex}
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="done"

@@ -13,12 +13,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@auth/AuthContext';
 import { branding } from '@lib/branding';
+import { useTheme } from '@theme/index';
 
 type AuthMode = 'service_user' | 'pat';
 
 export default function CredentialsScreen() {
   const router = useRouter();
   const { isPatAvailable } = useAuth();
+  const { tokens } = useTheme();
 
   const [mode, setMode] = useState<AuthMode>('service_user');
   const [apiKey, setApiKey] = useState('');
@@ -86,7 +88,7 @@ export default function CredentialsScreen() {
             value={apiKey}
             onChangeText={setApiKey}
             placeholder={mode === 'service_user' ? 'cog_...' : 'your PAT'}
-            placeholderTextColor="#FFFFFF66"
+            placeholderTextColor={tokens.textLow.hex}
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
@@ -102,7 +104,7 @@ export default function CredentialsScreen() {
             value={orgId}
             onChangeText={setOrgId}
             placeholder="org-..."
-            placeholderTextColor="#FFFFFF66"
+            placeholderTextColor={tokens.textLow.hex}
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
@@ -120,7 +122,7 @@ export default function CredentialsScreen() {
               value={attributionUserId}
               onChangeText={setAttributionUserId}
               placeholder="Your user ID (for create_as_user_id)"
-              placeholderTextColor="#FFFFFF66"
+              placeholderTextColor={tokens.textLow.hex}
               autoCapitalize="none"
               autoCorrect={false}
               spellCheck={false}

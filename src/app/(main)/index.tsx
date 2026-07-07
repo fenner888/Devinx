@@ -25,6 +25,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@theme/index';
 import { useSessions, useArchiveSession, useTerminateSession, useCreateSession, usePlaybooks } from '@api/devin/queries';
 import { OfflineBanner } from '@components/OfflineBanner';
 import { BoardSkeleton, EmptyState, ErrorState } from '@components/Skeletons';
@@ -54,6 +55,7 @@ export default function MainScreen() {
   const terminateMutation = useTerminateSession();
   const createSession = useCreateSession();
   const { data: playbooks } = usePlaybooks();
+  const { tokens } = useTheme();
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -211,7 +213,7 @@ export default function MainScreen() {
               value={prompt}
               onChangeText={setPrompt}
               placeholder="Ask Devin to build features, fix bugs, or work on your code"
-              placeholderTextColor="#FFFFFF66"
+              placeholderTextColor={tokens.textLow.hex}
               multiline
               autoCapitalize="sentences"
               autoCorrect
@@ -239,10 +241,10 @@ export default function MainScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Select playbook"
                 >
-                  <Text className={`text-text13 ${selectedPlaybook ? 'text-brand' : 'text-text-mid'}`}>
-                    {'\u2933'} {selectedPlaybook
+                  <Text className={`text-text13 ${selectedPlaybook ? 'text-brand' : 'text-text-mid'}`} numberOfLines={1}>
+                    {selectedPlaybook
                       ? (playbooks?.find((p) => p.playbook_id === selectedPlaybook)?.title ?? 'Playbook')
-                      : ''}
+                      : 'Playbook'}
                   </Text>
                 </Pressable>
                 {/* Mode picker */}
@@ -346,7 +348,7 @@ export default function MainScreen() {
                     value={search}
                     onChangeText={setSearch}
                     placeholder="Search sessions…"
-                    placeholderTextColor="#FFFFFF66"
+                    placeholderTextColor={tokens.textLow.hex}
                     autoCapitalize="none"
                     autoCorrect={false}
                     clearButtonMode="while-editing"
