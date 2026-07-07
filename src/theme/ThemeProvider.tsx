@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useSyncExternalStore } from 'react';
-import { Appearance } from 'react-native';
+import { Appearance, View } from 'react-native';
 import { themes, defaultTheme, type ThemeName, type ThemeTokens } from './tokens';
 
 type Listener = () => void;
@@ -47,7 +47,6 @@ export function useTheme(): { name: ThemeName; tokens: ThemeTokens } {
  * ThemeProvider injects via a wrapping <View style={...}>. NativeWind reads
  * these as inherited custom properties. Wired in Session 1.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function tokensToStyleVars(tokens: ThemeTokens): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(tokens)) {
@@ -61,9 +60,12 @@ function kebab(s: string): string {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  useTheme();
+  const { tokens } = useTheme();
   useEffect(() => () => appearanceSubscription.remove(), []);
-  // Style vars are injected in Session 1 when NativeWind components consume them.
-  // Phase 0 just tracks the active theme so useTheme() works for StatusBar etc.
-  return <>{children}</>;
+  const styleVars = tokensToStyleVars(tokens);
+  return (
+    <View style={{ flex: 1, ...styleVars } as Record<string, string | number>}>
+      {children}
+    </View>
+  );
 }

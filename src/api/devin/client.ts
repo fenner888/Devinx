@@ -115,12 +115,15 @@ export async function apiRequest<T = unknown>(
         Object.assign(headers, await auth.authHeaders());
       }
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
       const res = await fetch(url, {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       // 401 — hard stop, no retry (spec §8.4).
       if (res.status === 401) {

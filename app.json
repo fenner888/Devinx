@@ -7,7 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "devinx",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.fenner888.devinx",
@@ -18,7 +17,7 @@
     "android": {
       "package": "com.fenner888.devinx",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#141414"
       }
     },

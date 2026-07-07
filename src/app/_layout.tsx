@@ -3,10 +3,8 @@
  * SafeAreaProvider. Expo Router file-based routing lives under /src/app.
  */
 
-// @ts-expect-error — side-effect CSS import (NativeWind)
 import '../../global.css';
-import { useEffect } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, Redirect, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -20,7 +18,6 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
-        // Spec §8.4: 401 → hard stop; 5xx/network → 3 retries with backoff.
         if (error instanceof Error && /401|auth/i.test(error.message)) return false;
         return failureCount < 3;
       },
@@ -31,22 +28,19 @@ const queryClient = new QueryClient({
   },
 });
 
-/** Route guard — redirects to onboarding if not authenticated. */
-function RouteGuard({ children }: { children: React.ReactNode }) {
+/** Initial route — declarative redirect based on auth state. */
+function InitialRoute() {
   const { isAuthenticated } = useAuth();
   const segments = useSegments();
-  const router = useRouter();
+  const inOnboarding = segments[0] === '(onboarding)';
 
-  useEffect(() => {
-    const inOnboarding = segments[0] === '(onboarding)';
-    if (!isAuthenticated && !inOnboarding) {
-      router.replace('/(onboarding)');
-    } else if (isAuthenticated && inOnboarding) {
-      router.replace('/(main)');
-    }
-  }, [isAuthenticated, segments, router]);
-
-  return <>{children}</>;
+  if (!isAuthenticated && !inOnboarding) {
+    return <Redirect href="/(onboarding)" />;
+  }
+  if (isAuthenticated && inOnboarding) {
+    return <Redirect href="/(main)" />;
+  }
+  return null;
 }
 
 function ThemedStack() {
@@ -73,9 +67,8 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <AuthProvider>
-            <RouteGuard>
-              <ThemedStack />
-            </RouteGuard>
+            <InitialRoute />
+            <ThemedStack />
           </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>

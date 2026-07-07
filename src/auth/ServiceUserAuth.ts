@@ -74,19 +74,29 @@ export class ServiceUserAuth implements AuthProvider {
       const headers = await this.authHeaders();
       const orgPath = await this.orgPath();
       const url = `https://api.devin.ai${orgPath}/sessions?first=1`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15_000);
       const res = await fetch(url, {
         headers: { ...headers, 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(15_000),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (res.ok) return { ok: true };
       if (res.status === 401) {
         return { ok: false, code: 'invalid_key', detail: 'Invalid API key. Check that it starts with cog_ and has not been revoked.' };
       }
       if (res.status === 403) {
+        // The Devin API returns 403 for both invalid keys and insufficient permissions.
+        // Distinguish by checking the response body.
+        let body = '';
+        try { body = await res.text(); } catch { /* ignore */ }
+        if (/unauthorized/i.test(body)) {
+          return { ok: false, code: 'invalid_key', detail: 'Invalid or unauthorized API key. Check that it starts with cog_ and has not been revoked.' };
+        }
         return {
           ok: false,
           code: 'missing_permission',
-          detail: 'This key lacks ViewOrgSessions permission. Create a service user with UseDevinSessions + ViewOrgSessions.',
+          detail: 'This key lacks permission to list sessions. Create a service user with Member role or higher.',
         };
       }
       if (res.status === 404) {
