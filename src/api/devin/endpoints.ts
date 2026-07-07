@@ -21,7 +21,7 @@ import {
   knowledgeNoteListResponseSchema,
   secretListResponseSchema,
   attachmentResponseSchema,
-  dailyConsumptionResponseSchema,
+  dailyConsumptionListSchema,
 } from './schemas';
 import type {
   SessionResponse,
@@ -102,8 +102,17 @@ export async function sendMessage(
 ): Promise<void> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
+  // The message endpoint attributes via message_as_user_id (the session-create
+  // field is create_as_user_id) — spreading sessionAttribution() here silently
+  // dropped attribution through .passthrough().
   const attribution = await auth.sessionAttribution();
-  const body = { message, attachment_urls: attachmentUrls, ...attribution };
+  const body = {
+    message,
+    attachment_urls: attachmentUrls,
+    ...(attribution.create_as_user_id
+      ? { message_as_user_id: attribution.create_as_user_id }
+      : {}),
+  };
   sessionMessageCreateRequestSchema.parse(body);
   await apiRequest(auth, paths.messages(orgId, sessionId as `devin-${string}`), {
     method: 'POST',
@@ -241,11 +250,12 @@ export async function uploadAttachment(auth: AuthProvider, file: { name: string;
 export async function getDailyConsumption(auth: AuthProvider, params?: { start_date?: string; end_date?: string }): Promise<DailyConsumptionResponse[]> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  const data = await apiRequest<DailyConsumptionResponse>(auth, paths.consumptionDaily(orgId), {
+  const data = await apiRequest<DailyConsumptionResponse[] | { items: DailyConsumptionResponse[] } | DailyConsumptionResponse>(auth, paths.consumptionDaily(orgId), {
     method: 'GET',
     query: { start_date: params?.start_date, end_date: params?.end_date },
-    schema: dailyConsumptionResponseSchema,
+    schema: dailyConsumptionListSchema,
   });
-  // Daily consumption returns a list directly or paginated — handle both.
-  return Array.isArray(data) ? data : [data];
+  if (Array.isArray(data)) return data;
+  if ('items' in data && Array.isArray(data.items)) return data.items;
+  return [data as DailyConsumptionResponse];
 }

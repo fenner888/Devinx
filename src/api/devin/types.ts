@@ -80,7 +80,7 @@ export type SessionCategory =
   | 'security'
   | 'unit_test_generation';
 
-export type DevinMode = 'normal' | 'fast';
+export type DevinMode = 'normal' | 'fast' | 'lite' | 'ultra' | 'fusion';
 
 export type SessionSize = 'xs' | 's' | 'm' | 'l' | 'xl';
 

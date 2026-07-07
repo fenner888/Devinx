@@ -13,6 +13,8 @@ import { branding } from '@lib/branding';
 interface AuthContextValue {
   provider: AuthProvider | null;
   isAuthenticated: boolean;
+  /** True while the initial Keychain check is still running. */
+  isLoading: boolean;
   isPatAvailable: boolean;
   connect: (params: { kind: 'service_user' | 'pat'; apiKey: string; orgId: string; attributionUserId?: string }) => Promise<ValidationResult>;
   disconnect: () => Promise<void>;
@@ -25,15 +27,20 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [provider, setProvider] = useState<AuthProvider | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // On mount, check if credentials exist and prime the provider.
     (async () => {
-      const creds = await loadCredentials();
-      if (creds) {
-        const p = creds.authKind === 'pat' ? new PatAuth() : new ServiceUserAuth();
-        setProvider(p);
-        setIsAuthenticated(true);
+      try {
+        const creds = await loadCredentials();
+        if (creds) {
+          const p = creds.authKind === 'pat' ? new PatAuth() : new ServiceUserAuth();
+          setProvider(p);
+          setIsAuthenticated(true);
+        }
+      } finally {
+        setIsLoading(false);
       }
     })();
   }, []);
@@ -62,7 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const disconnect = useCallback(async () => {
-    await disconnectService(); // wipes all secrets regardless of kind
+    // Wipe Keychain and zeroize BOTH providers' in-memory caches — an
+    // in-flight query may still hold the other provider's instance.
+    await disconnectService();
+    await disconnectPat();
     setProvider(null);
     setIsAuthenticated(false);
   }, []);
@@ -83,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [provider]);
 
   return (
-    <AuthContext.Provider value={{ provider, isAuthenticated, isPatAvailable: isPatEnabled(), connect, disconnect, refresh }}>
+    <AuthContext.Provider value={{ provider, isAuthenticated, isLoading, isPatAvailable: isPatEnabled(), connect, disconnect, refresh }}>
       {children}
     </AuthContext.Provider>
   );

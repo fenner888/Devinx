@@ -87,15 +87,16 @@ export function initSentry() {
       if (event.extra) event.extra = scrubUnknown(event.extra) as Record<string, unknown>;
       if (event.contexts) event.contexts = scrubUnknown(event.contexts) as Record<string, Record<string, unknown>>;
       if (event.message) event.message = scrubString(event.message);
+      // captureException payloads land in event.exception, not event.message —
+      // scrub error strings (they can embed request URLs or auth headers).
+      if (event.exception?.values) {
+        event.exception.values = event.exception.values.map((ex) => ({
+          ...ex,
+          value: typeof ex.value === 'string' ? scrubString(ex.value) : ex.value,
+        }));
+      }
       return event;
     },
-    integrations: [
-      // Explicitly disable network breadcrumb capture for the API host.
-      Sentry.httpClientIntegration({
-        // @ts-expect-error — RN SDK supports this flag
-        ignoreURLs: [/api\.devin\.ai/],
-      }),
-    ],
     ignoreErrors: ['ApiSchemaError'],
   });
 }

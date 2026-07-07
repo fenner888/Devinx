@@ -38,6 +38,18 @@ module.exports = {
         'tint-red': 'rgb(var(--color-tint-red))',
         'tint-purple': 'rgb(var(--color-tint-purple))',
         'tint-blue': 'rgb(var(--color-tint-blue))',
+        'text-always-white': 'rgb(var(--color-text-always-white))',
+        'text-always-black': 'rgb(var(--color-text-always-black))',
+        'text-hi-strong': 'rgb(var(--color-text-hi-strong))',
+        'brand-text': 'rgb(var(--color-brand-text))',
+      },
+      spacing: {
+        // Component paddings from spec §1.7 (extracted from app.devin.ai)
+        buttonPrimaryX: '16px', // primary button px-4
+        buttonPrimaryY: '8px', // primary button py-2
+        buttonSecondaryX: '8px', // secondary/ghost button px
+        pillX: '10px', // status pill px
+        pillY: '4px', // status pill py
       },
       borderRadius: {
         // [FALLBACK-REPLACED §5.3] 12/10/8 → 6/4/9999 (Devin's live scale)
@@ -62,6 +74,7 @@ module.exports = {
       },
       fontSize: {
         // [FALLBACK-REPLACED §5.2] 15/17/20/24/28 → 12/13/14/16/17
+        text11: ['11px', { lineHeight: '14px' }],
         text12: ['12px', { lineHeight: '16px' }],
         text13: ['13px', { lineHeight: '18px' }],
         text14: ['14px', { lineHeight: '20px' }],

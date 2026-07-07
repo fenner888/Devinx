@@ -2,7 +2,7 @@
  * Polling policy tests (§8.4 / ADR-003).
  */
 
-import { pollingPolicy, backoffDelay } from '../../src/lib/polling';
+import { pollingPolicy, backoffDelay, scalePolling } from '../../src/lib/polling';
 
 describe('pollingPolicy (§8.4)', () => {
   it('never polls terminal statuses', () => {
@@ -24,6 +24,19 @@ describe('pollingPolicy (§8.4)', () => {
 
   it('does not poll other screens by default', () => {
     expect(pollingPolicy(undefined, 'active', 'other')).toBe(false);
+  });
+
+  it('polls all non-terminal session-detail statuses, gently for sleeping', () => {
+    expect(pollingPolicy('new', 'active', 'session_detail')).toBe(5_000);
+    expect(pollingPolicy('resuming', 'active', 'session_detail')).toBe(5_000);
+    expect(pollingPolicy('suspended', 'active', 'session_detail')).toBe(30_000);
+  });
+
+  it('scales intervals by polling mode', () => {
+    expect(scalePolling(10_000, 'battery_saver')).toBe(20_000);
+    expect(scalePolling(10_000, 'fast')).toBe(5_000);
+    expect(scalePolling(false, 'fast')).toBe(false);
+    expect(pollingPolicy('running', 'active', 'session_detail', 'battery_saver')).toBe(10_000);
   });
 });
 

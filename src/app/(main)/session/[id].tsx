@@ -1,7 +1,9 @@
 /**
  * Session Detail — spec §7.3.
  * Header with status, title, PR badges.
- * Tabbed: Timeline (messages) | Worklog | Changes (PRs).
+ * Tabbed: Timeline (messages) | Worklog | Changes (PRs) | Insights.
+ * Timeline matches the Devin desktop chat (specs/reference-ui/03b): Devin
+ * messages render as plain text, user messages as right-aligned bubbles.
  * Message steering: send message to session.
  * Polls with useSession + useMessages hooks.
  */
@@ -18,9 +20,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  RefreshControl,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useSession, useMessages, useSendMessage, useUpdateTags, useInsights, useGenerateInsights } from '@api/devin/queries';
 import { isValidSessionId } from '@lib/deepLink';
 import { SessionDetailSkeleton, ErrorState } from '@components/Skeletons';
@@ -34,8 +40,24 @@ import {
   prNumber,
 } from '@lib/session-utils';
 import type { SessionMessage } from '@api/devin/types';
+import { useTheme } from '@theme/index';
 
 type Tab = 'timeline' | 'worklog' | 'changes' | 'insights';
+
+function BackButton({ onPress }: { onPress: () => void }) {
+  const { tokens } = useTheme();
+  return (
+    <Pressable
+      className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center mr-3"
+      onPress={onPress}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel="Go back"
+    >
+      <Ionicons name="chevron-back" size={18} color={tokens.textMid.hex} />
+    </Pressable>
+  );
+}
 
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,19 +67,21 @@ export default function SessionDetailScreen() {
   const [showTagEditor, setShowTagEditor] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [editedTags, setEditedTags] = useState<string[] | null>(null);
+  const [tagError, setTagError] = useState<string | null>(null);
 
   const validId = id && isValidSessionId(id) ? id : undefined;
-  const { data: session, isLoading, error } = useSession(validId);
+  const { data: session, isLoading, error, refetch } = useSession(validId);
   const { data: messages } = useMessages(validId);
   const sendMessage = useSendMessage(validId);
   const updateTags = useUpdateTags(validId);
+  const { tokens } = useTheme();
 
   if (!validId) {
     return (
       <SafeAreaView className="flex-1 bg-surface0 items-center justify-center" edges={['top']}>
         <Text className="text-failed text-text14">Invalid session ID</Text>
         <Pressable className="mt-4" onPress={() => router.back()}>
-          <Text className="text-brand text-text14">Go back</Text>
+          <Text className="text-brand-text text-text14">Go back</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -67,9 +91,7 @@ export default function SessionDetailScreen() {
     return (
       <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
         <View className="flex-row items-center px-4 py-3">
-          <Pressable onPress={() => router.back()} className="mr-3">
-            <Text className="text-brand text-text14">{'\u2190 Back'}</Text>
-          </Pressable>
+          <BackButton onPress={() => router.back()} />
         </View>
         <SessionDetailSkeleton />
       </SafeAreaView>
@@ -80,14 +102,12 @@ export default function SessionDetailScreen() {
     return (
       <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
         <View className="flex-row items-center px-4 py-3">
-          <Pressable onPress={() => router.back()} className="mr-3">
-            <Text className="text-brand text-text14">{'\u2190 Back'}</Text>
-          </Pressable>
+          <BackButton onPress={() => router.back()} />
         </View>
         <ErrorState
           title="Could not load session"
           message={error?.message ?? 'Unknown error'}
-          onRetry={() => router.back()}
+          onRetry={() => refetch()}
         />
       </SafeAreaView>
     );
@@ -97,19 +117,27 @@ export default function SessionDetailScreen() {
   const colorClass = statusColorClass(statusKey);
   const dotClass = statusDotClass(statusKey);
   const label = statusLabel(session);
-  const isActive = session.status === 'running' || session.status === 'new' || session.status === 'claimed';
+  const isActive =
+    session.status === 'running' ||
+    session.status === 'new' ||
+    session.status === 'claimed' ||
+    session.status === 'resuming';
 
   function handleSend() {
-    if (!messageText.trim()) return;
+    const text = messageText.trim();
+    if (!text || sendMessage.isPending) return;
     hapticLight();
     sendMessage.mutate(
-      { message: messageText.trim() },
+      { message: text },
       {
-        onSuccess: () => hapticSuccess(),
+        onSuccess: () => {
+          hapticSuccess();
+          // Clear only on success — on failure the draft stays in the input.
+          setMessageText('');
+        },
         onError: () => hapticError(),
       },
     );
-    setMessageText('');
   }
 
   return (
@@ -117,9 +145,7 @@ export default function SessionDetailScreen() {
       {/* Header */}
       <View className="px-4 py-3 border-b border-border-subtle">
         <View className="flex-row items-center mb-2">
-          <Pressable onPress={() => router.back()} className="mr-3">
-            <Text className="text-brand text-text14">{'\u2190 Back'}</Text>
-          </Pressable>
+          <BackButton onPress={() => router.back()} />
           <View className={`w-2 h-2 rounded-full mr-2 ${dotClass}`} />
           <Text className={`text-text13 ${colorClass}`}>{label}</Text>
           <Text className="text-text-low text-text12 ml-auto">{relativeTime(session.updated_at)}</Text>
@@ -138,11 +164,16 @@ export default function SessionDetailScreen() {
             {session.pull_requests.map((pr, i) => (
               <Pressable
                 key={i}
-                className="bg-tint-green rounded-chip px-pillX py-pillY mr-2"
+                className={`flex-row items-center rounded-chip px-pillX py-pillY mr-2 ${pr.state === 'merged' ? 'bg-tint-purple' : 'bg-tint-green'}`}
                 onPress={() => pr.pr_url && Linking.openURL(pr.pr_url)}
               >
-                <Text className="text-finished text-text12 font-medium">
-                  #{prNumber(pr.pr_url)} {pr.state === 'merged' ? '(merged)' : ''}
+                <Ionicons
+                  name="git-pull-request-outline"
+                  size={12}
+                  color={pr.state === 'merged' ? tokens.merged.hex : tokens.finished.hex}
+                />
+                <Text className={`text-text12 font-medium ml-1 ${pr.state === 'merged' ? 'text-merged' : 'text-finished'}`}>
+                  #{prNumber(pr.pr_url)}{pr.state === 'merged' ? ' Merged' : ''}
                 </Text>
               </Pressable>
             ))}
@@ -153,6 +184,7 @@ export default function SessionDetailScreen() {
           className="flex-row items-center flex-wrap mt-2"
           onPress={() => {
             setEditedTags([...session.tags]);
+            setTagError(null);
             setShowTagEditor(true);
           }}
           accessibilityRole="button"
@@ -182,7 +214,7 @@ export default function SessionDetailScreen() {
             className={`flex-1 py-3 items-center ${tab === key ? 'border-b-2 border-brand' : ''}`}
             onPress={() => setTab(key)}
           >
-            <Text className={`text-text13 ${tab === key ? 'text-brand font-medium' : 'text-text-mid'}`}>
+            <Text className={`text-text13 ${tab === key ? 'text-brand-text font-medium' : 'text-text-mid'}`}>
               {tabLabel}
             </Text>
           </Pressable>
@@ -210,28 +242,39 @@ export default function SessionDetailScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View className="flex-row items-center bg-surface1 border-t border-border-subtle px-3 py-2">
-            <TextInput
-              className="flex-1 bg-surface2 rounded-input px-3 py-2 text-text14 text-text-hi max-h-20"
-              value={messageText}
-              onChangeText={setMessageText}
-              placeholder="Send a message…"
-              placeholderTextColor="#FFFFFF66"
-              multiline
-            />
-            <Pressable
-              className={`rounded-button px-4 py-2 ml-2 ${messageText.trim() && !sendMessage.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
-              disabled={!messageText.trim() || sendMessage.isPending}
-              onPress={handleSend}
-            >
-              {sendMessage.isPending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text className={`text-text14 font-medium ${messageText.trim() ? 'text-text-always-white' : 'text-text-low'}`}>
-                  Send
-                </Text>
-              )}
-            </Pressable>
+          <View className="px-3 py-2 border-t border-border-subtle bg-surface0">
+            <View className="flex-row items-end bg-surface1 rounded-2xl border border-border px-3 py-2">
+              <TextInput
+                className="flex-1 text-text14 text-text-hi max-h-24 py-1"
+                value={messageText}
+                onChangeText={setMessageText}
+                placeholder="Ask Devin to build features, fix bugs, or work on your code"
+                placeholderTextColor={tokens.textLow.hex}
+                multiline
+              />
+              <Pressable
+                className={`w-8 h-8 rounded-full items-center justify-center ml-2 ${messageText.trim() && !sendMessage.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
+                disabled={!messageText.trim() || sendMessage.isPending}
+                onPress={handleSend}
+                accessibilityRole="button"
+                accessibilityLabel="Send message"
+              >
+                {sendMessage.isPending ? (
+                  <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+                ) : (
+                  <Ionicons
+                    name="arrow-up"
+                    size={17}
+                    color={messageText.trim() ? tokens.textAlwaysWhite.hex : tokens.textLow.hex}
+                  />
+                )}
+              </Pressable>
+            </View>
+            {sendMessage.isError && (
+              <Text className="text-failed text-text12 mt-1 px-1">
+                Message failed to send — your draft is preserved above. Tap send to retry.
+              </Text>
+            )}
           </View>
         </KeyboardAvoidingView>
       )}
@@ -245,8 +288,13 @@ export default function SessionDetailScreen() {
               <Pressable
                 onPress={() => {
                   if (editedTags) {
+                    setTagError(null);
                     updateTags.mutate(editedTags, {
                       onSuccess: () => setShowTagEditor(false),
+                      onError: (e) => {
+                        hapticError();
+                        setTagError(e instanceof Error ? e.message : 'Could not save tags.');
+                      },
                     });
                   } else {
                     setShowTagEditor(false);
@@ -254,9 +302,9 @@ export default function SessionDetailScreen() {
                 }}
               >
                 {updateTags.isPending ? (
-                  <ActivityIndicator size="small" color="#4489FF" />
+                  <ActivityIndicator size="small" color={tokens.brand.hex} />
                 ) : (
-                  <Text className="text-brand text-text14">Save</Text>
+                  <Text className="text-brand-text text-text14">Save</Text>
                 )}
               </Pressable>
             </View>
@@ -266,7 +314,7 @@ export default function SessionDetailScreen() {
                 value={tagInput}
                 onChangeText={setTagInput}
                 placeholder="Add a tag…"
-                placeholderTextColor="#FFFFFF66"
+                placeholderTextColor={tokens.textLow.hex}
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="done"
@@ -279,6 +327,9 @@ export default function SessionDetailScreen() {
                 }}
               />
             </View>
+            {tagError && (
+              <Text className="text-failed text-text12 mb-2">{tagError}</Text>
+            )}
             {editedTags && editedTags.length > 0 ? (
               <View className="flex-row flex-wrap mb-2">
                 {editedTags.map((tag) => (
@@ -288,7 +339,7 @@ export default function SessionDetailScreen() {
                     onPress={() => setEditedTags(editedTags.filter((t) => t !== tag))}
                   >
                     <Text className="text-text-mid text-text12 mr-1">{tag}</Text>
-                    <Text className="text-text-low text-text12">{'\u00D7'}</Text>
+                    <Ionicons name="close" size={11} color={tokens.textLow.hex} />
                   </Pressable>
                 ))}
               </View>
@@ -304,46 +355,68 @@ export default function SessionDetailScreen() {
 
 /** Insights tab — AI analysis of the session (issues, timeline, classification). */
 function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
-  const { data: insights, isLoading, error, refetch } = useInsights(sessionId);
+  const { data: insights, isLoading, error, refetch, isRefetching } = useInsights(sessionId);
   const generate = useGenerateInsights(sessionId);
+  const { tokens } = useTheme();
+  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+  }, []);
 
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#4489FF" />
+        <ActivityIndicator size="large" color={tokens.brand.hex} />
         <Text className="text-text-mid text-text14 mt-3">Loading insights…</Text>
       </View>
     );
   }
 
   if (error || !insights) {
+    // A 404 means "not generated yet"; anything else is a real error.
+    const isRealError = !!error && !/404|not found/i.test(error.message);
     return (
       <View className="flex-1 items-center justify-center px-6">
         <Text className="text-text-mid text-text14 text-center mb-4">
-          No insights generated for this session yet.
+          {isRealError
+            ? `Could not load insights: ${error.message}`
+            : 'No insights generated for this session yet.'}
         </Text>
-        <Pressable
-          className={`rounded-button px-buttonPrimaryX py-buttonPrimaryY ${generate.isPending ? 'bg-tint-secondary' : 'bg-brand'}`}
-          disabled={generate.isPending}
-          onPress={() =>
-            generate.mutate(undefined, {
-              onSuccess: () => {
-                // Poll for results after generation kicks off.
-                setTimeout(() => refetch(), 5000);
-              },
-            })
-          }
-        >
-          {generate.isPending ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text className="text-text-always-white text-text14 font-medium">Generate insights</Text>
-          )}
-        </Pressable>
+        {isRealError ? (
+          <Pressable
+            className="bg-tint-secondary rounded-button px-buttonPrimaryX py-buttonPrimaryY"
+            onPress={() => refetch()}
+          >
+            <Text className="text-brand-text text-text14 font-medium">Try again</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            className={`rounded-button px-buttonPrimaryX py-buttonPrimaryY ${generate.isPending ? 'bg-tint-secondary' : 'bg-brand'}`}
+            disabled={generate.isPending}
+            onPress={() =>
+              generate.mutate(undefined, {
+                onSuccess: () => {
+                  // Poll for results after generation kicks off.
+                  refetchTimer.current = setTimeout(() => refetch(), 5000);
+                },
+              })
+            }
+          >
+            {generate.isPending ? (
+              <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+            ) : (
+              <Text className="text-text-always-white text-text14 font-medium">Generate insights</Text>
+            )}
+          </Pressable>
+        )}
         {generate.isSuccess && (
-          <Text className="text-text-low text-text12 mt-3 text-center">
-            Generating… this can take a minute. Pull to refresh or tap again shortly.
-          </Text>
+          <View className="flex-row items-center mt-3">
+            {isRefetching && <ActivityIndicator size="small" color={tokens.brand.hex} />}
+            <Text className="text-text-low text-text12 text-center ml-2">
+              Generating… this can take a minute.
+            </Text>
+          </View>
         )}
       </View>
     );
@@ -352,7 +425,12 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
   const { analysis } = insights;
 
   return (
-    <ScrollView className="flex-1 px-4 py-3">
+    <ScrollView
+      className="flex-1 px-4 py-3"
+      refreshControl={
+        <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={tokens.brand.hex} />
+      }
+    >
       {/* Classification */}
       <View className="bg-surface1 rounded-card px-4 py-3 mb-3">
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">Classification</Text>
@@ -392,7 +470,7 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
           <Text className="text-text-low text-text12 font-medium uppercase mb-2">Suggested actions</Text>
           {analysis.action.map((action, i) => (
             <Text key={i} className="text-text-mid text-text13 py-1">
-              {'\u2022'} {action}
+              {'•'} {action}
             </Text>
           ))}
         </View>
@@ -427,16 +505,26 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
   );
 }
 
-/** Timeline tab — shows messages from Devin and user in chronological order. */
+/**
+ * Timeline tab — Devin desktop chat style: Devin messages as plain text,
+ * user messages as right-aligned bubbles. Auto-scrolls only while the user
+ * is already near the bottom, so reading history isn't hijacked by polling.
+ */
 function TimelineTab({ messages, isLoading }: { messages: SessionMessage[]; isLoading: boolean }) {
   const listRef = useRef<FlatList<SessionMessage>>(null);
+  const nearBottomRef = useRef(true);
 
   useEffect(() => {
-    // Scroll to bottom when new messages arrive.
-    if (messages.length > 0) {
+    if (messages.length > 0 && nearBottomRef.current) {
       listRef.current?.scrollToEnd({ animated: true });
     }
   }, [messages.length]);
+
+  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    nearBottomRef.current =
+      layoutMeasurement.height + contentOffset.y >= contentSize.height - 80;
+  }
 
   if (isLoading && messages.length === 0) {
     return (
@@ -461,22 +549,35 @@ function TimelineTab({ messages, isLoading }: { messages: SessionMessage[]; isLo
       data={messages}
       keyExtractor={(item) => item.event_id}
       renderItem={({ item }) => <MessageBubble message={item} />}
-      onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+      onScroll={handleScroll}
+      scrollEventThrottle={100}
+      onContentSizeChange={() => {
+        if (nearBottomRef.current) listRef.current?.scrollToEnd({ animated: false });
+      }}
     />
   );
 }
 
 function MessageBubble({ message }: { message: SessionMessage }) {
   const isUser = message.source === 'user';
-  return (
-    <View className={`mb-3 max-w-[85%] ${isUser ? 'self-end' : 'self-start'}`}>
-      <View className={`rounded-card px-4 py-3 ${isUser ? 'bg-brand' : 'bg-surface1'}`}>
-        <Text className={`text-text14 ${isUser ? 'text-text-always-white' : 'text-text-hi'}`}>
-          {message.message}
+  if (isUser) {
+    return (
+      <View className="mb-4 max-w-[85%] self-end items-end">
+        <View className="rounded-2xl px-4 py-3 bg-tint-primary">
+          <Text className="text-text14 text-text-hi">{message.message}</Text>
+        </View>
+        <Text className="text-text-low text-text11 mt-1 text-right">
+          {relativeTime(message.created_at)}
         </Text>
       </View>
-      <Text className={`text-text-low text-text11 mt-1 ${isUser ? 'text-right' : ''}`}>
-        {isUser ? 'You' : 'Devin'} · {relativeTime(message.created_at)}
+    );
+  }
+  // Devin messages render as plain text, like the desktop timeline.
+  return (
+    <View className="mb-4">
+      <Text className="text-text-hi text-text14 leading-5">{message.message}</Text>
+      <Text className="text-text-low text-text11 mt-1">
+        Devin · {relativeTime(message.created_at)}
       </Text>
     </View>
   );
@@ -500,8 +601,8 @@ function WorklogTab({ session }: { session: NonNullable<ReturnType<typeof useSes
     <ScrollView className="flex-1 px-4 py-3">
       <View className="bg-surface1 rounded-card px-4 py-3 mb-4">
         <Text className="text-text-low text-text12 font-medium uppercase mb-3">Session info</Text>
-        {rows.map(({ label, value }) => (
-          <View key={label} className="flex-row py-2 border-b border-border-subtle last:border-b-0">
+        {rows.map(({ label, value }, i) => (
+          <View key={label} className={`flex-row py-2 ${i < rows.length - 1 ? 'border-b border-border-subtle' : ''}`}>
             <Text className="text-text-mid text-text13 flex-1">{label}</Text>
             <Text className="text-text-hi text-text13 flex-1 text-right">{value}</Text>
           </View>
@@ -521,6 +622,7 @@ function WorklogTab({ session }: { session: NonNullable<ReturnType<typeof useSes
 
 /** Changes tab — shows PRs associated with the session. */
 function ChangesTab({ session }: { session: NonNullable<ReturnType<typeof useSession>['data']> }) {
+  const { tokens } = useTheme();
   if (session.pull_requests.length === 0) {
     return (
       <View className="flex-1 items-center justify-center px-6">
@@ -538,8 +640,13 @@ function ChangesTab({ session }: { session: NonNullable<ReturnType<typeof useSes
           onPress={() => pr.pr_url && Linking.openURL(pr.pr_url)}
         >
           <View className="flex-row items-center mb-2">
-            <View className={`rounded-chip px-pillX py-pillY mr-2 ${pr.state === 'merged' ? 'bg-tint-purple' : 'bg-tint-green'}`}>
-              <Text className={`text-text12 font-medium ${pr.state === 'merged' ? 'text-merged' : 'text-finished'}`}>
+            <View className={`flex-row items-center rounded-chip px-pillX py-pillY mr-2 ${pr.state === 'merged' ? 'bg-tint-purple' : 'bg-tint-green'}`}>
+              <Ionicons
+                name={pr.state === 'merged' ? 'git-merge-outline' : 'git-pull-request-outline'}
+                size={12}
+                color={pr.state === 'merged' ? tokens.merged.hex : tokens.finished.hex}
+              />
+              <Text className={`text-text12 font-medium ml-1 capitalize ${pr.state === 'merged' ? 'text-merged' : 'text-finished'}`}>
                 {pr.state ?? 'open'}
               </Text>
             </View>

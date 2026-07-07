@@ -7,6 +7,8 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { dark } from '@theme/tokens';
 
 const PUSH_TOKEN_KEY = '@devinx/push-token';
 
@@ -35,7 +37,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       name: 'Session updates',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#4489FF',
+      lightColor: dark.brand.hex,
     });
   }
   return true;
@@ -43,6 +45,12 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
 /** Get or register the Expo push token. Returns null if not available. */
 export async function getPushToken(): Promise<string | null> {
+  // getExpoPushTokenAsync requires the EAS project UUID — the app slug is
+  // rejected. Without a configured project (app.json extra.eas.projectId),
+  // push registration is impossible; bail out instead of throwing.
+  const projectId: string | undefined = Constants.expoConfig?.extra?.eas?.projectId;
+  if (!projectId) return null;
+
   // Check if we already have a token stored.
   const cached = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
   if (cached) return cached;
@@ -51,9 +59,7 @@ export async function getPushToken(): Promise<string | null> {
   if (!granted) return null;
 
   try {
-    const token = (await Notifications.getExpoPushTokenAsync({
-      projectId: 'devinx',
-    })).data;
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
     return token;
   } catch {

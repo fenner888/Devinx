@@ -4,7 +4,7 @@
  * Default theme: dark (spec §5.1). Follows system preference unless overridden.
  */
 
-import { useEffect, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Appearance, View, StyleSheet } from 'react-native';
 import { vars } from 'nativewind';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,7 +16,7 @@ const styles = StyleSheet.create({
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
-let current: ThemeName = defaultTheme;
+let current: ThemeName = Appearance.getColorScheme() === 'light' ? 'light' : defaultTheme;
 let override: ThemeName | null = null;
 
 export type ThemePreference = 'system' | 'dark' | 'light';
@@ -29,10 +29,13 @@ export async function loadThemePreference(): Promise<void> {
     const saved = await AsyncStorage.getItem(THEME_PREF_KEY);
     if (saved === 'dark' || saved === 'light' || saved === 'system') {
       themePref = saved;
-      if (saved !== 'system') {
+      if (saved === 'system') {
+        override = null;
+        current = Appearance.getColorScheme() === 'light' ? 'light' : 'dark';
+      } else {
         override = saved;
-        emit();
       }
+      emit();
     }
   } catch { /* ignore */ }
 }
@@ -50,7 +53,9 @@ function subscribe(listener: Listener): () => void {
   return () => listeners.delete(listener);
 }
 
-const appearanceSubscription = Appearance.addChangeListener(({ colorScheme }) => {
+// Module-level subscription: lives for the app's lifetime so system theme
+// changes are tracked even if ThemeProvider remounts (e.g. ErrorBoundary reset).
+Appearance.addChangeListener(({ colorScheme }) => {
   if (override) return;
   current = colorScheme === 'light' ? 'light' : 'dark';
   emit();
@@ -79,6 +84,15 @@ export function getThemePreference(): ThemePreference {
   return themePref;
 }
 
+function getPrefSnapshot(): ThemePreference {
+  return themePref;
+}
+
+/** Reactive theme preference — re-renders when setThemePreference is called. */
+export function useThemePreference(): ThemePreference {
+  return useSyncExternalStore(subscribe, getPrefSnapshot, getPrefSnapshot);
+}
+
 export function useTheme(): { name: ThemeName; tokens: ThemeTokens } {
   const name = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   return { name, tokens: themes[name] };
@@ -103,7 +117,6 @@ function kebab(s: string): string {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { tokens } = useTheme();
-  useEffect(() => () => appearanceSubscription.remove(), []);
   const styleVars = tokensToStyleVars(tokens);
   return (
     <View style={[styles.root, vars(styleVars)]}>

@@ -6,42 +6,44 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@auth/AuthContext';
+import { takePendingCredentials } from '@auth/pendingCredentials';
 import type { ValidationResult } from '@auth/AuthProvider';
+import { useTheme } from '@theme/index';
 
 export default function ValidateScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ mode: string; apiKey: string; orgId: string; attributionUserId?: string }>();
   const { connect } = useAuth();
+  const { tokens } = useTheme();
 
   const [status, setStatus] = useState<'validating' | 'success' | 'error'>('validating');
   const [result, setResult] = useState<ValidationResult | null>(null);
 
   useEffect(() => {
-    if (!params.apiKey || !params.orgId) {
-      // Missing params — go back to credentials.
+    const creds = takePendingCredentials();
+    if (!creds) {
+      // Nothing pending (e.g. web reload) — go back to credentials.
       router.replace('/(onboarding)/credentials');
       return;
     }
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     (async () => {
-      const r = await connect({
-        kind: params.mode === 'pat' ? 'pat' : 'service_user',
-        apiKey: params.apiKey,
-        orgId: params.orgId,
-        attributionUserId: params.attributionUserId || undefined,
-      });
+      const r = await connect(creds);
       if (cancelled) return;
       setResult(r);
       setStatus(r.ok ? 'success' : 'error');
       if (r.ok) {
         // Route guard will redirect to (main) automatically.
         // Small delay so the user sees the success state.
-        setTimeout(() => router.replace('/(main)'), 600);
+        timer = setTimeout(() => router.replace('/(main)'), 600);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -49,7 +51,7 @@ export default function ValidateScreen() {
     <SafeAreaView className="flex-1 bg-surface0 items-center justify-center px-6" edges={['top', 'bottom']}>
       {status === 'validating' && (
         <View className="items-center">
-          <ActivityIndicator size="large" color="#4489FF" />
+          <ActivityIndicator size="large" color={tokens.brand.hex} />
           <Text className="text-text-mid text-text14 mt-4">Validating your credentials…</Text>
         </View>
       )}

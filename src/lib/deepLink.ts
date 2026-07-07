@@ -20,7 +20,9 @@ export function parseDeepLink(url: string): ParsedDeepLink {
   if (!url.startsWith(branding.linkPrefix)) {
     return { valid: false, reason: 'Wrong scheme' };
   }
-  const path = url.slice(branding.linkPrefix.length);
+  // Strip query string and fragment — devinx://session/<id>?src=push is a
+  // legitimate link and must not glue "?src=push" onto the session ID.
+  const path = url.slice(branding.linkPrefix.length).split(/[?#]/)[0] ?? '';
   const parts = path.split('/').filter(Boolean);
 
   if (parts.length === 0) {
