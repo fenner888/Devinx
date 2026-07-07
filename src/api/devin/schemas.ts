@@ -132,7 +132,7 @@ export const sessionCreateRequestSchema = z
     session_secrets: z.array(sessionSecretInputSchema).optional(),
     snapshot_id: z.string().optional(),
     structured_output_schema: z.record(z.unknown()).optional(),
-    tags: z.array(z.string()).optional(),
+    tags: z.array(z.string()).max(50).optional(),
     title: z.string().optional(),
     unlisted: z.boolean().optional(),
   })
