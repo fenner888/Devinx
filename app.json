@@ -51,7 +51,8 @@
             "newArchEnabled": true
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "tsconfigPaths": true

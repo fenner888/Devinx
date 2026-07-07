@@ -4,7 +4,7 @@
  */
 
 // @ts-expect-error — side-effect CSS import (NativeWind)
-import '../global.css';
+import '../../global.css';
 import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
