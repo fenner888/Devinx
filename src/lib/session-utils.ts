@@ -1,0 +1,158 @@
+/**
+ * Session utilities — shared between Board and Session Detail.
+ * Status derivation, sorting, sectioning, formatting.
+ */
+
+import type { SessionResponse } from '@api/devin/types';
+import { statusLabels, type StatusLabelKey } from '@theme/tokens';
+
+/** Derive the status label key from a session (mirrors web app state machine). */
+export function deriveStatusKey(s: SessionResponse): StatusLabelKey {
+  if (s.status === 'error') return 'crashed';
+  if (s.status === 'exit') {
+    if (s.status_detail === 'finished') {
+      if (s.pull_requests.length > 0) {
+        const pr = s.pull_requests[0];
+        if (pr?.state === 'merged' || pr?.merged_at) return 'done';
+        return 'prReady';
+      }
+      return 'done';
+    }
+    return 'closed';
+  }
+  if (s.status === 'suspended') {
+    if (s.status_detail === 'usage_limit_exceeded') return 'exceededLimit';
+    if (s.status_detail === 'inactivity') return 'sleeping';
+    return 'sleeping';
+  }
+  if (s.status_detail === 'waiting_for_user') return 'waitingForResponse';
+  if (s.status_detail === 'waiting_for_approval') return 'approvalRequired';
+  if (s.status_detail === 'finished') return 'done';
+  return 'working';
+}
+
+/** Section keys for the board. */
+export type SectionKey = 'needs_input' | 'working' | 'recent' | 'sleeping';
+
+export const sectionTitles: Record<SectionKey, string> = {
+  needs_input: 'Needs input',
+  working: 'Working',
+  recent: 'Recent',
+  sleeping: 'Sleeping',
+};
+
+/** Map a status key to a board section. */
+export function statusKeyToSection(key: StatusLabelKey): SectionKey {
+  if (key === 'waitingForResponse' || key === 'approvalRequired' || key === 'exceededLimit') return 'needs_input';
+  if (key === 'working' || key === 'settingUp' || key === 'planning' || key === 'coding' || key === 'iterating' || key === 'testing') return 'working';
+  if (key === 'prReady' || key === 'prReadyWaitingCI' || key === 'waitingForCI' || key === 'reviewPR' || key === 'done' || key === 'closed' || key === 'crashed') return 'recent';
+  return 'sleeping';
+}
+
+/** Sort priority for blocked-first ordering (parity-delta #1). */
+function sortPriority(s: SessionResponse): number {
+  const key = deriveStatusKey(s);
+  const section = statusKeyToSection(key);
+  if (section === 'needs_input') return 0;
+  if (section === 'working') return 1;
+  if (section === 'recent') return 2;
+  return 3;
+}
+
+/** Sort sessions: blocked-first, then by updated_at descending. */
+export function sortSessions(sessions: SessionResponse[]): SessionResponse[] {
+  return [...sessions].sort((a, b) => {
+    const pa = sortPriority(a);
+    const pb = sortPriority(b);
+    if (pa !== pb) return pa - pb;
+    return b.updated_at - a.updated_at;
+  });
+}
+
+/** Group sessions into board sections (preserving sort order). */
+export function sectionSessions(sessions: SessionResponse[]): { section: SectionKey; data: SessionResponse[] }[] {
+  const sorted = sortSessions(sessions);
+  const groups: Record<SectionKey, SessionResponse[]> = {
+    needs_input: [],
+    working: [],
+    recent: [],
+    sleeping: [],
+  };
+  for (const s of sorted) {
+    const key = deriveStatusKey(s);
+    groups[statusKeyToSection(key)].push(s);
+  }
+  return (Object.keys(groups) as SectionKey[])
+    .filter((k) => groups[k].length > 0)
+    .map((k) => ({ section: k, data: groups[k] }));
+}
+
+/** Status color class for text/dot. */
+export function statusColorClass(key: StatusLabelKey): string {
+  if (key === 'crashed') return 'text-failed';
+  if (key === 'waitingForResponse' || key === 'approvalRequired' || key === 'exceededLimit') return 'text-blocked';
+  if (key === 'prReady' || key === 'prReadyWaitingCI' || key === 'waitingForCI' || key === 'reviewPR' || key === 'done') return 'text-finished';
+  if (key === 'sleeping' || key === 'closed') return 'text-text-mid';
+  return 'text-brand';
+}
+
+/** Status dot bg class (derived from text class). */
+export function statusDotClass(key: StatusLabelKey): string {
+  return statusColorClass(key).replace('text-', 'bg-');
+}
+
+/** Get the human-readable label for a session. */
+export function statusLabel(s: SessionResponse): string {
+  return statusLabels[deriveStatusKey(s)];
+}
+
+/** Format a Unix timestamp as a relative time string (e.g. "2m ago", "3h ago"). */
+export function relativeTime(ts: number): string {
+  const now = Date.now() / 1000;
+  const diff = now - ts;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(ts * 1000).toLocaleDateString();
+}
+
+/** Extract PR number from a PR URL. */
+export function prNumber(prUrl: string): string {
+  if (!prUrl) return 'PR';
+  const parts = prUrl.split('/');
+  const num = parts[parts.length - 1];
+  // Return only if it looks like a number, otherwise 'PR'.
+  return /^\d+$/.test(num) ? num : 'PR';
+}
+
+/** Filter sessions by search query (title, tags, session_id). */
+export function filterBySearch(sessions: SessionResponse[], query: string): SessionResponse[] {
+  if (!query.trim()) return sessions;
+  const q = query.toLowerCase().trim();
+  return sessions.filter(
+    (s) =>
+      (s.title ?? '').toLowerCase().includes(q) ||
+      s.tags.some((t) => t.toLowerCase().includes(q)) ||
+      s.session_id.toLowerCase().includes(q),
+  );
+}
+
+/** Filter sessions by a set of tags (AND logic — must have all selected tags). */
+export function filterByTags(sessions: SessionResponse[], tags: string[]): SessionResponse[] {
+  if (tags.length === 0) return sessions;
+  return sessions.filter((s) => tags.every((t) => s.tags.includes(t)));
+}
+
+/** Collect all unique tags from sessions, sorted by frequency. */
+export function collectTags(sessions: SessionResponse[]): { tag: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const s of sessions) {
+    for (const t of s.tags) {
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count);
+}
