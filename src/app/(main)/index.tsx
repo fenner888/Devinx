@@ -4,10 +4,10 @@
  * search bar, tag filter chips, long-press context menu, pull-to-refresh.
  */
 import { useState, useMemo, useCallback } from 'react';
-import { View, Text, Pressable, RefreshControl, TextInput, SectionList, Modal, ScrollView } from 'react-native';
+import { View, Text, Pressable, RefreshControl, TextInput, SectionList, Modal, ScrollView, Alert, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useSessions } from '@api/devin/queries';
+import { useSessions, useArchiveSession, useTerminateSession } from '@api/devin/queries';
 import {
   deriveStatusKey,
   statusColorClass,
@@ -28,6 +28,8 @@ type ContextAction = 'open' | 'copy_link' | 'archive' | 'terminate';
 export default function BoardScreen() {
   const router = useRouter();
   const { data, isLoading, error, refetch, isRefetching } = useSessions('board');
+  const archiveMutation = useArchiveSession();
+  const terminateMutation = useTerminateSession();
 
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -57,13 +59,27 @@ export default function BoardScreen() {
         router.push(`/(main)/session/${s.session_id}`);
         break;
       case 'copy_link':
-        // Copy to clipboard — would use expo-clipboard in production.
+        // Copy deep link to clipboard
+        Share.share({ message: `devinx://session/${s.session_id}` });
         break;
       case 'archive':
-        // Archive via API — would call archiveSession endpoint.
+        Alert.alert('Archive session?', 'This will archive the session. You can unarchive it from the Devin web app.', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Archive',
+            onPress: () => archiveMutation.mutate(s.session_id),
+          },
+        ]);
         break;
       case 'terminate':
-        // Terminate via API — would call terminateSession endpoint.
+        Alert.alert('Terminate session?', 'This will stop the session immediately. This action cannot be undone.', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Terminate',
+            style: 'destructive',
+            onPress: () => terminateMutation.mutate(s.session_id),
+          },
+        ]);
         break;
     }
   }
