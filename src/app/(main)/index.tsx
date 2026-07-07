@@ -8,6 +8,9 @@ import { View, Text, Pressable, RefreshControl, TextInput, SectionList, Modal, S
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useSessions, useArchiveSession, useTerminateSession } from '@api/devin/queries';
+import { BoardSkeleton, EmptyState, ErrorState } from '@components/Skeletons';
+import { OfflineBanner } from '@components/OfflineBanner';
+import { hapticLight, hapticMedium, hapticWarning } from '@lib/haptics';
 import {
   deriveStatusKey,
   statusColorClass,
@@ -56,13 +59,15 @@ export default function BoardScreen() {
     if (!s) return;
     switch (action) {
       case 'open':
+        hapticLight();
         router.push(`/(main)/session/${s.session_id}`);
         break;
       case 'copy_link':
-        // Copy deep link to clipboard
+        hapticLight();
         Share.share({ message: `devinx://session/${s.session_id}` });
         break;
       case 'archive':
+        hapticWarning();
         Alert.alert('Archive session?', 'This will archive the session. You can unarchive it from the Devin web app.', [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -72,6 +77,7 @@ export default function BoardScreen() {
         ]);
         break;
       case 'terminate':
+        hapticWarning();
         Alert.alert('Terminate session?', 'This will stop the session immediately. This action cannot be undone.', [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -120,6 +126,8 @@ export default function BoardScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             clearButtonMode="while-editing"
+            accessibilityLabel="Search sessions"
+            accessibilityHint="Search by session title, tags, or session ID"
           />
         </View>
       </View>
@@ -142,31 +150,30 @@ export default function BoardScreen() {
         </View>
       )}
 
+      {/* Offline banner */}
+      <OfflineBanner />
+
       {/* Loading */}
-      {isLoading && (
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-text-mid text-text14">Loading sessions…</Text>
-        </View>
-      )}
+      {isLoading && <BoardSkeleton />}
 
       {/* Error */}
       {error && (
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-failed text-text14 mb-2">Could not load sessions</Text>
-          <Text className="text-text-mid text-text13 text-center">{error.message}</Text>
-        </View>
+        <ErrorState
+          title="Could not load sessions"
+          message={error.message}
+          onRetry={() => refetch()}
+        />
       )}
 
       {/* Empty */}
       {!isLoading && !error && filtered.length === 0 && (
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="font-mono text-brand text-text14 mb-3">{'>_'}</Text>
-          <Text className="text-text-mid text-text14 text-center">
-            {data && data.length > 0
-              ? 'No sessions match your filters.'
-              : 'No sessions yet. Start a new one to see it here.'}
-          </Text>
-        </View>
+        <EmptyState
+          icon=">_"
+          title={data && data.length > 0 ? 'No matches' : 'No sessions yet'}
+          message={data && data.length > 0
+            ? 'No sessions match your search or tag filters.'
+            : 'Start a new session to see it here.'}
+        />
       )}
 
       {/* Sectioned list */}
@@ -280,8 +287,15 @@ function SessionRow({
     <Pressable
       className="flex-row items-center bg-surface1 rounded-card px-4 py-3 mb-2"
       onPress={onPress}
-      onLongPress={onLongPress}
+      onLongPress={() => {
+        hapticMedium();
+        onLongPress();
+      }}
       delayLongPress={400}
+      accessibilityRole="button"
+      accessibilityLabel={`${session.title || 'Untitled session'}, ${label}`}
+      accessibilityHint="Double tap to open session details. Long press for more options."
+      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
     >
       {/* Status dot */}
       <View className={`w-2 h-2 rounded-full mr-3 ${dotClass}`} />

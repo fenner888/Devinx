@@ -13,6 +13,7 @@ import { ThemeProvider, useTheme, loadThemePreference } from '@theme/index';
 import { initSentry } from '@lib/sentry';
 import { AuthProvider, useAuth } from '@auth/AuthContext';
 import { getPushToken, setupNotificationListener } from '@lib/notifications';
+import { ErrorBoundary } from '@components/ErrorBoundary';
 
 initSentry();
 loadThemePreference();
@@ -85,12 +86,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <AuthProvider>
-            <InitialRoute />
-            <ThemedStack />
-          </AuthProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <AuthProvider>
+              <InitialRoute />
+              <ThemedStack />
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </QueryClientProvider>
     </SafeAreaProvider>
   );
