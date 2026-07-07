@@ -219,12 +219,20 @@ export async function uploadAttachment(auth: AuthProvider, file: { name: string;
   const formData = new FormData();
   formData.append('file', file as unknown as Blob);
   const base = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://api.devin.ai';
-  const res = await fetch(`${base}${paths.attachments(orgId)}`, {
-    method: 'POST',
-    headers,
-    body: formData,
-    signal: AbortSignal.timeout(30_000),
-  });
+  // Manual AbortController — AbortSignal.timeout is unreliable on RN runtimes.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  let res: Response;
+  try {
+    res = await fetch(`${base}${paths.attachments(orgId)}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(`Attachment upload failed: ${res.status}`);
   const json = await res.json();
   return attachmentResponseSchema.parse(json);

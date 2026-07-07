@@ -6,7 +6,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { AppState } from 'react-native';
 import { useAuth } from '@auth/AuthContext';
-import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, archiveSession, terminateSession, getDailyConsumption } from './endpoints';
+import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment } from './endpoints';
 import { queryKeys } from './queryKeys';
 import { pollingPolicy, type ScreenContext } from '@lib/polling';
 import type { SessionCreateRequest, SessionResponse } from './types';
@@ -219,6 +219,83 @@ export function useTerminateSession() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
+    },
+  });
+}
+
+export function useSecrets() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.secrets,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listSecrets(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (failureCount, error) => {
+      if (error instanceof Error && /401|auth/i.test(error.message)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export function useInsights(sessionId: string | undefined) {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.insights(sessionId ?? ''),
+    queryFn: async () => {
+      if (!provider || !sessionId) throw new Error('Not authenticated');
+      return getInsights(provider, sessionId);
+    },
+    enabled: isAuthenticated && !!provider && !!sessionId,
+    staleTime: 60_000,
+    retry: (failureCount, error) => {
+      // 404 means insights not generated yet — don't retry.
+      if (error instanceof Error && /404|not found|401|auth/i.test(error.message)) return false;
+      return failureCount < 2;
+    },
+  });
+}
+
+export function useGenerateInsights(sessionId: string | undefined) {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async () => {
+      if (!provider || !sessionId) throw new Error('Not authenticated');
+      return generateInsights(provider, sessionId);
+    },
+    onSuccess: () => {
+      if (sessionId) queryClient.invalidateQueries({ queryKey: queryKeys.insights(sessionId) });
+    },
+  });
+}
+
+export function useUploadAttachment() {
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (file: { name: string; type: string; uri: string }) => {
+      if (!provider) throw new Error('Not authenticated');
+      return uploadAttachment(provider, file);
+    },
+  });
+}
+
+export function useUpdateTags(sessionId: string | undefined) {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (tags: string[]) => {
+      if (!provider || !sessionId) throw new Error('Not authenticated');
+      return replaceTags(provider, sessionId, tags);
+    },
+    onSuccess: () => {
+      if (sessionId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.session(sessionId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
+      }
     },
   });
 }

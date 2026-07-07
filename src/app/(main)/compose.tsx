@@ -20,7 +20,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCreateSession, usePlaybooks, useKnowledge } from '@api/devin/queries';
+import * as DocumentPicker from 'expo-document-picker';
+import { useCreateSession, usePlaybooks, useKnowledge, useSecrets, useUploadAttachment } from '@api/devin/queries';
 import type { DevinMode } from '@api/devin/types';
 
 const DRAFT_KEY = '@devinx/compose-draft';
@@ -32,8 +33,11 @@ interface Draft {
   title: string;
   playbookId: string | null;
   knowledgeIds: string[];
+  secretIds: string[];
   mode: DevinMode;
   tags: string[];
+  maxAcuLimit: string;
+  unlisted: boolean;
 }
 
 const emptyDraft: Draft = {
@@ -41,8 +45,11 @@ const emptyDraft: Draft = {
   title: '',
   playbookId: null,
   knowledgeIds: [],
+  secretIds: [],
   mode: 'normal',
   tags: [],
+  maxAcuLimit: '',
+  unlisted: false,
 };
 
 export default function ComposeScreen() {
@@ -50,11 +57,16 @@ export default function ComposeScreen() {
   const createSession = useCreateSession();
   const { data: playbooks, isLoading: playbooksLoading } = usePlaybooks();
   const { data: knowledge } = useKnowledge();
+  const { data: secrets } = useSecrets();
+  const uploadAttachment = useUploadAttachment();
 
+  const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [loaded, setLoaded] = useState(false);
   const [showPlaybookPicker, setShowPlaybookPicker] = useState(false);
   const [showKnowledgePicker, setShowKnowledgePicker] = useState(false);
+  const [showSecretsPicker, setShowSecretsPicker] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [tagInput, setTagInput] = useState('');
 
   // Load draft from AsyncStorage on mount.
@@ -109,16 +121,49 @@ export default function ComposeScreen() {
     }
   }
 
+  function toggleSecret(id: string) {
+    if (draft.secretIds.includes(id)) {
+      updateDraft({ secretIds: draft.secretIds.filter((s) => s !== id) });
+    } else {
+      updateDraft({ secretIds: [...draft.secretIds, id] });
+    }
+  }
+
+  async function pickAttachment() {
+    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    try {
+      const uploaded = await uploadAttachment.mutateAsync({
+        name: asset.name,
+        type: asset.mimeType ?? 'application/octet-stream',
+        uri: asset.uri,
+      });
+      setAttachments((prev) => [...prev, { name: uploaded.name, url: uploaded.url }]);
+    } catch (e) {
+      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Unknown error');
+    }
+  }
+
+  function removeAttachment(url: string) {
+    setAttachments((prev) => prev.filter((a) => a.url !== url));
+  }
+
   async function handleSubmit() {
     if (!draft.prompt.trim()) return;
     try {
+      const acuLimit = parseFloat(draft.maxAcuLimit);
       const session = await createSession.mutateAsync({
         prompt: draft.prompt.trim(),
         title: draft.title.trim() || undefined,
         playbook_id: draft.playbookId ?? undefined,
         knowledge_ids: draft.knowledgeIds.length > 0 ? draft.knowledgeIds : undefined,
+        secret_ids: draft.secretIds.length > 0 ? draft.secretIds : undefined,
         devin_mode: draft.mode,
         tags: draft.tags.length > 0 ? draft.tags : undefined,
+        max_acu_limit: Number.isFinite(acuLimit) && acuLimit > 0 ? acuLimit : undefined,
+        unlisted: draft.unlisted || undefined,
+        attachment_urls: attachments.length > 0 ? attachments.map((a) => a.url) : undefined,
       });
       // Clear draft on success.
       await AsyncStorage.removeItem(DRAFT_KEY);
@@ -142,6 +187,7 @@ export default function ComposeScreen() {
 
   const selectedPlaybook = playbooks?.find((p) => p.playbook_id === draft.playbookId);
   const selectedKnowledge = knowledge?.filter((k) => draft.knowledgeIds.includes(k.note_id)) ?? [];
+  const selectedSecrets = secrets?.filter((s) => draft.secretIds.includes(s.secret_id)) ?? [];
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
@@ -236,6 +282,59 @@ export default function ComposeScreen() {
             <Text className="text-text-mid text-text14">{'\u203A'}</Text>
           </Pressable>
 
+          {/* Secrets */}
+          <Pressable
+            className="bg-surface1 rounded-input px-3 py-3 mb-3 flex-row items-center justify-between"
+            onPress={() => setShowSecretsPicker(true)}
+          >
+            <View className="flex-1">
+              <Text className="text-text-low text-text12 mb-0.5">Secrets</Text>
+              <Text className="text-text14 text-text-hi" numberOfLines={1}>
+                {selectedSecrets.length > 0
+                  ? selectedSecrets.map((s) => s.key).join(', ')
+                  : 'None'}
+              </Text>
+            </View>
+            <Text className="text-text-mid text-text14">{'\u203A'}</Text>
+          </Pressable>
+
+          {/* Attachments */}
+          <Pressable
+            className="bg-surface1 rounded-input px-3 py-3 mb-1 flex-row items-center justify-between"
+            onPress={pickAttachment}
+            disabled={uploadAttachment.isPending}
+          >
+            <View className="flex-1">
+              <Text className="text-text-low text-text12 mb-0.5">Attachments</Text>
+              <Text className="text-text14 text-text-hi" numberOfLines={1}>
+                {uploadAttachment.isPending
+                  ? 'Uploading…'
+                  : attachments.length > 0
+                    ? `${attachments.length} file${attachments.length > 1 ? 's' : ''}`
+                    : 'Add a file'}
+              </Text>
+            </View>
+            {uploadAttachment.isPending ? (
+              <ActivityIndicator size="small" color="#4489FF" />
+            ) : (
+              <Text className="text-text-mid text-text14">{'\u203A'}</Text>
+            )}
+          </Pressable>
+          {attachments.length > 0 && (
+            <View className="flex-row flex-wrap mb-3 mt-1">
+              {attachments.map((a) => (
+                <Pressable
+                  key={a.url}
+                  className="bg-tint-secondary rounded-chip px-pillX py-pillY mr-2 mb-1 flex-row items-center"
+                  onPress={() => removeAttachment(a.url)}
+                >
+                  <Text className="text-text-mid text-text12 mr-1" numberOfLines={1}>{a.name}</Text>
+                  <Text className="text-text-low text-text12">{'\u00D7'}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
           {/* Tags */}
           <Text className="text-text-low text-text12 font-medium uppercase mb-1 mt-2">Tags</Text>
           <View className="flex-row items-center bg-surface1 rounded-input px-3 py-2 mb-2">
@@ -263,6 +362,48 @@ export default function ComposeScreen() {
                   <Text className="text-text-low text-text12">{'\u00D7'}</Text>
                 </Pressable>
               ))}
+            </View>
+          )}
+
+          {/* Advanced options */}
+          <Pressable
+            className="flex-row items-center justify-between py-3 mt-2"
+            onPress={() => setShowAdvanced(!showAdvanced)}
+          >
+            <Text className="text-text-mid text-text14 font-medium">Advanced</Text>
+            <Text className="text-text-mid text-text14">{showAdvanced ? '\u25B4' : '\u25BE'}</Text>
+          </Pressable>
+          {showAdvanced && (
+            <View className="mb-4">
+              {/* Max ACU limit */}
+              <Text className="text-text-low text-text12 font-medium uppercase mb-1">Max ACU limit</Text>
+              <TextInput
+                className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-1"
+                value={draft.maxAcuLimit}
+                onChangeText={(v) => updateDraft({ maxAcuLimit: v.replace(/[^0-9.]/g, '') })}
+                placeholder="No limit"
+                placeholderTextColor="#FFFFFF66"
+                keyboardType="decimal-pad"
+              />
+              <Text className="text-text-low text-text12 mb-4">
+                Session stops when it consumes this many ACUs. Leave empty for no cap.
+              </Text>
+
+              {/* Unlisted toggle */}
+              <Pressable
+                className="flex-row items-center justify-between bg-surface1 rounded-input px-3 py-3"
+                onPress={() => updateDraft({ unlisted: !draft.unlisted })}
+              >
+                <View className="flex-1 mr-3">
+                  <Text className="text-text14 text-text-hi mb-0.5">Unlisted</Text>
+                  <Text className="text-text-low text-text12">
+                    Only visible to you and people with the link.
+                  </Text>
+                </View>
+                <View className={`w-12 h-7 rounded-chip p-0.5 ${draft.unlisted ? 'bg-brand' : 'bg-tint-primary'}`}>
+                  <View className={`w-6 h-6 rounded-chip bg-surface2 ${draft.unlisted ? 'ml-auto' : ''}`} />
+                </View>
+              </Pressable>
             </View>
           )}
         </ScrollView>
@@ -371,6 +512,47 @@ export default function ComposeScreen() {
               </ScrollView>
             ) : (
               <Text className="text-text-mid text-text14">No knowledge entries available.</Text>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Secrets picker modal */}
+      <Modal visible={showSecretsPicker} animationType="slide" transparent onRequestClose={() => setShowSecretsPicker(false)}>
+        <View className="flex-1 bg-scrim justify-end">
+          <View className="bg-surface1 rounded-t-card px-5 py-6 max-h-[70%]">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-text-hi text-text17">Select secrets</Text>
+              <Pressable onPress={() => setShowSecretsPicker(false)}>
+                <Text className="text-brand text-text14">Done</Text>
+              </Pressable>
+            </View>
+            {secrets && secrets.length > 0 ? (
+              <ScrollView>
+                {secrets.map((sec) => (
+                  <Pressable
+                    key={sec.secret_id}
+                    className={`py-3 border-b border-border-subtle flex-row items-center ${draft.secretIds.includes(sec.secret_id) ? 'bg-tint-primary' : ''}`}
+                    onPress={() => toggleSecret(sec.secret_id)}
+                  >
+                    <View className="flex-1">
+                      <Text className={`text-text14 ${draft.secretIds.includes(sec.secret_id) ? 'text-brand font-medium' : 'text-text-hi'}`}>
+                        {sec.key}
+                      </Text>
+                      {sec.note && (
+                        <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>
+                          {sec.note}
+                        </Text>
+                      )}
+                    </View>
+                    {draft.secretIds.includes(sec.secret_id) && (
+                      <Text className="text-brand text-text16">{'\u2713'}</Text>
+                    )}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : (
+              <Text className="text-text-mid text-text14">No secrets available.</Text>
             )}
           </View>
         </View>
