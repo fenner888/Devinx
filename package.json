@@ -31,7 +31,7 @@
     "expo-linking": "~8.0.12",
     "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.24",
-    "expo-secure-store": "~15.0.8",
+    "expo-secure-store": "~57.0.0",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "~15.0.11",
