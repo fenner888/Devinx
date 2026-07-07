@@ -27,8 +27,6 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             // §10.5: wipe Keychain + SQLite cache + query cache.
-            // Dynamic import so expo-sqlite (WASM on web) doesn't block the bundle.
-            const { purgeCache } = await import('@cache/index');
             await disconnect();
             await purgeCache();
             queryClient.clear();

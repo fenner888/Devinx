@@ -121,7 +121,7 @@ export function relativeTime(ts: number): string {
 export function prNumber(prUrl: string): string {
   if (!prUrl) return 'PR';
   const parts = prUrl.split('/');
-  const num = parts[parts.length - 1];
+  const num = parts[parts.length - 1] ?? '';
   // Return only if it looks like a number, otherwise 'PR'.
   return /^\d+$/.test(num) ? num : 'PR';
 }
