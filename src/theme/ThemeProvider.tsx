@@ -5,9 +5,14 @@
  */
 
 import { useEffect, useSyncExternalStore } from 'react';
-import { Appearance, View } from 'react-native';
+import { Appearance, View, StyleSheet } from 'react-native';
+import { vars } from 'nativewind';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { themes, defaultTheme, type ThemeName, type ThemeTokens } from './tokens';
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -101,7 +106,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => () => appearanceSubscription.remove(), []);
   const styleVars = tokensToStyleVars(tokens);
   return (
-    <View style={{ flex: 1, ...styleVars } as Record<string, string | number>}>
+    <View style={[styles.root, vars(styleVars)]}>
       {children}
     </View>
   );

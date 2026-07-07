@@ -287,7 +287,7 @@ export default function ComposeScreen() {
 
       {/* Playbook picker modal */}
       <Modal visible={showPlaybookPicker} animationType="slide" transparent onRequestClose={() => setShowPlaybookPicker(false)}>
-        <View className="flex-1 bg-scrim/50 justify-end">
+        <View className="flex-1 bg-scrim justify-end">
           <View className="bg-surface1 rounded-t-card px-5 py-6 max-h-[70%]">
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select playbook</Text>
@@ -337,7 +337,7 @@ export default function ComposeScreen() {
 
       {/* Knowledge picker modal */}
       <Modal visible={showKnowledgePicker} animationType="slide" transparent onRequestClose={() => setShowKnowledgePicker(false)}>
-        <View className="flex-1 bg-scrim/50 justify-end">
+        <View className="flex-1 bg-scrim justify-end">
           <View className="bg-surface1 rounded-t-card px-5 py-6 max-h-[70%]">
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select knowledge</Text>

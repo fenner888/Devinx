@@ -54,7 +54,10 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
-      <View className="px-5 py-3 border-b border-border-subtle">
+      <View className="flex-row items-center px-5 py-3 border-b border-border-subtle">
+        <Pressable onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text className="text-brand text-text14 mr-3">{'\u2190'}</Text>
+        </Pressable>
         <Text className="text-text-hi text-text17">Settings</Text>
       </View>
 
