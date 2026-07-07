@@ -22,6 +22,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSession, useMessages, useSendMessage } from '@api/devin/queries';
 import { isValidSessionId } from '@lib/deepLink';
+import { SessionDetailSkeleton, ErrorState } from '@components/Skeletons';
+import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
 import {
   deriveStatusKey,
   statusColorClass,
@@ -58,21 +60,30 @@ export default function SessionDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-surface0 items-center justify-center" edges={['top']}>
-        <ActivityIndicator size="large" color="#4489FF" />
-        <Text className="text-text-mid text-text14 mt-3">Loading session…</Text>
+      <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
+        <View className="flex-row items-center px-4 py-3">
+          <Pressable onPress={() => router.back()} className="mr-3">
+            <Text className="text-brand text-text14">{'\u2190 Back'}</Text>
+          </Pressable>
+        </View>
+        <SessionDetailSkeleton />
       </SafeAreaView>
     );
   }
 
   if (error || !session) {
     return (
-      <SafeAreaView className="flex-1 bg-surface0 items-center justify-center px-6" edges={['top']}>
-        <Text className="text-failed text-text14 mb-2">Could not load session</Text>
-        <Text className="text-text-mid text-text13 text-center">{error?.message ?? 'Unknown error'}</Text>
-        <Pressable className="mt-4" onPress={() => router.back()}>
-          <Text className="text-brand text-text14">Go back</Text>
-        </Pressable>
+      <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
+        <View className="flex-row items-center px-4 py-3">
+          <Pressable onPress={() => router.back()} className="mr-3">
+            <Text className="text-brand text-text14">{'\u2190 Back'}</Text>
+          </Pressable>
+        </View>
+        <ErrorState
+          title="Could not load session"
+          message={error?.message ?? 'Unknown error'}
+          onRetry={() => router.back()}
+        />
       </SafeAreaView>
     );
   }
@@ -85,7 +96,14 @@ export default function SessionDetailScreen() {
 
   function handleSend() {
     if (!messageText.trim()) return;
-    sendMessage.mutate({ message: messageText.trim() });
+    hapticLight();
+    sendMessage.mutate(
+      { message: messageText.trim() },
+      {
+        onSuccess: () => hapticSuccess(),
+        onError: () => hapticError(),
+      },
+    );
     setMessageText('');
   }
 

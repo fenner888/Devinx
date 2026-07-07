@@ -100,4 +100,37 @@ export function initSentry() {
   });
 }
 
+/** Set Sentry user context (non-sensitive — just auth kind, no IDs). */
+export function setSentryUserContext(authKind: 'service_user' | 'pat' | null): void {
+  if (!authKind) {
+    Sentry.setUser(null);
+    return;
+  }
+  Sentry.setUser({
+    // Don't send actual user/org IDs — just the auth method for debugging.
+    id: authKind,
+    username: authKind,
+  });
+  Sentry.setTag('auth_kind', authKind);
+}
+
+/** Add a breadcrumb for navigation events. */
+export function addNavigationBreadcrumb(screen: string): void {
+  Sentry.addBreadcrumb({
+    category: 'navigation',
+    message: `Navigated to ${screen}`,
+    level: 'info',
+  });
+}
+
+/** Add a breadcrumb for API calls (without sensitive data). */
+export function addApiBreadcrumb(method: string, endpoint: string, statusCode?: number): void {
+  Sentry.addBreadcrumb({
+    category: 'api',
+    message: `${method.toUpperCase()} ${endpoint}`,
+    level: statusCode && statusCode >= 400 ? 'warning' : 'info',
+    data: statusCode ? { status: statusCode } : undefined,
+  });
+}
+
 export { branding };
