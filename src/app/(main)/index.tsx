@@ -25,6 +25,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@theme/index';
 import { useSessions, useArchiveSession, useTerminateSession, useCreateSession, usePlaybooks } from '@api/devin/queries';
 import { OfflineBanner } from '@components/OfflineBanner';
@@ -52,6 +53,17 @@ import type { DevinMode } from '@api/devin/types';
 type ContextAction = 'open' | 'share_link' | 'archive' | 'terminate';
 
 const MAX_PROMPT = 10000;
+
+/**
+ * Devin sidebar products without a usable public API — these open the
+ * web app in the browser (same pattern as Ask mode).
+ */
+const WEB_NAV_ITEMS: { icon: keyof typeof Ionicons.glyphMap; label: string; url: string }[] = [
+  { icon: 'time-outline', label: 'Automations', url: 'https://app.devin.ai/automations' },
+  { icon: 'shield-outline', label: 'Security', url: 'https://app.devin.ai/security' },
+  { icon: 'git-pull-request-outline', label: 'Review', url: 'https://app.devin.ai/review' },
+  { icon: 'book-outline', label: 'Wiki', url: 'https://app.devin.ai/wiki' },
+];
 
 export default function MainScreen() {
   const router = useRouter();
@@ -377,25 +389,63 @@ export default function MainScreen() {
           <View className="absolute top-0 bottom-0 left-0 w-[85%] max-w-[340px] bg-surface0 border-r border-border">
             <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
               {/* Drawer header */}
-              <View className="flex-row items-center justify-between px-4 py-3 border-b border-border-subtle">
-                <Text className="text-text-hi text-text17">Sessions</Text>
-                <View className="flex-row gap-2">
-                  <Pressable
-                    className={`rounded-button px-3 py-2 ${selectedTags.length > 0 ? 'bg-brand' : 'bg-tint-secondary'}`}
-                    onPress={() => setShowTagFilter(true)}
-                  >
-                    <Text className={`text-text13 font-medium ${selectedTags.length > 0 ? 'text-text-always-white' : 'text-text-mid'}`}>
-                      Tags{selectedTags.length > 0 ? ` (${selectedTags.length})` : ''}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center"
-                    onPress={() => setDrawerOpen(false)}
-                    accessibilityLabel="Close sessions list"
-                  >
-                    <Ionicons name="close" size={17} color={tokens.textMid.hex} />
-                  </Pressable>
+              <View className="flex-row items-center justify-between px-4 py-3">
+                <View className="flex-row items-center">
+                  <Text className="text-brand text-text16 mr-2">{'✦'}</Text>
+                  <Text className="text-text-hi text-text16 font-medium">DevinX</Text>
                 </View>
+                <Pressable
+                  className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center"
+                  onPress={() => setDrawerOpen(false)}
+                  accessibilityLabel="Close sessions list"
+                >
+                  <Ionicons name="close" size={17} color={tokens.textMid.hex} />
+                </Pressable>
+              </View>
+
+              {/* Primary nav — mirrors the Devin sidebar */}
+              <View className="px-2 pb-2">
+                <Pressable
+                  className="flex-row items-center bg-tint-primary rounded-button px-3 py-2.5 mb-1"
+                  onPress={() => {
+                    setDrawerOpen(false);
+                    router.push('/(main)/compose');
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="New session"
+                >
+                  <Ionicons name="add" size={17} color={tokens.textHi.hex} />
+                  <Text className="text-text-hi text-text14 font-medium ml-3">New session</Text>
+                </Pressable>
+                {WEB_NAV_ITEMS.map(({ icon, label, url }) => (
+                  <Pressable
+                    key={label}
+                    className="flex-row items-center rounded-button px-3 py-2.5"
+                    onPress={() => {
+                      hapticLight();
+                      WebBrowser.openBrowserAsync(url).catch(() => {});
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${label} (opens in browser)`}
+                  >
+                    <Ionicons name={icon} size={16} color={tokens.textMid.hex} />
+                    <Text className="text-text-mid text-text14 ml-3 flex-1">{label}</Text>
+                    <Ionicons name="open-outline" size={12} color={tokens.textLow.hex} />
+                  </Pressable>
+                ))}
+              </View>
+
+              {/* Recent header */}
+              <View className="flex-row items-center justify-between px-4 pt-2 pb-1">
+                <Text className="text-text-low text-text12 font-medium uppercase tracking-wider">Recent</Text>
+                <Pressable
+                  className={`rounded-chip px-2.5 py-1 ${selectedTags.length > 0 ? 'bg-brand' : 'bg-tint-secondary'}`}
+                  onPress={() => setShowTagFilter(true)}
+                >
+                  <Text className={`text-text12 font-medium ${selectedTags.length > 0 ? 'text-text-always-white' : 'text-text-mid'}`}>
+                    Tags{selectedTags.length > 0 ? ` (${selectedTags.length})` : ''}
+                  </Text>
+                </Pressable>
               </View>
 
               {/* Search */}
@@ -486,6 +536,21 @@ export default function MainScreen() {
                   stickySectionHeadersEnabled={false}
                 />
               )}
+
+              {/* Footer — Settings pinned at the bottom, like the Devin sidebar */}
+              <Pressable
+                className="flex-row items-center px-4 py-3 border-t border-border-subtle"
+                onPress={() => {
+                  setDrawerOpen(false);
+                  router.push('/(main)/settings');
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Settings"
+              >
+                <Ionicons name="settings-outline" size={16} color={tokens.textMid.hex} />
+                <Text className="text-text-mid text-text14 ml-3 flex-1">Settings</Text>
+                <Ionicons name="chevron-forward" size={14} color={tokens.textLow.hex} />
+              </Pressable>
             </SafeAreaView>
           </View>
         </View>
