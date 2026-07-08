@@ -49,6 +49,7 @@ import {
 } from '@lib/session-utils';
 import type { SessionResponse } from '@api/devin/types';
 import ICON_MARK from '../../../assets/brand/icon-transparent.png';
+import WORDMARK from '../../../assets/wordmark.png';
 import type { DevinMode } from '@api/devin/types';
 
 type ContextAction = 'open' | 'share_link' | 'archive' | 'terminate';
@@ -194,8 +195,12 @@ export default function MainScreen() {
           accessibilityLabel="Open sessions list"
         >
           <Ionicons name="menu-outline" size={22} color={tokens.textMid.hex} />
-          <Image source={ICON_MARK} className="w-5 h-5 ml-2" resizeMode="contain" />
-          <Text className="text-text-hi text-text16 font-medium ml-1.5">DevinX</Text>
+          <Image
+            source={WORDMARK}
+            className="w-24 h-6 ml-2"
+            resizeMode="contain"
+            accessibilityLabel="DevinX"
+          />
         </Pressable>
         <View className="flex-row items-center gap-2">
           <Pressable
@@ -241,8 +246,7 @@ export default function MainScreen() {
           {/* Devin wordmark row */}
           <View className="flex-row items-center justify-between mb-3 px-1">
             <View className="flex-row items-center">
-              <Image source={ICON_MARK} className="w-5 h-5 mr-2" resizeMode="contain" />
-              <Text className="text-text-hi text-text16 font-medium">Devin</Text>
+              <Image source={ICON_MARK} className="w-6 h-6" resizeMode="contain" />
             </View>
             <View className="flex-row bg-tint-secondary rounded-chip p-0.5">
               <View className="bg-surface2 rounded-chip px-3 py-1">
