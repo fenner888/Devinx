@@ -13,20 +13,18 @@ updates:
           - patch
     ignore:
       # Expo/React Native packages must move together with the Expo SDK
-      # (via `npx expo install`) — individual major bumps break the runtime
-      # even when CI passes, since CI never boots Metro or the native app.
+      # (via `npx expo install --fix`) — ANY independent bump of a native
+      # module can mismatch Expo Go's embedded native code, and CI can't
+      # catch it because it never boots the native runtime. All update
+      # types blocked, not just majors.
       - dependency-name: 'expo*'
-        update-types: ['version-update:semver-major']
       - dependency-name: '@expo/*'
-        update-types: ['version-update:semver-major']
       - dependency-name: 'babel-preset-expo'
-        update-types: ['version-update:semver-major']
       - dependency-name: 'react-native*'
-        update-types: ['version-update:semver-major']
+      - dependency-name: '@react-native-community/*'
+      - dependency-name: '@react-native/*'
       - dependency-name: 'react'
-        update-types: ['version-update:semver-major']
       - dependency-name: 'react-dom'
-        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
