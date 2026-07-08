@@ -115,6 +115,8 @@ export interface ThemeTokens {
   tintPurple: ColorToken;
   /** Tint: blue (brand chip fill). */
   tintBlue: ColorToken;
+  /** Chart accent: amber (M-size bucket in analytics). */
+  chartAmber: ColorToken;
 }
 
 const c = (channels: string, hex: string): ColorToken => ({ channels, hex });
@@ -179,6 +181,7 @@ export const dark: ThemeTokens = {
   tintRed: c('245 59 58 / .12', '#F53B3A1F'),
   tintPurple: c('149 108 222 / .12', '#956CDE1F'),
   tintBlue: c('51 125 244 / .1', '#337DF41A'),
+  chartAmber: c('245 195 58', '#F5C33A'),
 };
 
 // [FALLBACK-REPLACED §1.1] surface0 #FAF7F2 → #FCFCFC (Devin --bg-page light)
@@ -240,6 +243,7 @@ export const light: ThemeTokens = {
   tintRed: c('245 59 58 / .12', '#F53B3A1F'),
   tintPurple: c('149 108 222 / .12', '#956CDE1F'),
   tintBlue: c('51 125 244 / .1', '#337DF41A'),
+  chartAmber: c('212 160 23', '#D4A017'),
 };
 
 /**

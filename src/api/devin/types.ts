@@ -135,6 +135,8 @@ export interface SessionCreateRequest {
   knowledge_ids?: string[];
   max_acu_limit?: number;
   playbook_id?: string;
+  /** Repos the session should work in (host-prefixed paths). */
+  repos?: string[];
   secret_ids?: string[];
   session_secrets?: SessionSecretInput[];
   snapshot_id?: string;
@@ -417,6 +419,17 @@ export const paths = {
     `/v3/organizations/${orgId}/consumption/daily`,
   /** Enterprise-level (requires ManageBilling). */
   consumptionCycles: () => `/v3/enterprise/consumption/cycles`,
+  playbook: (orgId: OrgId, playbookId: string) =>
+    `/v3/organizations/${orgId}/playbooks/${playbookId}`,
+  knowledgeNote: (orgId: OrgId, noteId: string) =>
+    `/v3/organizations/${orgId}/knowledge/notes/${noteId}`,
+  secret: (orgId: OrgId, secretId: string) =>
+    `/v3/organizations/${orgId}/secrets/${secretId}`,
+  metricsSessions: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/sessions`,
+  metricsPrs: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/prs`,
+  metricsSearches: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/searches`,
+  metricsWau: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/wau`,
+  repositories: (orgId: OrgId) => `/v3beta1/organizations/${orgId}/repositories`,
   schedules: (orgId: OrgId) => `/v3/organizations/${orgId}/schedules`,
   schedule: (orgId: OrgId, scheduleId: string) =>
     `/v3/organizations/${orgId}/schedules/${scheduleId}`,
@@ -510,4 +523,88 @@ export interface CodeScanFinding {
   /** Remediation session, when one has been launched. */
   session_id?: string | null;
   created_at?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Resource management (Knowledge / Playbooks / Secrets)
+// ---------------------------------------------------------------------------
+
+export interface KnowledgeNoteCreateRequest {
+  name: string;
+  body: string;
+  trigger: string;
+  folder_id?: string | null;
+  is_enabled?: boolean;
+  pinned_repo?: string | null;
+}
+
+export type KnowledgeNoteUpdateRequest = Partial<KnowledgeNoteCreateRequest>;
+
+export interface PlaybookCreateRequest {
+  title: string;
+  body: string;
+  macro?: string | null;
+}
+
+export type PlaybookUpdateRequest = Partial<PlaybookCreateRequest>;
+
+export interface SecretCreateRequest {
+  type: SecretType;
+  key: string;
+  value: string;
+  note?: string | null;
+  is_sensitive?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Org metrics (Analytics)
+// ---------------------------------------------------------------------------
+
+export interface SessionMetrics {
+  sessions_created_count: number;
+  sessions_created_by_size: Record<string, number>;
+  sessions_created_by_origin: Record<string, number>;
+  sessions_created_with_playbook_count: number;
+  sessions_created_with_search_count: number;
+  sessions_with_merged_prs_count: number;
+  sessions_with_merged_prs_by_size: Record<string, number>;
+  avg_acus_per_session: number;
+}
+
+export interface PrMetrics {
+  prs_created_count?: number;
+  prs_opened_count?: number;
+  prs_merged_count?: number;
+  prs_closed_count?: number;
+}
+
+export interface SearchMetrics {
+  searches_created_count?: number;
+}
+
+export interface ActiveUserPeriod {
+  start_time: number | string;
+  end_time: number | string;
+  active_users: number;
+}
+
+export interface MetricsQuery {
+  time_after?: number;
+  time_before?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Repositories (v3beta1)
+// ---------------------------------------------------------------------------
+
+export interface RepositoryResponse {
+  provider_repository_id: string;
+  git_connection_id: string;
+  git_connection_host: string;
+  repo_name: string;
+  repo_path: string;
+  repo_description: string | null;
+  repo_language: string | null;
+  last_updated_at: string | number | null;
+  indexing_status: string | null;
 }

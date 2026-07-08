@@ -13,6 +13,8 @@ export const queryKeys = {
   insights: (id: string) => ['insights', id] as const,
   tags: (id: string) => ['tags', id] as const,
   schedules: ['schedules'] as const,
+  metrics: (range: string) => ['metrics', range] as const,
+  repositories: ['repositories'] as const,
   prReview: (url: string) => ['prReview', url] as const,
   codeScanFindings: ['codeScanFindings'] as const,
 } as const;

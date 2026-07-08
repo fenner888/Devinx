@@ -8,6 +8,10 @@ export default function MainGroup() {
       <Stack.Screen name="compose" />
       <Stack.Screen name="usage" />
       <Stack.Screen name="automations" />
+      <Stack.Screen name="analytics" />
+      <Stack.Screen name="knowledge" />
+      <Stack.Screen name="playbooks" />
+      <Stack.Screen name="secrets" />
       <Stack.Screen name="review" />
       <Stack.Screen name="security" />
       <Stack.Screen name="settings/index" />

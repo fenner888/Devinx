@@ -128,6 +128,7 @@ export const sessionCreateRequestSchema = z
     knowledge_ids: z.array(z.string()).optional(),
     max_acu_limit: z.number().positive().optional(),
     playbook_id: z.string().optional(),
+    repos: z.array(z.string()).optional(),
     secret_ids: z.array(z.string()).optional(),
     session_secrets: z.array(sessionSecretInputSchema).optional(),
     snapshot_id: z.string().optional(),
@@ -522,3 +523,102 @@ export const codeScanFindingSchema = z
   .passthrough();
 
 export const codeScanFindingListResponseSchema = paginatedResponseSchema(codeScanFindingSchema);
+
+// ---------------------------------------------------------------------------
+// Resource management requests (outbound validation)
+// ---------------------------------------------------------------------------
+
+export const knowledgeNoteCreateRequestSchema = z
+  .object({
+    name: z.string().min(1),
+    body: z.string().min(1),
+    trigger: z.string().min(1),
+    folder_id: z.string().nullable().optional(),
+    is_enabled: z.boolean().optional(),
+    pinned_repo: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const playbookCreateRequestSchema = z
+  .object({
+    title: z.string().min(1),
+    body: z.string().min(1),
+    macro: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const secretCreateRequestSchema = z
+  .object({
+    type: secretTypeSchema,
+    key: z.string().min(1).max(256),
+    value: z.string().min(1),
+    note: z.string().nullable().optional(),
+    is_sensitive: z.boolean().optional(),
+  })
+  .passthrough();
+
+// ---------------------------------------------------------------------------
+// Org metrics (Analytics)
+// ---------------------------------------------------------------------------
+
+const countRecordSchema = z.record(z.number());
+
+export const sessionMetricsSchema = z
+  .object({
+    sessions_created_count: z.number(),
+    sessions_created_by_size: countRecordSchema.optional().default({}),
+    sessions_created_by_origin: countRecordSchema.optional().default({}),
+    sessions_created_with_playbook_count: z.number().optional().default(0),
+    sessions_created_with_search_count: z.number().optional().default(0),
+    sessions_with_merged_prs_count: z.number().optional().default(0),
+    sessions_with_merged_prs_by_size: countRecordSchema.optional().default({}),
+    avg_acus_per_session: z.number().optional().default(0),
+  })
+  .passthrough();
+
+export const prMetricsSchema = z
+  .object({
+    prs_created_count: z.number().optional(),
+    prs_opened_count: z.number().optional(),
+    prs_merged_count: z.number().optional(),
+    prs_closed_count: z.number().optional(),
+  })
+  .passthrough();
+
+export const searchMetricsSchema = z
+  .object({ searches_created_count: z.number().optional() })
+  .passthrough();
+
+export const activeUserPeriodSchema = z
+  .object({
+    start_time: z.union([z.number(), z.string()]),
+    end_time: z.union([z.number(), z.string()]),
+    active_users: z.number(),
+  })
+  .passthrough();
+
+// The list may arrive bare or wrapped in an items envelope.
+export const activeUsersResponseSchema = z.union([
+  z.array(activeUserPeriodSchema),
+  z.object({ items: z.array(activeUserPeriodSchema) }).passthrough(),
+]);
+
+// ---------------------------------------------------------------------------
+// Repositories (v3beta1)
+// ---------------------------------------------------------------------------
+
+export const repositoryResponseSchema = z
+  .object({
+    provider_repository_id: z.string(),
+    git_connection_id: z.string(),
+    git_connection_host: z.string(),
+    repo_name: z.string(),
+    repo_path: z.string(),
+    repo_description: z.string().nullable().optional(),
+    repo_language: z.string().nullable().optional(),
+    last_updated_at: z.union([z.string(), z.number()]).nullable().optional(),
+    indexing_status: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const repositoryListResponseSchema = paginatedResponseSchema(repositoryResponseSchema);

@@ -26,6 +26,17 @@ import {
   scheduleListResponseSchema,
   prReviewResponseSchema,
   codeScanFindingListResponseSchema,
+  knowledgeNoteCreateRequestSchema,
+  knowledgeNoteResponseSchema,
+  playbookCreateRequestSchema,
+  playbookResponseSchema,
+  secretCreateRequestSchema,
+  secretResponseSchema,
+  sessionMetricsSchema,
+  prMetricsSchema,
+  searchMetricsSchema,
+  activeUsersResponseSchema,
+  repositoryListResponseSchema,
 } from './schemas';
 import type {
   SessionResponse,
@@ -45,6 +56,17 @@ import type {
   ScheduleUpdateRequest,
   PrReviewResponse,
   CodeScanFinding,
+  KnowledgeNoteCreateRequest,
+  KnowledgeNoteUpdateRequest,
+  PlaybookCreateRequest,
+  PlaybookUpdateRequest,
+  SecretCreateRequest,
+  SessionMetrics,
+  PrMetrics,
+  SearchMetrics,
+  ActiveUserPeriod,
+  MetricsQuery,
+  RepositoryResponse,
   Cursor,
 } from './types';
 
@@ -387,4 +409,117 @@ export async function remediateFinding(auth: AuthProvider, scanId: string, findi
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   await apiRequest(auth, paths.codeScanRemediate(orgId, scanId, findingId), { method: 'POST' });
+}
+
+// ---------------------------------------------------------------------------
+// Resource management (Knowledge / Playbooks / Secrets)
+// ---------------------------------------------------------------------------
+
+async function orgIdOf(auth: AuthProvider): Promise<string> {
+  return (await auth.orgPath()).replace('/v3/organizations/', '');
+}
+
+export async function createKnowledgeNote(auth: AuthProvider, body: KnowledgeNoteCreateRequest): Promise<KnowledgeNoteResponse> {
+  knowledgeNoteCreateRequestSchema.parse(body);
+  return apiRequest<KnowledgeNoteResponse>(auth, paths.knowledge(await orgIdOf(auth)), {
+    method: 'POST',
+    body,
+    schema: knowledgeNoteResponseSchema,
+  });
+}
+
+export async function updateKnowledgeNote(auth: AuthProvider, noteId: string, body: KnowledgeNoteUpdateRequest): Promise<KnowledgeNoteResponse> {
+  return apiRequest<KnowledgeNoteResponse>(auth, paths.knowledgeNote(await orgIdOf(auth), noteId), {
+    method: 'PUT',
+    body,
+    schema: knowledgeNoteResponseSchema,
+  });
+}
+
+export async function deleteKnowledgeNote(auth: AuthProvider, noteId: string): Promise<void> {
+  await apiRequest(auth, paths.knowledgeNote(await orgIdOf(auth), noteId), { method: 'DELETE' });
+}
+
+export async function createPlaybook(auth: AuthProvider, body: PlaybookCreateRequest): Promise<PlaybookResponse> {
+  playbookCreateRequestSchema.parse(body);
+  return apiRequest<PlaybookResponse>(auth, paths.playbooks(await orgIdOf(auth)), {
+    method: 'POST',
+    body,
+    schema: playbookResponseSchema,
+  });
+}
+
+export async function updatePlaybook(auth: AuthProvider, playbookId: string, body: PlaybookUpdateRequest): Promise<PlaybookResponse> {
+  return apiRequest<PlaybookResponse>(auth, paths.playbook(await orgIdOf(auth), playbookId), {
+    method: 'PUT',
+    body,
+    schema: playbookResponseSchema,
+  });
+}
+
+export async function deletePlaybook(auth: AuthProvider, playbookId: string): Promise<void> {
+  await apiRequest(auth, paths.playbook(await orgIdOf(auth), playbookId), { method: 'DELETE' });
+}
+
+export async function createSecret(auth: AuthProvider, body: SecretCreateRequest): Promise<SecretResponse> {
+  secretCreateRequestSchema.parse(body);
+  return apiRequest<SecretResponse>(auth, paths.secrets(await orgIdOf(auth)), {
+    method: 'POST',
+    body,
+    schema: secretResponseSchema,
+  });
+}
+
+export async function deleteSecret(auth: AuthProvider, secretId: string): Promise<void> {
+  await apiRequest(auth, paths.secret(await orgIdOf(auth), secretId), { method: 'DELETE' });
+}
+
+// ---------------------------------------------------------------------------
+// Org metrics (Analytics)
+// ---------------------------------------------------------------------------
+
+export async function getSessionMetrics(auth: AuthProvider, query?: MetricsQuery): Promise<SessionMetrics> {
+  return apiRequest<SessionMetrics>(auth, paths.metricsSessions(await orgIdOf(auth)), {
+    method: 'GET',
+    query: { time_after: query?.time_after, time_before: query?.time_before },
+    schema: sessionMetricsSchema,
+  });
+}
+
+export async function getPrMetrics(auth: AuthProvider, query?: MetricsQuery): Promise<PrMetrics> {
+  return apiRequest<PrMetrics>(auth, paths.metricsPrs(await orgIdOf(auth)), {
+    method: 'GET',
+    query: { time_after: query?.time_after, time_before: query?.time_before },
+    schema: prMetricsSchema,
+  });
+}
+
+export async function getSearchMetrics(auth: AuthProvider, query?: MetricsQuery): Promise<SearchMetrics> {
+  return apiRequest<SearchMetrics>(auth, paths.metricsSearches(await orgIdOf(auth)), {
+    method: 'GET',
+    query: { time_after: query?.time_after, time_before: query?.time_before },
+    schema: searchMetricsSchema,
+  });
+}
+
+export async function getWeeklyActiveUsers(auth: AuthProvider, query?: MetricsQuery): Promise<ActiveUserPeriod[]> {
+  const data = await apiRequest<ActiveUserPeriod[] | { items: ActiveUserPeriod[] }>(auth, paths.metricsWau(await orgIdOf(auth)), {
+    method: 'GET',
+    query: { time_after: query?.time_after, time_before: query?.time_before },
+    schema: activeUsersResponseSchema,
+  });
+  return Array.isArray(data) ? data : data.items;
+}
+
+// ---------------------------------------------------------------------------
+// Repositories (v3beta1)
+// ---------------------------------------------------------------------------
+
+export async function listRepositories(auth: AuthProvider): Promise<RepositoryResponse[]> {
+  const data = await apiRequest<{ items: RepositoryResponse[] }>(auth, paths.repositories(await orgIdOf(auth)), {
+    method: 'GET',
+    query: { first: 100 },
+    schema: repositoryListResponseSchema,
+  });
+  return data.items;
 }

@@ -7,11 +7,11 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { AppState } from 'react-native';
 import { useAuth } from '@auth/AuthContext';
 import { shouldRetryQuery } from './client';
-import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment, listSchedules, createSchedule, updateSchedule, deleteSchedule, triggerPrReview, getPrReview, listCodeScanFindings, remediateFinding } from './endpoints';
+import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment, listSchedules, createSchedule, updateSchedule, deleteSchedule, triggerPrReview, getPrReview, listCodeScanFindings, remediateFinding, createKnowledgeNote, updateKnowledgeNote, deleteKnowledgeNote, createPlaybook, updatePlaybook, deletePlaybook, createSecret, deleteSecret, getSessionMetrics, getPrMetrics, getSearchMetrics, getWeeklyActiveUsers, listRepositories } from './endpoints';
 import { queryKeys } from './queryKeys';
 import { pollingPolicy, scalePolling, type ScreenContext } from '@lib/polling';
 import { useAppPreferences } from '@store/preferences';
-import type { Cursor, SessionCreateRequest, SessionResponse, ScheduleCreateRequest, ScheduleUpdateRequest } from './types';
+import type { Cursor, SessionCreateRequest, SessionResponse, ScheduleCreateRequest, ScheduleUpdateRequest, KnowledgeNoteCreateRequest, KnowledgeNoteUpdateRequest, PlaybookCreateRequest, PlaybookUpdateRequest, SecretCreateRequest, MetricsQuery } from './types';
 
 // Pagination caps — enough for any realistic board/timeline while bounding
 // worst-case request fan-out per refetch.
@@ -432,5 +432,159 @@ export function useRemediateFinding() {
       queryClient.invalidateQueries({ queryKey: queryKeys.codeScanFindings });
       queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Resource management (Knowledge / Playbooks / Secrets)
+// ---------------------------------------------------------------------------
+
+export function useCreateKnowledgeNote() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (body: KnowledgeNoteCreateRequest) => {
+      if (!provider) throw new Error('Not authenticated');
+      return createKnowledgeNote(provider, body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+  });
+}
+
+export function useUpdateKnowledgeNote() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (params: { noteId: string; body: KnowledgeNoteUpdateRequest }) => {
+      if (!provider) throw new Error('Not authenticated');
+      return updateKnowledgeNote(provider, params.noteId, params.body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+  });
+}
+
+export function useDeleteKnowledgeNote() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (noteId: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      await deleteKnowledgeNote(provider, noteId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+  });
+}
+
+export function useCreatePlaybook() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (body: PlaybookCreateRequest) => {
+      if (!provider) throw new Error('Not authenticated');
+      return createPlaybook(provider, body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.playbooks }),
+  });
+}
+
+export function useUpdatePlaybook() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (params: { playbookId: string; body: PlaybookUpdateRequest }) => {
+      if (!provider) throw new Error('Not authenticated');
+      return updatePlaybook(provider, params.playbookId, params.body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.playbooks }),
+  });
+}
+
+export function useDeletePlaybook() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (playbookId: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      await deletePlaybook(provider, playbookId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.playbooks }),
+  });
+}
+
+export function useCreateSecret() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (body: SecretCreateRequest) => {
+      if (!provider) throw new Error('Not authenticated');
+      return createSecret(provider, body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.secrets }),
+  });
+}
+
+export function useDeleteSecret() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (secretId: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      await deleteSecret(provider, secretId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.secrets }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Org metrics (Analytics)
+// ---------------------------------------------------------------------------
+
+export interface OrgMetricsBundle {
+  sessions: Awaited<ReturnType<typeof getSessionMetrics>>;
+  prs: Awaited<ReturnType<typeof getPrMetrics>>;
+  searches: Awaited<ReturnType<typeof getSearchMetrics>>;
+  weeklyActiveUsers: Awaited<ReturnType<typeof getWeeklyActiveUsers>>;
+}
+
+export function useOrgMetrics(rangeDays: number) {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.metrics(String(rangeDays)),
+    queryFn: async (): Promise<OrgMetricsBundle> => {
+      if (!provider) throw new Error('Not authenticated');
+      const query: MetricsQuery = {
+        time_after: Math.floor(Date.now() / 1000) - rangeDays * 86_400,
+      };
+      // Fire the four metric calls together; WAU/searches may be unavailable
+      // on some plans — degrade those to empty rather than failing the screen.
+      const [sessions, prs, searches, weeklyActiveUsers] = await Promise.all([
+        getSessionMetrics(provider, query),
+        getPrMetrics(provider, query).catch(() => ({}) as Awaited<ReturnType<typeof getPrMetrics>>),
+        getSearchMetrics(provider, query).catch(() => ({}) as Awaited<ReturnType<typeof getSearchMetrics>>),
+        getWeeklyActiveUsers(provider, query).catch(() => []),
+      ]);
+      return { sessions, prs, searches, weeklyActiveUsers };
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Repositories (v3beta1)
+// ---------------------------------------------------------------------------
+
+export function useRepositories() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.repositories,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listRepositories(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 10 * 60_000,
+    retry: shouldRetryQuery,
   });
 }
