@@ -199,6 +199,17 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(out.acus_by_product.devin).toBe(3.0);
   });
 
+  it('tolerates unknown products, missing total, and ISO dates in daily consumption', () => {
+    const out = dailyConsumptionResponseSchema.parse({
+      acus_by_product: { devin: 2, devin_review: 1.5, deepwiki: 0.25 },
+      date: '2026-07-07T00:00:00Z',
+    });
+    expect(out.acus).toBeUndefined();
+    expect(out.acus_by_product.devin_review).toBe(1.5);
+    const empty = dailyConsumptionResponseSchema.parse({ date: '2026-07-07' });
+    expect(empty.acus_by_product).toEqual({});
+  });
+
   it('parses a session create request with all optional fields', () => {
     const out = sessionCreateRequestSchema.parse({
       prompt: 'fix the bug',

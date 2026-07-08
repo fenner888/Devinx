@@ -369,8 +369,9 @@ export default function MainScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Sessions drawer */}
-      <Modal visible={drawerOpen} animationType="slide" transparent onRequestClose={() => setDrawerOpen(false)}>
+      {/* Sessions drawer — fade, not slide: Modal's slide animates from the
+          bottom of the screen, which looks wrong for a left-side drawer. */}
+      <Modal visible={drawerOpen} animationType="fade" transparent onRequestClose={() => setDrawerOpen(false)}>
         <View className="flex-1 bg-scrim">
           <Pressable className="flex-1" onPress={() => setDrawerOpen(false)} />
           <View className="absolute top-0 bottom-0 left-0 w-[85%] max-w-[340px] bg-surface0 border-r border-border">

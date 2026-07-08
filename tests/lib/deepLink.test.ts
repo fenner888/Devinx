@@ -59,4 +59,15 @@ describe('deep-link validation (§10.9)', () => {
     expect(isValidSessionId('not-a-devin-id')).toBe(false);
     expect(isValidSessionId('')).toBe(false);
   });
+
+  it('accepts real-world ID shapes beyond 32-hex (dashed UUIDs etc.)', () => {
+    expect(isValidSessionId('devin-0a4d31d6-3889-4ec2-b9d6-4338be35eb3b')).toBe(true);
+    expect(isValidSessionId('devin-AbC123xyz789')).toBe(true);
+  });
+
+  it('still rejects path-unsafe IDs', () => {
+    expect(isValidSessionId('devin-abc/../etc')).toBe(false);
+    expect(isValidSessionId('devin-abc?x=1')).toBe(false);
+    expect(isValidSessionId('devin-abc#frag')).toBe(false);
+  });
 });

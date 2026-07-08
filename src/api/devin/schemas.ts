@@ -409,15 +409,15 @@ export const attachmentResponseSchema = z
 // Consumption
 // ---------------------------------------------------------------------------
 
+// Tolerant on purpose: the product set changes as Cognition ships products
+// (devin/cascade/terminal/review/...), `acus` may be omitted, and `date` may
+// arrive as YYYY-MM-DD or a full ISO datetime. Requiring exact keys made
+// every real response fail validation and broke the Usage screen.
 export const dailyConsumptionResponseSchema = z
   .object({
-    acus: acuCountSchema,
-    acus_by_product: z.object({
-      devin: acuCountSchema,
-      cascade: acuCountSchema,
-      terminal: acuCountSchema,
-    }),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    acus: acuCountSchema.optional(),
+    acus_by_product: z.record(acuCountSchema).optional().default({}),
+    date: z.string().min(1),
   })
   .passthrough();
 

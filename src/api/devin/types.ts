@@ -353,13 +353,11 @@ export interface AttachmentResponse {
 // ---------------------------------------------------------------------------
 
 export interface DailyConsumptionResponse {
-  acus: AcuCount;
-  acus_by_product: {
-    devin: AcuCount;
-    cascade: AcuCount;
-    terminal: AcuCount;
-  };
-  date: string; // YYYY-MM-DD
+  /** Total ACUs for the day; may be omitted (sum acus_by_product instead). */
+  acus?: AcuCount;
+  /** Per-product ACUs — keys vary as Cognition ships products. */
+  acus_by_product: Record<string, AcuCount>;
+  date: string; // YYYY-MM-DD or ISO datetime
 }
 
 export interface ConsumptionCycle {

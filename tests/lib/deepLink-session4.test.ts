@@ -56,8 +56,15 @@ describe('deepLink', () => {
       expect(isValidSessionId('devin-abc')).toBe(false);
     });
 
-    it('rejects non-hex characters', () => {
-      expect(isValidSessionId('devin-xyz123def456789012345678901234abcd')).toBe(false);
+    // Real session IDs aren't hex-only (dashed UUIDs, older formats exist) —
+    // the check enforces path-segment safety, not a hex format.
+    it('accepts non-hex but URL-safe characters', () => {
+      expect(isValidSessionId('devin-xyz123def456789012345678901234abcd')).toBe(true);
+    });
+
+    it('rejects path-unsafe characters', () => {
+      expect(isValidSessionId('devin-abc123/../../etc')).toBe(false);
+      expect(isValidSessionId('devin-abc123?q=1')).toBe(false);
     });
   });
 });
