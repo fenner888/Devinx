@@ -210,13 +210,19 @@ export function useCreateSession() {
   });
 }
 
-export function useDailyConsumption() {
+export function useDailyConsumption(rangeDays = 30) {
   const { provider, isAuthenticated } = useAuth();
   return useQuery({
-    queryKey: queryKeys.consumption,
+    queryKey: [...queryKeys.consumption, rangeDays],
     queryFn: async () => {
       if (!provider) throw new Error('Not authenticated');
-      return getDailyConsumption(provider);
+      // Without an explicit range the endpoint returns nothing — request the
+      // last N days so the chart actually has data (matches the screen copy).
+      const now = Math.floor(Date.now() / 1000);
+      return getDailyConsumption(provider, {
+        time_after: now - rangeDays * 86_400,
+        time_before: now,
+      });
     },
     enabled: isAuthenticated && !!provider,
     staleTime: 5 * 60_000,
