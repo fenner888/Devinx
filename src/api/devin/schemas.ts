@@ -409,29 +409,27 @@ export const attachmentResponseSchema = z
 // Consumption
 // ---------------------------------------------------------------------------
 
-// Tolerant on purpose: the product set changes as Cognition ships products
-// (devin/cascade/terminal/review/...), `acus` may be omitted, and `date` may
-// arrive as YYYY-MM-DD or a full ISO datetime. Requiring exact keys made
-// every real response fail validation and broke the Usage screen.
-export const dailyConsumptionResponseSchema = z
+/**
+ * GET /v3/organizations/{org_id}/consumption/daily returns an ENVELOPE
+ * (per the v3 OpenAPI spec):
+ *   { total_acus: number, consumption_by_date: [{ date, acus, acus_by_product }] }
+ * where `date` is a unix INTEGER (midnight PST = 08:00 UTC) and product
+ * values can be null (e.g. `review`). Product keys stay open-ended.
+ */
+export const consumptionByDateSchema = z
   .object({
+    date: z.union([z.number(), z.string()]),
     acus: acuCountSchema.optional(),
-    acus_by_product: z.record(acuCountSchema).optional().default({}),
-    date: z.string().min(1),
+    acus_by_product: z.record(z.number().nullable()).optional().default({}),
   })
   .passthrough();
 
-/**
- * The daily-consumption endpoint returns a date-range of days — accept a bare
- * array, a paginated `{items}` envelope, or a single object (defensively).
- * Validating against the single-object schema alone rejected every real
- * multi-day response and broke the Usage screen.
- */
-export const dailyConsumptionListSchema = z.union([
-  z.array(dailyConsumptionResponseSchema),
-  z.object({ items: z.array(dailyConsumptionResponseSchema) }).passthrough(),
-  dailyConsumptionResponseSchema,
-]);
+export const consumptionResponseSchema = z
+  .object({
+    total_acus: z.number().optional(),
+    consumption_by_date: z.array(consumptionByDateSchema),
+  })
+  .passthrough();
 
 export const consumptionCycleSchema = z
   .object({

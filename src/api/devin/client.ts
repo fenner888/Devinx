@@ -192,9 +192,15 @@ export async function apiRequest<T = unknown>(
         throw lastError;
       }
 
-      // 4xx (non-401/429) — no retry.
+      // 4xx (non-401/429) — no retry. Include the response body detail so
+      // validation errors (422 etc.) are actionable instead of opaque.
       if (!res.ok) {
-        throw classifyError(res.status);
+        const err = classifyError(res.status);
+        let detail = '';
+        try {
+          detail = (await res.text()).slice(0, 300);
+        } catch { /* ignore */ }
+        throw detail ? new ApiError(`${err.message} — ${detail}`, err.status, err.code) : err;
       }
 
       // Parse response. 204s and empty bodies are valid successes — treating

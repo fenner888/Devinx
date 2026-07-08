@@ -25,8 +25,8 @@ describe('deepLink', () => {
       expect(result.reason).toBe('Wrong scheme');
     });
 
-    it('rejects invalid session ID format', () => {
-      const result = parseDeepLink('devinx://session/not-a-valid-id');
+    it('rejects a path-unsafe session ID', () => {
+      const result = parseDeepLink('devinx://session/bad$id{}');
       expect(result.valid).toBe(false);
       expect(result.reason).toBe('Invalid session ID format');
     });
@@ -48,12 +48,14 @@ describe('deepLink', () => {
       expect(isValidSessionId('devin-abc123def456789012345678901234ab')).toBe(true);
     });
 
-    it('rejects non-devin prefix', () => {
-      expect(isValidSessionId('session-abc123')).toBe(false);
+    // The v3 API returns session_id without the devin- prefix (the prefixed
+    // form is devin_id, added by the API layer when building URL paths).
+    it('accepts bare session IDs without the devin- prefix', () => {
+      expect(isValidSessionId('abc123def456789012345678901234ab')).toBe(true);
     });
 
     it('rejects too-short ID', () => {
-      expect(isValidSessionId('devin-abc')).toBe(false);
+      expect(isValidSessionId('abc')).toBe(false);
     });
 
     // Real session IDs aren't hex-only (dashed UUIDs, older formats exist) —
