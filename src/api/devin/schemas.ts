@@ -591,32 +591,44 @@ export const secretCreateRequestSchema = z
 // Org metrics (Analytics)
 // ---------------------------------------------------------------------------
 
-const countRecordSchema = z.record(z.number());
+// Metrics can legitimately be null for sparse ranges (e.g. avg over zero
+// sessions) — normalize null/missing to 0 instead of failing the screen.
+const metricCount = z
+  .number()
+  .nullable()
+  .optional()
+  .transform((v) => v ?? 0);
+
+const countRecordSchema = z
+  .record(z.number().nullable())
+  .optional()
+  .default({})
+  .transform((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v ?? 0])));
 
 export const sessionMetricsSchema = z
   .object({
-    sessions_created_count: z.number(),
-    sessions_created_by_size: countRecordSchema.optional().default({}),
-    sessions_created_by_origin: countRecordSchema.optional().default({}),
-    sessions_created_with_playbook_count: z.number().optional().default(0),
-    sessions_created_with_search_count: z.number().optional().default(0),
-    sessions_with_merged_prs_count: z.number().optional().default(0),
-    sessions_with_merged_prs_by_size: countRecordSchema.optional().default({}),
-    avg_acus_per_session: z.number().optional().default(0),
+    sessions_created_count: metricCount,
+    sessions_created_by_size: countRecordSchema,
+    sessions_created_by_origin: countRecordSchema,
+    sessions_created_with_playbook_count: metricCount,
+    sessions_created_with_search_count: metricCount,
+    sessions_with_merged_prs_count: metricCount,
+    sessions_with_merged_prs_by_size: countRecordSchema,
+    avg_acus_per_session: metricCount,
   })
   .passthrough();
 
 export const prMetricsSchema = z
   .object({
-    prs_created_count: z.number().optional(),
-    prs_opened_count: z.number().optional(),
-    prs_merged_count: z.number().optional(),
-    prs_closed_count: z.number().optional(),
+    prs_created_count: metricCount,
+    prs_opened_count: metricCount,
+    prs_merged_count: metricCount,
+    prs_closed_count: metricCount,
   })
   .passthrough();
 
 export const searchMetricsSchema = z
-  .object({ searches_created_count: z.number().optional() })
+  .object({ searches_created_count: metricCount })
   .passthrough();
 
 export const activeUserPeriodSchema = z
