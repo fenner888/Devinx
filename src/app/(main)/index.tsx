@@ -26,8 +26,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
-import { useSessions, useArchiveSession, useTerminateSession, useCreateSession, usePlaybooks } from '@api/devin/queries';
+import { useSessions, useArchiveSession, useTerminateSession, useCreateSession, usePlaybooks, useCodeScanFindings } from '@api/devin/queries';
 import { OfflineBanner } from '@components/OfflineBanner';
+import { ModeSettings } from '@components/ModeSettings';
 import { BoardSkeleton, EmptyState, ErrorState } from '@components/Skeletons';
 import { hapticLight, hapticMedium, hapticWarning, hapticSuccess, hapticError } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
@@ -43,7 +44,6 @@ import {
   filterBySearch,
   filterByTags,
   collectTags,
-  MODE_OPTIONS,
   modeLabel,
 } from '@lib/session-utils';
 import type { SessionResponse } from '@api/devin/types';
@@ -54,14 +54,11 @@ type ContextAction = 'open' | 'share_link' | 'archive' | 'terminate';
 const MAX_PROMPT = 10000;
 
 /**
- * Devin sidebar products — all native screens. Wiki (DeepWiki) is omitted:
- * it has no public API, and nothing here should bounce users to a browser.
+ * Devin sidebar products — all native screens. Wiki (DeepWiki) is omitted
+ * (no public API), and Security only appears when the key can actually
+ * reach the enterprise code-scans API — no dead nav items.
  */
-const NAV_ITEMS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: string }[] = [
-  { icon: 'time-outline', label: 'Automations', route: '/(main)/automations' },
-  { icon: 'shield-outline', label: 'Security', route: '/(main)/security' },
-  { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review' },
-];
+type NavItem = { icon: keyof typeof Ionicons.glyphMap; label: string; route: string };
 
 export default function MainScreen() {
   const router = useRouter();
@@ -70,7 +67,17 @@ export default function MainScreen() {
   const terminateMutation = useTerminateSession();
   const createSession = useCreateSession();
   const { data: playbooks } = usePlaybooks();
+  const { data: scanFindings } = useCodeScanFindings();
   const { tokens } = useTheme();
+
+  const navItems: NavItem[] = [
+    { icon: 'time-outline', label: 'Automations', route: '/(main)/automations' },
+    // Enterprise-gated: only show when the key can actually list findings.
+    ...(scanFindings
+      ? [{ icon: 'shield-outline' as const, label: 'Security', route: '/(main)/security' }]
+      : []),
+    { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review' },
+  ];
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -415,7 +422,7 @@ export default function MainScreen() {
                   <Ionicons name="add" size={17} color={tokens.textHi.hex} />
                   <Text className="text-text-hi text-text14 font-medium ml-3">New session</Text>
                 </Pressable>
-                {NAV_ITEMS.map(({ icon, label, route }) => (
+                {navItems.map(({ icon, label, route }) => (
                   <Pressable
                     key={label}
                     className="flex-row items-center rounded-button px-3 py-2.5"
@@ -632,26 +639,17 @@ export default function MainScreen() {
         <View className="flex-1 bg-scrim justify-end">
           <View className="bg-surface2 rounded-t-sheet px-5 py-4">
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-text-hi text-text17">Execution mode</Text>
+              <Text className="text-text-hi text-text17">Session settings</Text>
               <Pressable onPress={() => setShowModePicker(false)}>
                 <Text className="text-brand-text text-text14">Done</Text>
               </Pressable>
             </View>
-            {MODE_OPTIONS.map(({ key, label: mLabel, description }) => (
-              <Pressable
-                key={key}
-                className={`flex-row items-center justify-between px-4 py-3 rounded-card mb-2 ${mode === key ? 'bg-tint-blue' : 'bg-surface1'}`}
-                onPress={() => { setMode(key); setShowModePicker(false); }}
-              >
-                <View>
-                  <Text className={`text-text14 ${mode === key ? 'text-brand-text font-medium' : 'text-text-hi'}`}>
-                    {mLabel}
-                  </Text>
-                  <Text className="text-text-mid text-text12 mt-0.5">{description}</Text>
-                </View>
-                {mode === key && <Ionicons name="checkmark" size={17} color={tokens.brandText.hex} />}
-              </Pressable>
-            ))}
+            <ModeSettings
+              mode={mode}
+              onChange={setMode}
+              checkColor={tokens.brandText.hex}
+              mutedColor={tokens.textLow.hex}
+            />
           </View>
         </View>
       </Modal>

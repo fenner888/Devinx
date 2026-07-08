@@ -23,7 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { useCreateSession, usePlaybooks, useKnowledge, useSecrets, useUploadAttachment } from '@api/devin/queries';
-import { MODE_OPTIONS } from '@lib/session-utils';
+import { ModeSettings } from '@components/ModeSettings';
 import type { DevinMode } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 
@@ -245,24 +245,16 @@ export default function ComposeScreen() {
             </Text>
           )}
 
-          {/* Mode toggle */}
-          <Text className="text-text-low text-text12 font-medium uppercase mb-1 mt-4">Mode</Text>
-          <View className="flex-row bg-tint-secondary rounded-button p-1 mb-1">
-            {MODE_OPTIONS.map(({ key, label }) => (
-              <Pressable
-                key={key}
-                className={`flex-1 rounded-button py-2 ${draft.mode === key ? 'bg-surface2' : ''}`}
-                onPress={() => updateDraft({ mode: key })}
-              >
-                <Text className={`text-center text-text13 ${draft.mode === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
+          {/* Session settings — same grouping as the web composer */}
+          <Text className="text-text-low text-text12 font-medium uppercase mb-1 mt-4">Session settings</Text>
+          <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-2 mb-4">
+            <ModeSettings
+              mode={draft.mode}
+              onChange={(m) => updateDraft({ mode: m })}
+              checkColor={tokens.brandText.hex}
+              mutedColor={tokens.textLow.hex}
+            />
           </View>
-          <Text className="text-text-low text-text12 mb-4">
-            {MODE_OPTIONS.find((m) => m.key === draft.mode)?.description}
-          </Text>
 
           {/* Playbook picker */}
           <Pressable

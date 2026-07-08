@@ -462,6 +462,8 @@ export interface ScheduleCreateRequest {
   scheduled_at?: string | null;
   tags?: string[];
   playbook_id?: string | null;
+  /** Which agent runs the schedule (the API supports both). */
+  agent?: 'devin' | 'data_analyst';
 }
 
 export interface ScheduleUpdateRequest {

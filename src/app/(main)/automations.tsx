@@ -44,13 +44,14 @@ export default function AutomationsScreen() {
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
   const [cron, setCron] = useState('0 9 * * 1-5');
+  const [agent, setAgent] = useState<'devin' | 'data_analyst'>('devin');
   const [createError, setCreateError] = useState<string | null>(null);
 
   function handleCreate() {
     if (!name.trim() || !prompt.trim() || !cron.trim() || createSchedule.isPending) return;
     setCreateError(null);
     createSchedule.mutate(
-      { name: name.trim(), prompt: prompt.trim(), schedule_type: 'recurring', frequency: cron.trim() },
+      { name: name.trim(), prompt: prompt.trim(), schedule_type: 'recurring', frequency: cron.trim(), agent },
       {
         onSuccess: () => {
           hapticSuccess();
@@ -221,6 +222,26 @@ export default function AutomationsScreen() {
                 multiline
                 textAlignVertical="top"
               />
+
+              <Text className="text-text-low text-text12 font-medium uppercase mb-1">Agent</Text>
+              <View className="flex-row bg-tint-secondary rounded-button p-1 mb-3">
+                {(
+                  [
+                    { key: 'devin', label: 'Devin' },
+                    { key: 'data_analyst', label: 'Data Analyst' },
+                  ] as const
+                ).map(({ key, label }) => (
+                  <Pressable
+                    key={key}
+                    className={`flex-1 rounded-button py-2 ${agent === key ? 'bg-surface1' : ''}`}
+                    onPress={() => setAgent(key)}
+                  >
+                    <Text className={`text-center text-text13 ${agent === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
 
               <Text className="text-text-low text-text12 font-medium uppercase mb-1">Schedule (cron, UTC)</Text>
               <View className="flex-row flex-wrap mb-2">
