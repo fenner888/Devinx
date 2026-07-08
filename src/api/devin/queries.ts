@@ -572,8 +572,12 @@ export function useOrgMetrics(rangeDays: number) {
     queryKey: queryKeys.metrics(String(rangeDays)),
     queryFn: async (): Promise<OrgMetricsBundle> => {
       if (!provider) throw new Error('Not authenticated');
+      // Both bounds are REQUIRED by the metrics API — omitting time_before
+      // returns a 422 and blanks the screen.
+      const now = Math.floor(Date.now() / 1000);
       const query: MetricsQuery = {
-        time_after: Math.floor(Date.now() / 1000) - rangeDays * 86_400,
+        time_after: now - rangeDays * 86_400,
+        time_before: now,
       };
       // Fire the four metric calls together; WAU/searches may be unavailable
       // on some plans — degrade those to empty rather than failing the screen.
