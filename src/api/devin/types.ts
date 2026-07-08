@@ -290,47 +290,49 @@ export interface SessionInsightsResponse {
 // ---------------------------------------------------------------------------
 
 export interface PlaybookResponse {
-  access_type: AccessType;
-  body: string;
-  created_at: UnixTimestamp;
-  created_by: string;
-  macro: string | null;
-  org_id: string | null;
   playbook_id: string;
-  structured_output_schema: Record<string, unknown> | null;
   title: string;
-  updated_at: UnixTimestamp;
-  updated_by: string;
+  body: string;
+  macro?: string | null;
+  access_type?: AccessType;
+  created_at?: UnixTimestamp;
+  created_by?: string;
+  org_id?: string | null;
+  structured_output_schema?: Record<string, unknown> | null;
+  updated_at?: UnixTimestamp;
+  updated_by?: string;
 }
 
 export interface KnowledgeNoteResponse {
-  access_type: AccessType;
-  body: string;
-  created_at: UnixTimestamp;
-  created_by: string;
-  folder_id: string | null;
-  is_enabled: boolean | null;
-  name: string;
   note_id: string;
-  org_id: string | null;
-  pinned_repo: string | null;
+  name: string;
+  body: string;
   trigger: string;
-  updated_at: UnixTimestamp;
-  updated_by: string;
+  access_type?: AccessType;
+  created_at?: UnixTimestamp;
+  updated_at?: UnixTimestamp;
+  folder_id?: string | null;
+  folder_path?: string;
+  is_enabled?: boolean | null;
+  macro?: string | null;
+  org_id?: string | null;
+  pinned_repo?: string | null;
+  created_by?: string;
+  updated_by?: string;
 }
 
 export interface SecretResponse {
-  access_type: AccessType;
-  created_at: UnixTimestamp;
-  created_by: string;
-  is_sensitive: boolean;
-  key: string;
-  note: string | null;
-  org_id: string | null;
   secret_id: string;
+  key: string;
+  note?: string | null;
   secret_type: SecretType;
-  updated_at: UnixTimestamp;
-  updated_by: string;
+  access_type?: AccessType;
+  created_at?: UnixTimestamp;
+  created_by?: string;
+  is_sensitive?: boolean;
+  org_id?: string | null;
+  updated_at?: UnixTimestamp;
+  updated_by?: string;
   /** VALUES ARE NEVER RETURNED — only metadata. */
 }
 

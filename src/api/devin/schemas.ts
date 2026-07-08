@@ -343,37 +343,42 @@ export const sessionInsightsResponseSchema = z
 
 export const playbookResponseSchema = z
   .object({
-    access_type: accessTypeSchema,
-    body: z.string(),
-    created_at: unixTimestampSchema,
-    created_by: z.string(),
-    macro: z.string().nullable(),
-    org_id: z.string().nullable(),
     playbook_id: z.string(),
-    structured_output_schema: z.record(z.unknown()).nullable(),
     title: z.string(),
-    updated_at: unixTimestampSchema,
-    updated_by: z.string(),
+    body: z.string(),
+    macro: z.string().nullable().optional(),
+    access_type: accessTypeSchema.optional(),
+    created_at: unixTimestampSchema.optional(),
+    created_by: z.string().optional(),
+    org_id: z.string().nullable().optional(),
+    structured_output_schema: z.record(z.unknown()).nullable().optional(),
+    updated_at: unixTimestampSchema.optional(),
+    updated_by: z.string().optional(),
   })
   .passthrough();
 
 export const playbookListResponseSchema = paginatedResponseSchema(playbookResponseSchema);
 
+// Matches the real v3 KnowledgeNoteResponse: it has NO created_by/updated_by
+// (requiring them dropped every real note), and includes folder_path + macro.
+// Non-essential metadata is optional so shape drift can't blank the screen.
 export const knowledgeNoteResponseSchema = z
   .object({
-    access_type: accessTypeSchema,
-    body: z.string(),
-    created_at: unixTimestampSchema,
-    created_by: z.string(),
-    folder_id: z.string().nullable(),
-    is_enabled: z.boolean().nullable(),
-    name: z.string(),
     note_id: z.string(),
-    org_id: z.string().nullable(),
-    pinned_repo: z.string().nullable(),
+    name: z.string(),
+    body: z.string(),
     trigger: z.string(),
-    updated_at: unixTimestampSchema,
-    updated_by: z.string(),
+    access_type: accessTypeSchema.optional(),
+    created_at: unixTimestampSchema.optional(),
+    updated_at: unixTimestampSchema.optional(),
+    folder_id: z.string().nullable().optional(),
+    folder_path: z.string().optional(),
+    is_enabled: z.boolean().nullable().optional(),
+    macro: z.string().nullable().optional(),
+    org_id: z.string().nullable().optional(),
+    pinned_repo: z.string().nullable().optional(),
+    created_by: z.string().optional(),
+    updated_by: z.string().optional(),
   })
   .passthrough();
 
@@ -381,19 +386,20 @@ export const knowledgeNoteListResponseSchema = paginatedResponseSchema(
   knowledgeNoteResponseSchema,
 );
 
+// The real SecretResponse has no org_id; keep metadata optional.
 export const secretResponseSchema = z
   .object({
-    access_type: accessTypeSchema,
-    created_at: unixTimestampSchema,
-    created_by: z.string(),
-    is_sensitive: z.boolean(),
-    key: z.string(),
-    note: z.string().nullable(),
-    org_id: z.string().nullable(),
     secret_id: z.string(),
-    secret_type: secretTypeSchema,
-    updated_at: unixTimestampSchema,
-    updated_by: z.string(),
+    key: z.string(),
+    note: z.string().nullable().optional(),
+    secret_type: secretTypeSchema.catch('key-value'),
+    access_type: accessTypeSchema.optional(),
+    created_at: unixTimestampSchema.optional(),
+    created_by: z.string().optional(),
+    is_sensitive: z.boolean().optional(),
+    org_id: z.string().nullable().optional(),
+    updated_at: unixTimestampSchema.optional(),
+    updated_by: z.string().optional(),
   })
   .passthrough();
 // SECURITY: secret values are never returned by the list endpoint. This schema
