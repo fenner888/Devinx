@@ -71,7 +71,8 @@ export default function SessionDetailScreen() {
 
   const validId = id && isValidSessionId(id) ? id : undefined;
   const { data: session, isLoading, error, refetch } = useSession(validId);
-  const { data: messages } = useMessages(validId);
+  const { data: messagesData } = useMessages(validId);
+  const messages = messagesData?.items;
   const sendMessage = useSendMessage(validId);
   const updateTags = useUpdateTags(validId);
   const { tokens } = useTheme();

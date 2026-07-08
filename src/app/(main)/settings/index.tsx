@@ -162,6 +162,33 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
+        {/* Resources — mirrors the web settings tree */}
+        <Text className="text-text-low text-text12 font-medium uppercase mb-2">Resources</Text>
+        <View className="bg-surface1 rounded-2xl border border-border-subtle overflow-hidden mb-6">
+          {(
+            [
+              { icon: 'document-text-outline', label: 'Knowledge', route: '/(main)/knowledge', tint: 'bg-tint-purple', color: tokens.merged.hex },
+              { icon: 'book-outline', label: 'Playbooks', route: '/(main)/playbooks', tint: 'bg-tint-blue', color: tokens.brandText.hex },
+              { icon: 'lock-closed-outline', label: 'Secrets', route: '/(main)/secrets', tint: 'bg-tint-orange', color: tokens.blocked.hex },
+              { icon: 'stats-chart-outline', label: 'Analytics', route: '/(main)/analytics', tint: 'bg-tint-green', color: tokens.finished.hex },
+            ] as const
+          ).map(({ icon, label, route, tint, color }, i, arr) => (
+            <Pressable
+              key={label}
+              className={`flex-row items-center px-4 py-3 ${i < arr.length - 1 ? 'border-b border-border-subtle' : ''}`}
+              onPress={() => router.push(route)}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+            >
+              <View className={`w-8 h-8 rounded-button items-center justify-center mr-3 ${tint}`}>
+                <Ionicons name={icon} size={15} color={color} />
+              </View>
+              <Text className="text-text-hi text-text14 flex-1">{label}</Text>
+              <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+            </Pressable>
+          ))}
+        </View>
+
         {/* About */}
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">About</Text>
         <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-3 mb-6">

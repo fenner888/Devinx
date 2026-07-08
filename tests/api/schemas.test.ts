@@ -15,7 +15,7 @@ import {
   knowledgeNoteResponseSchema,
   secretResponseSchema,
   attachmentResponseSchema,
-  dailyConsumptionResponseSchema,
+  consumptionResponseSchema,
   sessionCreateRequestSchema,
 } from '../../src/api/devin/schemas';
 
@@ -190,24 +190,31 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(out.attachment_id).toBe('a1');
   });
 
-  it('parses daily consumption', () => {
-    const out = dailyConsumptionResponseSchema.parse({
-      acus: 3.5,
-      acus_by_product: { devin: 3.0, cascade: 0.5, terminal: 0 },
-      date: '2026-07-07',
+  it('parses the real daily-consumption envelope (unix dates, nullable products)', () => {
+    const out = consumptionResponseSchema.parse({
+      total_acus: 12.5,
+      consumption_by_date: [
+        {
+          date: 1751875200, // unix seconds — NOT a string
+          acus: 3.5,
+          acus_by_product: { devin: 3.0, cascade: 0.5, terminal: 0, review: null },
+        },
+      ],
     });
-    expect(out.acus_by_product.devin).toBe(3.0);
+    expect(out.consumption_by_date[0]?.acus).toBe(3.5);
+    expect(out.consumption_by_date[0]?.acus_by_product.review).toBeNull();
   });
 
-  it('tolerates unknown products, missing total, and ISO dates in daily consumption', () => {
-    const out = dailyConsumptionResponseSchema.parse({
-      acus_by_product: { devin: 2, devin_review: 1.5, deepwiki: 0.25 },
-      date: '2026-07-07T00:00:00Z',
+  it('tolerates unknown products and missing totals in the envelope', () => {
+    const out = consumptionResponseSchema.parse({
+      consumption_by_date: [
+        { date: 1751875200, acus_by_product: { devin: 2, deepwiki: 0.25 } },
+        { date: '2026-07-07' },
+      ],
     });
-    expect(out.acus).toBeUndefined();
-    expect(out.acus_by_product.devin_review).toBe(1.5);
-    const empty = dailyConsumptionResponseSchema.parse({ date: '2026-07-07' });
-    expect(empty.acus_by_product).toEqual({});
+    expect(out.total_acus).toBeUndefined();
+    expect(out.consumption_by_date[0]?.acus_by_product.deepwiki).toBe(0.25);
+    expect(out.consumption_by_date[1]?.acus_by_product).toEqual({});
   });
 
   it('parses a session create request with all optional fields', () => {

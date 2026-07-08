@@ -7,12 +7,13 @@
 import { branding } from '@lib/branding';
 
 /**
- * Devin session ID: devin- prefix + URL-safe suffix. Real IDs come in more
- * than one shape (32-hex, dashed UUIDs, older formats) — requiring exactly
- * 32 hex chars rejected legitimate sessions returned by the API. The point
- * of this check is path-segment safety (no /, ?, #, .), not format policing.
+ * Session ID safety check. The v3 API returns `session_id` WITHOUT the
+ * devin- prefix (the prefixed form is `devin_id`, used only in URL paths),
+ * so the prefix must be optional here — requiring it rejected every real
+ * session. The point of this check is path-segment safety (no /, ?, #),
+ * not format policing; the API layer adds the devin- prefix when needed.
  */
-const SESSION_ID_RE = /^devin-[A-Za-z0-9_-]{6,64}$/;
+const SESSION_ID_RE = /^(devin-)?[A-Za-z0-9_-]{6,64}$/;
 
 export interface ParsedDeepLink {
   valid: boolean;

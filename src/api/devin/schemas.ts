@@ -128,6 +128,7 @@ export const sessionCreateRequestSchema = z
     knowledge_ids: z.array(z.string()).optional(),
     max_acu_limit: z.number().positive().optional(),
     playbook_id: z.string().optional(),
+    repos: z.array(z.string()).optional(),
     secret_ids: z.array(z.string()).optional(),
     session_secrets: z.array(sessionSecretInputSchema).optional(),
     snapshot_id: z.string().optional(),
@@ -409,29 +410,27 @@ export const attachmentResponseSchema = z
 // Consumption
 // ---------------------------------------------------------------------------
 
-// Tolerant on purpose: the product set changes as Cognition ships products
-// (devin/cascade/terminal/review/...), `acus` may be omitted, and `date` may
-// arrive as YYYY-MM-DD or a full ISO datetime. Requiring exact keys made
-// every real response fail validation and broke the Usage screen.
-export const dailyConsumptionResponseSchema = z
+/**
+ * GET /v3/organizations/{org_id}/consumption/daily returns an ENVELOPE
+ * (per the v3 OpenAPI spec):
+ *   { total_acus: number, consumption_by_date: [{ date, acus, acus_by_product }] }
+ * where `date` is a unix INTEGER (midnight PST = 08:00 UTC) and product
+ * values can be null (e.g. `review`). Product keys stay open-ended.
+ */
+export const consumptionByDateSchema = z
   .object({
+    date: z.union([z.number(), z.string()]),
     acus: acuCountSchema.optional(),
-    acus_by_product: z.record(acuCountSchema).optional().default({}),
-    date: z.string().min(1),
+    acus_by_product: z.record(z.number().nullable()).optional().default({}),
   })
   .passthrough();
 
-/**
- * The daily-consumption endpoint returns a date-range of days — accept a bare
- * array, a paginated `{items}` envelope, or a single object (defensively).
- * Validating against the single-object schema alone rejected every real
- * multi-day response and broke the Usage screen.
- */
-export const dailyConsumptionListSchema = z.union([
-  z.array(dailyConsumptionResponseSchema),
-  z.object({ items: z.array(dailyConsumptionResponseSchema) }).passthrough(),
-  dailyConsumptionResponseSchema,
-]);
+export const consumptionResponseSchema = z
+  .object({
+    total_acus: z.number().optional(),
+    consumption_by_date: z.array(consumptionByDateSchema),
+  })
+  .passthrough();
 
 export const consumptionCycleSchema = z
   .object({
@@ -459,3 +458,171 @@ export const apiErrorDetailSchema = z.object({
 export const apiErrorResponseSchema = z.object({
   detail: z.union([z.array(apiErrorDetailSchema), z.string()]),
 });
+
+// ---------------------------------------------------------------------------
+// Schedules (Automations)
+// ---------------------------------------------------------------------------
+
+export const scheduleResponseSchema = z
+  .object({
+    // The API calls the sched- ID `scheduled_session_id`; accept either name.
+    schedule_id: z.string().optional(),
+    scheduled_session_id: z.string().optional(),
+    name: z.string(),
+    prompt: z.string(),
+    enabled: z.boolean(),
+    schedule_type: z.enum(['recurring', 'one_time']).catch('recurring'),
+    frequency: z.string().nullable().optional(),
+    scheduled_at: z.string().nullable().optional(),
+    agent: z.string().optional(),
+    notify_on: z.string().optional(),
+    consecutive_failures: z.number().optional(),
+    last_executed_at: z.string().nullable().optional(),
+    last_error_message: z.string().nullable().optional(),
+    created_at: z.string().optional(),
+    updated_at: z.string().optional(),
+    tags: z.array(z.string()).nullable().optional(),
+  })
+  .passthrough()
+  // Fail closed: without an ID, PATCH/DELETE would target the collection path.
+  .refine((s) => !!(s.schedule_id || s.scheduled_session_id), {
+    message: 'schedule has no schedule_id/scheduled_session_id',
+  });
+
+export const scheduleListResponseSchema = paginatedResponseSchema(scheduleResponseSchema);
+
+// ---------------------------------------------------------------------------
+// PR Reviews (Devin Review)
+// ---------------------------------------------------------------------------
+
+export const prReviewResponseSchema = z
+  .object({
+    status: z.enum(['pending', 'running', 'completed', 'errored', 'cancelled']),
+    repo_path: z.string(),
+    pr_number: z.number(),
+    commit_sha: z.string(),
+    created_at: z.string(),
+  })
+  .passthrough();
+
+// ---------------------------------------------------------------------------
+// Code scans (Devin Security — enterprise-scoped)
+// ---------------------------------------------------------------------------
+
+export const codeScanFindingSchema = z
+  .object({
+    finding_id: z.string(),
+    scan_id: z.string(),
+    title: z.string(),
+    description: z.string().nullable().optional(),
+    recommendation: z.string().nullable().optional(),
+    severity: z.enum(['critical', 'high', 'medium', 'low']).catch('medium'),
+    status: z.enum(['open', 'dismissed', 'resolved']).catch('open'),
+    category: z.string().nullable().optional(),
+    repo_name: z.string(),
+    pr_url: z.string().nullable().optional(),
+    session_id: z.string().nullable().optional(),
+    created_at: z.number().optional(),
+  })
+  .passthrough();
+
+export const codeScanFindingListResponseSchema = paginatedResponseSchema(codeScanFindingSchema);
+
+// ---------------------------------------------------------------------------
+// Resource management requests (outbound validation)
+// ---------------------------------------------------------------------------
+
+export const knowledgeNoteCreateRequestSchema = z
+  .object({
+    name: z.string().min(1),
+    body: z.string().min(1),
+    trigger: z.string().min(1),
+    folder_id: z.string().nullable().optional(),
+    is_enabled: z.boolean().optional(),
+    pinned_repo: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const playbookCreateRequestSchema = z
+  .object({
+    title: z.string().min(1),
+    body: z.string().min(1),
+    macro: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const secretCreateRequestSchema = z
+  .object({
+    type: secretTypeSchema,
+    key: z.string().min(1).max(256),
+    value: z.string().min(1),
+    note: z.string().nullable().optional(),
+    is_sensitive: z.boolean().optional(),
+  })
+  .passthrough();
+
+// ---------------------------------------------------------------------------
+// Org metrics (Analytics)
+// ---------------------------------------------------------------------------
+
+const countRecordSchema = z.record(z.number());
+
+export const sessionMetricsSchema = z
+  .object({
+    sessions_created_count: z.number(),
+    sessions_created_by_size: countRecordSchema.optional().default({}),
+    sessions_created_by_origin: countRecordSchema.optional().default({}),
+    sessions_created_with_playbook_count: z.number().optional().default(0),
+    sessions_created_with_search_count: z.number().optional().default(0),
+    sessions_with_merged_prs_count: z.number().optional().default(0),
+    sessions_with_merged_prs_by_size: countRecordSchema.optional().default({}),
+    avg_acus_per_session: z.number().optional().default(0),
+  })
+  .passthrough();
+
+export const prMetricsSchema = z
+  .object({
+    prs_created_count: z.number().optional(),
+    prs_opened_count: z.number().optional(),
+    prs_merged_count: z.number().optional(),
+    prs_closed_count: z.number().optional(),
+  })
+  .passthrough();
+
+export const searchMetricsSchema = z
+  .object({ searches_created_count: z.number().optional() })
+  .passthrough();
+
+export const activeUserPeriodSchema = z
+  .object({
+    start_time: z.union([z.number(), z.string()]),
+    end_time: z.union([z.number(), z.string()]),
+    active_users: z.number(),
+  })
+  .passthrough();
+
+// The list may arrive bare or wrapped in an items envelope.
+export const activeUsersResponseSchema = z.union([
+  z.array(activeUserPeriodSchema),
+  z.object({ items: z.array(activeUserPeriodSchema) }).passthrough(),
+]);
+
+// ---------------------------------------------------------------------------
+// Repositories (v3beta1)
+// ---------------------------------------------------------------------------
+
+export const repositoryResponseSchema = z
+  .object({
+    provider_repository_id: z.string(),
+    git_connection_id: z.string(),
+    git_connection_host: z.string(),
+    repo_name: z.string(),
+    repo_path: z.string(),
+    repo_description: z.string().nullable().optional(),
+    repo_language: z.string().nullable().optional(),
+    last_updated_at: z.union([z.string(), z.number()]).nullable().optional(),
+    indexing_status: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const repositoryListResponseSchema = paginatedResponseSchema(repositoryResponseSchema);

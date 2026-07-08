@@ -14,15 +14,18 @@ describe('deep-link validation (§10.9)', () => {
     expect(result.sessionId).toBe(id);
   });
 
-  it('rejects a session ID without devin- prefix', () => {
+  // The v3 API returns session_id without the devin- prefix — both forms
+  // are legitimate deep-link payloads.
+  it('accepts a bare session ID without devin- prefix', () => {
     const result = parseDeepLink('devinx://session/0a4d31d638894ec2b9d64338be35eb3b');
-    expect(result.valid).toBe(false);
-    expect(result.reason).toContain('Invalid session ID');
+    expect(result.valid).toBe(true);
+    expect(result.sessionId).toBe('0a4d31d638894ec2b9d64338be35eb3b');
   });
 
-  it('rejects a session ID that is too short', () => {
-    const result = parseDeepLink('devinx://session/devin-short');
+  it('rejects a path-unsafe session ID', () => {
+    const result = parseDeepLink('devinx://session/devin-abc%2F..%2Fetc');
     expect(result.valid).toBe(false);
+    expect(result.reason).toContain('Invalid session ID');
   });
 
   it('rejects a non-session route', () => {
@@ -53,16 +56,17 @@ describe('deep-link validation (§10.9)', () => {
     expect(withFragment.sessionId).toBe(id);
   });
 
-  it('isValidSessionId validates standalone IDs', () => {
+  it('isValidSessionId enforces path safety, not format', () => {
     expect(isValidSessionId('devin-0a4d31d638894ec2b9d64338be35eb3b')).toBe(true);
-    expect(isValidSessionId('devin-short')).toBe(false);
-    expect(isValidSessionId('not-a-devin-id')).toBe(false);
+    // The v3 API returns session_id WITHOUT the devin- prefix.
+    expect(isValidSessionId('0a4d31d638894ec2b9d64338be35eb3b')).toBe(true);
+    expect(isValidSessionId('abc')).toBe(false); // too short
     expect(isValidSessionId('')).toBe(false);
   });
 
   it('accepts real-world ID shapes beyond 32-hex (dashed UUIDs etc.)', () => {
     expect(isValidSessionId('devin-0a4d31d6-3889-4ec2-b9d6-4338be35eb3b')).toBe(true);
-    expect(isValidSessionId('devin-AbC123xyz789')).toBe(true);
+    expect(isValidSessionId('AbC123xyz789')).toBe(true);
   });
 
   it('still rejects path-unsafe IDs', () => {

@@ -6,6 +6,7 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator, useWindowDimensio
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useDailyConsumption } from '@api/devin/queries';
 import { useTheme } from '@theme/index';
 import type { DailyConsumptionResponse } from '@api/devin/types';
@@ -67,9 +68,41 @@ export default function UsageScreen() {
         <ScrollView className="flex-1 px-4 py-4">
           <ConsumptionChart data={data} />
           <ConsumptionSummary data={data} />
+          <PlanAndQuotas />
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+/**
+ * Plan, quota, and on-demand balance aren't exposed by the public Devin API —
+ * only ACU consumption is. Hand off to the web app's Usage & Limits page.
+ */
+function PlanAndQuotas() {
+  const { tokens } = useTheme();
+  return (
+    <Pressable
+      className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4"
+      onPress={() => {
+        WebBrowser.openBrowserAsync('https://app.devin.ai/settings/usage-limits').catch(() => {});
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Plan and quotas (opens in browser)"
+    >
+      <View className="flex-row items-center">
+        <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
+          <Ionicons name="card-outline" size={15} color={tokens.brandText.hex} />
+        </View>
+        <View className="flex-1">
+          <Text className="text-text-hi text-text14">Plan, quotas & billing</Text>
+          <Text className="text-text-low text-text12 mt-0.5">
+            Daily/weekly quota and on-demand balance aren't exposed by the Devin API — manage them on the web.
+          </Text>
+        </View>
+        <Ionicons name="open-outline" size={15} color={tokens.textLow.hex} />
+      </View>
+    </Pressable>
   );
 }
 

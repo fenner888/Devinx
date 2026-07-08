@@ -22,8 +22,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
-import { useCreateSession, usePlaybooks, useKnowledge, useSecrets, useUploadAttachment } from '@api/devin/queries';
-import { MODE_OPTIONS } from '@lib/session-utils';
+import { useCreateSession, usePlaybooks, useKnowledge, useSecrets, useUploadAttachment, useRepositories } from '@api/devin/queries';
+import { ModeSettings } from '@components/ModeSettings';
 import type { DevinMode } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 
@@ -34,6 +34,7 @@ const MAX_TITLE = 200;
 interface Draft {
   prompt: string;
   title: string;
+  repos: string[];
   playbookId: string | null;
   knowledgeIds: string[];
   secretIds: string[];
@@ -46,6 +47,7 @@ interface Draft {
 const emptyDraft: Draft = {
   prompt: '',
   title: '',
+  repos: [],
   playbookId: null,
   knowledgeIds: [],
   secretIds: [],
@@ -61,6 +63,7 @@ export default function ComposeScreen() {
   const { data: playbooks, isLoading: playbooksLoading } = usePlaybooks();
   const { data: knowledge } = useKnowledge();
   const { data: secrets } = useSecrets();
+  const { data: repositories } = useRepositories();
   const uploadAttachment = useUploadAttachment();
   const { tokens } = useTheme();
 
@@ -68,6 +71,7 @@ export default function ComposeScreen() {
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [loaded, setLoaded] = useState(false);
   const [showPlaybookPicker, setShowPlaybookPicker] = useState(false);
+  const [showRepoPicker, setShowRepoPicker] = useState(false);
   const [showKnowledgePicker, setShowKnowledgePicker] = useState(false);
   const [showSecretsPicker, setShowSecretsPicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -160,6 +164,7 @@ export default function ComposeScreen() {
       const session = await createSession.mutateAsync({
         prompt: draft.prompt.trim(),
         title: draft.title.trim() || undefined,
+        repos: draft.repos.length > 0 ? draft.repos : undefined,
         playbook_id: draft.playbookId ?? undefined,
         knowledge_ids: draft.knowledgeIds.length > 0 ? draft.knowledgeIds : undefined,
         secret_ids: draft.secretIds.length > 0 ? draft.secretIds : undefined,
@@ -245,24 +250,30 @@ export default function ComposeScreen() {
             </Text>
           )}
 
-          {/* Mode toggle */}
-          <Text className="text-text-low text-text12 font-medium uppercase mb-1 mt-4">Mode</Text>
-          <View className="flex-row bg-tint-secondary rounded-button p-1 mb-1">
-            {MODE_OPTIONS.map(({ key, label }) => (
-              <Pressable
-                key={key}
-                className={`flex-1 rounded-button py-2 ${draft.mode === key ? 'bg-surface2' : ''}`}
-                onPress={() => updateDraft({ mode: key })}
-              >
-                <Text className={`text-center text-text13 ${draft.mode === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
+          {/* Session settings — same grouping as the web composer */}
+          <Text className="text-text-low text-text12 font-medium uppercase mb-1 mt-4">Session settings</Text>
+          <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-2 mb-4">
+            <ModeSettings
+              mode={draft.mode}
+              onChange={(m) => updateDraft({ mode: m })}
+              checkColor={tokens.brandText.hex}
+              mutedColor={tokens.textLow.hex}
+            />
           </View>
-          <Text className="text-text-low text-text12 mb-4">
-            {MODE_OPTIONS.find((m) => m.key === draft.mode)?.description}
-          </Text>
+
+          {/* Repository picker */}
+          <Pressable
+            className="bg-surface1 rounded-input px-3 py-3 mb-3 flex-row items-center justify-between"
+            onPress={() => setShowRepoPicker(true)}
+          >
+            <View className="flex-1">
+              <Text className="text-text-low text-text12 mb-0.5">Repositories</Text>
+              <Text className="text-text14 text-text-hi" numberOfLines={1}>
+                {draft.repos.length > 0 ? draft.repos.join(', ') : 'Any (Devin decides)'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+          </Pressable>
 
           {/* Playbook picker */}
           <Pressable
@@ -437,6 +448,54 @@ export default function ComposeScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Repository picker modal */}
+      <Modal visible={showRepoPicker} animationType="slide" transparent onRequestClose={() => setShowRepoPicker(false)}>
+        <View className="flex-1 bg-scrim justify-end">
+          <View className="bg-surface1 rounded-t-card px-5 py-6 max-h-[70%]">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-text-hi text-text17">Select repositories</Text>
+              <Pressable onPress={() => setShowRepoPicker(false)}>
+                <Text className="text-brand-text text-text14">Done</Text>
+              </Pressable>
+            </View>
+            {repositories && repositories.length > 0 ? (
+              <ScrollView>
+                {repositories.map((repo) => {
+                  const selected = draft.repos.includes(repo.repo_path);
+                  return (
+                    <Pressable
+                      key={repo.provider_repository_id}
+                      className={`py-3 border-b border-border-subtle flex-row items-center ${selected ? 'bg-tint-primary' : ''}`}
+                      onPress={() =>
+                        updateDraft({
+                          repos: selected
+                            ? draft.repos.filter((r) => r !== repo.repo_path)
+                            : [...draft.repos, repo.repo_path],
+                        })
+                      }
+                    >
+                      <View className="flex-1">
+                        <Text className={`text-text14 ${selected ? 'text-brand-text font-medium' : 'text-text-hi'}`}>
+                          {repo.repo_name}
+                        </Text>
+                        <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>
+                          {repo.repo_path}{repo.repo_language ? ` · ${repo.repo_language}` : ''}
+                        </Text>
+                      </View>
+                      {selected && <Ionicons name="checkmark" size={16} color={tokens.brandText.hex} />}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <Text className="text-text-mid text-text14">
+                No repositories found — connect a git provider in the Devin web app first.
+              </Text>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Playbook picker modal */}
       <Modal visible={showPlaybookPicker} animationType="slide" transparent onRequestClose={() => setShowPlaybookPicker(false)}>

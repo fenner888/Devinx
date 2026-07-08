@@ -7,11 +7,11 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { AppState } from 'react-native';
 import { useAuth } from '@auth/AuthContext';
 import { shouldRetryQuery } from './client';
-import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment } from './endpoints';
+import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment, listSchedules, createSchedule, updateSchedule, deleteSchedule, triggerPrReview, getPrReview, listCodeScanFindings, remediateFinding, createKnowledgeNote, updateKnowledgeNote, deleteKnowledgeNote, createPlaybook, updatePlaybook, deletePlaybook, createSecret, deleteSecret, getSessionMetrics, getPrMetrics, getSearchMetrics, getWeeklyActiveUsers, listRepositories } from './endpoints';
 import { queryKeys } from './queryKeys';
 import { pollingPolicy, scalePolling, type ScreenContext } from '@lib/polling';
 import { useAppPreferences } from '@store/preferences';
-import type { Cursor, SessionCreateRequest, SessionResponse } from './types';
+import type { Cursor, SessionCreateRequest, SessionResponse, ScheduleCreateRequest, ScheduleUpdateRequest, KnowledgeNoteCreateRequest, KnowledgeNoteUpdateRequest, PlaybookCreateRequest, PlaybookUpdateRequest, SecretCreateRequest, MetricsQuery } from './types';
 
 // Pagination caps — enough for any realistic board/timeline while bounding
 // worst-case request fan-out per refetch.
@@ -92,26 +92,40 @@ export function useSession(sessionId: string | undefined) {
   });
 }
 
+interface MessagesData {
+  items: import('./types').SessionMessage[];
+  endCursor: Cursor | null;
+}
+
 export function useMessages(sessionId: string | undefined) {
   const { provider, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: sessionId ? queryKeys.messages(sessionId) : ['messages', 'none'],
-    queryFn: async () => {
+    queryFn: async (): Promise<MessagesData> => {
       if (!provider) throw new Error('Not authenticated');
       if (!sessionId) throw new Error('No session ID');
-      // Follow pagination — long sessions have >100 messages, and the cursor
-      // is forward-only, so a single page would never show new messages.
-      const items = [];
-      let cursor: Cursor | null = null;
+      // Incremental fetch: messages are append-only with forward cursors, so
+      // steady-state polls only pull NEW messages after the stored cursor
+      // instead of re-downloading every page every 5 seconds.
+      const prev = queryClient.getQueryData<MessagesData>(queryKeys.messages(sessionId));
+      const items = prev ? [...prev.items] : [];
+      let cursor: Cursor | null = prev?.endCursor ?? null;
       for (let page = 0; page < MAX_MESSAGE_PAGES; page++) {
         const result = await listMessages(provider, sessionId, { first: 100, after: cursor });
         items.push(...result.items);
-        if (!result.hasNextPage || !result.endCursor) break;
-        cursor = result.endCursor;
+        if (result.endCursor) cursor = result.endCursor;
+        if (!result.hasNextPage) break;
       }
-      return items;
+      // Dedupe by event_id in case a page boundary repeats an item.
+      const seen = new Set<string>();
+      const deduped = items.filter((m) => {
+        if (seen.has(m.event_id)) return false;
+        seen.add(m.event_id);
+        return true;
+      });
+      return { items: deduped, endCursor: cursor };
     },
     enabled: isAuthenticated && !!provider && !!sessionId,
     placeholderData: keepPreviousData,
@@ -309,5 +323,288 @@ export function useUpdateTags(sessionId: string | undefined) {
         queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
       }
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Schedules (Automations)
+// ---------------------------------------------------------------------------
+
+export function useSchedules() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.schedules,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listSchedules(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+export function useCreateSchedule() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (body: ScheduleCreateRequest) => {
+      if (!provider) throw new Error('Not authenticated');
+      return createSchedule(provider, body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.schedules }),
+  });
+}
+
+export function useUpdateSchedule() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (params: { scheduleId: string; body: ScheduleUpdateRequest }) => {
+      if (!provider) throw new Error('Not authenticated');
+      return updateSchedule(provider, params.scheduleId, params.body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.schedules }),
+  });
+}
+
+export function useDeleteSchedule() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (scheduleId: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      await deleteSchedule(provider, scheduleId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.schedules }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// PR Reviews (Devin Review)
+// ---------------------------------------------------------------------------
+
+export function usePrReview(prUrl: string | null) {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.prReview(prUrl ?? ''),
+    queryFn: async () => {
+      if (!provider || !prUrl) throw new Error('Not authenticated');
+      return getPrReview(provider, prUrl);
+    },
+    enabled: isAuthenticated && !!provider && !!prUrl,
+    staleTime: 15_000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      // Poll while a review is in flight.
+      return status === 'pending' || status === 'running' ? 10_000 : false;
+    },
+    retry: shouldRetryQuery,
+  });
+}
+
+export function useTriggerPrReview() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (prUrl: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      return triggerPrReview(provider, prUrl);
+    },
+    onSuccess: (_data, prUrl) => queryClient.invalidateQueries({ queryKey: queryKeys.prReview(prUrl) }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Code scans (Devin Security — enterprise-scoped)
+// ---------------------------------------------------------------------------
+
+export function useCodeScanFindings() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.codeScanFindings,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listCodeScanFindings(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    // This query doubles as the enterprise-access probe for the Security nav
+    // item. For org-level keys it always 403s — without these flags the
+    // failed probe refires on every home mount/focus. Pull-to-refresh on the
+    // Security screen still refetches manually.
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: shouldRetryQuery,
+  });
+}
+
+export function useRemediateFinding() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (params: { scanId: string; findingId: string }) => {
+      if (!provider) throw new Error('Not authenticated');
+      await remediateFinding(provider, params.scanId, params.findingId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.codeScanFindings });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Resource management (Knowledge / Playbooks / Secrets)
+// ---------------------------------------------------------------------------
+
+export function useCreateKnowledgeNote() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (body: KnowledgeNoteCreateRequest) => {
+      if (!provider) throw new Error('Not authenticated');
+      return createKnowledgeNote(provider, body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+  });
+}
+
+export function useUpdateKnowledgeNote() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (params: { noteId: string; body: KnowledgeNoteUpdateRequest }) => {
+      if (!provider) throw new Error('Not authenticated');
+      return updateKnowledgeNote(provider, params.noteId, params.body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+  });
+}
+
+export function useDeleteKnowledgeNote() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (noteId: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      await deleteKnowledgeNote(provider, noteId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+  });
+}
+
+export function useCreatePlaybook() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (body: PlaybookCreateRequest) => {
+      if (!provider) throw new Error('Not authenticated');
+      return createPlaybook(provider, body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.playbooks }),
+  });
+}
+
+export function useUpdatePlaybook() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (params: { playbookId: string; body: PlaybookUpdateRequest }) => {
+      if (!provider) throw new Error('Not authenticated');
+      return updatePlaybook(provider, params.playbookId, params.body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.playbooks }),
+  });
+}
+
+export function useDeletePlaybook() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (playbookId: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      await deletePlaybook(provider, playbookId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.playbooks }),
+  });
+}
+
+export function useCreateSecret() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (body: SecretCreateRequest) => {
+      if (!provider) throw new Error('Not authenticated');
+      return createSecret(provider, body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.secrets }),
+  });
+}
+
+export function useDeleteSecret() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (secretId: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      await deleteSecret(provider, secretId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.secrets }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Org metrics (Analytics)
+// ---------------------------------------------------------------------------
+
+export interface OrgMetricsBundle {
+  sessions: Awaited<ReturnType<typeof getSessionMetrics>>;
+  prs: Awaited<ReturnType<typeof getPrMetrics>>;
+  searches: Awaited<ReturnType<typeof getSearchMetrics>>;
+  weeklyActiveUsers: Awaited<ReturnType<typeof getWeeklyActiveUsers>>;
+}
+
+export function useOrgMetrics(rangeDays: number) {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.metrics(String(rangeDays)),
+    queryFn: async (): Promise<OrgMetricsBundle> => {
+      if (!provider) throw new Error('Not authenticated');
+      const query: MetricsQuery = {
+        time_after: Math.floor(Date.now() / 1000) - rangeDays * 86_400,
+      };
+      // Fire the four metric calls together; WAU/searches may be unavailable
+      // on some plans — degrade those to empty rather than failing the screen.
+      const [sessions, prs, searches, weeklyActiveUsers] = await Promise.all([
+        getSessionMetrics(provider, query),
+        getPrMetrics(provider, query).catch(() => ({}) as Awaited<ReturnType<typeof getPrMetrics>>),
+        getSearchMetrics(provider, query).catch(() => ({}) as Awaited<ReturnType<typeof getSearchMetrics>>),
+        getWeeklyActiveUsers(provider, query).catch(() => []),
+      ]);
+      return { sessions, prs, searches, weeklyActiveUsers };
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Repositories (v3beta1)
+// ---------------------------------------------------------------------------
+
+export function useRepositories() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.repositories,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listRepositories(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 10 * 60_000,
+    retry: shouldRetryQuery,
   });
 }
