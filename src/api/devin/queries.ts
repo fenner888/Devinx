@@ -7,11 +7,11 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { AppState } from 'react-native';
 import { useAuth } from '@auth/AuthContext';
 import { shouldRetryQuery } from './client';
-import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment } from './endpoints';
+import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment, listSchedules, createSchedule, updateSchedule, deleteSchedule, triggerPrReview, getPrReview, listCodeScanFindings, remediateFinding } from './endpoints';
 import { queryKeys } from './queryKeys';
 import { pollingPolicy, scalePolling, type ScreenContext } from '@lib/polling';
 import { useAppPreferences } from '@store/preferences';
-import type { Cursor, SessionCreateRequest, SessionResponse } from './types';
+import type { Cursor, SessionCreateRequest, SessionResponse, ScheduleCreateRequest, ScheduleUpdateRequest } from './types';
 
 // Pagination caps — enough for any realistic board/timeline while bounding
 // worst-case request fan-out per refetch.
@@ -308,6 +308,129 @@ export function useUpdateTags(sessionId: string | undefined) {
         queryClient.invalidateQueries({ queryKey: queryKeys.session(sessionId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
       }
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Schedules (Automations)
+// ---------------------------------------------------------------------------
+
+export function useSchedules() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.schedules,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listSchedules(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+export function useCreateSchedule() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (body: ScheduleCreateRequest) => {
+      if (!provider) throw new Error('Not authenticated');
+      return createSchedule(provider, body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.schedules }),
+  });
+}
+
+export function useUpdateSchedule() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (params: { scheduleId: string; body: ScheduleUpdateRequest }) => {
+      if (!provider) throw new Error('Not authenticated');
+      return updateSchedule(provider, params.scheduleId, params.body);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.schedules }),
+  });
+}
+
+export function useDeleteSchedule() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (scheduleId: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      await deleteSchedule(provider, scheduleId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.schedules }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// PR Reviews (Devin Review)
+// ---------------------------------------------------------------------------
+
+export function usePrReview(prUrl: string | null) {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.prReview(prUrl ?? ''),
+    queryFn: async () => {
+      if (!provider || !prUrl) throw new Error('Not authenticated');
+      return getPrReview(provider, prUrl);
+    },
+    enabled: isAuthenticated && !!provider && !!prUrl,
+    staleTime: 15_000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      // Poll while a review is in flight.
+      return status === 'pending' || status === 'running' ? 10_000 : false;
+    },
+    retry: shouldRetryQuery,
+  });
+}
+
+export function useTriggerPrReview() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (prUrl: string) => {
+      if (!provider) throw new Error('Not authenticated');
+      return triggerPrReview(provider, prUrl);
+    },
+    onSuccess: (_data, prUrl) => queryClient.invalidateQueries({ queryKey: queryKeys.prReview(prUrl) }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Code scans (Devin Security — enterprise-scoped)
+// ---------------------------------------------------------------------------
+
+export function useCodeScanFindings() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.codeScanFindings,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listCodeScanFindings(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+export function useRemediateFinding() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (params: { scanId: string; findingId: string }) => {
+      if (!provider) throw new Error('Not authenticated');
+      await remediateFinding(provider, params.scanId, params.findingId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.codeScanFindings });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
     },
   });
 }

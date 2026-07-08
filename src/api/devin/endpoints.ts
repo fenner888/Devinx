@@ -22,6 +22,10 @@ import {
   secretListResponseSchema,
   attachmentResponseSchema,
   consumptionResponseSchema,
+  scheduleResponseSchema,
+  scheduleListResponseSchema,
+  prReviewResponseSchema,
+  codeScanFindingListResponseSchema,
 } from './schemas';
 import type {
   SessionResponse,
@@ -36,6 +40,11 @@ import type {
   DailyConsumptionResponse,
   SessionInsightsResponse,
   InsightsGenerateResponse,
+  ScheduleResponse,
+  ScheduleCreateRequest,
+  ScheduleUpdateRequest,
+  PrReviewResponse,
+  CodeScanFinding,
   Cursor,
 } from './types';
 
@@ -286,4 +295,96 @@ export async function getDailyConsumption(auth: AuthProvider, params?: { time_af
       ),
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ---------------------------------------------------------------------------
+// Schedules (Automations)
+// ---------------------------------------------------------------------------
+
+/** The API names the sched- ID `scheduled_session_id`; normalize to schedule_id. */
+function normalizeSchedule(raw: Record<string, unknown>): ScheduleResponse {
+  const schedule = raw as unknown as ScheduleResponse & { scheduled_session_id?: string };
+  return { ...schedule, schedule_id: schedule.schedule_id ?? schedule.scheduled_session_id ?? '' };
+}
+
+export async function listSchedules(auth: AuthProvider): Promise<ScheduleResponse[]> {
+  const orgPath = await auth.orgPath();
+  const orgId = orgPath.replace('/v3/organizations/', '');
+  const data = await apiRequest<{ items: Record<string, unknown>[] }>(auth, paths.schedules(orgId), {
+    method: 'GET',
+    query: { first: 100 },
+    schema: scheduleListResponseSchema,
+  });
+  return data.items.map(normalizeSchedule);
+}
+
+export async function createSchedule(auth: AuthProvider, body: ScheduleCreateRequest): Promise<ScheduleResponse> {
+  const orgPath = await auth.orgPath();
+  const orgId = orgPath.replace('/v3/organizations/', '');
+  const raw = await apiRequest<Record<string, unknown>>(auth, paths.schedules(orgId), {
+    method: 'POST',
+    body,
+    schema: scheduleResponseSchema,
+  });
+  return normalizeSchedule(raw);
+}
+
+export async function updateSchedule(auth: AuthProvider, scheduleId: string, body: ScheduleUpdateRequest): Promise<ScheduleResponse> {
+  const orgPath = await auth.orgPath();
+  const orgId = orgPath.replace('/v3/organizations/', '');
+  const raw = await apiRequest<Record<string, unknown>>(auth, paths.schedule(orgId, scheduleId), {
+    method: 'PATCH',
+    body,
+    schema: scheduleResponseSchema,
+  });
+  return normalizeSchedule(raw);
+}
+
+export async function deleteSchedule(auth: AuthProvider, scheduleId: string): Promise<void> {
+  const orgPath = await auth.orgPath();
+  const orgId = orgPath.replace('/v3/organizations/', '');
+  await apiRequest(auth, paths.schedule(orgId, scheduleId), { method: 'DELETE' });
+}
+
+// ---------------------------------------------------------------------------
+// PR Reviews (Devin Review)
+// ---------------------------------------------------------------------------
+
+export async function triggerPrReview(auth: AuthProvider, prUrl: string): Promise<PrReviewResponse> {
+  const orgPath = await auth.orgPath();
+  const orgId = orgPath.replace('/v3/organizations/', '');
+  return apiRequest<PrReviewResponse>(auth, paths.prReviews(orgId), {
+    method: 'POST',
+    body: { pr_url: prUrl },
+    schema: prReviewResponseSchema,
+  });
+}
+
+export async function getPrReview(auth: AuthProvider, prUrl: string): Promise<PrReviewResponse> {
+  const orgPath = await auth.orgPath();
+  const orgId = orgPath.replace('/v3/organizations/', '');
+  return apiRequest<PrReviewResponse>(auth, paths.prReviews(orgId), {
+    method: 'GET',
+    query: { pr_url: prUrl },
+    schema: prReviewResponseSchema,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Code scans (Devin Security — enterprise-scoped)
+// ---------------------------------------------------------------------------
+
+export async function listCodeScanFindings(auth: AuthProvider): Promise<CodeScanFinding[]> {
+  const data = await apiRequest<{ items: CodeScanFinding[] }>(auth, paths.codeScanFindings(), {
+    method: 'GET',
+    query: { first: 100 },
+    schema: codeScanFindingListResponseSchema,
+  });
+  return data.items;
+}
+
+export async function remediateFinding(auth: AuthProvider, scanId: string, findingId: string): Promise<void> {
+  const orgPath = await auth.orgPath();
+  const orgId = orgPath.replace('/v3/organizations/', '');
+  await apiRequest(auth, paths.codeScanRemediate(orgId, scanId, findingId), { method: 'POST' });
 }

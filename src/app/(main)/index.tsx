@@ -25,7 +25,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@theme/index';
 import { useSessions, useArchiveSession, useTerminateSession, useCreateSession, usePlaybooks } from '@api/devin/queries';
 import { OfflineBanner } from '@components/OfflineBanner';
@@ -55,14 +54,13 @@ type ContextAction = 'open' | 'share_link' | 'archive' | 'terminate';
 const MAX_PROMPT = 10000;
 
 /**
- * Devin sidebar products without a usable public API — these open the
- * web app in the browser (same pattern as Ask mode).
+ * Devin sidebar products — all native screens. Wiki (DeepWiki) is omitted:
+ * it has no public API, and nothing here should bounce users to a browser.
  */
-const WEB_NAV_ITEMS: { icon: keyof typeof Ionicons.glyphMap; label: string; url: string }[] = [
-  { icon: 'time-outline', label: 'Automations', url: 'https://app.devin.ai/automations' },
-  { icon: 'shield-outline', label: 'Security', url: 'https://app.devin.ai/security' },
-  { icon: 'git-pull-request-outline', label: 'Review', url: 'https://app.devin.ai/review' },
-  { icon: 'book-outline', label: 'Wiki', url: 'https://app.devin.ai/wiki' },
+const NAV_ITEMS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: string }[] = [
+  { icon: 'time-outline', label: 'Automations', route: '/(main)/automations' },
+  { icon: 'shield-outline', label: 'Security', route: '/(main)/security' },
+  { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review' },
 ];
 
 export default function MainScreen() {
@@ -417,20 +415,20 @@ export default function MainScreen() {
                   <Ionicons name="add" size={17} color={tokens.textHi.hex} />
                   <Text className="text-text-hi text-text14 font-medium ml-3">New session</Text>
                 </Pressable>
-                {WEB_NAV_ITEMS.map(({ icon, label, url }) => (
+                {NAV_ITEMS.map(({ icon, label, route }) => (
                   <Pressable
                     key={label}
                     className="flex-row items-center rounded-button px-3 py-2.5"
                     onPress={() => {
                       hapticLight();
-                      WebBrowser.openBrowserAsync(url).catch(() => {});
+                      setDrawerOpen(false);
+                      router.push(route as never);
                     }}
                     accessibilityRole="button"
-                    accessibilityLabel={`${label} (opens in browser)`}
+                    accessibilityLabel={label}
                   >
                     <Ionicons name={icon} size={16} color={tokens.textMid.hex} />
                     <Text className="text-text-mid text-text14 ml-3 flex-1">{label}</Text>
-                    <Ionicons name="open-outline" size={12} color={tokens.textLow.hex} />
                   </Pressable>
                 ))}
               </View>

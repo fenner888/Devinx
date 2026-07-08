@@ -15,7 +15,7 @@ const DEFAULT_BASE_URL = 'https://api.devin.ai';
 const TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 3;
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export class ApiError extends Error {
   constructor(

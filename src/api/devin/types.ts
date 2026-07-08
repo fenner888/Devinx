@@ -417,4 +417,95 @@ export const paths = {
     `/v3/organizations/${orgId}/consumption/daily`,
   /** Enterprise-level (requires ManageBilling). */
   consumptionCycles: () => `/v3/enterprise/consumption/cycles`,
+  schedules: (orgId: OrgId) => `/v3/organizations/${orgId}/schedules`,
+  schedule: (orgId: OrgId, scheduleId: string) =>
+    `/v3/organizations/${orgId}/schedules/${scheduleId}`,
+  prReviews: (orgId: OrgId) => `/v3/organizations/${orgId}/pr-reviews`,
+  /** Enterprise-level (requires enterprise code-scan permissions). */
+  codeScanFindings: () => `/v3/enterprise/code-scans/findings`,
+  codeScanRemediate: (orgId: OrgId, scanId: string, findingId: string) =>
+    `/v3/enterprise/organizations/${orgId}/code-scans/${scanId}/findings/${findingId}/remediate`,
 } as const;
+
+// ---------------------------------------------------------------------------
+// Schedules (Automations)
+// ---------------------------------------------------------------------------
+
+export type ScheduleType = 'recurring' | 'one_time';
+
+export interface ScheduleResponse {
+  /** Schedule ID (prefix: sched-). */
+  schedule_id: string;
+  name: string;
+  prompt: string;
+  enabled: boolean;
+  schedule_type: ScheduleType;
+  /** Cron expression (recurring schedules). */
+  frequency: string | null;
+  /** ISO 8601 datetime (one-time schedules). */
+  scheduled_at: string | null;
+  agent?: string;
+  notify_on?: string;
+  consecutive_failures?: number;
+  last_executed_at?: string | null;
+  last_error_message?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  tags?: string[] | null;
+}
+
+export interface ScheduleCreateRequest {
+  name: string;
+  prompt: string;
+  schedule_type?: ScheduleType;
+  frequency?: string | null;
+  scheduled_at?: string | null;
+  tags?: string[];
+  playbook_id?: string | null;
+}
+
+export interface ScheduleUpdateRequest {
+  name?: string;
+  prompt?: string;
+  enabled?: boolean;
+  frequency?: string | null;
+  scheduled_at?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// PR Reviews (Devin Review)
+// ---------------------------------------------------------------------------
+
+export type PrReviewStatus = 'pending' | 'running' | 'completed' | 'errored' | 'cancelled';
+
+export interface PrReviewResponse {
+  status: PrReviewStatus;
+  /** Host-prefixed repo path, e.g. github.com/owner/repo. */
+  repo_path: string;
+  pr_number: number;
+  commit_sha: string;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Code scans (Devin Security — enterprise-scoped)
+// ---------------------------------------------------------------------------
+
+export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
+export type FindingStatus = 'open' | 'dismissed' | 'resolved';
+
+export interface CodeScanFinding {
+  finding_id: string;
+  scan_id: string;
+  title: string;
+  description: string | null;
+  recommendation: string | null;
+  severity: FindingSeverity;
+  status: FindingStatus;
+  category: string | null;
+  repo_name: string;
+  pr_url: string | null;
+  /** Remediation session, when one has been launched. */
+  session_id?: string | null;
+  created_at?: number;
+}

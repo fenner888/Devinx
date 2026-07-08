@@ -457,3 +457,68 @@ export const apiErrorDetailSchema = z.object({
 export const apiErrorResponseSchema = z.object({
   detail: z.union([z.array(apiErrorDetailSchema), z.string()]),
 });
+
+// ---------------------------------------------------------------------------
+// Schedules (Automations)
+// ---------------------------------------------------------------------------
+
+export const scheduleResponseSchema = z
+  .object({
+    // The API calls the sched- ID `scheduled_session_id`; accept either name.
+    schedule_id: z.string().optional(),
+    scheduled_session_id: z.string().optional(),
+    name: z.string(),
+    prompt: z.string(),
+    enabled: z.boolean(),
+    schedule_type: z.enum(['recurring', 'one_time']).catch('recurring'),
+    frequency: z.string().nullable().optional(),
+    scheduled_at: z.string().nullable().optional(),
+    agent: z.string().optional(),
+    notify_on: z.string().optional(),
+    consecutive_failures: z.number().optional(),
+    last_executed_at: z.string().nullable().optional(),
+    last_error_message: z.string().nullable().optional(),
+    created_at: z.string().optional(),
+    updated_at: z.string().optional(),
+    tags: z.array(z.string()).nullable().optional(),
+  })
+  .passthrough();
+
+export const scheduleListResponseSchema = paginatedResponseSchema(scheduleResponseSchema);
+
+// ---------------------------------------------------------------------------
+// PR Reviews (Devin Review)
+// ---------------------------------------------------------------------------
+
+export const prReviewResponseSchema = z
+  .object({
+    status: z.enum(['pending', 'running', 'completed', 'errored', 'cancelled']),
+    repo_path: z.string(),
+    pr_number: z.number(),
+    commit_sha: z.string(),
+    created_at: z.string(),
+  })
+  .passthrough();
+
+// ---------------------------------------------------------------------------
+// Code scans (Devin Security — enterprise-scoped)
+// ---------------------------------------------------------------------------
+
+export const codeScanFindingSchema = z
+  .object({
+    finding_id: z.string(),
+    scan_id: z.string(),
+    title: z.string(),
+    description: z.string().nullable().optional(),
+    recommendation: z.string().nullable().optional(),
+    severity: z.enum(['critical', 'high', 'medium', 'low']).catch('medium'),
+    status: z.enum(['open', 'dismissed', 'resolved']).catch('open'),
+    category: z.string().nullable().optional(),
+    repo_name: z.string(),
+    pr_url: z.string().nullable().optional(),
+    session_id: z.string().nullable().optional(),
+    created_at: z.number().optional(),
+  })
+  .passthrough();
+
+export const codeScanFindingListResponseSchema = paginatedResponseSchema(codeScanFindingSchema);

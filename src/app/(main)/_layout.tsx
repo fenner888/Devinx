@@ -7,6 +7,9 @@ export default function MainGroup() {
       <Stack.Screen name="session/[id]" />
       <Stack.Screen name="compose" />
       <Stack.Screen name="usage" />
+      <Stack.Screen name="automations" />
+      <Stack.Screen name="review" />
+      <Stack.Screen name="security" />
       <Stack.Screen name="settings/index" />
     </Stack>
   );
