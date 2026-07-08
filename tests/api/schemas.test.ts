@@ -190,6 +190,19 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(out.attachment_id).toBe('a1');
   });
 
+  it('salvages a list page when one item is malformed instead of failing the page', () => {
+    const page = sessionListResponseSchema.parse({
+      end_cursor: null,
+      has_next_page: false,
+      items: [
+        sessionFixture,
+        { session_id: 'broken', title: 'missing every required field' },
+      ],
+    });
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]?.session_id).toBe(sessionFixture.session_id);
+  });
+
   it('parses the real daily-consumption envelope (unix dates, nullable products)', () => {
     const out = consumptionResponseSchema.parse({
       total_acus: 12.5,

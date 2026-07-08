@@ -87,12 +87,32 @@ export const messageSourceSchema = z.enum(['devin', 'user']);
 // Pagination envelope (generic)
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-item salvage: one malformed item must not blank an entire list
+ * (fail-closed at the item level, fail-open at the page level). Dropped
+ * items are logged in dev; the page still renders everything valid.
+ */
+export const salvageArraySchema = <T extends z.ZodTypeAny>(item: T) =>
+  z.array(z.unknown()).transform((arr) => {
+    const valid: z.infer<T>[] = [];
+    let dropped = 0;
+    for (const raw of arr) {
+      const parsed = item.safeParse(raw);
+      if (parsed.success) valid.push(parsed.data);
+      else dropped++;
+    }
+    if (dropped > 0 && typeof console !== 'undefined') {
+      console.warn(`[schemas] dropped ${dropped} invalid item(s) from a list response`);
+    }
+    return valid;
+  });
+
 export const paginatedResponseSchema = <T extends z.ZodTypeAny>(item: T) =>
   z
     .object({
       end_cursor: cursorSchema.nullable(),
       has_next_page: z.boolean().default(false),
-      items: z.array(item),
+      items: salvageArraySchema(item),
       total: z.number().nullable().optional(),
     })
     .passthrough();

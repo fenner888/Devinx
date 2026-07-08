@@ -542,20 +542,6 @@ export default function MainScreen() {
                 />
               )}
 
-              {/* Footer — Settings pinned at the bottom, like the Devin sidebar */}
-              <Pressable
-                className="flex-row items-center px-4 py-3 border-t border-border-subtle"
-                onPress={() => {
-                  setDrawerOpen(false);
-                  router.push('/(main)/settings');
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Settings"
-              >
-                <Ionicons name="settings-outline" size={16} color={tokens.textMid.hex} />
-                <Text className="text-text-mid text-text14 ml-3 flex-1">Settings</Text>
-                <Ionicons name="chevron-forward" size={14} color={tokens.textLow.hex} />
-              </Pressable>
             </SafeAreaView>
           </View>
         </View>
