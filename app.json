@@ -32,6 +32,18 @@
       "expo-sqlite",
       "expo-font",
       [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#141414",
+          "dark": {
+            "backgroundColor": "#141414"
+          }
+        }
+      ],
+      [
         "@sentry/react-native",
         {
           "organization": "devinx",

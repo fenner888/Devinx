@@ -21,6 +21,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -47,6 +48,7 @@ import {
   modeLabel,
 } from '@lib/session-utils';
 import type { SessionResponse } from '@api/devin/types';
+import ICON_MARK from '../../../assets/brand/icon-transparent.png';
 import type { DevinMode } from '@api/devin/types';
 
 type ContextAction = 'open' | 'share_link' | 'archive' | 'terminate';
@@ -192,7 +194,8 @@ export default function MainScreen() {
           accessibilityLabel="Open sessions list"
         >
           <Ionicons name="menu-outline" size={22} color={tokens.textMid.hex} />
-          <Text className="text-text-hi text-text16 font-medium ml-2">DevinX</Text>
+          <Image source={ICON_MARK} className="w-5 h-5 ml-2" resizeMode="contain" />
+          <Text className="text-text-hi text-text16 font-medium ml-1.5">DevinX</Text>
         </Pressable>
         <View className="flex-row items-center gap-2">
           <Pressable
@@ -238,7 +241,7 @@ export default function MainScreen() {
           {/* Devin wordmark row */}
           <View className="flex-row items-center justify-between mb-3 px-1">
             <View className="flex-row items-center">
-              <Text className="text-brand text-text16 mr-2">{'✦'}</Text>
+              <Image source={ICON_MARK} className="w-5 h-5 mr-2" resizeMode="contain" />
               <Text className="text-text-hi text-text16 font-medium">Devin</Text>
             </View>
             <View className="flex-row bg-tint-secondary rounded-chip p-0.5">
@@ -396,7 +399,7 @@ export default function MainScreen() {
               {/* Drawer header */}
               <View className="flex-row items-center justify-between px-4 py-3">
                 <View className="flex-row items-center">
-                  <Text className="text-brand text-text16 mr-2">{'✦'}</Text>
+                  <Image source={ICON_MARK} className="w-5 h-5 mr-2" resizeMode="contain" />
                   <Text className="text-text-hi text-text16 font-medium">DevinX</Text>
                 </View>
                 <Pressable

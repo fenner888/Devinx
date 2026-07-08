@@ -2,10 +2,11 @@
  * Welcome screen — spec §7.1 step 1.
  * Value prop, disclaimer footer (§1.4), "Connect your Devin account" CTA.
  */
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { branding } from '@lib/branding';
+import WORDMARK from '../../../assets/wordmark.png';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -13,12 +14,13 @@ export default function WelcomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top', 'bottom']}>
       <ScrollView contentContainerClassName="flex-1 items-center justify-center px-6">
-        {/* Terminal-prompt motif (parity-delta #2: visual anchor for touch-first) */}
-        <View className="mb-8 items-center">
-          <Text className="font-mono text-text14 text-brand">{'>_'}</Text>
-        </View>
-
-        <Text className="text-text-hi text-text17 text-center mb-2">{branding.name}</Text>
+        {/* DevinX wordmark */}
+        <Image
+          source={WORDMARK}
+          className="w-56 h-14 mb-4"
+          resizeMode="contain"
+          accessibilityLabel={branding.name}
+        />
         <Text className="text-text-mid text-text14 text-center mb-8">
           {branding.subtitle}
         </Text>

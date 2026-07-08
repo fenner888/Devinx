@@ -41,7 +41,8 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    "nativewind-env.d.ts"
+    "nativewind-env.d.ts",
+    "assets-modules.d.ts"
   ],
   "exclude": [
     "node_modules",
