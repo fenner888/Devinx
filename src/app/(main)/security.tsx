@@ -98,7 +98,7 @@ export default function SecurityScreen() {
         </View>
       )}
 
-      {error && !isPermissionError && (
+      {error && !isPermissionError && !findings && (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-failed text-text14 mb-2">Could not load findings</Text>
           <Text className="text-text-mid text-text13 text-center mb-4">{error.message}</Text>
@@ -111,7 +111,7 @@ export default function SecurityScreen() {
         </View>
       )}
 
-      {!isLoading && !error && (findings?.length ?? 0) === 0 && (
+      {!isLoading && !error && findings && findings.length === 0 && (
         <EmptyState
           icon=">_"
           title="No findings"
@@ -119,7 +119,7 @@ export default function SecurityScreen() {
         />
       )}
 
-      {!isLoading && !error && (findings?.length ?? 0) > 0 && (
+      {findings && findings.length > 0 && (
         <ScrollView
           className="flex-1 px-4 py-3"
           refreshControl={

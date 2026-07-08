@@ -46,6 +46,8 @@ export default function AutomationsScreen() {
   const [cron, setCron] = useState('0 9 * * 1-5');
   const [agent, setAgent] = useState<'devin' | 'data_analyst'>('devin');
   const [createError, setCreateError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   function handleCreate() {
     if (!name.trim() || !prompt.trim() || !cron.trim() || createSchedule.isPending) return;
@@ -68,10 +70,22 @@ export default function AutomationsScreen() {
   }
 
   function handleToggle(schedule: ScheduleResponse) {
+    // One in-flight mutation per row — a second tap during flight would
+    // recompute from the same stale value and undo what the user sees.
+    if (pendingId === schedule.schedule_id) return;
     hapticLight();
+    setActionError(null);
+    setPendingId(schedule.schedule_id);
+    const target = !schedule.enabled;
     updateSchedule.mutate(
-      { scheduleId: schedule.schedule_id, body: { enabled: !schedule.enabled } },
-      { onError: () => hapticError() },
+      { scheduleId: schedule.schedule_id, body: { enabled: target } },
+      {
+        onSettled: () => setPendingId(null),
+        onError: (e) => {
+          hapticError();
+          setActionError(`Could not ${target ? 'enable' : 'disable'} "${schedule.name}": ${e.message}`);
+        },
+      },
     );
   }
 
@@ -84,7 +98,13 @@ export default function AutomationsScreen() {
         confirmLabel: 'Delete',
         destructive: true,
       },
-      () => deleteSchedule.mutate(schedule.schedule_id, { onError: () => hapticError() }),
+      () =>
+        deleteSchedule.mutate(schedule.schedule_id, {
+          onError: (e) => {
+            hapticError();
+            setActionError(`Could not delete "${schedule.name}": ${e.message}`);
+          },
+        }),
     );
   }
 
@@ -118,7 +138,7 @@ export default function AutomationsScreen() {
         </View>
       )}
 
-      {error && (
+      {error && !schedules && (
         <ErrorState
           title="Could not load automations"
           message={error.message}
@@ -126,7 +146,7 @@ export default function AutomationsScreen() {
         />
       )}
 
-      {!isLoading && !error && (schedules?.length ?? 0) === 0 && (
+      {!isLoading && schedules && schedules.length === 0 && (
         <EmptyState
           icon=">_"
           title="No automations yet"
@@ -134,14 +154,20 @@ export default function AutomationsScreen() {
         />
       )}
 
-      {!isLoading && !error && (schedules?.length ?? 0) > 0 && (
+      {schedules && schedules.length > 0 && (
         <ScrollView
           className="flex-1 px-4 py-3"
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={tokens.brand.hex} />
           }
         >
-          {schedules?.map((s) => (
+          {actionError && (
+            <View className="flex-row items-start bg-tint-red rounded-card px-3 py-2 mb-3">
+              <Ionicons name="alert-circle-outline" size={13} color={tokens.failed.hex} />
+              <Text className="text-failed text-text12 ml-2 flex-1">{actionError}</Text>
+            </View>
+          )}
+          {schedules.map((s) => (
             <View key={s.schedule_id} className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-3 mb-3">
               <View className="flex-row items-center">
                 <View className="flex-1 mr-3">
@@ -151,13 +177,20 @@ export default function AutomationsScreen() {
                 {/* Enable toggle */}
                 <Pressable
                   onPress={() => handleToggle(s)}
+                  disabled={pendingId === s.schedule_id}
                   accessibilityRole="switch"
                   accessibilityState={{ checked: s.enabled }}
                   accessibilityLabel={`${s.name} enabled`}
                 >
-                  <View className={`w-12 h-7 rounded-chip p-0.5 ${s.enabled ? 'bg-brand' : 'bg-tint-primary'}`}>
-                    <View className={`w-6 h-6 rounded-chip bg-surface2 ${s.enabled ? 'ml-auto' : ''}`} />
-                  </View>
+                  {pendingId === s.schedule_id ? (
+                    <View className="w-12 h-7 items-center justify-center">
+                      <ActivityIndicator size="small" color={tokens.brand.hex} />
+                    </View>
+                  ) : (
+                    <View className={`w-12 h-7 rounded-chip p-0.5 ${s.enabled ? 'bg-brand' : 'bg-tint-primary'}`}>
+                      <View className={`w-6 h-6 rounded-chip bg-surface2 ${s.enabled ? 'ml-auto' : ''}`} />
+                    </View>
+                  )}
                 </Pressable>
               </View>
               <View className="flex-row items-center mt-2">
@@ -194,14 +227,19 @@ export default function AutomationsScreen() {
       <Modal visible={showCreate} animationType="slide" transparent onRequestClose={() => setShowCreate(false)}>
         <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View className="flex-1 bg-scrim justify-end">
-            <View className="bg-surface2 rounded-t-sheet px-5 py-4">
+            <View className="bg-surface2 rounded-t-sheet px-5 py-4 max-h-[85%]">
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-text-hi text-text17">New automation</Text>
-                <Pressable onPress={() => setShowCreate(false)}>
+                <Pressable
+                  onPress={() => {
+                    setShowCreate(false);
+                    setCreateError(null);
+                  }}
+                >
                   <Ionicons name="close" size={18} color={tokens.textMid.hex} />
                 </Pressable>
               </View>
-
+              <ScrollView keyboardShouldPersistTaps="handled">
               <Text className="text-text-low text-text12 font-medium uppercase mb-1">Name</Text>
               <TextInput
                 className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-3"
@@ -287,6 +325,7 @@ export default function AutomationsScreen() {
                   </Text>
                 )}
               </Pressable>
+              </ScrollView>
             </View>
           </View>
         </KeyboardAvoidingView>

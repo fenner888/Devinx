@@ -483,7 +483,11 @@ export const scheduleResponseSchema = z
     updated_at: z.string().optional(),
     tags: z.array(z.string()).nullable().optional(),
   })
-  .passthrough();
+  .passthrough()
+  // Fail closed: without an ID, PATCH/DELETE would target the collection path.
+  .refine((s) => !!(s.schedule_id || s.scheduled_session_id), {
+    message: 'schedule has no schedule_id/scheduled_session_id',
+  });
 
 export const scheduleListResponseSchema = paginatedResponseSchema(scheduleResponseSchema);
 

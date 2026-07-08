@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { usePrReview, useTriggerPrReview } from '@api/devin/queries';
+import { ApiError } from '@api/devin/client';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
 import { useTheme } from '@theme/index';
 import type { PrReviewStatus } from '@api/devin/types';
@@ -66,10 +67,14 @@ export default function ReviewScreen() {
     if (!urlValid) return;
     hapticLight();
     setTriggerError(null);
-    setLookupUrl(url);
+    if (url === lookupUrl) {
+      review.refetch();
+    } else {
+      setLookupUrl(url);
+    }
   }
 
-  const isNotFound = review.error && /not found|404/i.test(review.error.message);
+  const isNotFound = review.error instanceof ApiError && review.error.code === 'not_found';
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
@@ -149,7 +154,7 @@ export default function ReviewScreen() {
             </View>
           )}
 
-          {lookupUrl && isNotFound && (
+          {lookupUrl && isNotFound && !review.data && (
             <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4">
               <Text className="text-text-hi text-text14 mb-1">No review yet</Text>
               <Text className="text-text-mid text-text13">
@@ -158,10 +163,19 @@ export default function ReviewScreen() {
             </View>
           )}
 
-          {lookupUrl && review.error && !isNotFound && (
+          {lookupUrl && review.error && !isNotFound && !review.data && (
             <View className="flex-row items-start bg-tint-red rounded-card px-3 py-2">
               <Ionicons name="alert-circle-outline" size={13} color={tokens.failed.hex} />
               <Text className="text-failed text-text12 ml-2 flex-1">{review.error.message}</Text>
+            </View>
+          )}
+
+          {review.data && review.error && (
+            <View className="flex-row items-start bg-tint-orange rounded-card px-3 py-2 mb-3">
+              <Ionicons name="alert-circle-outline" size={13} color={tokens.blocked.hex} />
+              <Text className="text-blocked text-text12 ml-2 flex-1">
+                Latest refresh failed — showing the last known status.
+              </Text>
             </View>
           )}
 

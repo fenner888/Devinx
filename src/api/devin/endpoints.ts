@@ -332,12 +332,20 @@ function normalizeSchedule(raw: Record<string, unknown>): ScheduleResponse {
 export async function listSchedules(auth: AuthProvider): Promise<ScheduleResponse[]> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  const data = await apiRequest<{ items: Record<string, unknown>[] }>(auth, paths.schedules(orgId), {
-    method: 'GET',
-    query: { first: 100 },
-    schema: scheduleListResponseSchema,
-  });
-  return data.items.map(normalizeSchedule);
+  const items: Record<string, unknown>[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 5; page++) {
+    const data: { items: Record<string, unknown>[]; end_cursor?: string | null; has_next_page?: boolean } =
+      await apiRequest(auth, paths.schedules(orgId), {
+        method: 'GET',
+        query: { first: 100, after: cursor },
+        schema: scheduleListResponseSchema,
+      });
+    items.push(...data.items);
+    if (!data.has_next_page || !data.end_cursor) break;
+    cursor = data.end_cursor;
+  }
+  return items.map(normalizeSchedule);
 }
 
 export async function createSchedule(auth: AuthProvider, body: ScheduleCreateRequest): Promise<ScheduleResponse> {
@@ -397,12 +405,20 @@ export async function getPrReview(auth: AuthProvider, prUrl: string): Promise<Pr
 // ---------------------------------------------------------------------------
 
 export async function listCodeScanFindings(auth: AuthProvider): Promise<CodeScanFinding[]> {
-  const data = await apiRequest<{ items: CodeScanFinding[] }>(auth, paths.codeScanFindings(), {
-    method: 'GET',
-    query: { first: 100 },
-    schema: codeScanFindingListResponseSchema,
-  });
-  return data.items;
+  const items: CodeScanFinding[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 5; page++) {
+    const data: { items: CodeScanFinding[]; end_cursor?: string | null; has_next_page?: boolean } =
+      await apiRequest(auth, paths.codeScanFindings(), {
+        method: 'GET',
+        query: { first: 100, after: cursor },
+        schema: codeScanFindingListResponseSchema,
+      });
+    items.push(...data.items);
+    if (!data.has_next_page || !data.end_cursor) break;
+    cursor = data.end_cursor;
+  }
+  return items;
 }
 
 export async function remediateFinding(auth: AuthProvider, scanId: string, findingId: string): Promise<void> {

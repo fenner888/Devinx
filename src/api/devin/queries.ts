@@ -92,26 +92,40 @@ export function useSession(sessionId: string | undefined) {
   });
 }
 
+interface MessagesData {
+  items: import('./types').SessionMessage[];
+  endCursor: Cursor | null;
+}
+
 export function useMessages(sessionId: string | undefined) {
   const { provider, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: sessionId ? queryKeys.messages(sessionId) : ['messages', 'none'],
-    queryFn: async () => {
+    queryFn: async (): Promise<MessagesData> => {
       if (!provider) throw new Error('Not authenticated');
       if (!sessionId) throw new Error('No session ID');
-      // Follow pagination — long sessions have >100 messages, and the cursor
-      // is forward-only, so a single page would never show new messages.
-      const items = [];
-      let cursor: Cursor | null = null;
+      // Incremental fetch: messages are append-only with forward cursors, so
+      // steady-state polls only pull NEW messages after the stored cursor
+      // instead of re-downloading every page every 5 seconds.
+      const prev = queryClient.getQueryData<MessagesData>(queryKeys.messages(sessionId));
+      const items = prev ? [...prev.items] : [];
+      let cursor: Cursor | null = prev?.endCursor ?? null;
       for (let page = 0; page < MAX_MESSAGE_PAGES; page++) {
         const result = await listMessages(provider, sessionId, { first: 100, after: cursor });
         items.push(...result.items);
-        if (!result.hasNextPage || !result.endCursor) break;
-        cursor = result.endCursor;
+        if (result.endCursor) cursor = result.endCursor;
+        if (!result.hasNextPage) break;
       }
-      return items;
+      // Dedupe by event_id in case a page boundary repeats an item.
+      const seen = new Set<string>();
+      const deduped = items.filter((m) => {
+        if (seen.has(m.event_id)) return false;
+        seen.add(m.event_id);
+        return true;
+      });
+      return { items: deduped, endCursor: cursor };
     },
     enabled: isAuthenticated && !!provider && !!sessionId,
     placeholderData: keepPreviousData,
@@ -416,6 +430,12 @@ export function useCodeScanFindings() {
     },
     enabled: isAuthenticated && !!provider,
     staleTime: 5 * 60_000,
+    // This query doubles as the enterprise-access probe for the Security nav
+    // item. For org-level keys it always 403s — without these flags the
+    // failed probe refires on every home mount/focus. Pull-to-refresh on the
+    // Security screen still refetches manually.
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     retry: shouldRetryQuery,
   });
 }
