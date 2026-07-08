@@ -1,13 +1,17 @@
 /**
- * Usage screen — ACU consumption dashboard.
- * Shows daily ACU breakdown for the last 30 days with a bar chart.
+ * Usage screen — ACU consumption.
+ * Headline totals come from the org SESSION METRICS endpoint (works for all
+ * plans, and is what the web Usage tab is built from). The per-day / per-
+ * product breakdown from the consumption endpoint is shown ONLY when it
+ * returns data (it's enterprise-billing-scoped and empty for self-serve orgs).
  */
 import { View, Text, Pressable, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import { useDailyConsumption } from '@api/devin/queries';
+import { useDailyConsumption, useOrgMetrics } from '@api/devin/queries';
+import { ApiError } from '@api/devin/client';
 import { useTheme } from '@theme/index';
 import type { DailyConsumptionResponse } from '@api/devin/types';
 
@@ -26,8 +30,14 @@ function formatAcu(n: number): string {
 
 export default function UsageScreen() {
   const router = useRouter();
-  const { data, isLoading, error, refetch } = useDailyConsumption();
   const { tokens } = useTheme();
+  const metrics = useOrgMetrics(30);
+  const { data: daily } = useDailyConsumption(30);
+
+  const isPermissionError = metrics.error instanceof ApiError && metrics.error.code === 'permission';
+  const sessions = metrics.data?.sessions;
+  const totalAcu = sessions ? sessions.avg_acus_per_session * sessions.sessions_created_count : 0;
+  const hasDaily = !!daily && daily.length > 0;
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
@@ -45,29 +55,58 @@ export default function UsageScreen() {
         <Text className="text-text-hi text-text17">Usage & limits</Text>
       </View>
 
-      {isLoading && (
+      {metrics.isLoading && (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={tokens.brand.hex} />
         </View>
       )}
 
-      {error && (
+      {isPermissionError && (
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-text-hi text-text14 text-center mb-2">Usage unavailable</Text>
+          <Text className="text-text-mid text-text13 text-center">
+            This service user lacks the metrics permission for the organization.
+          </Text>
+        </View>
+      )}
+
+      {metrics.error && !isPermissionError && !sessions && (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-failed text-text14 mb-2">Could not load usage data</Text>
-          <Text className="text-text-mid text-text13 text-center mb-4">{error.message}</Text>
+          <Text className="text-text-mid text-text13 text-center mb-4">{metrics.error.message}</Text>
           <Pressable
             className="bg-tint-secondary rounded-button px-buttonPrimaryX py-buttonPrimaryY"
-            onPress={() => refetch()}
+            onPress={() => metrics.refetch()}
           >
             <Text className="text-brand-text text-text14 font-medium">Try again</Text>
           </Pressable>
         </View>
       )}
 
-      {data && (
+      {sessions && (
         <ScrollView className="flex-1 px-4 py-4">
-          <ConsumptionChart data={data} />
-          <ConsumptionSummary data={data} />
+          {/* Headline totals (metrics — works for all plans) */}
+          <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
+            <Text className="text-text-low text-text12 font-medium uppercase mb-3">ACU consumption · last 30 days</Text>
+            <View className="flex-row flex-wrap">
+              {[
+                { label: 'Total ACU', value: formatAcu(totalAcu) },
+                { label: 'Sessions', value: String(sessions.sessions_created_count) },
+                { label: 'ACU / session', value: sessions.avg_acus_per_session.toFixed(2) },
+                { label: 'Merged PRs', value: String(sessions.sessions_with_merged_prs_count) },
+              ].map(({ label, value }) => (
+                <View key={label} className="w-1/2 mb-3 pr-2">
+                  <Text className="text-text-low text-text12">{label}</Text>
+                  <Text className="text-text-hi text-text17 mt-0.5">{value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Daily / per-product breakdown — only when consumption data exists */}
+          {hasDaily && <ConsumptionChart data={daily} />}
+          {hasDaily && <ConsumptionSummary data={daily} />}
+
           <PlanAndQuotas />
         </ScrollView>
       )}
