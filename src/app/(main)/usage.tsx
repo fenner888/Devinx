@@ -5,18 +5,74 @@
  * product breakdown from the consumption endpoint is shown ONLY when it
  * returns data (it's enterprise-billing-scoped and empty for self-serve orgs).
  */
+import { useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import { useDailyConsumption, useOrgMetrics } from '@api/devin/queries';
+import { useDailyConsumption, useOrgMetrics, type OrgMetricsBundle } from '@api/devin/queries';
 import { ApiError } from '@api/devin/client';
 import { useTheme } from '@theme/index';
 import type { DailyConsumptionResponse } from '@api/devin/types';
 
+type Tab = 'overview' | 'sessions' | 'reviews' | 'automations';
+
 const BAR_WIDTH = 4;
 const CHART_HEIGHT = 112;
+
+/** Shared stat-pair grid. */
+function StatGrid({ items }: { items: { label: string; value: string }[] }) {
+  return (
+    <View className="flex-row flex-wrap">
+      {items.map(({ label, value }) => (
+        <View key={label} className="w-1/2 mb-3 pr-2">
+          <Text className="text-text-low text-text12">{label}</Text>
+          <Text className="text-text-hi text-text17 mt-0.5">{value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const SIZE_ORDER = ['xs', 's', 'm', 'l', 'xl'];
+
+/** Horizontal distribution bar + legend, matching the analytics palette. */
+function Distribution({ data }: { data: Record<string, number> }) {
+  const { tokens } = useTheme();
+  const entries = Object.entries(data)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => {
+      const ai = SIZE_ORDER.indexOf(a[0]);
+      const bi = SIZE_ORDER.indexOf(b[0]);
+      if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      return b[1] - a[1];
+    });
+  const total = entries.reduce((sum, [, v]) => sum + v, 0);
+  if (total === 0) return <Text className="text-text-low text-text12">No data in this range.</Text>;
+  const sizeColors: Record<string, string> = {
+    xs: tokens.brand.hex, s: tokens.finished.hex, m: tokens.chartAmber.hex, l: tokens.blocked.hex, xl: tokens.failed.hex,
+  };
+  const palette = [tokens.brand.hex, tokens.finished.hex, tokens.merged.hex, tokens.blocked.hex, tokens.chartAmber.hex, tokens.failed.hex];
+  const color = (k: string, i: number) => sizeColors[k] ?? palette[i % palette.length] ?? tokens.brand.hex;
+  return (
+    <View>
+      <View className="flex-row h-2.5 rounded-chip overflow-hidden mb-2">
+        {entries.map(([k, v], i) => (
+          <View key={k} style={{ flex: v, backgroundColor: color(k, i) }} />
+        ))}
+      </View>
+      {entries.map(([k, v], i) => (
+        <View key={k} className="flex-row items-center py-1">
+          <View className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: color(k, i) }} />
+          <Text className="text-text-mid text-text13 flex-1">{k.replace(/_/g, ' ')}</Text>
+          <Text className="text-text-hi text-text13">{v}</Text>
+          <Text className="text-text-low text-text12 ml-2">({Math.round((v / total) * 100)}%)</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 /** Daily total — `acus` may be omitted by the API; fall back to the product sum. */
 function dayTotal(d: DailyConsumptionResponse): number {
@@ -28,21 +84,27 @@ function formatAcu(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'sessions', label: 'Sessions' },
+  { key: 'reviews', label: 'Reviews' },
+  { key: 'automations', label: 'Automations' },
+];
+
 export default function UsageScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
+  const [tab, setTab] = useState<Tab>('overview');
   const metrics = useOrgMetrics(30);
   const { data: daily } = useDailyConsumption(30);
 
   const isPermissionError = metrics.error instanceof ApiError && metrics.error.code === 'permission';
-  const sessions = metrics.data?.sessions;
-  const totalAcu = sessions ? sessions.avg_acus_per_session * sessions.sessions_created_count : 0;
-  const hasDaily = !!daily && daily.length > 0;
+  const bundle = metrics.data;
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
       {/* Header */}
-      <View className="flex-row items-center px-4 py-3 border-b border-border-subtle">
+      <View className="flex-row items-center px-4 py-3">
         <Pressable
           className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center mr-3"
           onPress={() => router.back()}
@@ -53,6 +115,21 @@ export default function UsageScreen() {
           <Ionicons name="chevron-back" size={18} color={tokens.textMid.hex} />
         </Pressable>
         <Text className="text-text-hi text-text17">Usage & limits</Text>
+      </View>
+
+      {/* Tabs — mirror the web Usage & Limits page */}
+      <View className="flex-row border-b border-border-subtle px-2">
+        {TABS.map(({ key, label }) => (
+          <Pressable
+            key={key}
+            className={`px-3 py-2.5 ${tab === key ? 'border-b-2 border-brand' : ''}`}
+            onPress={() => setTab(key)}
+          >
+            <Text className={`text-text13 ${tab === key ? 'text-brand-text font-medium' : 'text-text-mid'}`}>
+              {label}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       {metrics.isLoading && (
@@ -70,7 +147,7 @@ export default function UsageScreen() {
         </View>
       )}
 
-      {metrics.error && !isPermissionError && !sessions && (
+      {metrics.error && !isPermissionError && !bundle && (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-failed text-text14 mb-2">Could not load usage data</Text>
           <Text className="text-text-mid text-text13 text-center mb-4">{metrics.error.message}</Text>
@@ -83,34 +160,126 @@ export default function UsageScreen() {
         </View>
       )}
 
-      {sessions && (
+      {bundle && (
         <ScrollView className="flex-1 px-4 py-4">
-          {/* Headline totals (metrics — works for all plans) */}
-          <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
-            <Text className="text-text-low text-text12 font-medium uppercase mb-3">ACU consumption · last 30 days</Text>
-            <View className="flex-row flex-wrap">
-              {[
-                { label: 'Total ACU', value: formatAcu(totalAcu) },
-                { label: 'Sessions', value: String(sessions.sessions_created_count) },
-                { label: 'ACU / session', value: sessions.avg_acus_per_session.toFixed(2) },
-                { label: 'Merged PRs', value: String(sessions.sessions_with_merged_prs_count) },
-              ].map(({ label, value }) => (
-                <View key={label} className="w-1/2 mb-3 pr-2">
-                  <Text className="text-text-low text-text12">{label}</Text>
-                  <Text className="text-text-hi text-text17 mt-0.5">{value}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Daily / per-product breakdown — only when consumption data exists */}
-          {hasDaily && <ConsumptionChart data={daily} />}
-          {hasDaily && <ConsumptionSummary data={daily} />}
-
-          <PlanAndQuotas />
+          {tab === 'overview' && <OverviewTab bundle={bundle} daily={daily} />}
+          {tab === 'sessions' && <SessionsTab bundle={bundle} />}
+          {tab === 'reviews' && <ReviewsTab bundle={bundle} />}
+          {tab === 'automations' && <AutomationsTab bundle={bundle} onManage={() => router.push('/(main)/automations')} />}
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function OverviewTab({ bundle, daily }: { bundle: OrgMetricsBundle; daily?: DailyConsumptionResponse[] }) {
+  const s = bundle.sessions;
+  const totalAcu = s.avg_acus_per_session * s.sessions_created_count;
+  const hasDaily = !!daily && daily.length > 0;
+  return (
+    <>
+      <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
+        <Text className="text-text-low text-text12 font-medium uppercase mb-3">ACU consumption · last 30 days</Text>
+        <StatGrid
+          items={[
+            { label: 'Total ACU', value: formatAcu(totalAcu) },
+            { label: 'Sessions', value: String(s.sessions_created_count) },
+            { label: 'ACU / session', value: s.avg_acus_per_session.toFixed(2) },
+            { label: 'Merged PRs', value: String(s.sessions_with_merged_prs_count) },
+          ]}
+        />
+      </View>
+      {hasDaily && <ConsumptionChart data={daily} />}
+      {hasDaily && <ConsumptionSummary data={daily} />}
+      <PlanAndQuotas />
+    </>
+  );
+}
+
+function SessionsTab({ bundle }: { bundle: OrgMetricsBundle }) {
+  const s = bundle.sessions;
+  return (
+    <>
+      <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
+        <Text className="text-text-low text-text12 font-medium uppercase mb-3">Sessions · last 30 days</Text>
+        <StatGrid
+          items={[
+            { label: 'Created', value: String(s.sessions_created_count) },
+            { label: 'ACU / session', value: s.avg_acus_per_session.toFixed(2) },
+            { label: 'With playbook', value: String(s.sessions_created_with_playbook_count) },
+            { label: 'With search', value: String(s.sessions_created_with_search_count) },
+          ]}
+        />
+      </View>
+      <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
+        <Text className="text-text-low text-text12 font-medium uppercase mb-2">By size</Text>
+        <Distribution data={s.sessions_created_by_size} />
+      </View>
+      <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
+        <Text className="text-text-low text-text12 font-medium uppercase mb-2">By origin</Text>
+        <Distribution data={s.sessions_created_by_origin} />
+      </View>
+    </>
+  );
+}
+
+function ReviewsTab({ bundle }: { bundle: OrgMetricsBundle }) {
+  const p = bundle.prs;
+  const created = p.prs_created_count ?? 0;
+  const merged = p.prs_merged_count ?? 0;
+  const rate = created > 0 ? `${Math.round((merged / created) * 100)}%` : '—';
+  return (
+    <>
+      <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
+        <Text className="text-text-low text-text12 font-medium uppercase mb-3">Pull requests · last 30 days</Text>
+        <StatGrid
+          items={[
+            { label: 'Created', value: String(created) },
+            { label: 'Merged', value: String(merged) },
+            { label: 'Merge rate', value: rate },
+            { label: 'Closed', value: String(p.prs_closed_count ?? 0) },
+          ]}
+        />
+      </View>
+      <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
+        <Text className="text-text-low text-text12 font-medium uppercase mb-3">Merged PRs by session size</Text>
+        <Distribution data={bundle.sessions.sessions_with_merged_prs_by_size} />
+      </View>
+    </>
+  );
+}
+
+function AutomationsTab({ bundle, onManage }: { bundle: OrgMetricsBundle; onManage: () => void }) {
+  const { tokens } = useTheme();
+  const byOrigin = bundle.sessions.sessions_created_by_origin;
+  const automationSessions = byOrigin.automation ?? 0;
+  return (
+    <>
+      <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
+        <Text className="text-text-low text-text12 font-medium uppercase mb-3">Automations · last 30 days</Text>
+        <StatGrid
+          items={[
+            { label: 'Automated sessions', value: String(automationSessions) },
+            { label: 'Total sessions', value: String(bundle.sessions.sessions_created_count) },
+          ]}
+        />
+        <Text className="text-text-low text-text12 mt-1">
+          Sessions started by scheduled automations, of all sessions created in the range.
+        </Text>
+      </View>
+      <Pressable
+        className="flex-row items-center bg-surface1 rounded-2xl border border-border-subtle px-4 py-3 mb-4"
+        onPress={onManage}
+        accessibilityRole="button"
+        accessibilityLabel="Manage automations"
+      >
+        <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
+          <Ionicons name="time-outline" size={15} color={tokens.brandText.hex} />
+        </View>
+        <Text className="text-text-hi text-text14 flex-1">Manage automations</Text>
+        <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+      </Pressable>
+    </>
   );
 }
 
