@@ -6,17 +6,20 @@ import { View, Text, Pressable, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { branding } from '@lib/branding';
-import WORDMARK from '../../../assets/wordmark.png';
+import { useTheme } from '@theme/index';
+import WORDMARK_DARK from '../../../assets/wordmark.png';
+import WORDMARK_LIGHT from '../../../assets/wordmark-light.png';
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { name } = useTheme();
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top', 'bottom']}>
       <ScrollView contentContainerClassName="flex-1 items-center justify-center px-6">
         {/* DevinX wordmark */}
         <Image
-          source={WORDMARK}
+          source={name === 'light' ? WORDMARK_LIGHT : WORDMARK_DARK}
           className="w-56 h-14 mb-4"
           resizeMode="contain"
           accessibilityLabel={branding.name}

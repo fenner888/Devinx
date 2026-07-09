@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@auth/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCodeScanFindings } from '@api/devin/queries';
 import { purgeCache } from '@cache/index';
 import { branding } from '@lib/branding';
 import { confirmAction } from '@lib/confirm';
@@ -24,6 +25,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { disconnect, provider } = useAuth();
   const queryClient = useQueryClient();
+  const { data: scanFindings } = useCodeScanFindings();
   const { name, tokens } = useTheme();
   const currentPref = useThemePreference();
   const pollingMode = useAppPreferences((s) => s.pollingMode);
@@ -57,20 +59,11 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
-      <View className="flex-row items-center px-4 py-3 border-b border-border-subtle">
-        <Pressable
-          className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center mr-3"
-          onPress={() => router.back()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Ionicons name="chevron-back" size={18} color={tokens.textMid.hex} />
-        </Pressable>
-        <Text className="text-text-hi text-text17">Settings</Text>
+      <View className="px-5 pt-2 pb-4">
+        <Text className="text-text-hi text-text24">Settings</Text>
       </View>
 
-      <ScrollView className="flex-1 px-4 py-4">
+      <ScrollView className="flex-1 px-5" contentContainerClassName="pb-24">
         {/* Appearance */}
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">Appearance</Text>
         <View className="flex-row bg-tint-secondary rounded-button p-1 mb-6">
@@ -162,9 +155,36 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
+        {/* Products */}
+        <Text className="text-text-low text-text12 font-medium uppercase mb-2">Products</Text>
+        <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
+          {(
+            [
+              { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review', tint: 'bg-tint-blue', color: tokens.brandText.hex },
+              ...(scanFindings
+                ? [{ icon: 'shield-outline', label: 'Security', route: '/(main)/security', tint: 'bg-tint-red', color: tokens.failed.hex } as const]
+                : []),
+            ] as const
+          ).map(({ icon, label, route, tint, color }, i, arr) => (
+            <Pressable
+              key={label}
+              className={`flex-row items-center px-4 py-3 ${i < arr.length - 1 ? 'border-b border-border-subtle' : ''}`}
+              onPress={() => router.push(route)}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+            >
+              <View className={`w-8 h-8 rounded-button items-center justify-center mr-3 ${tint}`}>
+                <Ionicons name={icon} size={15} color={color} />
+              </View>
+              <Text className="text-text-hi text-text14 flex-1">{label}</Text>
+              <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+            </Pressable>
+          ))}
+        </View>
+
         {/* Resources — mirrors the web settings tree */}
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">Resources</Text>
-        <View className="bg-surface1 rounded-2xl border border-border-subtle overflow-hidden mb-6">
+        <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
           {(
             [
               { icon: 'document-text-outline', label: 'Knowledge', route: '/(main)/knowledge', tint: 'bg-tint-purple', color: tokens.merged.hex },

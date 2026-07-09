@@ -16,7 +16,6 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSchedules, useCreateSchedule, useUpdateSchedule, useDeleteSchedule } from '@api/devin/queries';
 import { ErrorState, EmptyState } from '@components/Skeletons';
@@ -33,7 +32,6 @@ const CRON_PRESETS: { label: string; cron: string }[] = [
 ];
 
 export default function AutomationsScreen() {
-  const router = useRouter();
   const { tokens } = useTheme();
   const { data: schedules, isLoading, error, refetch, isRefetching } = useSchedules();
   const createSchedule = useCreateSchedule();
@@ -110,19 +108,11 @@ export default function AutomationsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-3 border-b border-border-subtle">
+      {/* Header — top-level tab, no back button */}
+      <View className="flex-row items-center px-5 pt-2 pb-4">
+        <Text className="text-text-hi text-text24 flex-1">Automations</Text>
         <Pressable
-          className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center mr-3"
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Ionicons name="chevron-back" size={18} color={tokens.textMid.hex} />
-        </Pressable>
-        <Text className="text-text-hi text-text17 flex-1">Automations</Text>
-        <Pressable
-          className="flex-row items-center bg-brand rounded-button px-3 py-2"
+          className="flex-row items-center bg-brand rounded-button px-3.5 py-2"
           onPress={() => setShowCreate(true)}
           accessibilityRole="button"
           accessibilityLabel="New automation"

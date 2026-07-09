@@ -52,15 +52,16 @@ module.exports = {
         pillY: '4px', // status pill py
       },
       borderRadius: {
-        // [FALLBACK-REPLACED §5.3] 12/10/8 → 6/4/9999 (Devin's live scale)
-        card: '6px',
-        input: '6px',
-        button: '6px',
-        tab: '6px',
+        // Softer, roomier scale (Perplexity/Cursor-style) — larger surfaces.
+        card: '18px',
+        cardLg: '24px',
+        input: '14px',
+        button: '12px',
+        tab: '10px',
         chip: '9999px',
         dot: '9999px',
         inlineCode: '4px',
-        sheet: '20px',
+        sheet: '24px',
       },
       fontFamily: {
         sans: [
@@ -73,13 +74,16 @@ module.exports = {
         mono: ['SF Mono', 'Roboto Mono', 'JetBrains Mono', 'ui-monospace'],
       },
       fontSize: {
-        // [FALLBACK-REPLACED §5.2] 15/17/20/24/28 → 12/13/14/16/17
         text11: ['11px', { lineHeight: '14px' }],
         text12: ['12px', { lineHeight: '16px' }],
         text13: ['13px', { lineHeight: '18px' }],
         text14: ['14px', { lineHeight: '20px' }],
         text16: ['16px', { lineHeight: '22px' }],
         text17: ['17px', { lineHeight: '22px', fontWeight: '600' }],
+        // Larger display sizes for the roomier hero/heading hierarchy.
+        text20: ['20px', { lineHeight: '26px', fontWeight: '600' }],
+        text24: ['24px', { lineHeight: '30px', fontWeight: '600' }],
+        text28: ['28px', { lineHeight: '34px', fontWeight: '700' }],
       },
     },
   },
