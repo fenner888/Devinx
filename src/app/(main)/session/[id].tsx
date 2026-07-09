@@ -118,11 +118,10 @@ export default function SessionDetailScreen() {
   const colorClass = statusColorClass(statusKey);
   const dotClass = statusDotClass(statusKey);
   const label = statusLabel(session);
-  const isActive =
-    session.status === 'running' ||
-    session.status === 'new' ||
-    session.status === 'claimed' ||
-    session.status === 'resuming';
+  // You can message any non-terminal session. Sending to a suspended
+  // (sleeping) session automatically resumes it (per the Devin API), so the
+  // composer must show there too — only truly ended sessions hide it.
+  const canSend = session.status !== 'exit' && session.status !== 'error';
 
   function handleSend() {
     const text = messageText.trim();
@@ -238,12 +237,17 @@ export default function SessionDetailScreen() {
         )}
       </View>
 
-      {/* Message steering bar (only for active sessions) */}
-      {isActive && (
+      {/* Message steering bar — any non-terminal session (sleeping resumes) */}
+      {canSend && (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View className="px-3 py-2 border-t border-border-subtle bg-surface0">
+            {session.status === 'suspended' && (
+              <Text className="text-text-low text-text12 px-1 pb-1.5">
+                Sleeping — sending a message will wake Devin.
+              </Text>
+            )}
             <View className="flex-row items-end bg-surface1 rounded-2xl border border-border px-3 py-2">
               <TextInput
                 className="flex-1 text-text14 text-text-hi max-h-24 py-1"
