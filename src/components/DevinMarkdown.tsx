@@ -2,11 +2,36 @@
  * DevinMarkdown — renders Devin's chat replies as markdown (code blocks,
  * lists, headings, links) with theme-token styling, instead of plain text.
  */
-import { Linking, Platform } from 'react-native';
+import { Text, Linking, Platform } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { useTheme } from '@theme/index';
+import { InlineImage, InlineVideo, InlineAudio, isVideoUrl, isAudioUrl } from '@components/InlineMedia';
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
+
+type MdNode = { key: string; attributes: { src?: string; href?: string } };
+type MdStyle = { link?: object };
+
+/** Custom renderers (module-scope so they're stable across renders). */
+const MEDIA_RULES = {
+  image: (node: MdNode) => {
+    const src = node.attributes?.src ?? '';
+    if (!src) return null;
+    if (isVideoUrl(src)) return <InlineVideo key={node.key} uri={src} />;
+    if (isAudioUrl(src)) return <InlineAudio key={node.key} uri={src} />;
+    return <InlineImage key={node.key} uri={src} />;
+  },
+  link: (node: MdNode, linkChildren: React.ReactNode, _parent: unknown, mdStyles: MdStyle) => {
+    const href = node.attributes?.href ?? '';
+    if (isVideoUrl(href)) return <InlineVideo key={node.key} uri={href} />;
+    if (isAudioUrl(href)) return <InlineAudio key={node.key} uri={href} />;
+    return (
+      <Text key={node.key} style={mdStyles.link} onPress={() => Linking.openURL(href).catch(() => {})}>
+        {linkChildren}
+      </Text>
+    );
+  },
+};
 
 export function DevinMarkdown({ children }: { children: string }) {
   const { tokens } = useTheme();
@@ -69,6 +94,7 @@ export function DevinMarkdown({ children }: { children: string }) {
   return (
     <Markdown
       style={styles}
+      rules={MEDIA_RULES}
       onLinkPress={(url) => {
         Linking.openURL(url).catch(() => {});
         return false;

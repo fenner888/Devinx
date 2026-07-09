@@ -24,3 +24,16 @@ describe('DevinMarkdown', () => {
     expect(getByText('item one')).toBeTruthy();
   });
 });
+
+import { isVideoUrl, isAudioUrl } from '../../src/components/InlineMedia';
+
+describe('media URL detection', () => {
+  it('detects video and audio extensions (with query strings)', () => {
+    expect(isVideoUrl('https://x.com/a.mp4')).toBe(true);
+    expect(isVideoUrl('https://x.com/a.mov?t=1')).toBe(true);
+    expect(isAudioUrl('https://x.com/a.mp3')).toBe(true);
+    expect(isAudioUrl('https://x.com/a.m4a#frag')).toBe(true);
+    expect(isVideoUrl('https://x.com/a.png')).toBe(false);
+    expect(isAudioUrl('https://x.com/a.png')).toBe(false);
+  });
+});
