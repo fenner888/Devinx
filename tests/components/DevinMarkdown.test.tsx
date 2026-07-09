@@ -2,14 +2,47 @@
  * Smoke test for the markdown renderer — renders code/lists/links without
  * throwing and surfaces the text content.
  */
+const mockAudioPlayer = { play: jest.fn(), pause: jest.fn() };
+
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
   setItem: jest.fn(async () => undefined),
   removeItem: jest.fn(async () => undefined),
 }));
 
-import { render } from '@testing-library/react-native';
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  useSafeAreaInsets: jest.fn(() => ({ top: 0, right: 0, bottom: 0, left: 0 })),
+}));
+
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: () => null,
+}));
+
+jest.mock('expo-video', () => ({
+  VideoView: () => {
+    const React = jest.requireActual('react');
+    const { View } = jest.requireActual('react-native');
+    return React.createElement(View, { accessibilityLabel: 'Inline video' });
+  },
+  useVideoPlayer: jest.fn(() => ({ loop: false })),
+}));
+
+jest.mock('expo-audio', () => ({
+  useAudioPlayer: jest.fn(() => mockAudioPlayer),
+  useAudioPlayerStatus: jest.fn(() => ({
+    playing: false,
+    isLoaded: true,
+    currentTime: 0,
+    duration: 0,
+  })),
+}));
+
+import { Image } from 'react-native';
+import { useAudioPlayer } from 'expo-audio';
+import { fireEvent, render } from '@testing-library/react-native';
 import { DevinMarkdown } from '../../src/components/DevinMarkdown';
+import { InlineImage, isVideoUrl, isAudioUrl, isImageUrl } from '../../src/components/InlineMedia';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
 
 describe('DevinMarkdown', () => {
@@ -22,5 +55,71 @@ describe('DevinMarkdown', () => {
     );
     expect(getByText('Title')).toBeTruthy();
     expect(getByText('item one')).toBeTruthy();
+  });
+
+  it('renders an image with its markdown alt text', () => {
+    const { getByLabelText } = render(
+      <ThemeProvider>
+        <DevinMarkdown>![Architecture diagram](https://x.com/diagram.png)</DevinMarkdown>
+      </ThemeProvider>,
+    );
+    expect(getByLabelText('Architecture diagram')).toBeTruthy();
+  });
+
+  it('renders bare video and audio links as inline media', () => {
+    const audioUrl = 'https://x.com/clip.m4a?token=1';
+    const { getByLabelText } = render(
+      <ThemeProvider>
+        <DevinMarkdown>{`https://x.com/demo.mp4\n\n${audioUrl}`}</DevinMarkdown>
+      </ThemeProvider>,
+    );
+    expect(getByLabelText('Inline video')).toBeTruthy();
+    fireEvent.press(getByLabelText('Play audio'));
+    expect(useAudioPlayer).toHaveBeenCalledWith(audioUrl);
+    expect(mockAudioPlayer.play).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('InlineImage', () => {
+  it('opens and closes the full-screen viewer', () => {
+    const { getByLabelText, queryByLabelText } = render(
+      <ThemeProvider>
+        <InlineImage uri="https://x.com/image.png" alt="Screenshot" />
+      </ThemeProvider>,
+    );
+    fireEvent.press(getByLabelText('Screenshot'));
+    expect(getByLabelText('Close image')).toBeTruthy();
+    fireEvent.press(getByLabelText('Close image'));
+    expect(queryByLabelText('Close image')).toBeNull();
+  });
+
+  it('shows a non-interactive fallback without exposing the URI', () => {
+    const uri = 'https://x.com/image.png?token=secret';
+    const { UNSAFE_getByType, getByText, queryByText } = render(
+      <ThemeProvider>
+        <InlineImage uri={uri} />
+      </ThemeProvider>,
+    );
+    fireEvent(UNSAFE_getByType(Image), 'error');
+    expect(getByText('Image unavailable')).toBeTruthy();
+    expect(queryByText(uri)).toBeNull();
+  });
+});
+
+describe('media URL detection', () => {
+  it('detects supported HTTPS media extensions with query strings and fragments', () => {
+    expect(isVideoUrl('https://x.com/a.mp4')).toBe(true);
+    expect(isVideoUrl('https://x.com/a.mov?t=1')).toBe(true);
+    expect(isAudioUrl('https://x.com/a.mp3')).toBe(true);
+    expect(isAudioUrl('https://x.com/a.m4a#frag')).toBe(true);
+    expect(isImageUrl('https://x.com/a.png')).toBe(true);
+  });
+
+  it('rejects unsupported extensions and unsafe schemes', () => {
+    expect(isVideoUrl('https://x.com/a.png')).toBe(false);
+    expect(isAudioUrl('https://x.com/a.png')).toBe(false);
+    expect(isVideoUrl('ftp://x.com/a.mp4')).toBe(false);
+    expect(isAudioUrl('file:///tmp/a.mp3')).toBe(false);
+    expect(isImageUrl('data:text/html;base64,PHNjcmlwdD4=')).toBe(false);
   });
 });

@@ -63,7 +63,10 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-video",
+      "expo-audio",
+      "expo-asset"
     ],
     "experiments": {
       "tsconfigPaths": true
