@@ -23,7 +23,7 @@ import {
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession, useMessages, useSendMessage, useUpdateTags, useInsights, useGenerateInsights } from '@api/devin/queries';
@@ -77,6 +77,7 @@ export default function SessionDetailScreen() {
   const sendMessage = useSendMessage(validId);
   const updateTags = useUpdateTags(validId);
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
 
   // Clear the optimistic echo once the real user message shows up in the list.
   useEffect(() => {
@@ -257,9 +258,13 @@ export default function SessionDetailScreen() {
           {tab === 'insights' && <InsightsTab sessionId={validId} />}
         </View>
 
-        {/* Message steering bar — any non-terminal session (sleeping resumes) */}
+        {/* Message steering bar — any non-terminal session (sleeping resumes).
+            Bottom inset clears the iOS home indicator without sitting too low. */}
         {canSend && (
-          <View className="px-3 py-2 border-t border-border-subtle bg-surface0">
+          <View
+            className="px-3 pt-2 border-t border-border-subtle bg-surface0"
+            style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+          >
             {session.status === 'suspended' && (
               <Text className="text-text-low text-text12 px-1 pb-1.5">
                 Sleeping — sending a message will wake Devin.
@@ -395,7 +400,9 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
     );
   }
 
-  if (error || !insights) {
+  // Insights can come back without an `analysis` block until it's generated —
+  // treat that the same as "not generated yet".
+  if (error || !insights || !insights.analysis) {
     // A 404 means "not generated yet"; anything else is a real error.
     const isRealError = !!error && !/404|not found/i.test(error.message);
     return (

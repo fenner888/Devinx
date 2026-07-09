@@ -124,7 +124,21 @@ describe('API schema boundary validation (§8.3)', () => {
         timeline: [{ description: 'd', title: 't' }],
       },
     });
-    expect(out.analysis.issues[0]?.severity).toBe('low');
+    expect(out.analysis?.issues[0]?.severity).toBe('low');
+  });
+
+  it('parses insights without an analysis block (not generated yet)', () => {
+    const out = sessionInsightsResponseSchema.parse({
+      session_id: 'devin-1',
+      org_id: 'org-abc',
+      url: 'https://app.devin.ai/sessions/devin-1',
+      num_devin_messages: 3,
+      num_user_messages: 2,
+      tags: [],
+      pull_requests: [],
+    });
+    expect(out.analysis == null).toBe(true);
+    expect(out.session_id).toBe('devin-1');
   });
 
   it('parses a playbook', () => {

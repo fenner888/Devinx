@@ -270,19 +270,20 @@ export interface SessionInsightsAnalysis {
 }
 
 export interface SessionInsightsResponse {
-  acus_consumed: AcuCount;
-  created_at: UnixTimestamp;
+  session_id: string;
+  org_id: string;
+  url: string;
   num_devin_messages: number;
   num_user_messages: number;
-  org_id: string;
-  pull_requests: PullRequest[];
-  session_id: string;
-  session_size: SessionSize;
-  status: SessionStatus;
+  session_size?: string | null;
+  status?: string;
+  acus_consumed: AcuCount;
+  created_at?: UnixTimestamp;
+  updated_at?: UnixTimestamp;
   tags: string[];
-  updated_at: UnixTimestamp;
-  url: string;
-  analysis: SessionInsightsAnalysis;
+  pull_requests: PullRequest[];
+  /** Absent until insights have been generated for the session. */
+  analysis?: SessionInsightsAnalysis | null;
 }
 
 // ---------------------------------------------------------------------------

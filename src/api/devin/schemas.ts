@@ -309,31 +309,36 @@ export const insightTimelineEntrySchema = z
   })
   .passthrough();
 
+// Analysis fields default to empty so a partial/omitted analysis renders
+// gracefully instead of failing the whole insights response.
 export const sessionInsightsAnalysisSchema = z
   .object({
-    action: z.array(z.string()),
-    classification: z.string(),
-    issues: z.array(insightIssueSchema),
-    prompts: z.array(insightPromptSchema).nullable(),
-    timeline: z.array(insightTimelineEntrySchema),
+    action: z.array(z.string()).optional().default([]),
+    classification: z.string().optional().default(''),
+    issues: z.array(insightIssueSchema).optional().default([]),
+    prompts: z.array(insightPromptSchema).nullable().optional(),
+    timeline: z.array(insightTimelineEntrySchema).optional().default([]),
   })
   .passthrough();
 
+// Tolerant per the real contract: `analysis` is NOT required (absent until
+// generated), session_size/status are loosened to strings, and only IDs +
+// core counts are mandatory.
 export const sessionInsightsResponseSchema = z
   .object({
-    acus_consumed: acuCountSchema,
-    created_at: unixTimestampSchema,
-    num_devin_messages: z.number().int(),
-    num_user_messages: z.number().int(),
-    org_id: z.string(),
-    pull_requests: z.array(pullRequestSchema),
     session_id: z.string(),
-    session_size: sessionSizeSchema,
-    status: sessionStatusSchema,
-    tags: z.array(z.string()),
-    updated_at: unixTimestampSchema,
+    org_id: z.string(),
     url: z.string(),
-    analysis: sessionInsightsAnalysisSchema,
+    num_devin_messages: z.number().optional().default(0),
+    num_user_messages: z.number().optional().default(0),
+    session_size: z.string().nullable().optional(),
+    status: z.string().optional(),
+    acus_consumed: acuCountSchema.optional().default(0),
+    created_at: unixTimestampSchema.optional(),
+    updated_at: unixTimestampSchema.optional(),
+    tags: z.array(z.string()).optional().default([]),
+    pull_requests: z.array(pullRequestSchema).optional().default([]),
+    analysis: sessionInsightsAnalysisSchema.nullable().optional(),
   })
   .passthrough();
 
