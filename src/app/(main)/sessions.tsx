@@ -51,6 +51,7 @@ export default function SessionsScreen() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showTagFilter, setShowTagFilter] = useState(false);
   const [contextSession, setContextSession] = useState<SessionResponse | null>(null);
+  const [actionNote, setActionNote] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -79,16 +80,24 @@ export default function SessionsScreen() {
         break;
       case 'archive':
         hapticWarning();
+        setActionNote(null);
         confirmAction(
-          { title: 'Archive session?', message: 'This will archive the session. You can unarchive it from the Devin web app.', confirmLabel: 'Archive' },
-          () => archiveMutation.mutate(s.session_id),
+          { title: 'Archive session?', message: 'Removes it from your board (Devin has no permanent delete). You can unarchive it from the Devin web app.', confirmLabel: 'Archive' },
+          () =>
+            archiveMutation.mutate(s.session_id, {
+              onError: (e) => setActionNote(`Could not archive "${s.title || 'session'}": ${e.message}`),
+            }),
         );
         break;
       case 'terminate':
         hapticWarning();
+        setActionNote(null);
         confirmAction(
           { title: 'Terminate session?', message: 'This will stop the session immediately. This action cannot be undone.', confirmLabel: 'Terminate', destructive: true },
-          () => terminateMutation.mutate(s.session_id),
+          () =>
+            terminateMutation.mutate(s.session_id, {
+              onError: (e) => setActionNote(`Could not terminate "${s.title || 'session'}": ${e.message}`),
+            }),
         );
         break;
     }
@@ -117,6 +126,13 @@ export default function SessionsScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {actionNote && (
+        <View className="flex-row items-start bg-tint-red rounded-card px-3 py-2 mx-5 mb-2">
+          <Ionicons name="alert-circle-outline" size={13} color={tokens.failed.hex} />
+          <Text className="text-failed text-text12 ml-2 flex-1">{actionNote}</Text>
+        </View>
+      )}
 
       {/* Search */}
       <View className="px-5 pb-2">
@@ -227,7 +243,7 @@ export default function SessionsScreen() {
             {([
               { action: 'open', icon: 'open-outline', label: 'Open session', color: tokens.textHi.hex, cls: 'text-text-hi' },
               { action: 'share_link', icon: 'share-outline', label: 'Share deep link', color: tokens.textHi.hex, cls: 'text-text-hi' },
-              { action: 'archive', icon: 'archive-outline', label: 'Archive', color: tokens.textMid.hex, cls: 'text-text-mid' },
+              { action: 'archive', icon: 'archive-outline', label: 'Archive (remove from board)', color: tokens.textMid.hex, cls: 'text-text-mid' },
               { action: 'terminate', icon: 'stop-circle-outline', label: 'Terminate', color: tokens.failed.hex, cls: 'text-failed' },
             ] as { action: ContextAction; icon: keyof typeof Ionicons.glyphMap; label: string; color: string; cls: string }[]).map(({ action, icon, label, color, cls }) => (
               <Pressable key={action} className="flex-row items-center px-4 py-3 rounded-button" onPress={() => handleContextAction(action)}>
