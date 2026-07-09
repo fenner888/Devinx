@@ -18,7 +18,7 @@ module.exports = {
     '^@cache/(.*)$': '<rootDir>/src/cache/$1',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|nativewind|@tanstack|zustand|zod)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|nativewind|@tanstack|zustand|zod|react-native-markdown-display)',
   ],
   setupFiles: [],
 };

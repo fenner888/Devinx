@@ -40,6 +40,7 @@ import {
 } from '@lib/session-utils';
 import type { SessionMessage } from '@api/devin/types';
 import { useTheme } from '@theme/index';
+import { DevinMarkdown } from '@components/DevinMarkdown';
 
 type Tab = 'timeline' | 'worklog' | 'changes' | 'insights';
 
@@ -636,10 +637,10 @@ function MessageBubble({ message }: { message: SessionMessage }) {
       </View>
     );
   }
-  // Devin messages render as plain text, like the desktop timeline.
+  // Devin messages render as markdown (code blocks, lists, links).
   return (
     <View className="mb-4">
-      <Text className="text-text-hi text-text14 leading-5">{message.message}</Text>
+      <DevinMarkdown>{message.message}</DevinMarkdown>
       <Text className="text-text-low text-text11 mt-1">
         Devin · {relativeTime(message.created_at)}
       </Text>
