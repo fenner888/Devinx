@@ -22,6 +22,9 @@ import {
   secretListResponseSchema,
   attachmentResponseSchema,
   consumptionResponseSchema,
+  selfResponseSchema,
+  repositoryIndexingListSchema,
+  repositoryIndexingSchema,
   scheduleResponseSchema,
   scheduleListResponseSchema,
   prReviewResponseSchema,
@@ -67,6 +70,8 @@ import type {
   ActiveUserPeriod,
   MetricsQuery,
   RepositoryResponse,
+  SelfResponse,
+  RepositoryIndexing,
   Cursor,
 } from './types';
 
@@ -538,4 +543,48 @@ export async function listRepositories(auth: AuthProvider): Promise<RepositoryRe
     schema: repositoryListResponseSchema,
   });
   return data.items;
+}
+
+// ---------------------------------------------------------------------------
+// Self / identity
+// ---------------------------------------------------------------------------
+
+export async function getSelf(auth: AuthProvider): Promise<SelfResponse> {
+  return apiRequest<SelfResponse>(auth, paths.self(), { method: 'GET', schema: selfResponseSchema });
+}
+
+// ---------------------------------------------------------------------------
+// Per-session ACU consumption
+// ---------------------------------------------------------------------------
+
+export async function getSessionConsumption(auth: AuthProvider, sessionId: string): Promise<number> {
+  const orgId = await orgIdOf(auth);
+  const data = await apiRequest<{ total_acus?: number }>(auth, paths.sessionConsumption(orgId, toDevinId(sessionId)), {
+    method: 'GET',
+    schema: consumptionResponseSchema,
+  });
+  return data.total_acus ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// Repository indexing (v3beta1)
+// ---------------------------------------------------------------------------
+
+export async function listIndexedRepositories(auth: AuthProvider): Promise<RepositoryIndexing[]> {
+  const orgId = await orgIdOf(auth);
+  const data = await apiRequest<{ items: RepositoryIndexing[] }>(auth, paths.repoIndexing(orgId), {
+    method: 'GET',
+    query: { first: 100 },
+    schema: repositoryIndexingListSchema,
+  });
+  return data.items;
+}
+
+export async function indexRepository(auth: AuthProvider, repoPath: string, branches?: string[]): Promise<RepositoryIndexing> {
+  const orgId = await orgIdOf(auth);
+  return apiRequest<RepositoryIndexing>(auth, paths.repoIndex(orgId, repoPath), {
+    method: 'PUT',
+    body: { branch_names: branches ?? [] },
+    schema: repositoryIndexingSchema,
+  });
 }

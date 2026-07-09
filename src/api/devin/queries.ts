@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { AppState } from 'react-native';
 import { useAuth } from '@auth/AuthContext';
 import { shouldRetryQuery } from './client';
-import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment, listSchedules, createSchedule, updateSchedule, deleteSchedule, triggerPrReview, getPrReview, listCodeScanFindings, remediateFinding, createKnowledgeNote, updateKnowledgeNote, deleteKnowledgeNote, createPlaybook, updatePlaybook, deletePlaybook, createSecret, deleteSecret, getSessionMetrics, getPrMetrics, getSearchMetrics, getWeeklyActiveUsers, listRepositories } from './endpoints';
+import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment, listSchedules, createSchedule, updateSchedule, deleteSchedule, triggerPrReview, getPrReview, listCodeScanFindings, remediateFinding, createKnowledgeNote, updateKnowledgeNote, deleteKnowledgeNote, createPlaybook, updatePlaybook, deletePlaybook, createSecret, deleteSecret, getSessionMetrics, getPrMetrics, getSearchMetrics, getWeeklyActiveUsers, listRepositories, getSelf, getSessionConsumption, listIndexedRepositories, indexRepository } from './endpoints';
 import { queryKeys } from './queryKeys';
 import { pollingPolicy, scalePolling, type ScreenContext } from '@lib/polling';
 import { useAppPreferences } from '@store/preferences';
@@ -617,5 +617,71 @@ export function useRepositories() {
     enabled: isAuthenticated && !!provider,
     staleTime: 10 * 60_000,
     retry: shouldRetryQuery,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Self / identity
+// ---------------------------------------------------------------------------
+
+export function useSelf() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.self,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return getSelf(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 10 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Per-session ACU consumption
+// ---------------------------------------------------------------------------
+
+export function useSessionConsumption(sessionId: string | undefined) {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.sessionConsumption(sessionId ?? ''),
+    queryFn: async () => {
+      if (!provider || !sessionId) throw new Error('Not authenticated');
+      return getSessionConsumption(provider, sessionId);
+    },
+    enabled: isAuthenticated && !!provider && !!sessionId,
+    staleTime: 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Repository indexing (v3beta1)
+// ---------------------------------------------------------------------------
+
+export function useIndexedRepositories() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.repoIndexing,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listIndexedRepositories(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+export function useIndexRepository() {
+  const queryClient = useQueryClient();
+  const { provider } = useAuth();
+  return useMutation({
+    mutationFn: async (params: { repoPath: string; branches?: string[] }) => {
+      if (!provider) throw new Error('Not authenticated');
+      return indexRepository(provider, params.repoPath, params.branches);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.repoIndexing }),
   });
 }

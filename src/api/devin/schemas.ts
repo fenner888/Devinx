@@ -685,3 +685,30 @@ export const repositoryResponseSchema = z
   .passthrough();
 
 export const repositoryListResponseSchema = paginatedResponseSchema(repositoryResponseSchema);
+
+// ---------------------------------------------------------------------------
+// Self / identity + repository indexing
+// ---------------------------------------------------------------------------
+
+export const selfResponseSchema = z
+  .object({
+    principal_type: z.string().optional(),
+    org_id: z.string().optional(),
+    service_user_id: z.string().optional(),
+    service_user_name: z.string().optional(),
+    user_id: z.string().optional(),
+    api_key_id: z.string().optional(),
+    api_key_name: z.string().optional(),
+  })
+  .passthrough();
+
+export const repositoryIndexingSchema = z
+  .object({
+    repository_path: z.string(),
+    indexing_enabled: z.boolean().optional().default(false),
+    branches: z.array(z.string()).optional().default([]),
+    indexing_status: z.unknown().optional(),
+  })
+  .passthrough();
+
+export const repositoryIndexingListSchema = paginatedResponseSchema(repositoryIndexingSchema);

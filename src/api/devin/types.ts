@@ -440,6 +440,12 @@ export const paths = {
   metricsSearches: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/searches`,
   metricsWau: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/wau`,
   repositories: (orgId: OrgId) => `/v3beta1/organizations/${orgId}/repositories`,
+  self: () => `/v3/self`,
+  sessionConsumption: (orgId: OrgId, devinId: DevinId) =>
+    `/v3/organizations/${orgId}/consumption/daily/sessions/${devinId}`,
+  repoIndexing: (orgId: OrgId) => `/v3beta1/organizations/${orgId}/repositories/indexing`,
+  repoIndex: (orgId: OrgId, repoPath: string) =>
+    `/v3beta1/organizations/${orgId}/repositories/${encodeURIComponent(repoPath)}/indexing`,
   schedules: (orgId: OrgId) => `/v3/organizations/${orgId}/schedules`,
   schedule: (orgId: OrgId, scheduleId: string) =>
     `/v3/organizations/${orgId}/schedules/${scheduleId}`,
@@ -616,5 +622,32 @@ export interface RepositoryResponse {
   repo_description: string | null;
   repo_language: string | null;
   last_updated_at: string | number | null;
+  indexing_status?: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// Self / identity
+// ---------------------------------------------------------------------------
+
+export interface SelfResponse {
+  principal_type?: string;
+  org_id?: string;
+  /** Service-user identity. */
+  service_user_id?: string;
+  service_user_name?: string;
+  /** PAT identity. */
+  user_id?: string;
+  api_key_id?: string;
+  api_key_name?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Repository indexing (v3beta1)
+// ---------------------------------------------------------------------------
+
+export interface RepositoryIndexing {
+  repository_path: string;
+  indexing_enabled: boolean;
+  branches: string[];
   indexing_status?: unknown;
 }

@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@auth/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCodeScanFindings } from '@api/devin/queries';
+import { useCodeScanFindings, useSelf } from '@api/devin/queries';
 import { purgeCache } from '@cache/index';
 import { branding } from '@lib/branding';
 import { confirmAction } from '@lib/confirm';
@@ -26,7 +26,8 @@ export default function SettingsScreen() {
   const { disconnect, provider } = useAuth();
   const queryClient = useQueryClient();
   const { data: scanFindings } = useCodeScanFindings();
-  const { name, tokens } = useTheme();
+  const { data: self } = useSelf();
+  const { tokens } = useTheme();
   const currentPref = useThemePreference();
   const pollingMode = useAppPreferences((s) => s.pollingMode);
   const setPollingMode = useAppPreferences((s) => s.setPollingMode);
@@ -143,10 +144,11 @@ export default function SettingsScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-text-hi text-text14">
-                {provider?.kind === 'pat' ? 'Personal access token' : 'Service user key'}
+                {self?.service_user_name || self?.service_user_id || self?.user_id ||
+                  (provider?.kind === 'pat' ? 'Personal access token' : 'Service user key')}
               </Text>
               <Text className="text-text-low text-text12 mt-0.5">
-                Stored in the device Keychain · Active theme: {name}
+                {self?.org_id ? `${self.org_id} · ` : ''}{provider?.kind === 'pat' ? 'Personal access token' : 'Service user key'}
               </Text>
             </View>
           </View>

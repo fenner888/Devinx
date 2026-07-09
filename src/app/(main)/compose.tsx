@@ -22,7 +22,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
-import { useCreateSession, usePlaybooks, useKnowledge, useSecrets, useUploadAttachment, useRepositories } from '@api/devin/queries';
+import { useCreateSession, usePlaybooks, useKnowledge, useSecrets, useUploadAttachment, useRepositories, useIndexedRepositories, useIndexRepository } from '@api/devin/queries';
 import { ModeSettings } from '@components/ModeSettings';
 import type { DevinMode } from '@api/devin/types';
 import { useTheme } from '@theme/index';
@@ -64,6 +64,8 @@ export default function ComposeScreen() {
   const { data: knowledge } = useKnowledge();
   const { data: secrets } = useSecrets();
   const { data: repositories } = useRepositories();
+  const { data: indexedRepos } = useIndexedRepositories();
+  const indexRepo = useIndexRepository();
   const uploadAttachment = useUploadAttachment();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -464,6 +466,7 @@ export default function ComposeScreen() {
               <ScrollView>
                 {repositories.map((repo) => {
                   const selected = draft.repos.includes(repo.repo_path);
+                  const indexed = indexedRepos?.some((r) => r.repository_path === repo.repo_path && r.indexing_enabled);
                   return (
                     <Pressable
                       key={repo.provider_repository_id}
@@ -477,13 +480,31 @@ export default function ComposeScreen() {
                       }
                     >
                       <View className="flex-1">
-                        <Text className={`text-text14 ${selected ? 'text-brand-text font-medium' : 'text-text-hi'}`}>
-                          {repo.repo_name}
-                        </Text>
+                        <View className="flex-row items-center">
+                          <Text className={`text-text14 ${selected ? 'text-brand-text font-medium' : 'text-text-hi'}`}>
+                            {repo.repo_name}
+                          </Text>
+                          {indexed && (
+                            <View className="flex-row items-center ml-2">
+                              <Ionicons name="sparkles" size={10} color={tokens.finished.hex} />
+                              <Text className="text-finished text-text11 ml-0.5">indexed</Text>
+                            </View>
+                          )}
+                        </View>
                         <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>
                           {repo.repo_path}{repo.repo_language ? ` · ${repo.repo_language}` : ''}
                         </Text>
                       </View>
+                      {!indexed && (
+                        <Pressable
+                          className="rounded-chip px-2.5 py-1 bg-tint-secondary mr-2"
+                          onPress={() => indexRepo.mutate({ repoPath: repo.repo_path })}
+                          disabled={indexRepo.isPending}
+                          accessibilityLabel={`Index ${repo.repo_name}`}
+                        >
+                          <Text className="text-brand-text text-text11 font-medium">Index</Text>
+                        </Pressable>
+                      )}
                       {selected && <Ionicons name="checkmark" size={16} color={tokens.brandText.hex} />}
                     </Pressable>
                   );

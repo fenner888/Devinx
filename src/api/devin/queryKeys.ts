@@ -15,6 +15,9 @@ export const queryKeys = {
   schedules: ['schedules'] as const,
   metrics: (range: string) => ['metrics', range] as const,
   repositories: ['repositories'] as const,
+  self: ['self'] as const,
+  sessionConsumption: (id: string) => ['sessionConsumption', id] as const,
+  repoIndexing: ['repoIndexing'] as const,
   prReview: (url: string) => ['prReview', url] as const,
   codeScanFindings: ['codeScanFindings'] as const,
 } as const;
