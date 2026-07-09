@@ -5,29 +5,65 @@
 import { Text, Linking, Platform } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { useTheme } from '@theme/index';
-import { InlineImage, InlineVideo, InlineAudio, isVideoUrl, isAudioUrl } from '@components/InlineMedia';
+import {
+  InlineImage,
+  InlineVideo,
+  InlineAudio,
+  isVideoUrl,
+  isAudioUrl,
+  isImageUrl,
+} from '@components/InlineMedia';
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
 
-type MdNode = { key: string; attributes: { src?: string; href?: string } };
-type MdStyle = { link?: object };
+type MdNode = {
+  key: string;
+  content?: string;
+  attributes: { src?: string; href?: string; alt?: string };
+  children?: MdNode[];
+};
+type MdStyle = { link?: object; textgroup?: object };
+
+function renderMedia(node: MdNode, uri: string) {
+  if (isVideoUrl(uri)) return <InlineVideo key={node.key} uri={uri} />;
+  if (isAudioUrl(uri)) return <InlineAudio key={node.key} uri={uri} />;
+  return null;
+}
 
 /** Custom renderers (module-scope so they're stable across renders). */
 const MEDIA_RULES = {
   image: (node: MdNode) => {
     const src = node.attributes?.src ?? '';
-    if (!src) return null;
-    if (isVideoUrl(src)) return <InlineVideo key={node.key} uri={src} />;
-    if (isAudioUrl(src)) return <InlineAudio key={node.key} uri={src} />;
-    return <InlineImage key={node.key} uri={src} />;
+    const media = renderMedia(node, src);
+    if (media) return media;
+    if (!isImageUrl(src)) return null;
+    return <InlineImage key={node.key} uri={src} alt={node.attributes?.alt} />;
   },
   link: (node: MdNode, linkChildren: React.ReactNode, _parent: unknown, mdStyles: MdStyle) => {
     const href = node.attributes?.href ?? '';
-    if (isVideoUrl(href)) return <InlineVideo key={node.key} uri={href} />;
-    if (isAudioUrl(href)) return <InlineAudio key={node.key} uri={href} />;
+    const media = renderMedia(node, href);
+    if (media) return media;
     return (
-      <Text key={node.key} style={mdStyles.link} onPress={() => Linking.openURL(href).catch(() => {})}>
+      <Text
+        key={node.key}
+        style={mdStyles.link}
+        onPress={() => Linking.openURL(href).catch(() => {})}
+      >
         {linkChildren}
+      </Text>
+    );
+  },
+  textgroup: (node: MdNode, textChildren: React.ReactNode, _parent: unknown, mdStyles: MdStyle) => {
+    const content =
+      node.children
+        ?.map((child) => child.content ?? '')
+        .join('')
+        .trim() ?? '';
+    const media = renderMedia(node, content);
+    if (media) return media;
+    return (
+      <Text key={node.key} style={mdStyles.textgroup}>
+        {textChildren}
       </Text>
     );
   },
@@ -38,9 +74,27 @@ export function DevinMarkdown({ children }: { children: string }) {
 
   const styles = {
     body: { color: tokens.textHi.hex, fontSize: 14, lineHeight: 20 },
-    heading1: { color: tokens.textHi.hex, fontSize: 18, fontWeight: '600' as const, marginTop: 8, marginBottom: 4 },
-    heading2: { color: tokens.textHi.hex, fontSize: 16, fontWeight: '600' as const, marginTop: 8, marginBottom: 4 },
-    heading3: { color: tokens.textHi.hex, fontSize: 15, fontWeight: '600' as const, marginTop: 6, marginBottom: 4 },
+    heading1: {
+      color: tokens.textHi.hex,
+      fontSize: 18,
+      fontWeight: '600' as const,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    heading2: {
+      color: tokens.textHi.hex,
+      fontSize: 16,
+      fontWeight: '600' as const,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    heading3: {
+      color: tokens.textHi.hex,
+      fontSize: 15,
+      fontWeight: '600' as const,
+      marginTop: 6,
+      marginBottom: 4,
+    },
     strong: { color: tokens.textHi.hex, fontWeight: '700' as const },
     em: { fontStyle: 'italic' as const },
     link: { color: tokens.brandText.hex },

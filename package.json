@@ -24,6 +24,7 @@
     "@tanstack/react-query": "^5.0.0",
     "ajv": "^8.20.0",
     "expo": "^54.0.35",
+    "expo-asset": "~12.0.13",
     "expo-audio": "~1.1.1",
     "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.13",
@@ -77,6 +78,7 @@
     "node": ">=20.19.4"
   },
   "overrides": {
-    "@xmldom/xmldom": "0.9.10"
+    "@xmldom/xmldom": "0.9.10",
+    "linkify-it": "5.0.2"
   }
 }

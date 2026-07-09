@@ -65,7 +65,8 @@
       ],
       "expo-web-browser",
       "expo-video",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ],
     "experiments": {
       "tsconfigPaths": true
