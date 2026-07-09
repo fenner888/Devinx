@@ -20,7 +20,7 @@
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-community/netinfo": "11.4.1",
-    "@sentry/react-native": "~7.2.0",
+    "@sentry/react-native": "~8.18.0",
     "@tanstack/react-query": "^5.0.0",
     "ajv": "^8.20.0",
     "expo": "^54.0.35",
