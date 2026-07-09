@@ -17,6 +17,8 @@ export interface AuthProvider {
   orgPath(): Promise<string>;
   /** Returns attribution params for session create / message send. */
   sessionAttribution(): Promise<{ create_as_user_id?: string }>;
+  /** Returns only the final four credential characters for account identification. */
+  credentialFingerprint(): Promise<string>;
   /** Cheap authenticated call to validate the key (spec §7.1 step 3). */
   validate(): Promise<ValidationResult>;
 }

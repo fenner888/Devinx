@@ -25,8 +25,9 @@ Set the OTA updates URL (printed by `eas init`, or from the Expo dashboard):
 Builds:
 
 ```bash
-eas build --profile development --platform ios   # dev client on your device
-eas build --profile preview --platform ios       # TestFlight-style internal build
+eas build --profile development --platform ios             # dev client on your device
+eas build --profile development-simulator --platform ios   # local iOS simulator
+eas build --profile preview --platform ios                 # TestFlight-style internal build
 eas build --profile production --platform all     # store builds
 eas submit --profile production                    # upload to App Store / Play
 ```
@@ -67,6 +68,69 @@ everyone else loses nothing.
 ```bash
 npm run ci      # lint → typecheck → test → build → audit
 ```
+
+## 5. Device E2E
+
+Run the onboarding flow against a development or preview build without committing credentials:
+
+```bash
+DEVIN_API_KEY='cog_...' DEVIN_ORG_ID='org-...' \
+  .devin/maestro/run.sh onboarding
+
+E2E_PROMPT='Create a short plan for this repository. Do not modify files.' \
+E2E_FOLLOW_UP='Summarize the plan in one sentence.' \
+  .devin/maestro/run.sh cloud-session
+```
+
+Run the destructive wipe flow only on a test credential because it removes the device's stored connection:
+
+```bash
+.devin/maestro/run.sh disconnect-wipe
+```
+
+## 6. App Store metadata draft
+
+**Name:** DevinX
+
+**Subtitle:** Unofficial mission control for Devin sessions
+
+**Keywords:** Devin,developer,AI,coding,sessions,monitor,cloud,engineering,workflow
+
+**Promotional text:** Monitor, steer, and start Devin Cloud sessions from your phone.
+
+**Description:**
+
+> DevinX is a mobile mission-control client for the Devin API. Monitor active cloud sessions, surface work that needs your input, send follow-up messages, review pull requests and insights, create sessions with repository and attachment context, and track usage from your phone.
+>
+> Your API credential stays in the device Keychain. App traffic goes directly to the Devin API without an intermediary DevinX backend.
+>
+> DevinX is an independent, unofficial client for the Devin API. Not affiliated with, endorsed by, or a product of Cognition AI.
+
+**Review notes:**
+
+> This app requires an existing Devin account and a user-provided Devin API credential. Credentials are entered at runtime and stored in the iOS Keychain. The app is an independent API client and does not use Cognition or Devin logos. A test credential must be supplied privately in App Store Connect review notes; never commit it to this repository.
+
+**Privacy labels draft:**
+
+- User Content: collected only to provide app functionality; not linked by DevinX; sent directly to the Devin API
+- Identifiers: organization and account identifiers used for app functionality
+- Diagnostics: crash data only when Sentry is configured
+- Tracking: no
+- Data sale: no
+
+**Required URLs:**
+
+- Support: `https://github.com/fenner888/Devinx/issues`
+- Privacy policy: publish `PRIVACY.md` at a stable public HTTPS URL before submission
+
+**Screenshot set:**
+
+1. Home composer with repository and mode context
+2. Blocked-first Sessions board
+3. Active session timeline with attachment composer
+4. Pull request / Changes tab
+5. Usage and analytics
+6. Privacy and secure-storage explanation
 
 ## What's intentionally web-only (no API exists)
 

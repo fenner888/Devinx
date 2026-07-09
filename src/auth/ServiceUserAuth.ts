@@ -8,12 +8,7 @@
 
 import * as Sentry from '@sentry/react-native';
 import { branding } from '@lib/branding';
-import {
-  loadCredentials,
-  storeSecret,
-  wipeAllSecrets,
-  type StoredCredentials,
-} from './keychain';
+import { loadCredentials, storeSecret, wipeAllSecrets, type StoredCredentials } from './keychain';
 import type { AuthProvider, ValidationResult } from './AuthProvider';
 
 let cached: StoredCredentials | null = null;
@@ -34,7 +29,12 @@ export async function connectServiceUser(params: {
   if (attributionUserId) {
     await storeSecret(branding.keychain.attributionUserId, attributionUserId);
   }
-  cached = { apiKey, orgId, attributionUserId: attributionUserId ?? null, authKind: 'service_user' };
+  cached = {
+    apiKey,
+    orgId,
+    attributionUserId: attributionUserId ?? null,
+    authKind: 'service_user',
+  };
 }
 
 export class ServiceUserAuth implements AuthProvider {
@@ -65,6 +65,11 @@ export class ServiceUserAuth implements AuthProvider {
     return attributionUserId ? { create_as_user_id: attributionUserId } : {};
   }
 
+  async credentialFingerprint(): Promise<string> {
+    const { apiKey } = await this.getCreds();
+    return apiKey.slice(-4);
+  }
+
   /**
    * Cheap authenticated call — GET the session list with first=1.
    * Maps 401/403/network to actionable errors per spec §7.1 step 3.
@@ -83,30 +88,52 @@ export class ServiceUserAuth implements AuthProvider {
       clearTimeout(timeoutId);
       if (res.ok) return { ok: true };
       if (res.status === 401) {
-        return { ok: false, code: 'invalid_key', detail: 'Invalid API key. Check that it starts with cog_ and has not been revoked.' };
+        return {
+          ok: false,
+          code: 'invalid_key',
+          detail: 'Invalid API key. Check that it starts with cog_ and has not been revoked.',
+        };
       }
       if (res.status === 403) {
         // The Devin API returns 403 for both invalid keys and insufficient permissions.
         // Distinguish by checking the response body.
         let body = '';
-        try { body = await res.text(); } catch { /* ignore */ }
+        try {
+          body = await res.text();
+        } catch {
+          /* ignore */
+        }
         if (/unauthorized/i.test(body)) {
-          return { ok: false, code: 'invalid_key', detail: 'Invalid or unauthorized API key. Check that it starts with cog_ and has not been revoked.' };
+          return {
+            ok: false,
+            code: 'invalid_key',
+            detail:
+              'Invalid or unauthorized API key. Check that it starts with cog_ and has not been revoked.',
+          };
         }
         return {
           ok: false,
           code: 'missing_permission',
-          detail: 'This key lacks permission to list sessions. Create a service user with Member role or higher.',
+          detail:
+            'This key lacks permission to list sessions. Create a service user with Member role or higher.',
         };
       }
       if (res.status === 404) {
-        return { ok: false, code: 'invalid_key', detail: 'Organization not found. Check your org ID (should start with org-).' };
+        return {
+          ok: false,
+          code: 'invalid_key',
+          detail: 'Organization not found. Check your org ID (should start with org-).',
+        };
       }
       return { ok: false, code: 'network', detail: `Unexpected response: ${res.status}` };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (/timeout|abort|network/i.test(msg)) {
-        return { ok: false, code: 'network', detail: 'Could not reach api.devin.ai. Check your connection.' };
+        return {
+          ok: false,
+          code: 'network',
+          detail: 'Could not reach api.devin.ai. Check your connection.',
+        };
       }
       Sentry.captureException(e);
       return { ok: false, code: 'network', detail: msg };

@@ -32,13 +32,7 @@ export type UnixTimestamp = number;
 export type AcuCount = number;
 
 export type SessionStatus =
-  | 'new'
-  | 'claimed'
-  | 'running'
-  | 'exit'
-  | 'error'
-  | 'suspended'
-  | 'resuming';
+  'new' | 'claimed' | 'running' | 'exit' | 'error' | 'suspended' | 'resuming';
 
 export type SessionStatusDetail =
   | 'working'
@@ -165,6 +159,7 @@ export interface SessionResponse {
   playbook_id: string | null;
   pull_requests: PullRequest[];
   service_user_id: string | null;
+  user_id?: string | null;
   session_id: string;
   status: SessionStatus;
   status_detail?: SessionStatusDetail | null;
@@ -401,14 +396,12 @@ export interface ApiErrorResponse {
 
 export const paths = {
   sessions: (orgId: OrgId) => `/v3/organizations/${orgId}/sessions`,
-  session: (orgId: OrgId, devinId: DevinId) =>
-    `/v3/organizations/${orgId}/sessions/${devinId}`,
+  session: (orgId: OrgId, devinId: DevinId) => `/v3/organizations/${orgId}/sessions/${devinId}`,
   messages: (orgId: OrgId, devinId: DevinId) =>
     `/v3/organizations/${orgId}/sessions/${devinId}/messages`,
   archive: (orgId: OrgId, devinId: DevinId) =>
     `/v3/organizations/${orgId}/sessions/${devinId}/archive`,
-  tags: (orgId: OrgId, devinId: DevinId) =>
-    `/v3/organizations/${orgId}/sessions/${devinId}/tags`,
+  tags: (orgId: OrgId, devinId: DevinId) => `/v3/organizations/${orgId}/sessions/${devinId}/tags`,
   insightsGenerate: (orgId: OrgId, devinId: DevinId) =>
     `/v3/organizations/${orgId}/sessions/${devinId}/insights/generate`,
   insights: (orgId: OrgId, devinId: DevinId) =>
@@ -417,24 +410,20 @@ export const paths = {
   knowledge: (orgId: OrgId) => `/v3/organizations/${orgId}/knowledge/notes`,
   secrets: (orgId: OrgId) => `/v3/organizations/${orgId}/secrets`,
   /** Enterprise-level (requires ViewAccountMembership). */
-  membersEnterprise: (orgId: OrgId) =>
-    `/v3/enterprise/organizations/${orgId}/members/users`,
+  membersEnterprise: (orgId: OrgId) => `/v3/enterprise/organizations/${orgId}/members/users`,
   /** Beta org-level (requires ViewOrgMembership). */
-  membersOrgBeta: (orgId: OrgId) =>
-    `/v3beta1/organizations/${orgId}/members/users`,
+  membersOrgBeta: (orgId: OrgId) => `/v3beta1/organizations/${orgId}/members/users`,
   attachments: (orgId: OrgId) => `/v3/organizations/${orgId}/attachments`,
   attachment: (orgId: OrgId, uuid: string, name: string) =>
     `/v3/organizations/${orgId}/attachments/${uuid}/${name}`,
-  consumptionDaily: (orgId: OrgId) =>
-    `/v3/organizations/${orgId}/consumption/daily`,
+  consumptionDaily: (orgId: OrgId) => `/v3/organizations/${orgId}/consumption/daily`,
   /** Enterprise-level (requires ManageBilling). */
   consumptionCycles: () => `/v3/enterprise/consumption/cycles`,
   playbook: (orgId: OrgId, playbookId: string) =>
     `/v3/organizations/${orgId}/playbooks/${playbookId}`,
   knowledgeNote: (orgId: OrgId, noteId: string) =>
     `/v3/organizations/${orgId}/knowledge/notes/${noteId}`,
-  secret: (orgId: OrgId, secretId: string) =>
-    `/v3/organizations/${orgId}/secrets/${secretId}`,
+  secret: (orgId: OrgId, secretId: string) => `/v3/organizations/${orgId}/secrets/${secretId}`,
   metricsSessions: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/sessions`,
   metricsPrs: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/prs`,
   metricsSearches: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/searches`,

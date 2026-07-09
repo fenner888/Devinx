@@ -23,6 +23,9 @@ updates:
       - dependency-name: 'react-native*'
       - dependency-name: '@react-native-community/*'
       - dependency-name: '@react-native/*'
+      - dependency-name: '@react-native-async-storage/*'
+      - dependency-name: '@testing-library/react-native'
+      - dependency-name: 'jest-expo'
       - dependency-name: 'react'
       - dependency-name: 'react-dom'
   - package-ecosystem: github-actions

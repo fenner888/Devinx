@@ -14,6 +14,7 @@ const mockAuth: AuthProvider = {
   kind: 'service_user',
   authHeaders: async () => ({ Authorization: 'Bearer cog_test' }),
   orgPath: async () => '/v3/organizations/org-test',
+  credentialFingerprint: async () => 'test',
   sessionAttribution: async () => ({}),
   validate: async () => ({ ok: true }),
 };

@@ -45,7 +45,9 @@ describe('session-utils', () => {
     });
 
     it('returns done for finished with no PRs', () => {
-      expect(deriveStatusKey(makeSession({ status: 'exit', status_detail: 'finished' }))).toBe('done');
+      expect(deriveStatusKey(makeSession({ status: 'exit', status_detail: 'finished' }))).toBe(
+        'done',
+      );
     });
 
     it('returns prReady for finished with open PR', () => {
@@ -54,7 +56,9 @@ describe('session-utils', () => {
           makeSession({
             status: 'exit',
             status_detail: 'finished',
-            pull_requests: [{ pr_state: 'open', pr_url: 'https://github.com/repo/pull/42', state: 'open' }],
+            pull_requests: [
+              { pr_state: 'open', pr_url: 'https://github.com/repo/pull/42', state: 'open' },
+            ],
           }),
         ),
       ).toBe('prReady');
@@ -66,32 +70,49 @@ describe('session-utils', () => {
           makeSession({
             status: 'exit',
             status_detail: 'finished',
-            pull_requests: [{ pr_state: 'merged', pr_url: 'https://github.com/repo/pull/42', state: 'merged', merged_at: 1500 }],
+            pull_requests: [
+              {
+                pr_state: 'merged',
+                pr_url: 'https://github.com/repo/pull/42',
+                state: 'merged',
+                merged_at: 1500,
+              },
+            ],
           }),
         ),
       ).toBe('done');
     });
 
     it('returns waitingForResponse for waiting_for_user', () => {
-      expect(deriveStatusKey(makeSession({ status_detail: 'waiting_for_user' }))).toBe('waitingForResponse');
+      expect(deriveStatusKey(makeSession({ status_detail: 'waiting_for_user' }))).toBe(
+        'waitingForResponse',
+      );
     });
 
     it('returns approvalRequired for waiting_for_approval', () => {
-      expect(deriveStatusKey(makeSession({ status_detail: 'waiting_for_approval' }))).toBe('approvalRequired');
+      expect(deriveStatusKey(makeSession({ status_detail: 'waiting_for_approval' }))).toBe(
+        'approvalRequired',
+      );
     });
 
     it('returns exceededLimit for usage_limit_exceeded', () => {
       expect(
-        deriveStatusKey(makeSession({ status: 'suspended', status_detail: 'usage_limit_exceeded' })),
+        deriveStatusKey(
+          makeSession({ status: 'suspended', status_detail: 'usage_limit_exceeded' }),
+        ),
       ).toBe('exceededLimit');
     });
 
     it('returns sleeping for inactivity', () => {
-      expect(deriveStatusKey(makeSession({ status: 'suspended', status_detail: 'inactivity' }))).toBe('sleeping');
+      expect(
+        deriveStatusKey(makeSession({ status: 'suspended', status_detail: 'inactivity' })),
+      ).toBe('sleeping');
     });
 
     it('returns working for running with working detail', () => {
-      expect(deriveStatusKey(makeSession({ status: 'running', status_detail: 'working' }))).toBe('working');
+      expect(deriveStatusKey(makeSession({ status: 'running', status_detail: 'working' }))).toBe(
+        'working',
+      );
     });
   });
 
@@ -127,6 +148,18 @@ describe('session-utils', () => {
       expect(sections[0]!.section).toBe('needs_input');
       expect(sections[1]!.section).toBe('working');
       expect(sections[2]!.section).toBe('recent');
+    });
+
+    it('sorts pinned sessions first within their section', () => {
+      const sessions = [
+        makeSession({ session_id: 'devin-new', status_detail: 'working', updated_at: 2000 }),
+        makeSession({ session_id: 'devin-pinned', status_detail: 'working', updated_at: 1000 }),
+      ];
+      const sections = sectionSessions(sessions, ['devin-pinned']);
+      expect(sections[0]!.data.map((session) => session.session_id)).toEqual([
+        'devin-pinned',
+        'devin-new',
+      ]);
     });
 
     it('skips empty sections', () => {

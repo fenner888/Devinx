@@ -16,6 +16,7 @@ export default function MainGroup() {
       <Stack.Screen name="secrets" />
       <Stack.Screen name="review" />
       <Stack.Screen name="security" />
+      <Stack.Screen name="privacy" />
     </Stack>
   );
 }

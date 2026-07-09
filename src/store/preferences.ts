@@ -11,6 +11,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type { PollingMode } from '@lib/polling';
 import type { PollingMode } from '@lib/polling';
 
+export function normalizeDefaultTags(input: string): string[] {
+  return [
+    ...new Set(
+      input
+        .split(',')
+        .map((tag) => tag.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ].slice(0, 50);
+}
+
 interface ComposerTemplate {
   id: string;
   name: string;

@@ -3,7 +3,9 @@
  * Devin settings design (specs/reference-ui/04-settings.png).
  * Theme toggle, auth status, usage link, about, disconnect.
  */
-import { View, Text, Pressable, ScrollView, Linking } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, Pressable, ScrollView, Linking, TextInput } from 'react-native';
+import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +15,7 @@ import { useCodeScanFindings, useSelf } from '@api/devin/queries';
 import { purgeCache } from '@cache/index';
 import { branding } from '@lib/branding';
 import { confirmAction } from '@lib/confirm';
-import { useAppPreferences, type PollingMode } from '@store/preferences';
+import { normalizeDefaultTags, useAppPreferences, type PollingMode } from '@store/preferences';
 import {
   setThemePreference,
   useThemePreference,
@@ -33,6 +35,29 @@ export default function SettingsScreen() {
   const setPollingMode = useAppPreferences((s) => s.setPollingMode);
   const hapticsEnabled = useAppPreferences((s) => s.hapticsEnabled);
   const setHaptics = useAppPreferences((s) => s.setHaptics);
+  const defaultTags = useAppPreferences((s) => s.defaultTags);
+  const setDefaultTags = useAppPreferences((s) => s.setDefaultTags);
+  const [defaultTagsInput, setDefaultTagsInput] = useState(defaultTags.join(', '));
+  const [credentialFingerprint, setCredentialFingerprint] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    provider
+      ?.credentialFingerprint()
+      .then((fingerprint) => {
+        if (active) setCredentialFingerprint(fingerprint);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [provider]);
+
+  function saveDefaultTags() {
+    const tags = normalizeDefaultTags(defaultTagsInput);
+    setDefaultTags(tags);
+    setDefaultTagsInput(tags.join(', '));
+  }
 
   function handleDisconnect() {
     confirmAction(
@@ -83,7 +108,9 @@ export default function SettingsScreen() {
               className={`flex-1 rounded-button py-2 ${currentPref === key ? 'bg-surface2' : ''}`}
               onPress={() => setThemePreference(key)}
             >
-              <Text className={`text-center text-text14 ${currentPref === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
+              <Text
+                className={`text-center text-text14 ${currentPref === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}
+              >
                 {label}
               </Text>
             </Pressable>
@@ -108,7 +135,9 @@ export default function SettingsScreen() {
                   className={`flex-1 rounded-button py-2 ${pollingMode === key ? 'bg-surface2' : ''}`}
                   onPress={() => setPollingMode(key)}
                 >
-                  <Text className={`text-center text-text13 ${pollingMode === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
+                  <Text
+                    className={`text-center text-text13 ${pollingMode === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}
+                  >
                     {label}
                   </Text>
                 </Pressable>
@@ -117,6 +146,34 @@ export default function SettingsScreen() {
             <Text className="text-text-low text-text12 mt-2">
               How often the app refreshes sessions while open.
             </Text>
+          </View>
+          <View className="px-4 py-3 border-b border-border-subtle">
+            <Text className="text-text-hi text-text14 mb-1">Default session tags</Text>
+            <Text className="text-text-low text-text12 mb-2">
+              Comma-separated tags applied to new sessions.
+            </Text>
+            <View className="flex-row items-center bg-surface2 rounded-input px-3 py-2">
+              <TextInput
+                className="flex-1 text-text-hi text-text13"
+                value={defaultTagsInput}
+                onChangeText={setDefaultTagsInput}
+                onBlur={saveDefaultTags}
+                onSubmitEditing={saveDefaultTags}
+                placeholder="mobile, priority"
+                placeholderTextColor={tokens.textLow.hex}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+                accessibilityLabel="Default session tags"
+              />
+              <Pressable
+                onPress={saveDefaultTags}
+                accessibilityRole="button"
+                accessibilityLabel="Save default tags"
+              >
+                <Text className="text-brand-text text-text13 font-medium">Save</Text>
+              </Pressable>
+            </View>
           </View>
           <Pressable
             className="flex-row items-center px-4 py-3"
@@ -127,10 +184,16 @@ export default function SettingsScreen() {
           >
             <View className="flex-1">
               <Text className="text-text-hi text-text14">Haptic feedback</Text>
-              <Text className="text-text-low text-text12 mt-0.5">Vibrate on taps and status changes.</Text>
+              <Text className="text-text-low text-text12 mt-0.5">
+                Vibrate on taps and status changes.
+              </Text>
             </View>
-            <View className={`w-12 h-7 rounded-chip p-0.5 ${hapticsEnabled ? 'bg-brand' : 'bg-tint-primary'}`}>
-              <View className={`w-6 h-6 rounded-chip bg-surface2 ${hapticsEnabled ? 'ml-auto' : ''}`} />
+            <View
+              className={`w-12 h-7 rounded-chip p-0.5 ${hapticsEnabled ? 'bg-brand' : 'bg-tint-primary'}`}
+            >
+              <View
+                className={`w-6 h-6 rounded-chip bg-surface2 ${hapticsEnabled ? 'ml-auto' : ''}`}
+              />
             </View>
           </Pressable>
         </View>
@@ -144,11 +207,15 @@ export default function SettingsScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-text-hi text-text14">
-                {self?.service_user_name || self?.service_user_id || self?.user_id ||
+                {self?.service_user_name ||
+                  self?.service_user_id ||
+                  self?.user_id ||
                   (provider?.kind === 'pat' ? 'Personal access token' : 'Service user key')}
               </Text>
               <Text className="text-text-low text-text12 mt-0.5">
-                {self?.org_id ? `${self.org_id} · ` : ''}{provider?.kind === 'pat' ? 'Personal access token' : 'Service user key'}
+                {self?.org_id ? `${self.org_id} · ` : ''}
+                {provider?.kind === 'pat' ? 'Personal access token' : 'Service user key'}
+                {credentialFingerprint ? ` · ending ${credentialFingerprint}` : ''}
               </Text>
             </View>
           </View>
@@ -171,9 +238,23 @@ export default function SettingsScreen() {
         <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
           {(
             [
-              { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review', tint: 'bg-tint-blue', color: tokens.brandText.hex },
+              {
+                icon: 'git-pull-request-outline',
+                label: 'Review',
+                route: '/(main)/review',
+                tint: 'bg-tint-blue',
+                color: tokens.brandText.hex,
+              },
               ...(scanFindings
-                ? [{ icon: 'shield-outline', label: 'Security', route: '/(main)/security', tint: 'bg-tint-red', color: tokens.failed.hex } as const]
+                ? [
+                    {
+                      icon: 'shield-outline',
+                      label: 'Security',
+                      route: '/(main)/security',
+                      tint: 'bg-tint-red',
+                      color: tokens.failed.hex,
+                    } as const,
+                  ]
                 : []),
             ] as const
           ).map(({ icon, label, route, tint, color }, i, arr) => (
@@ -198,10 +279,34 @@ export default function SettingsScreen() {
         <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
           {(
             [
-              { icon: 'document-text-outline', label: 'Knowledge', route: '/(main)/knowledge', tint: 'bg-tint-purple', color: tokens.merged.hex },
-              { icon: 'book-outline', label: 'Playbooks', route: '/(main)/playbooks', tint: 'bg-tint-blue', color: tokens.brandText.hex },
-              { icon: 'lock-closed-outline', label: 'Secrets', route: '/(main)/secrets', tint: 'bg-tint-orange', color: tokens.blocked.hex },
-              { icon: 'stats-chart-outline', label: 'Analytics', route: '/(main)/analytics', tint: 'bg-tint-green', color: tokens.finished.hex },
+              {
+                icon: 'document-text-outline',
+                label: 'Knowledge',
+                route: '/(main)/knowledge',
+                tint: 'bg-tint-purple',
+                color: tokens.merged.hex,
+              },
+              {
+                icon: 'book-outline',
+                label: 'Playbooks',
+                route: '/(main)/playbooks',
+                tint: 'bg-tint-blue',
+                color: tokens.brandText.hex,
+              },
+              {
+                icon: 'lock-closed-outline',
+                label: 'Secrets',
+                route: '/(main)/secrets',
+                tint: 'bg-tint-orange',
+                color: tokens.blocked.hex,
+              },
+              {
+                icon: 'stats-chart-outline',
+                label: 'Analytics',
+                route: '/(main)/analytics',
+                tint: 'bg-tint-green',
+                color: tokens.finished.hex,
+              },
             ] as const
           ).map(({ icon, label, route, tint, color }, i, arr) => (
             <Pressable
@@ -220,15 +325,52 @@ export default function SettingsScreen() {
           ))}
         </View>
 
+        <Text className="text-text-low text-text12 font-medium uppercase mb-2">Privacy</Text>
+        <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
+          <Pressable
+            className="flex-row items-center px-4 py-3"
+            onPress={() => router.push('/(main)/privacy')}
+            accessibilityRole="button"
+            accessibilityLabel="What data leaves your device"
+          >
+            <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
+              <Ionicons name="shield-checkmark-outline" size={15} color={tokens.brandText.hex} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-text-hi text-text14">What data leaves your device?</Text>
+              <Text className="text-text-low text-text12 mt-0.5">
+                Direct API, storage, crash reports, and analytics.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+          </Pressable>
+        </View>
+
         {/* About */}
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">About</Text>
         <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-3 mb-6">
           <Text className="text-text-hi text-text14 mb-1">{branding.name}</Text>
-          <Text className="text-text-mid text-text13 mb-3">{branding.subtitle}</Text>
+          <Text className="text-text-mid text-text13 mb-1">{branding.subtitle}</Text>
+          <Text className="text-text-low text-text12 mb-3">
+            Version {Constants.expoConfig?.version ?? '0.1.0'}
+          </Text>
           <Text className="text-text-low text-text12 leading-4 mb-3">{branding.disclaimer}</Text>
-          <Pressable onPress={() => Linking.openURL(branding.links.createServiceUser)}>
-            <Text className="text-link text-text13">API keys documentation →</Text>
-          </Pressable>
+          <View className="flex-row flex-wrap">
+            <Pressable className="mr-4 mb-2" onPress={() => Linking.openURL(branding.links.docs)}>
+              <Text className="text-link text-text13">Devin docs →</Text>
+            </Pressable>
+            <Pressable className="mr-4 mb-2" onPress={() => Linking.openURL(branding.links.status)}>
+              <Text className="text-link text-text13">Devin status →</Text>
+            </Pressable>
+            <Pressable
+              className="mb-2"
+              onPress={() => Linking.openURL('https://github.com/fenner888/Devinx')}
+              accessibilityRole="link"
+              accessibilityLabel="Open-source licenses"
+            >
+              <Text className="text-link text-text13">Licenses →</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Disconnect */}

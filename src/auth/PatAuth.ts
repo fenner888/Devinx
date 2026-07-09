@@ -53,6 +53,11 @@ export class PatAuth implements AuthProvider {
     return {};
   }
 
+  async credentialFingerprint(): Promise<string> {
+    const { apiKey } = await this.getCreds();
+    return apiKey.slice(-4);
+  }
+
   async validate(): Promise<ValidationResult> {
     try {
       const headers = await this.authHeaders();
@@ -63,8 +68,14 @@ export class PatAuth implements AuthProvider {
         signal: AbortSignal.timeout(15_000),
       });
       if (res.ok) return { ok: true };
-      if (res.status === 401) return { ok: false, code: 'invalid_key', detail: 'Invalid personal access token.' };
-      if (res.status === 403) return { ok: false, code: 'missing_permission', detail: 'This token lacks session permissions.' };
+      if (res.status === 401)
+        return { ok: false, code: 'invalid_key', detail: 'Invalid personal access token.' };
+      if (res.status === 403)
+        return {
+          ok: false,
+          code: 'missing_permission',
+          detail: 'This token lacks session permissions.',
+        };
       return { ok: false, code: 'network', detail: `Unexpected: ${res.status}` };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

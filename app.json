@@ -11,7 +11,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.fenner888.devinx",
       "infoPlist": {
-        "NSFileProtection": "NSFileProtectionComplete"
+        "NSFileProtection": "NSFileProtectionComplete",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        }
       }
     },
     "android": {
