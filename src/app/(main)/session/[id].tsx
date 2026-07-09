@@ -14,7 +14,6 @@ import {
   Pressable,
   ScrollView,
   TextInput,
-  FlatList,
   Linking,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -68,6 +67,8 @@ export default function SessionDetailScreen() {
   const [tagInput, setTagInput] = useState('');
   const [editedTags, setEditedTags] = useState<string[] | null>(null);
   const [tagError, setTagError] = useState<string | null>(null);
+  // Optimistically-echoed user message, shown instantly until the real one lands.
+  const [pendingText, setPendingText] = useState<string | null>(null);
 
   const validId = id && isValidSessionId(id) ? id : undefined;
   const { data: session, isLoading, error, refetch } = useSession(validId);
@@ -76,6 +77,13 @@ export default function SessionDetailScreen() {
   const sendMessage = useSendMessage(validId);
   const updateTags = useUpdateTags(validId);
   const { tokens } = useTheme();
+
+  // Clear the optimistic echo once the real user message shows up in the list.
+  useEffect(() => {
+    if (pendingText && messages?.some((m) => m.source === 'user' && m.message === pendingText)) {
+      setPendingText(null);
+    }
+  }, [messages, pendingText]);
 
   if (!validId) {
     return (
@@ -127,18 +135,31 @@ export default function SessionDetailScreen() {
     const text = messageText.trim();
     if (!text || sendMessage.isPending) return;
     hapticLight();
+    // Echo the message immediately, clear the input, then send.
+    setPendingText(text);
+    setMessageText('');
     sendMessage.mutate(
       { message: text },
       {
-        onSuccess: () => {
-          hapticSuccess();
-          // Clear only on success — on failure the draft stays in the input.
-          setMessageText('');
+        onSuccess: () => hapticSuccess(),
+        onError: () => {
+          hapticError();
+          // Restore the draft so nothing is lost, and drop the echo.
+          setPendingText(null);
+          setMessageText(text);
         },
-        onError: () => hapticError(),
       },
     );
   }
+
+  // Devin is "working" while the session is live or a send is in flight —
+  // drives the live typing indicator at the bottom of the timeline.
+  const isWorking =
+    sendMessage.isPending ||
+    !!pendingText ||
+    session.status === 'running' ||
+    session.status === 'resuming' ||
+    session.status_detail === 'working';
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
@@ -221,27 +242,23 @@ export default function SessionDetailScreen() {
         ))}
       </View>
 
-      {/* Tab content */}
-      <View className="flex-1">
-        {tab === 'timeline' && (
-          <TimelineTab messages={messages ?? []} isLoading={isLoading} />
-        )}
-        {tab === 'worklog' && (
-          <WorklogTab session={session} />
-        )}
-        {tab === 'changes' && (
-          <ChangesTab session={session} />
-        )}
-        {tab === 'insights' && (
-          <InsightsTab sessionId={validId} />
-        )}
-      </View>
+      {/* Tab content + steering bar — one KeyboardAvoidingView so the message
+          list shrinks (not just the input) and the layout doesn't jump. */}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View className="flex-1">
+          {tab === 'timeline' && (
+            <TimelineTab messages={messages ?? []} isLoading={isLoading} pendingText={pendingText} isWorking={isWorking} />
+          )}
+          {tab === 'worklog' && <WorklogTab session={session} />}
+          {tab === 'changes' && <ChangesTab session={session} />}
+          {tab === 'insights' && <InsightsTab sessionId={validId} />}
+        </View>
 
-      {/* Message steering bar — any non-terminal session (sleeping resumes) */}
-      {canSend && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        {/* Message steering bar — any non-terminal session (sleeping resumes) */}
+        {canSend && (
           <View className="px-3 py-2 border-t border-border-subtle bg-surface0">
             {session.status === 'suspended' && (
               <Text className="text-text-low text-text12 px-1 pb-1.5">
@@ -281,8 +298,8 @@ export default function SessionDetailScreen() {
               </Text>
             )}
           </View>
-        </KeyboardAvoidingView>
-      )}
+        )}
+      </KeyboardAvoidingView>
 
       {/* Tag editor modal */}
       <Modal visible={showTagEditor} animationType="slide" transparent onRequestClose={() => setShowTagEditor(false)}>
@@ -515,20 +532,29 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
  * user messages as right-aligned bubbles. Auto-scrolls only while the user
  * is already near the bottom, so reading history isn't hijacked by polling.
  */
-function TimelineTab({ messages, isLoading }: { messages: SessionMessage[]; isLoading: boolean }) {
-  const listRef = useRef<FlatList<SessionMessage>>(null);
+function TimelineTab({
+  messages,
+  isLoading,
+  pendingText,
+  isWorking,
+}: {
+  messages: SessionMessage[];
+  isLoading: boolean;
+  pendingText: string | null;
+  isWorking: boolean;
+}) {
+  const listRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
 
   useEffect(() => {
-    if (messages.length > 0 && nearBottomRef.current) {
+    if (nearBottomRef.current) {
       listRef.current?.scrollToEnd({ animated: true });
     }
-  }, [messages.length]);
+  }, [messages.length, pendingText, isWorking]);
 
   function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-    nearBottomRef.current =
-      layoutMeasurement.height + contentOffset.y >= contentSize.height - 80;
+    nearBottomRef.current = layoutMeasurement.height + contentOffset.y >= contentSize.height - 80;
   }
 
   if (isLoading && messages.length === 0) {
@@ -539,7 +565,7 @@ function TimelineTab({ messages, isLoading }: { messages: SessionMessage[]; isLo
     );
   }
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && !pendingText && !isWorking) {
     return (
       <View className="flex-1 items-center justify-center px-6">
         <Text className="text-text-mid text-text14">No messages yet.</Text>
@@ -547,19 +573,45 @@ function TimelineTab({ messages, isLoading }: { messages: SessionMessage[]; isLo
     );
   }
 
+  // A ScrollView (not FlatList) so the echo bubble + working indicator can sit
+  // after the mapped messages. Timelines are bounded (paginated to 1k), so the
+  // simpler layout is fine and keeps the "live" tail elements trivial.
   return (
-    <FlatList
+    <ScrollView
       ref={listRef}
-      className="flex-1 px-4 py-3"
-      data={messages}
-      keyExtractor={(item) => item.event_id}
-      renderItem={({ item }) => <MessageBubble message={item} />}
+      className="flex-1 px-4"
+      contentContainerClassName="py-3"
       onScroll={handleScroll}
       scrollEventThrottle={100}
       onContentSizeChange={() => {
         if (nearBottomRef.current) listRef.current?.scrollToEnd({ animated: false });
       }}
-    />
+    >
+      {messages.map((m) => (
+        <MessageBubble key={m.event_id} message={m} />
+      ))}
+      {/* Optimistic echo of the just-sent message (dropped once the real one lands). */}
+      {pendingText && (
+        <View className="mb-4 max-w-[85%] self-end items-end opacity-70">
+          <View className="rounded-2xl px-4 py-3 bg-tint-primary">
+            <Text className="text-text14 text-text-hi">{pendingText}</Text>
+          </View>
+          <Text className="text-text-low text-text11 mt-1 text-right">Sending…</Text>
+        </View>
+      )}
+      {/* Live "Devin is working" indicator. */}
+      {isWorking && <WorkingIndicator />}
+    </ScrollView>
+  );
+}
+
+function WorkingIndicator() {
+  const { tokens } = useTheme();
+  return (
+    <View className="flex-row items-center mb-4">
+      <ActivityIndicator size="small" color={tokens.brandText.hex} />
+      <Text className="text-text-mid text-text13 ml-2">Devin is working…</Text>
+    </View>
   );
 }
 

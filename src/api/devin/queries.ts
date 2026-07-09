@@ -139,7 +139,8 @@ export function useMessages(sessionId: string | undefined) {
         ? queryClient.getQueryData<SessionResponse>(queryKeys.session(sessionId))
         : undefined;
       if (session && !isActiveStatus(session.status)) return false;
-      return scalePolling(5_000, useAppPreferences.getState().pollingMode);
+      // Snappier while a session is live so Devin's replies appear quickly.
+      return scalePolling(2_500, useAppPreferences.getState().pollingMode);
     },
     refetchOnWindowFocus: true,
     retry: shouldRetryQuery,
