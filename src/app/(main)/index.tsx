@@ -1,7 +1,7 @@
 /**
- * Home tab — Perplexity-style hero composer.
- * Wordmark, a friendly prompt, a large rounded composer, and a compact
- * recent-sessions list. The full session list lives in the Sessions tab.
+ * Home — Perplexity-style hero composer.
+ * Top-left menu (slide-over) for navigation, a friendly prompt, a large
+ * rounded composer, and a compact recent-sessions list.
  */
 import { useState } from 'react';
 import {
@@ -20,14 +20,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
-import { useSessions, useCreateSession, usePlaybooks } from '@api/devin/queries';
+import { useSessions, useCreateSession, usePlaybooks, useCodeScanFindings } from '@api/devin/queries';
 import { OfflineBanner } from '@components/OfflineBanner';
+import { NavMenu } from '@components/NavMenu';
 import { ModeSettings } from '@components/ModeSettings';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
 import { deriveStatusKey, statusColorClass, statusLabel, relativeTime, prNumber, modeLabel } from '@lib/session-utils';
 import type { DevinMode } from '@api/devin/types';
-import WORDMARK_DARK from '../../../../assets/wordmark.png';
-import WORDMARK_LIGHT from '../../../../assets/wordmark-light.png';
+import WORDMARK_DARK from '../../../assets/wordmark.png';
+import WORDMARK_LIGHT from '../../../assets/wordmark-light.png';
 
 const MAX_PROMPT = 10000;
 
@@ -37,12 +38,14 @@ export default function HomeScreen() {
   const { data: sessions } = useSessions('board');
   const createSession = useCreateSession();
   const { data: playbooks } = usePlaybooks();
+  const { data: scanFindings } = useCodeScanFindings();
 
   const [prompt, setPrompt] = useState('');
   const [selectedPlaybook, setSelectedPlaybook] = useState<string | null>(null);
   const [mode, setMode] = useState<DevinMode>('normal');
   const [showPlaybookPicker, setShowPlaybookPicker] = useState(false);
   const [showModePicker, setShowModePicker] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
 
   const recent = (sessions ?? []).slice(0, 5);
@@ -74,17 +77,28 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
-      {/* Top bar — wordmark only (no drawer) */}
-      <View className="flex-row items-center px-5 pt-2 pb-1">
-        <Image source={name === 'light' ? WORDMARK_LIGHT : WORDMARK_DARK} className="w-28 h-7" resizeMode="contain" accessibilityLabel="DevinX" />
+      {/* Top bar — menu + wordmark */}
+      <View className="flex-row items-center px-4 pt-2 pb-1">
+        <Pressable
+          className="w-10 h-10 rounded-full items-center justify-center"
+          onPress={() => setShowMenu(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Menu"
+        >
+          <Ionicons name="menu" size={24} color={tokens.textMid.hex} />
+        </Pressable>
+        <Image source={name === 'light' ? WORDMARK_LIGHT : WORDMARK_DARK} className="w-28 h-7 ml-1" resizeMode="contain" accessibilityLabel="DevinX" />
       </View>
+
+      <NavMenu visible={showMenu} onClose={() => setShowMenu(false)} showSecurity={!!scanFindings} />
 
       <OfflineBanner />
 
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           className="flex-1"
-          contentContainerClassName="flex-grow px-5 pt-6 pb-32"
+          contentContainerClassName="flex-grow px-5 pt-6 pb-10"
           keyboardShouldPersistTaps="handled"
         >
           {/* Hero prompt */}

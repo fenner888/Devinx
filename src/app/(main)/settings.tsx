@@ -59,11 +59,20 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
-      <View className="px-5 pt-2 pb-4">
-        <Text className="text-text-hi text-text24">Settings</Text>
+      <View className="flex-row items-center px-4 pt-2 pb-4">
+        <Pressable
+          className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center mr-3"
+          onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={18} color={tokens.textMid.hex} />
+        </Pressable>
+        <Text className="text-text-hi text-text20">Settings</Text>
       </View>
 
-      <ScrollView className="flex-1 px-5" contentContainerClassName="pb-24">
+      <ScrollView className="flex-1 px-5" contentContainerClassName="pb-10">
         {/* Appearance */}
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">Appearance</Text>
         <View className="flex-row bg-tint-secondary rounded-button p-1 mb-6">

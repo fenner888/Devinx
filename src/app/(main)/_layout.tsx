@@ -3,9 +3,10 @@ import { Stack } from 'expo-router';
 export default function MainGroup() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {/* Bottom-tab home */}
-      <Stack.Screen name="(tabs)" />
-      {/* Detail / modal screens push over the tabs */}
+      <Stack.Screen name="index" />
+      <Stack.Screen name="sessions" />
+      <Stack.Screen name="automations" />
+      <Stack.Screen name="settings" />
       <Stack.Screen name="session/[id]" />
       <Stack.Screen name="compose" options={{ presentation: 'modal' }} />
       <Stack.Screen name="usage" />

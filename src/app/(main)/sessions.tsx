@@ -1,5 +1,5 @@
 /**
- * Sessions tab — the full session list (was the home drawer).
+ * Sessions — the full session list.
  * Search, tag filter, sectioned by status, long-press for context actions.
  */
 import { useState, useMemo, useCallback } from 'react';
@@ -96,8 +96,17 @@ export default function SessionsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
       {/* Header */}
-      <View className="flex-row items-center px-5 pt-2 pb-3">
-        <Text className="text-text-hi text-text24 flex-1">Sessions</Text>
+      <View className="flex-row items-center px-4 pt-2 pb-3">
+        <Pressable
+          className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center mr-3"
+          onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={18} color={tokens.textMid.hex} />
+        </Pressable>
+        <Text className="text-text-hi text-text20 flex-1">Sessions</Text>
         <Pressable
           className={`rounded-full px-3.5 py-2 ${selectedTags.length > 0 ? 'bg-brand' : 'bg-tint-secondary'}`}
           onPress={() => setShowTagFilter(true)}
@@ -145,14 +154,14 @@ export default function SessionsScreen() {
         <EmptyState
           icon=">_"
           title={data && data.length > 0 ? 'No matches' : 'No sessions yet'}
-          message={data && data.length > 0 ? 'No sessions match your search or tag filters.' : 'Start a new session from the Home tab.'}
+          message={data && data.length > 0 ? 'No sessions match your search or tag filters.' : 'Start a new session from Home.'}
         />
       )}
 
       {!error && filtered.length > 0 && (
         <SectionList
           className="flex-1 px-5"
-          contentContainerClassName="pb-24"
+          contentContainerClassName="pb-6"
           sections={sections}
           keyExtractor={(item) => item.session_id}
           renderSectionHeader={({ section: { section } }) => (
