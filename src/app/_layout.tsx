@@ -9,7 +9,12 @@ import { AppState, Platform } from 'react-native';
 import { Stack, Redirect, useSegments, useRouter } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider, focusManager, onlineManager } from '@tanstack/react-query';
+import {
+  QueryClient,
+  QueryClientProvider,
+  focusManager,
+  onlineManager,
+} from '@tanstack/react-query';
 import NetInfo from '@react-native-community/netinfo';
 import { ThemeProvider, useTheme, loadThemePreference } from '@theme/index';
 import { initSentry } from '@lib/sentry';
@@ -17,6 +22,7 @@ import { shouldRetryQuery } from '@api/devin/client';
 import { AuthProvider, useAuth } from '@auth/AuthContext';
 import { getPushToken, setupNotificationListener } from '@lib/notifications';
 import { ErrorBoundary } from '@components/ErrorBoundary';
+import { PrivacyShield } from '@components/PrivacyShield';
 
 initSentry();
 loadThemePreference();
@@ -58,7 +64,9 @@ function InitialRoute() {
   // Register for push notifications when authenticated.
   useEffect(() => {
     if (isAuthenticated) {
-      getPushToken().catch(() => { /* ignore */ });
+      getPushToken().catch(() => {
+        /* ignore */
+      });
     }
   }, [isAuthenticated]);
 
@@ -112,6 +120,7 @@ export default function RootLayout() {
             <AuthProvider>
               <InitialRoute />
               <ThemedStack />
+              <PrivacyShield />
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>

@@ -101,6 +101,7 @@ export function sortSessions(sessions: SessionResponse[]): SessionResponse[] {
 /** Group sessions into board sections (preserving sort order). */
 export function sectionSessions(
   sessions: SessionResponse[],
+  pinnedSessionIds: string[] = [],
 ): { section: SectionKey; data: SessionResponse[] }[] {
   const sorted = sortSessions(sessions);
   const groups: Record<SectionKey, SessionResponse[]> = {
@@ -113,9 +114,15 @@ export function sectionSessions(
     const key = deriveStatusKey(s);
     groups[statusKeyToSection(key)].push(s);
   }
+  const pinned = new Set(pinnedSessionIds);
   return (Object.keys(groups) as SectionKey[])
-    .filter((k) => groups[k].length > 0)
-    .map((k) => ({ section: k, data: groups[k] }));
+    .filter((key) => groups[key].length > 0)
+    .map((key) => ({
+      section: key,
+      data: groups[key].sort(
+        (a, b) => Number(pinned.has(b.session_id)) - Number(pinned.has(a.session_id)),
+      ),
+    }));
 }
 
 /** Status color class for text/dot. */

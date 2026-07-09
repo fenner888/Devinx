@@ -1,0 +1,17 @@
+appId: com.fenner888.devinx
+---
+- launchApp
+- extendedWaitUntil:
+    visible: What should Devin build?
+    timeout: 15000
+- tapOn: Menu
+- tapOn: Settings
+- scrollUntilVisible:
+    element:
+      text: Disconnect & wipe data
+    direction: DOWN
+- tapOn: Disconnect & wipe data
+- tapOn: Disconnect
+- extendedWaitUntil:
+    visible: Connect your Devin account
+    timeout: 15000

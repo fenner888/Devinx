@@ -6,13 +6,68 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { AppState } from 'react-native';
 import { useAuth } from '@auth/AuthContext';
+import type { AuthProvider } from '@auth/AuthProvider';
 import { shouldRetryQuery, ApiError } from './client';
 import { saveSessions, loadCachedSessions } from '@cache/index';
-import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment, listSchedules, createSchedule, updateSchedule, deleteSchedule, triggerPrReview, getPrReview, listCodeScanFindings, remediateFinding, createKnowledgeNote, updateKnowledgeNote, deleteKnowledgeNote, createPlaybook, updatePlaybook, deletePlaybook, createSecret, deleteSecret, getSessionMetrics, getPrMetrics, getSearchMetrics, getWeeklyActiveUsers, listRepositories, getSelf, getSessionConsumption, listIndexedRepositories, indexRepository } from './endpoints';
+import {
+  listSessions,
+  getSession,
+  listMessages,
+  sendMessage,
+  createSession,
+  listPlaybooks,
+  listKnowledge,
+  listSecrets,
+  archiveSession,
+  terminateSession,
+  getDailyConsumption,
+  getInsights,
+  generateInsights,
+  replaceTags,
+  uploadAttachment,
+  listSchedules,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule,
+  triggerPrReview,
+  getPrReview,
+  listCodeScanFindings,
+  remediateFinding,
+  createKnowledgeNote,
+  updateKnowledgeNote,
+  deleteKnowledgeNote,
+  createPlaybook,
+  updatePlaybook,
+  deletePlaybook,
+  createSecret,
+  deleteSecret,
+  getSessionMetrics,
+  getPrMetrics,
+  getSearchMetrics,
+  getWeeklyActiveUsers,
+  listRepositories,
+  getSelf,
+  getSessionConsumption,
+  listIndexedRepositories,
+  indexRepository,
+} from './endpoints';
 import { queryKeys } from './queryKeys';
 import { pollingPolicy, scalePolling, type ScreenContext } from '@lib/polling';
 import { useAppPreferences } from '@store/preferences';
-import type { Cursor, SessionCreateRequest, SessionResponse, ScheduleCreateRequest, ScheduleUpdateRequest, KnowledgeNoteCreateRequest, KnowledgeNoteUpdateRequest, PlaybookCreateRequest, PlaybookUpdateRequest, SecretCreateRequest, MetricsQuery } from './types';
+import { findPotentialCreatedSession } from '@lib/session-create';
+import type {
+  Cursor,
+  SessionCreateRequest,
+  SessionResponse,
+  ScheduleCreateRequest,
+  ScheduleUpdateRequest,
+  KnowledgeNoteCreateRequest,
+  KnowledgeNoteUpdateRequest,
+  PlaybookCreateRequest,
+  PlaybookUpdateRequest,
+  SecretCreateRequest,
+  MetricsQuery,
+} from './types';
 
 // Pagination caps — enough for any realistic board/timeline while bounding
 // worst-case request fan-out per refetch.
@@ -42,7 +97,14 @@ export function useSessions(screen: ScreenContext = 'board') {
           cursor = result.endCursor;
         }
         // Persist the board for offline / cold-start hydration (no secrets).
-        saveSessions(items.map((s) => ({ ...s, session_id: s.session_id, status: s.status, updated_at: s.updated_at }))).catch(() => {});
+        saveSessions(
+          items.map((s) => ({
+            ...s,
+            session_id: s.session_id,
+            status: s.status,
+            updated_at: s.updated_at,
+          })),
+        ).catch(() => {});
         return items;
       } catch (e) {
         // Offline (or transient network) — fall back to the last cached board
@@ -64,7 +126,12 @@ export function useSessions(screen: ScreenContext = 'board') {
       const appState = AppState.currentState;
       const mode = useAppPreferences.getState().pollingMode;
       if (anyRunning) {
-        return pollingPolicy('running', appState === 'active' ? 'active' : 'background', screen, mode);
+        return pollingPolicy(
+          'running',
+          appState === 'active' ? 'active' : 'background',
+          screen,
+          mode,
+        );
       }
       return appState === 'active' ? scalePolling(60_000, mode) : false;
     },
@@ -95,7 +162,12 @@ export function useSession(sessionId: string | undefined) {
       const isActive = isActiveStatus(data.status);
       const appState = AppState.currentState;
       if (isActive || data.status === 'suspended') {
-        return pollingPolicy(data.status, appState === 'active' ? 'active' : 'background', 'session_detail', useAppPreferences.getState().pollingMode);
+        return pollingPolicy(
+          data.status,
+          appState === 'active' ? 'active' : 'background',
+          'session_detail',
+          useAppPreferences.getState().pollingMode,
+        );
       }
       // Session finished — stop polling.
       return false;
@@ -209,6 +281,30 @@ export function useKnowledge() {
   });
 }
 
+async function reconcileAmbiguousSessionCreate(
+  provider: AuthProvider,
+  body: SessionCreateRequest,
+  startedAt: number,
+): Promise<SessionResponse | undefined> {
+  const identity = await getSelf(provider).catch(() => undefined);
+  if (!identity?.service_user_id && !identity?.user_id) return undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const result = await listSessions(provider, {
+        first: 100,
+        created_after: startedAt - 5,
+        search: body.title || undefined,
+      });
+      const match = findPotentialCreatedSession(body, result.items, startedAt, identity);
+      if (match) return match;
+    } catch {
+      return undefined;
+    }
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 750));
+  }
+  return undefined;
+}
+
 export function useCreateSession() {
   const queryClient = useQueryClient();
   const { provider } = useAuth();
@@ -216,7 +312,19 @@ export function useCreateSession() {
   return useMutation({
     mutationFn: async (body: SessionCreateRequest): Promise<SessionResponse> => {
       if (!provider) throw new Error('Not authenticated');
-      return createSession(provider, body);
+      const startedAt = Math.floor(Date.now() / 1000);
+      try {
+        return await createSession(provider, body);
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.code !== 'network') throw error;
+        const reconciled = await reconcileAmbiguousSessionCreate(provider, body, startedAt);
+        if (reconciled) return reconciled;
+        throw new ApiError(
+          'The create request lost its response and may have succeeded. Refresh Sessions before retrying.',
+          0,
+          'network',
+        );
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
@@ -432,7 +540,8 @@ export function useTriggerPrReview() {
       if (!provider) throw new Error('Not authenticated');
       return triggerPrReview(provider, prUrl);
     },
-    onSuccess: (_data, prUrl) => queryClient.invalidateQueries({ queryKey: queryKeys.prReview(prUrl) }),
+    onSuccess: (_data, prUrl) =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.prReview(prUrl) }),
   });
 }
 
@@ -604,7 +713,9 @@ export function useOrgMetrics(rangeDays: number) {
       const [sessions, prs, searches, weeklyActiveUsers] = await Promise.all([
         getSessionMetrics(provider, query),
         getPrMetrics(provider, query).catch(() => ({}) as Awaited<ReturnType<typeof getPrMetrics>>),
-        getSearchMetrics(provider, query).catch(() => ({}) as Awaited<ReturnType<typeof getSearchMetrics>>),
+        getSearchMetrics(provider, query).catch(
+          () => ({}) as Awaited<ReturnType<typeof getSearchMetrics>>,
+        ),
         getWeeklyActiveUsers(provider, query).catch(() => []),
       ]);
       return { sessions, prs, searches, weeklyActiveUsers };

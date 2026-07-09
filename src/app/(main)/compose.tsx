@@ -4,7 +4,7 @@
  * mode toggle (normal/fast), tag input, submit → createSession → session detail.
  * Draft persistence via AsyncStorage.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -37,6 +37,7 @@ import { AttachmentPickerSheet, type PickedAttachment } from '@components/Attach
 import type { DevinMode } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
+import { useAppPreferences } from '@store/preferences';
 
 const DRAFT_KEY = '@devinx/compose-draft';
 const MAX_PROMPT = 10000;
@@ -80,6 +81,7 @@ export default function ComposeScreen() {
   const uploadAttachment = useUploadAttachment();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
+  const defaultTags = useAppPreferences((state) => state.defaultTags);
 
   const [attachments, setAttachments] = useState<
     { name: string; url: string; previewUri?: string }[]
@@ -93,6 +95,7 @@ export default function ComposeScreen() {
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [tagInput, setTagInput] = useState('');
+  const defaultTagsRef = useRef(defaultTags);
 
   // Load draft from AsyncStorage on mount.
   useEffect(() => {
@@ -100,10 +103,12 @@ export default function ComposeScreen() {
       .then((json) => {
         if (json) {
           try {
-            setDraft({ ...emptyDraft, ...JSON.parse(json) });
+            setDraft({ ...emptyDraft, tags: defaultTagsRef.current, ...JSON.parse(json) });
           } catch {
             // ignore corrupt draft
           }
+        } else {
+          setDraft({ ...emptyDraft, tags: defaultTagsRef.current });
         }
       })
       .finally(() => setLoaded(true));

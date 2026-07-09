@@ -1,0 +1,18 @@
+appId: com.fenner888.devinx
+---
+- launchApp:
+    clearState: true
+- assertVisible: Connect your Devin account
+- tapOn: Connect your Devin account
+- tapOn:
+    id: api-key-input
+- inputText: ${DEVIN_API_KEY}
+- tapOn:
+    id: org-id-input
+- inputText: ${DEVIN_ORG_ID}
+- tapOn: Validate & connect
+- extendedWaitUntil:
+    visible: What should Devin build?
+    timeout: 30000
+- assertVisible: Any repository
+- assertVisible: Normal

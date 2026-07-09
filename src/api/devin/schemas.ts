@@ -183,6 +183,7 @@ export const sessionResponseSchema = z
     playbook_id: z.string().nullish(),
     pull_requests: z.array(pullRequestSchema),
     service_user_id: z.string().nullish(),
+    user_id: z.string().nullish(),
     session_id: z.string(),
     status: sessionStatusSchema,
     // Accept any string — status_detail carries billing/limit values that
@@ -212,15 +213,9 @@ export const sessionResponseSchema = z
       .nullable()
       .optional(),
     latest_permission_event_at: unixTimestampSchema.nullable().optional(),
-    latest_loop_contents: z
-      .object({ type: z.string().optional() })
-      .nullable()
-      .optional(),
+    latest_loop_contents: z.object({ type: z.string().optional() }).nullable().optional(),
     latest_loop_event_at: unixTimestampSchema.nullable().optional(),
-    latest_approval_contents: z
-      .object({ type: z.string().optional() })
-      .nullable()
-      .optional(),
+    latest_approval_contents: z.object({ type: z.string().optional() }).nullable().optional(),
     latest_approval_event_at: unixTimestampSchema.nullable().optional(),
     current_activity_changed_at: unixTimestampSchema.nullable().optional(),
     activity_status_changed_at: unixTimestampSchema.nullable().optional(),
@@ -401,9 +396,7 @@ export const knowledgeNoteResponseSchema = z
   })
   .passthrough();
 
-export const knowledgeNoteListResponseSchema = paginatedResponseSchema(
-  knowledgeNoteResponseSchema,
-);
+export const knowledgeNoteListResponseSchema = paginatedResponseSchema(knowledgeNoteResponseSchema);
 
 // The real SecretResponse has no org_id; keep metadata optional.
 export const secretResponseSchema = z
@@ -486,9 +479,7 @@ export const consumptionCycleSchema = z
   })
   .passthrough();
 
-export const consumptionCycleListResponseSchema = paginatedResponseSchema(
-  consumptionCycleSchema,
-);
+export const consumptionCycleListResponseSchema = paginatedResponseSchema(consumptionCycleSchema);
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -646,9 +637,7 @@ export const prMetricsSchema = z
   })
   .passthrough();
 
-export const searchMetricsSchema = z
-  .object({ searches_created_count: metricCount })
-  .passthrough();
+export const searchMetricsSchema = z.object({ searches_created_count: metricCount }).passthrough();
 
 export const activeUserPeriodSchema = z
   .object({

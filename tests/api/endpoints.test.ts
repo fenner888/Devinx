@@ -17,6 +17,7 @@ const mockAuth: AuthProvider = {
   kind: 'service_user',
   authHeaders: async () => ({ Authorization: 'Bearer cog_test' }),
   orgPath: async () => '/v3/organizations/org-abc',
+  credentialFingerprint: async () => 'test',
   sessionAttribution: async () => ({ create_as_user_id: 'user-42' }),
   validate: async () => ({ ok: true }),
 };
@@ -25,7 +26,13 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 function ok(data: unknown) {
-  return { ok: true, status: 200, headers: new Headers(), text: async () => JSON.stringify(data), json: async () => data };
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers(),
+    text: async () => JSON.stringify(data),
+    json: async () => data,
+  };
 }
 
 function lastUrl(): string {
@@ -77,7 +84,13 @@ describe('endpoints — path building & response shaping', () => {
   });
 
   it('sendMessage maps attribution to message_as_user_id (not create_as_user_id)', async () => {
-    mockFetch.mockResolvedValue({ ok: true, status: 204, headers: new Headers(), text: async () => '', json: async () => undefined });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 204,
+      headers: new Headers(),
+      text: async () => '',
+      json: async () => undefined,
+    });
     await sendMessage(mockAuth, 'devin-abc', 'hello');
     const body = lastBody() as Record<string, unknown>;
     expect(body.message_as_user_id).toBe('user-42');
@@ -107,7 +120,9 @@ describe('endpoints — path building & response shaping', () => {
   });
 
   it('listSessions unwraps the paginated items envelope', async () => {
-    mockFetch.mockResolvedValue(ok({ items: [sessionFixture], end_cursor: null, has_next_page: false }));
+    mockFetch.mockResolvedValue(
+      ok({ items: [sessionFixture], end_cursor: null, has_next_page: false }),
+    );
     const { items, hasNextPage } = await listSessions(mockAuth, { first: 100 });
     expect(items).toHaveLength(1);
     expect(hasNextPage).toBe(false);

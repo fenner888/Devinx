@@ -99,6 +99,8 @@ export default function CredentialsScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
+            accessibilityLabel="Devin API key"
+            testID="api-key-input"
           />
         </View>
 
@@ -114,6 +116,8 @@ export default function CredentialsScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
+            accessibilityLabel="Organization ID"
+            testID="org-id-input"
           />
         </View>
 

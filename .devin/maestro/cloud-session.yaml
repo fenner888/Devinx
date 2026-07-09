@@ -1,0 +1,19 @@
+appId: com.fenner888.devinx
+---
+- launchApp
+- extendedWaitUntil:
+    visible: What should Devin build?
+    timeout: 15000
+- tapOn: Session prompt
+- inputText: "${E2E_PROMPT}"
+- tapOn: Start session
+- extendedWaitUntil:
+    visible: Timeline
+    timeout: 30000
+- assertVisible: Devin Cloud
+- tapOn: Ask Devin to build features, fix bugs, or work on your code
+- inputText: "${E2E_FOLLOW_UP}"
+- tapOn: Send message
+- extendedWaitUntil:
+    visible: Sending…
+    timeout: 5000

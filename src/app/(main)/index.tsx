@@ -44,6 +44,7 @@ import {
   modeLabel,
 } from '@lib/session-utils';
 import type { DevinMode } from '@api/devin/types';
+import { useAppPreferences } from '@store/preferences';
 import WORDMARK_DARK from '../../../assets/wordmark.png';
 import WORDMARK_LIGHT from '../../../assets/wordmark-light.png';
 
@@ -53,6 +54,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { name, tokens } = useTheme();
   const insets = useSafeAreaInsets();
+  const defaultTags = useAppPreferences((state) => state.defaultTags);
   const { data: sessions } = useSessions('board');
   const createSession = useCreateSession();
   const uploadAttachment = useUploadAttachment();
@@ -114,6 +116,7 @@ export default function HomeScreen() {
         playbook_id: selectedPlaybook ?? undefined,
         repos: selectedRepo ? [selectedRepo] : undefined,
         devin_mode: mode,
+        tags: defaultTags.length > 0 ? defaultTags : undefined,
         attachment_urls:
           attachments.length > 0 ? attachments.map((attachment) => attachment.url) : undefined,
       },
