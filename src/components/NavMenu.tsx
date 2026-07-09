@@ -3,12 +3,14 @@
  * Cursor / Perplexity / ChatGPT / Claude on mobile. Replaces a bottom tab bar.
  * Pure-ish UI: takes visibility + a Security gate flag; navigates via router.
  */
-import { View, Text, Pressable, Modal } from 'react-native';
+import { View, Text, Pressable, Modal, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
 import { hapticLight } from '@lib/haptics';
+import WORDMARK_DARK from '../../assets/wordmark.png';
+import WORDMARK_LIGHT from '../../assets/wordmark-light.png';
 
 interface NavItem {
   icon: keyof typeof Ionicons.glyphMap;
@@ -26,7 +28,7 @@ export function NavMenu({
   showSecurity: boolean;
 }) {
   const router = useRouter();
-  const { tokens } = useTheme();
+  const { name, tokens } = useTheme();
   // SafeAreaView doesn't inset correctly inside a Modal — read the device
   // insets from context and apply them manually so the header clears the
   // status bar and the footer clears the home indicator.
@@ -58,7 +60,12 @@ export function NavMenu({
             style={{ paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 8) }}
           >
             <View className="flex-row items-center justify-between px-5 pt-3 pb-4">
-              <Text className="text-text-hi text-text20">DevinX</Text>
+              <Image
+                source={name === 'light' ? WORDMARK_LIGHT : WORDMARK_DARK}
+                className="w-28 h-7"
+                resizeMode="contain"
+                accessibilityLabel="DevinX"
+              />
               <Pressable
                 className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center"
                 onPress={onClose}
