@@ -16,16 +16,27 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as DocumentPicker from 'expo-document-picker';
-import { useCreateSession, usePlaybooks, useKnowledge, useSecrets, useUploadAttachment, useRepositories, useIndexedRepositories, useIndexRepository } from '@api/devin/queries';
+import {
+  useCreateSession,
+  usePlaybooks,
+  useKnowledge,
+  useSecrets,
+  useUploadAttachment,
+  useRepositories,
+  useIndexedRepositories,
+  useIndexRepository,
+} from '@api/devin/queries';
 import { ModeSettings } from '@components/ModeSettings';
+import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
 import type { DevinMode } from '@api/devin/types';
 import { useTheme } from '@theme/index';
+import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
 
 const DRAFT_KEY = '@devinx/compose-draft';
 const MAX_PROMPT = 10000;
@@ -70,13 +81,16 @@ export default function ComposeScreen() {
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
+  const [attachments, setAttachments] = useState<
+    { name: string; url: string; previewUri?: string }[]
+  >([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [loaded, setLoaded] = useState(false);
   const [showPlaybookPicker, setShowPlaybookPicker] = useState(false);
   const [showRepoPicker, setShowRepoPicker] = useState(false);
   const [showKnowledgePicker, setShowKnowledgePicker] = useState(false);
   const [showSecretsPicker, setShowSecretsPicker] = useState(false);
+  const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [tagInput, setTagInput] = useState('');
 
@@ -106,7 +120,8 @@ export default function ComposeScreen() {
     return () => clearTimeout(id);
   }, [draft, loaded]);
 
-  const canSubmit = draft.prompt.trim().length > 0 && !createSession.isPending;
+  const canSubmit =
+    draft.prompt.trim().length > 0 && !createSession.isPending && !uploadAttachment.isPending;
 
   const updateDraft = useCallback((patch: Partial<Draft>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
@@ -140,17 +155,17 @@ export default function ComposeScreen() {
     }
   }
 
-  async function pickAttachment() {
-    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
-    if (result.canceled || !result.assets?.[0]) return;
-    const asset = result.assets[0];
+  async function handleAttachment(file: PickedAttachment) {
     try {
-      const uploaded = await uploadAttachment.mutateAsync({
-        name: asset.name,
-        type: asset.mimeType ?? 'application/octet-stream',
-        uri: asset.uri,
-      });
-      setAttachments((prev) => [...prev, { name: uploaded.name, url: uploaded.url }]);
+      const uploaded = await uploadAttachment.mutateAsync(file);
+      setAttachments((prev) => [
+        ...prev,
+        {
+          name: uploaded.name,
+          url: uploaded.url,
+          previewUri: file.type.startsWith('image/') ? file.uri : undefined,
+        },
+      ]);
     } catch (e) {
       Alert.alert('Upload failed', e instanceof Error ? e.message : 'Unknown error');
     }
@@ -177,15 +192,16 @@ export default function ComposeScreen() {
         unlisted: draft.unlisted || undefined,
         attachment_urls: attachments.length > 0 ? attachments.map((a) => a.url) : undefined,
       });
+      await Promise.all([
+        rememberSessionRepository(session.session_id, draft.repos[0]),
+        rememberSessionMode(session.session_id, draft.mode),
+      ]);
       // Clear draft on success.
       await AsyncStorage.removeItem(DRAFT_KEY);
       setDraft(emptyDraft);
       router.replace(`/(main)/session/${session.session_id}`);
     } catch (e) {
-      Alert.alert(
-        'Could not create session',
-        e instanceof Error ? e.message : 'Unknown error',
-      );
+      Alert.alert('Could not create session', e instanceof Error ? e.message : 'Unknown error');
     }
   }
 
@@ -223,7 +239,9 @@ export default function ComposeScreen() {
 
         <ScrollView className="flex-1 px-4 py-4" keyboardShouldPersistTaps="handled">
           {/* Title (optional) */}
-          <Text className="text-text-low text-text12 font-medium uppercase mb-1">Title (optional)</Text>
+          <Text className="text-text-low text-text12 font-medium uppercase mb-1">
+            Title (optional)
+          </Text>
           <TextInput
             className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-4"
             value={draft.title}
@@ -254,7 +272,9 @@ export default function ComposeScreen() {
           )}
 
           {/* Session settings — same grouping as the web composer */}
-          <Text className="text-text-low text-text12 font-medium uppercase mb-1 mt-4">Session settings</Text>
+          <Text className="text-text-low text-text12 font-medium uppercase mb-1 mt-4">
+            Session settings
+          </Text>
           <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-2 mb-4">
             <ModeSettings
               mode={draft.mode}
@@ -316,9 +336,7 @@ export default function ComposeScreen() {
             <View className="flex-1">
               <Text className="text-text-low text-text12 mb-0.5">Secrets</Text>
               <Text className="text-text14 text-text-hi" numberOfLines={1}>
-                {selectedSecrets.length > 0
-                  ? selectedSecrets.map((s) => s.key).join(', ')
-                  : 'None'}
+                {selectedSecrets.length > 0 ? selectedSecrets.map((s) => s.key).join(', ') : 'None'}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
@@ -327,8 +345,10 @@ export default function ComposeScreen() {
           {/* Attachments */}
           <Pressable
             className="bg-surface1 rounded-input px-3 py-3 mb-1 flex-row items-center justify-between"
-            onPress={pickAttachment}
+            onPress={() => setShowAttachmentPicker(true)}
             disabled={uploadAttachment.isPending}
+            accessibilityRole="button"
+            accessibilityLabel="Add attachment"
           >
             <View className="flex-1">
               <Text className="text-text-low text-text12 mb-0.5">Attachments</Text>
@@ -337,7 +357,7 @@ export default function ComposeScreen() {
                   ? 'Uploading…'
                   : attachments.length > 0
                     ? `${attachments.length} file${attachments.length > 1 ? 's' : ''}`
-                    : 'Add a file'}
+                    : 'Add photo, video, or file'}
               </Text>
             </View>
             {uploadAttachment.isPending ? (
@@ -354,7 +374,12 @@ export default function ComposeScreen() {
                   className="bg-tint-secondary rounded-chip px-pillX py-pillY mr-2 mb-1 flex-row items-center"
                   onPress={() => removeAttachment(a.url)}
                 >
-                  <Text className="text-text-mid text-text12 mr-1" numberOfLines={1}>{a.name}</Text>
+                  {a.previewUri && (
+                    <Image source={{ uri: a.previewUri }} className="w-6 h-6 rounded-chip mr-1.5" />
+                  )}
+                  <Text className="text-text-mid text-text12 mr-1" numberOfLines={1}>
+                    {a.name}
+                  </Text>
                   <Ionicons name="close" size={11} color={tokens.textLow.hex} />
                 </Pressable>
               ))}
@@ -402,7 +427,9 @@ export default function ComposeScreen() {
           {showAdvanced && (
             <View className="mb-4">
               {/* Max ACU limit */}
-              <Text className="text-text-low text-text12 font-medium uppercase mb-1">Max ACU limit</Text>
+              <Text className="text-text-low text-text12 font-medium uppercase mb-1">
+                Max ACU limit
+              </Text>
               <TextInput
                 className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-1"
                 value={draft.maxAcuLimit}
@@ -426,8 +453,12 @@ export default function ComposeScreen() {
                     Only visible to you and people with the link.
                   </Text>
                 </View>
-                <View className={`w-12 h-7 rounded-chip p-0.5 ${draft.unlisted ? 'bg-brand' : 'bg-tint-primary'}`}>
-                  <View className={`w-6 h-6 rounded-chip bg-surface2 ${draft.unlisted ? 'ml-auto' : ''}`} />
+                <View
+                  className={`w-12 h-7 rounded-chip p-0.5 ${draft.unlisted ? 'bg-brand' : 'bg-tint-primary'}`}
+                >
+                  <View
+                    className={`w-6 h-6 rounded-chip bg-surface2 ${draft.unlisted ? 'ml-auto' : ''}`}
+                  />
                 </View>
               </Pressable>
             </View>
@@ -444,7 +475,9 @@ export default function ComposeScreen() {
             {createSession.isPending ? (
               <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
             ) : (
-              <Text className={`text-text14 font-medium ${canSubmit ? 'text-text-always-white' : 'text-text-low'}`}>
+              <Text
+                className={`text-text14 font-medium ${canSubmit ? 'text-text-always-white' : 'text-text-low'}`}
+              >
                 Start Session
               </Text>
             )}
@@ -452,10 +485,25 @@ export default function ComposeScreen() {
         </View>
       </KeyboardAvoidingView>
 
+      <AttachmentPickerSheet
+        visible={showAttachmentPicker}
+        onClose={() => setShowAttachmentPicker(false)}
+        onPick={handleAttachment}
+      />
+
       {/* Repository picker modal */}
-      <Modal statusBarTranslucent visible={showRepoPicker} animationType="slide" transparent onRequestClose={() => setShowRepoPicker(false)}>
+      <Modal
+        statusBarTranslucent
+        visible={showRepoPicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowRepoPicker(false)}
+      >
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+          <View
+            className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]"
+            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+          >
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select repositories</Text>
               <Pressable onPress={() => setShowRepoPicker(false)}>
@@ -466,7 +514,9 @@ export default function ComposeScreen() {
               <ScrollView>
                 {repositories.map((repo) => {
                   const selected = draft.repos.includes(repo.repo_path);
-                  const indexed = indexedRepos?.some((r) => r.repository_path === repo.repo_path && r.indexing_enabled);
+                  const indexed = indexedRepos?.some(
+                    (r) => r.repository_path === repo.repo_path && r.indexing_enabled,
+                  );
                   return (
                     <Pressable
                       key={repo.provider_repository_id}
@@ -481,7 +531,9 @@ export default function ComposeScreen() {
                     >
                       <View className="flex-1">
                         <View className="flex-row items-center">
-                          <Text className={`text-text14 ${selected ? 'text-brand-text font-medium' : 'text-text-hi'}`}>
+                          <Text
+                            className={`text-text14 ${selected ? 'text-brand-text font-medium' : 'text-text-hi'}`}
+                          >
                             {repo.repo_name}
                           </Text>
                           {indexed && (
@@ -492,7 +544,8 @@ export default function ComposeScreen() {
                           )}
                         </View>
                         <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>
-                          {repo.repo_path}{repo.repo_language ? ` · ${repo.repo_language}` : ''}
+                          {repo.repo_path}
+                          {repo.repo_language ? ` · ${repo.repo_language}` : ''}
                         </Text>
                       </View>
                       {!indexed && (
@@ -505,7 +558,9 @@ export default function ComposeScreen() {
                           <Text className="text-brand-text text-text11 font-medium">Index</Text>
                         </Pressable>
                       )}
-                      {selected && <Ionicons name="checkmark" size={16} color={tokens.brandText.hex} />}
+                      {selected && (
+                        <Ionicons name="checkmark" size={16} color={tokens.brandText.hex} />
+                      )}
                     </Pressable>
                   );
                 })}
@@ -520,9 +575,18 @@ export default function ComposeScreen() {
       </Modal>
 
       {/* Playbook picker modal */}
-      <Modal statusBarTranslucent visible={showPlaybookPicker} animationType="slide" transparent onRequestClose={() => setShowPlaybookPicker(false)}>
+      <Modal
+        statusBarTranslucent
+        visible={showPlaybookPicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowPlaybookPicker(false)}
+      >
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+          <View
+            className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]"
+            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+          >
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select playbook</Text>
               <Pressable onPress={() => setShowPlaybookPicker(false)}>
@@ -540,7 +604,9 @@ export default function ComposeScreen() {
                     setShowPlaybookPicker(false);
                   }}
                 >
-                  <Text className={`text-text14 ${!draft.playbookId ? 'text-brand font-medium' : 'text-text-hi'}`}>
+                  <Text
+                    className={`text-text14 ${!draft.playbookId ? 'text-brand font-medium' : 'text-text-hi'}`}
+                  >
                     None
                   </Text>
                 </Pressable>
@@ -553,7 +619,9 @@ export default function ComposeScreen() {
                       setShowPlaybookPicker(false);
                     }}
                   >
-                    <Text className={`text-text14 ${draft.playbookId === pb.playbook_id ? 'text-brand font-medium' : 'text-text-hi'}`}>
+                    <Text
+                      className={`text-text14 ${draft.playbookId === pb.playbook_id ? 'text-brand font-medium' : 'text-text-hi'}`}
+                    >
                       {pb.title}
                     </Text>
                     {pb.macro && (
@@ -570,9 +638,18 @@ export default function ComposeScreen() {
       </Modal>
 
       {/* Knowledge picker modal */}
-      <Modal statusBarTranslucent visible={showKnowledgePicker} animationType="slide" transparent onRequestClose={() => setShowKnowledgePicker(false)}>
+      <Modal
+        statusBarTranslucent
+        visible={showKnowledgePicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowKnowledgePicker(false)}
+      >
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+          <View
+            className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]"
+            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+          >
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select knowledge</Text>
               <Pressable onPress={() => setShowKnowledgePicker(false)}>
@@ -588,7 +665,9 @@ export default function ComposeScreen() {
                     onPress={() => toggleKnowledge(kn.note_id)}
                   >
                     <View className="flex-1">
-                      <Text className={`text-text14 ${draft.knowledgeIds.includes(kn.note_id) ? 'text-brand font-medium' : 'text-text-hi'}`}>
+                      <Text
+                        className={`text-text14 ${draft.knowledgeIds.includes(kn.note_id) ? 'text-brand font-medium' : 'text-text-hi'}`}
+                      >
                         {kn.name}
                       </Text>
                       {kn.trigger && (
@@ -611,9 +690,18 @@ export default function ComposeScreen() {
       </Modal>
 
       {/* Secrets picker modal */}
-      <Modal statusBarTranslucent visible={showSecretsPicker} animationType="slide" transparent onRequestClose={() => setShowSecretsPicker(false)}>
+      <Modal
+        statusBarTranslucent
+        visible={showSecretsPicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowSecretsPicker(false)}
+      >
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+          <View
+            className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]"
+            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+          >
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select secrets</Text>
               <Pressable onPress={() => setShowSecretsPicker(false)}>
@@ -629,7 +717,9 @@ export default function ComposeScreen() {
                     onPress={() => toggleSecret(sec.secret_id)}
                   >
                     <View className="flex-1">
-                      <Text className={`text-text14 ${draft.secretIds.includes(sec.secret_id) ? 'text-brand font-medium' : 'text-text-hi'}`}>
+                      <Text
+                        className={`text-text14 ${draft.secretIds.includes(sec.secret_id) ? 'text-brand font-medium' : 'text-text-hi'}`}
+                      >
                         {sec.key}
                       </Text>
                       {sec.note && (
