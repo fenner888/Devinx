@@ -307,9 +307,9 @@ export default function SessionDetailScreen() {
       </KeyboardAvoidingView>
 
       {/* Tag editor modal */}
-      <Modal visible={showTagEditor} animationType="slide" transparent onRequestClose={() => setShowTagEditor(false)}>
+      <Modal statusBarTranslucent visible={showTagEditor} animationType="slide" transparent onRequestClose={() => setShowTagEditor(false)}>
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface2 rounded-t-sheet px-5 py-4">
+          <View className="bg-surface2 rounded-t-sheet px-5 pt-4" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Edit tags</Text>
               <Pressable

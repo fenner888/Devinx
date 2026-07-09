@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
@@ -35,6 +35,7 @@ const MAX_PROMPT = 10000;
 export default function HomeScreen() {
   const router = useRouter();
   const { name, tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const { data: sessions } = useSessions('board');
   const createSession = useCreateSession();
   const { data: playbooks } = usePlaybooks();
@@ -217,9 +218,9 @@ export default function HomeScreen() {
       </KeyboardAvoidingView>
 
       {/* Playbook picker */}
-      <Modal visible={showPlaybookPicker} animationType="slide" transparent onRequestClose={() => setShowPlaybookPicker(false)}>
+      <Modal statusBarTranslucent visible={showPlaybookPicker} animationType="slide" transparent onRequestClose={() => setShowPlaybookPicker(false)}>
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface2 rounded-t-sheet px-5 py-4 max-h-[60%]">
+          <View className="bg-surface2 rounded-t-sheet px-5 pt-4 max-h-[60%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select playbook</Text>
               <Pressable onPress={() => setShowPlaybookPicker(false)}>
@@ -250,9 +251,9 @@ export default function HomeScreen() {
       </Modal>
 
       {/* Mode picker */}
-      <Modal visible={showModePicker} animationType="slide" transparent onRequestClose={() => setShowModePicker(false)}>
+      <Modal statusBarTranslucent visible={showModePicker} animationType="slide" transparent onRequestClose={() => setShowModePicker(false)}>
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface2 rounded-t-sheet px-5 py-4">
+          <View className="bg-surface2 rounded-t-sheet px-5 pt-4" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Session settings</Text>
               <Pressable onPress={() => setShowModePicker(false)}>

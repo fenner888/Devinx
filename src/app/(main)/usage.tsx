@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
@@ -94,6 +94,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function UsageScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('overview');
   const metrics = useOrgMetrics(30);
   const { data: daily } = useDailyConsumption(30);
@@ -161,7 +162,7 @@ export default function UsageScreen() {
       )}
 
       {bundle && (
-        <ScrollView className="flex-1 px-4 py-4">
+        <ScrollView className="flex-1 px-4 py-4" contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
           {tab === 'overview' && <OverviewTab bundle={bundle} daily={daily} />}
           {tab === 'sessions' && <SessionsTab bundle={bundle} />}
           {tab === 'reviews' && <ReviewsTab bundle={bundle} />}

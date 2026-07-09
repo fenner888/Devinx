@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useOrgMetrics } from '@api/devin/queries';
@@ -90,6 +90,7 @@ function Distribution({ data, colorFor }: { data: Record<string, number>; colorF
 export default function AnalyticsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const [rangeDays, setRangeDays] = useState(30);
   const { data, isLoading, error, refetch, isRefetching } = useOrgMetrics(rangeDays);
 
@@ -159,6 +160,7 @@ export default function AnalyticsScreen() {
       {sessions && (
         <ScrollView
           className="flex-1 px-4 py-4"
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={tokens.brand.hex} />
           }

@@ -17,7 +17,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -66,6 +66,7 @@ export default function ComposeScreen() {
   const { data: repositories } = useRepositories();
   const uploadAttachment = useUploadAttachment();
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -450,9 +451,9 @@ export default function ComposeScreen() {
       </KeyboardAvoidingView>
 
       {/* Repository picker modal */}
-      <Modal visible={showRepoPicker} animationType="slide" transparent onRequestClose={() => setShowRepoPicker(false)}>
+      <Modal statusBarTranslucent visible={showRepoPicker} animationType="slide" transparent onRequestClose={() => setShowRepoPicker(false)}>
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface1 rounded-t-card px-5 py-6 max-h-[70%]">
+          <View className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select repositories</Text>
               <Pressable onPress={() => setShowRepoPicker(false)}>
@@ -498,9 +499,9 @@ export default function ComposeScreen() {
       </Modal>
 
       {/* Playbook picker modal */}
-      <Modal visible={showPlaybookPicker} animationType="slide" transparent onRequestClose={() => setShowPlaybookPicker(false)}>
+      <Modal statusBarTranslucent visible={showPlaybookPicker} animationType="slide" transparent onRequestClose={() => setShowPlaybookPicker(false)}>
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface1 rounded-t-card px-5 py-6 max-h-[70%]">
+          <View className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select playbook</Text>
               <Pressable onPress={() => setShowPlaybookPicker(false)}>
@@ -548,9 +549,9 @@ export default function ComposeScreen() {
       </Modal>
 
       {/* Knowledge picker modal */}
-      <Modal visible={showKnowledgePicker} animationType="slide" transparent onRequestClose={() => setShowKnowledgePicker(false)}>
+      <Modal statusBarTranslucent visible={showKnowledgePicker} animationType="slide" transparent onRequestClose={() => setShowKnowledgePicker(false)}>
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface1 rounded-t-card px-5 py-6 max-h-[70%]">
+          <View className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select knowledge</Text>
               <Pressable onPress={() => setShowKnowledgePicker(false)}>
@@ -589,9 +590,9 @@ export default function ComposeScreen() {
       </Modal>
 
       {/* Secrets picker modal */}
-      <Modal visible={showSecretsPicker} animationType="slide" transparent onRequestClose={() => setShowSecretsPicker(false)}>
+      <Modal statusBarTranslucent visible={showSecretsPicker} animationType="slide" transparent onRequestClose={() => setShowSecretsPicker(false)}>
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface1 rounded-t-card px-5 py-6 max-h-[70%]">
+          <View className="bg-surface1 rounded-t-card px-5 pt-6 max-h-[70%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Select secrets</Text>
               <Pressable onPress={() => setShowSecretsPicker(false)}>

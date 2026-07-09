@@ -14,7 +14,7 @@ import {
   RefreshControl,
   Share,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
@@ -42,6 +42,7 @@ type ContextAction = 'open' | 'share_link' | 'archive' | 'terminate';
 export default function SessionsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const { data, isLoading, error, refetch, isRefetching } = useSessions('board');
   const archiveMutation = useArchiveSession();
   const terminateMutation = useTerminateSession();
@@ -184,9 +185,9 @@ export default function SessionsScreen() {
       )}
 
       {/* Tag filter */}
-      <Modal visible={showTagFilter} animationType="slide" transparent onRequestClose={() => setShowTagFilter(false)}>
+      <Modal statusBarTranslucent visible={showTagFilter} animationType="slide" transparent onRequestClose={() => setShowTagFilter(false)}>
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface2 rounded-t-sheet px-5 py-4 max-h-[60%]">
+          <View className="bg-surface2 rounded-t-sheet px-5 pt-4 max-h-[60%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Filter by tags</Text>
               <Pressable onPress={() => setShowTagFilter(false)}>
@@ -220,7 +221,7 @@ export default function SessionsScreen() {
       </Modal>
 
       {/* Context menu */}
-      <Modal visible={!!contextSession} animationType="fade" transparent onRequestClose={() => setContextSession(null)}>
+      <Modal statusBarTranslucent visible={!!contextSession} animationType="fade" transparent onRequestClose={() => setContextSession(null)}>
         <Pressable className="flex-1 bg-scrim justify-center items-center" onPress={() => setContextSession(null)}>
           <View className="bg-surface2 rounded-cardLg px-2 py-2 w-64 border border-border">
             {([

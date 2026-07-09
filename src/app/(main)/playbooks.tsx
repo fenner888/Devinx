@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlaybooks, useCreatePlaybook, useUpdatePlaybook, useDeletePlaybook } from '@api/devin/queries';
@@ -34,6 +34,7 @@ interface EditorState {
 export default function PlaybooksScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const { data: playbooks, isLoading, error, refetch, isRefetching } = usePlaybooks();
   const createPlaybook = useCreatePlaybook();
   const updatePlaybook = useUpdatePlaybook();
@@ -157,6 +158,7 @@ export default function PlaybooksScreen() {
       {playbooks && filtered.length > 0 && (
         <ScrollView
           className="flex-1 px-4"
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={tokens.brand.hex} />
           }
@@ -197,10 +199,10 @@ export default function PlaybooksScreen() {
       )}
 
       {/* Create/edit sheet */}
-      <Modal visible={!!editor} animationType="slide" transparent onRequestClose={() => setEditor(null)}>
+      <Modal statusBarTranslucent visible={!!editor} animationType="slide" transparent onRequestClose={() => setEditor(null)}>
         <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View className="flex-1 bg-scrim justify-end">
-            <View className="bg-surface2 rounded-t-sheet px-5 py-4 max-h-[85%]">
+            <View className="bg-surface2 rounded-t-sheet px-5 pt-4 max-h-[85%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-text-hi text-text17">
                   {editor?.playbookId ? 'Edit playbook' : 'Create playbook'}

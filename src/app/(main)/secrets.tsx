@@ -16,7 +16,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSecrets, useCreateSecret, useDeleteSecret } from '@api/devin/queries';
@@ -35,6 +35,7 @@ const SECRET_TYPES: { key: SecretType; label: string }[] = [
 export default function SecretsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const { data: secrets, isLoading, error, refetch, isRefetching } = useSecrets();
   const createSecret = useCreateSecret();
   const deleteSecret = useDeleteSecret();
@@ -161,6 +162,7 @@ export default function SecretsScreen() {
       {secrets && filtered.length > 0 && (
         <ScrollView
           className="flex-1 px-4"
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={tokens.brand.hex} />
           }
@@ -192,10 +194,10 @@ export default function SecretsScreen() {
       )}
 
       {/* Create sheet */}
-      <Modal visible={showCreate} animationType="slide" transparent onRequestClose={() => setShowCreate(false)}>
+      <Modal statusBarTranslucent visible={showCreate} animationType="slide" transparent onRequestClose={() => setShowCreate(false)}>
         <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View className="flex-1 bg-scrim justify-end">
-            <View className="bg-surface2 rounded-t-sheet px-5 py-4 max-h-[85%]">
+            <View className="bg-surface2 rounded-t-sheet px-5 pt-4 max-h-[85%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-text-hi text-text17">Add secret</Text>
                 <Pressable onPress={() => setShowCreate(false)}>
