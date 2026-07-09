@@ -18,7 +18,6 @@ const PREFIX = 'devinx_';
  * not store real API keys this way. `__DEV__` is false in production bundles.
  */
 function assertDevPreview(): void {
-  // eslint-disable-next-line no-undef
   if (typeof __DEV__ !== 'undefined' && !__DEV__) {
     throw new Error(
       'Web credential storage is disabled in production builds — the web target is a dev preview only. Use the iOS/Android app, where secrets are stored in the device Keychain.',
