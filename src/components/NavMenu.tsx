@@ -4,7 +4,7 @@
  * Pure-ish UI: takes visibility + a Security gate flag; navigates via router.
  */
 import { View, Text, Pressable, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
@@ -27,6 +27,10 @@ export function NavMenu({
 }) {
   const router = useRouter();
   const { tokens } = useTheme();
+  // SafeAreaView doesn't inset correctly inside a Modal — read the device
+  // insets from context and apply them manually so the header clears the
+  // status bar and the footer clears the home indicator.
+  const insets = useSafeAreaInsets();
 
   const primary: NavItem[] = [
     { icon: 'add', label: 'New session', route: '/(main)/compose' },
@@ -45,12 +49,15 @@ export function NavMenu({
   }
 
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={onClose}>
       <View className="flex-1 bg-scrim">
         <Pressable className="absolute inset-0" onPress={onClose} accessibilityLabel="Close menu" />
         <View className="absolute top-0 bottom-0 left-0 w-[80%] max-w-[320px] bg-surface0 border-r border-border">
-          <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
-            <View className="flex-row items-center justify-between px-5 pt-2 pb-4">
+          <View
+            className="flex-1"
+            style={{ paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 8) }}
+          >
+            <View className="flex-row items-center justify-between px-5 pt-3 pb-4">
               <Text className="text-text-hi text-text20">DevinX</Text>
               <Pressable
                 className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center"
@@ -89,7 +96,7 @@ export function NavMenu({
                 <Ionicons name="chevron-forward" size={15} color={tokens.textLow.hex} />
               </Pressable>
             </View>
-          </SafeAreaView>
+          </View>
         </View>
       </View>
     </Modal>
