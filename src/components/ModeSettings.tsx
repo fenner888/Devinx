@@ -33,7 +33,8 @@ export function ModeSettings({
 }) {
   const fusionOn = mode === 'fusion';
   const fastOn = mode === 'fast';
-  const capability: Mode = mode === 'normal' || mode === 'ultra' || mode === 'lite' ? mode : 'normal';
+  const capability: Mode =
+    mode === 'normal' || mode === 'ultra' || mode === 'lite' ? mode : 'normal';
 
   return (
     <View>
@@ -48,7 +49,9 @@ export function ModeSettings({
         <Text className="text-text-hi text-text14">Fusion</Text>
         <Text className="text-brand-text text-text12 ml-2">Preview</Text>
         <View className="flex-1" />
-        <View className={`w-10 h-6 rounded-chip p-0.5 ${fusionOn ? 'bg-brand' : 'bg-tint-primary'}`}>
+        <View
+          className={`w-10 h-6 rounded-chip p-0.5 ${fusionOn ? 'bg-brand' : 'bg-tint-primary'}`}
+        >
           <View className={`w-5 h-5 rounded-chip bg-surface2 ${fusionOn ? 'ml-auto' : ''}`} />
         </View>
       </Pressable>
@@ -69,7 +72,11 @@ export function ModeSettings({
             accessibilityState={{ selected }}
           >
             <View className="flex-1">
-              <Text className={`text-text14 ${fusionOn || fastOn ? 'text-text-mid' : 'text-text-hi'}`}>{label}</Text>
+              <Text
+                className={`text-text14 ${fusionOn || fastOn ? 'text-text-mid' : 'text-text-hi'}`}
+              >
+                {label}
+              </Text>
               <Text className="text-text-low text-text12 mt-0.5">{description}</Text>
             </View>
             {selected && <Ionicons name="checkmark" size={16} color={checkColor} />}
@@ -84,7 +91,7 @@ export function ModeSettings({
       {(
         [
           { key: 'standard', label: 'Standard', description: 'Full quality at normal pace' },
-          { key: 'fast', label: 'Fast', description: 'Quicker turnaround, lower cost' },
+          { key: 'fast', label: 'Fast', description: 'About 2× faster and 4× more expensive' },
         ] as const
       ).map(({ key, label, description }) => {
         const selected = key === 'fast' ? fastOn : !fastOn && !fusionOn;
@@ -98,7 +105,9 @@ export function ModeSettings({
             accessibilityState={{ selected }}
           >
             <View className="flex-1">
-              <Text className={`text-text14 ${fusionOn ? 'text-text-mid' : 'text-text-hi'}`}>{label}</Text>
+              <Text className={`text-text14 ${fusionOn ? 'text-text-mid' : 'text-text-hi'}`}>
+                {label}
+              </Text>
               <Text className="text-text-low text-text12 mt-0.5">{description}</Text>
             </View>
             {selected && <Ionicons name="checkmark" size={16} color={checkColor} />}

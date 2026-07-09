@@ -66,7 +66,15 @@
       "expo-web-browser",
       "expo-video",
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow DevinX to attach photos and videos to Devin sessions.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "tsconfigPaths": true

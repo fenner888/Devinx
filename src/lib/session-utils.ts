@@ -54,9 +54,27 @@ export const sectionTitles: Record<SectionKey, string> = {
 
 /** Map a status key to a board section. */
 export function statusKeyToSection(key: StatusLabelKey): SectionKey {
-  if (key === 'waitingForResponse' || key === 'approvalRequired' || key === 'exceededLimit') return 'needs_input';
-  if (key === 'working' || key === 'settingUp' || key === 'planning' || key === 'coding' || key === 'iterating' || key === 'testing') return 'working';
-  if (key === 'prReady' || key === 'prReadyWaitingCI' || key === 'waitingForCI' || key === 'reviewPR' || key === 'done' || key === 'closed' || key === 'crashed') return 'recent';
+  if (key === 'waitingForResponse' || key === 'approvalRequired' || key === 'exceededLimit')
+    return 'needs_input';
+  if (
+    key === 'working' ||
+    key === 'settingUp' ||
+    key === 'planning' ||
+    key === 'coding' ||
+    key === 'iterating' ||
+    key === 'testing'
+  )
+    return 'working';
+  if (
+    key === 'prReady' ||
+    key === 'prReadyWaitingCI' ||
+    key === 'waitingForCI' ||
+    key === 'reviewPR' ||
+    key === 'done' ||
+    key === 'closed' ||
+    key === 'crashed'
+  )
+    return 'recent';
   return 'sleeping';
 }
 
@@ -81,7 +99,9 @@ export function sortSessions(sessions: SessionResponse[]): SessionResponse[] {
 }
 
 /** Group sessions into board sections (preserving sort order). */
-export function sectionSessions(sessions: SessionResponse[]): { section: SectionKey; data: SessionResponse[] }[] {
+export function sectionSessions(
+  sessions: SessionResponse[],
+): { section: SectionKey; data: SessionResponse[] }[] {
   const sorted = sortSessions(sessions);
   const groups: Record<SectionKey, SessionResponse[]> = {
     needs_input: [],
@@ -101,8 +121,16 @@ export function sectionSessions(sessions: SessionResponse[]): { section: Section
 /** Status color class for text/dot. */
 export function statusColorClass(key: StatusLabelKey): string {
   if (key === 'crashed') return 'text-failed';
-  if (key === 'waitingForResponse' || key === 'approvalRequired' || key === 'exceededLimit') return 'text-blocked';
-  if (key === 'prReady' || key === 'prReadyWaitingCI' || key === 'waitingForCI' || key === 'reviewPR' || key === 'done') return 'text-finished';
+  if (key === 'waitingForResponse' || key === 'approvalRequired' || key === 'exceededLimit')
+    return 'text-blocked';
+  if (
+    key === 'prReady' ||
+    key === 'prReadyWaitingCI' ||
+    key === 'waitingForCI' ||
+    key === 'reviewPR' ||
+    key === 'done'
+  )
+    return 'text-finished';
   if (key === 'sleeping' || key === 'closed') return 'text-text-mid';
   return 'text-brand';
 }
@@ -174,7 +202,7 @@ export function collectTags(sessions: SessionResponse[]): { tag: string; count: 
  */
 export const MODE_OPTIONS: { key: DevinMode; label: string; description: string }[] = [
   { key: 'normal', label: 'Normal', description: 'Default Agent mode — full capability' },
-  { key: 'fast', label: 'Fast', description: 'Quicker turnaround, lower cost' },
+  { key: 'fast', label: 'Fast', description: 'About 2× faster and 4× more expensive' },
   { key: 'lite', label: 'Lite', description: 'Lightweight — cheapest for simple tasks' },
   { key: 'ultra', label: 'Ultra', description: 'Most capable — for complex work' },
   { key: 'fusion', label: 'Fusion', description: 'Fusion mode' },

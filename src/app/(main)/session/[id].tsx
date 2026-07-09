@@ -20,13 +20,23 @@ import {
   Platform,
   Modal,
   RefreshControl,
+  Alert,
+  Image,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSession, useMessages, useSendMessage, useUpdateTags, useInsights, useGenerateInsights } from '@api/devin/queries';
+import {
+  useSession,
+  useMessages,
+  useSendMessage,
+  useUpdateTags,
+  useInsights,
+  useGenerateInsights,
+  useUploadAttachment,
+} from '@api/devin/queries';
 import { isValidSessionId } from '@lib/deepLink';
 import { SessionDetailSkeleton, ErrorState } from '@components/Skeletons';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
@@ -37,10 +47,13 @@ import {
   statusLabel,
   relativeTime,
   prNumber,
+  modeLabel,
 } from '@lib/session-utils';
-import type { SessionMessage } from '@api/devin/types';
+import type { DevinMode, SessionMessage } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { DevinMarkdown } from '@components/DevinMarkdown';
+import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
+import { getSessionMode, getSessionRepository } from '@lib/session-repository';
 
 type Tab = 'timeline' | 'worklog' | 'changes' | 'insights';
 
@@ -65,6 +78,13 @@ export default function SessionDetailScreen() {
   const [tab, setTab] = useState<Tab>('timeline');
   const [messageText, setMessageText] = useState('');
   const [showTagEditor, setShowTagEditor] = useState(false);
+  const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
+  const [messageAttachments, setMessageAttachments] = useState<
+    { name: string; url: string; previewUri?: string }[]
+  >([]);
+  const [uploadingAttachmentName, setUploadingAttachmentName] = useState<string | null>(null);
+  const [sessionRepository, setSessionRepository] = useState<string | null>(null);
+  const [sessionMode, setSessionMode] = useState<DevinMode | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [editedTags, setEditedTags] = useState<string[] | null>(null);
   const [tagError, setTagError] = useState<string | null>(null);
@@ -76,6 +96,7 @@ export default function SessionDetailScreen() {
   const { data: messagesData } = useMessages(validId);
   const messages = messagesData?.items;
   const sendMessage = useSendMessage(validId);
+  const uploadAttachment = useUploadAttachment();
   const updateTags = useUpdateTags(validId);
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -86,6 +107,23 @@ export default function SessionDetailScreen() {
       setPendingText(null);
     }
   }, [messages, pendingText]);
+
+  useEffect(() => {
+    let active = true;
+    if (session) {
+      Promise.all([getSessionRepository(session), getSessionMode(session.session_id)]).then(
+        ([repository, mode]) => {
+          if (active) {
+            setSessionRepository(repository);
+            setSessionMode(mode);
+          }
+        },
+      );
+    }
+    return () => {
+      active = false;
+    };
+  }, [session]);
 
   if (!validId) {
     return (
@@ -132,16 +170,45 @@ export default function SessionDetailScreen() {
   // (sleeping) session automatically resumes it (per the Devin API), so the
   // composer must show there too — only truly ended sessions hide it.
   const canSend = session.status !== 'exit' && session.status !== 'error';
+  const sessionRepositoryName =
+    sessionRepository?.split('/').filter(Boolean).pop() ?? 'Repository unavailable';
+
+  async function handleAttachment(file: PickedAttachment) {
+    setUploadingAttachmentName(file.name);
+    try {
+      const uploaded = await uploadAttachment.mutateAsync(file);
+      setMessageAttachments((current) => [
+        ...current,
+        {
+          name: uploaded.name,
+          url: uploaded.url,
+          previewUri: file.type.startsWith('image/') ? file.uri : undefined,
+        },
+      ]);
+    } catch (uploadError) {
+      const message =
+        uploadError instanceof Error ? uploadError.message : 'Could not upload attachment.';
+      Alert.alert('Upload failed', message);
+    } finally {
+      setUploadingAttachmentName(null);
+    }
+  }
 
   function handleSend() {
     const text = messageText.trim();
-    if (!text || sendMessage.isPending) return;
+    if (!text || sendMessage.isPending || uploadAttachment.isPending) return;
     hapticLight();
     // Echo the message immediately, clear the input, then send.
+    const attachments = messageAttachments;
     setPendingText(text);
     setMessageText('');
+    setMessageAttachments([]);
     sendMessage.mutate(
-      { message: text },
+      {
+        message: text,
+        attachmentUrls:
+          attachments.length > 0 ? attachments.map((attachment) => attachment.url) : undefined,
+      },
       {
         onSuccess: () => hapticSuccess(),
         onError: () => {
@@ -149,6 +216,7 @@ export default function SessionDetailScreen() {
           // Restore the draft so nothing is lost, and drop the echo.
           setPendingText(null);
           setMessageText(text);
+          setMessageAttachments(attachments);
         },
       },
     );
@@ -171,7 +239,9 @@ export default function SessionDetailScreen() {
           <BackButton onPress={() => router.back()} />
           <View className={`w-2 h-2 rounded-full mr-2 ${dotClass}`} />
           <Text className={`text-text13 ${colorClass}`}>{label}</Text>
-          <Text className="text-text-low text-text12 ml-auto">{relativeTime(session.updated_at)}</Text>
+          <Text className="text-text-low text-text12 ml-auto">
+            {relativeTime(session.updated_at)}
+          </Text>
         </View>
         <Text className="text-text-hi text-text17 mb-1">{session.title || 'Untitled session'}</Text>
         <View className="flex-row items-center">
@@ -195,8 +265,11 @@ export default function SessionDetailScreen() {
                   size={12}
                   color={pr.state === 'merged' ? tokens.merged.hex : tokens.finished.hex}
                 />
-                <Text className={`text-text12 font-medium ml-1 ${pr.state === 'merged' ? 'text-merged' : 'text-finished'}`}>
-                  #{prNumber(pr.pr_url)}{pr.state === 'merged' ? ' Merged' : ''}
+                <Text
+                  className={`text-text12 font-medium ml-1 ${pr.state === 'merged' ? 'text-merged' : 'text-finished'}`}
+                >
+                  #{prNumber(pr.pr_url)}
+                  {pr.state === 'merged' ? ' Merged' : ''}
                 </Text>
               </Pressable>
             ))}
@@ -219,25 +292,29 @@ export default function SessionDetailScreen() {
             </View>
           ))}
           <View className="rounded-chip px-pillX py-pillY border border-border-subtle mb-1">
-            <Text className="text-text-low text-text11">{session.tags.length > 0 ? '+ Edit' : '+ Add tags'}</Text>
+            <Text className="text-text-low text-text11">
+              {session.tags.length > 0 ? '+ Edit' : '+ Add tags'}
+            </Text>
           </View>
         </Pressable>
       </View>
 
       {/* Tab bar */}
       <View className="flex-row border-b border-border-subtle">
-        {([
+        {[
           { key: 'timeline' as const, label: 'Timeline' },
           { key: 'worklog' as const, label: 'Worklog' },
           { key: 'changes' as const, label: 'Changes' },
           { key: 'insights' as const, label: 'Insights' },
-        ]).map(({ key, label: tabLabel }) => (
+        ].map(({ key, label: tabLabel }) => (
           <Pressable
             key={key}
             className={`flex-1 py-3 items-center ${tab === key ? 'border-b-2 border-brand' : ''}`}
             onPress={() => setTab(key)}
           >
-            <Text className={`text-text13 ${tab === key ? 'text-brand-text font-medium' : 'text-text-mid'}`}>
+            <Text
+              className={`text-text13 ${tab === key ? 'text-brand-text font-medium' : 'text-text-mid'}`}
+            >
               {tabLabel}
             </Text>
           </Pressable>
@@ -252,7 +329,12 @@ export default function SessionDetailScreen() {
       >
         <View className="flex-1">
           {tab === 'timeline' && (
-            <TimelineTab messages={messages ?? []} isLoading={isLoading} pendingText={pendingText} isWorking={isWorking} />
+            <TimelineTab
+              messages={messages ?? []}
+              isLoading={isLoading}
+              pendingText={pendingText}
+              isWorking={isWorking}
+            />
           )}
           {tab === 'worklog' && <WorklogTab session={session} />}
           {tab === 'changes' && <ChangesTab session={session} />}
@@ -271,7 +353,61 @@ export default function SessionDetailScreen() {
                 Sleeping — sending a message will wake Devin.
               </Text>
             )}
-            <View className="flex-row items-end bg-surface1 rounded-2xl border border-border px-3 py-2">
+            {(messageAttachments.length > 0 || uploadingAttachmentName) && (
+              <View className="flex-row flex-wrap px-1 pb-2">
+                {uploadingAttachmentName && (
+                  <View className="flex-row items-center bg-tint-blue rounded-chip px-pillX py-pillY mr-2 mb-1">
+                    <ActivityIndicator size="small" color={tokens.brandText.hex} />
+                    <Text className="text-brand-text text-text12 ml-1.5 max-w-40" numberOfLines={1}>
+                      Uploading {uploadingAttachmentName}…
+                    </Text>
+                  </View>
+                )}
+                {messageAttachments.map((attachment) => (
+                  <Pressable
+                    key={attachment.url}
+                    className="flex-row items-center bg-tint-secondary rounded-chip px-pillX py-pillY mr-2 mb-1"
+                    onPress={() =>
+                      setMessageAttachments((current) =>
+                        current.filter((item) => item.url !== attachment.url),
+                      )
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${attachment.name}`}
+                  >
+                    {attachment.previewUri ? (
+                      <Image
+                        source={{ uri: attachment.previewUri }}
+                        className="w-6 h-6 rounded-chip"
+                      />
+                    ) : (
+                      <Ionicons name="attach" size={12} color={tokens.textMid.hex} />
+                    )}
+                    <Text
+                      className="text-text-mid text-text12 ml-1 mr-1 max-w-40"
+                      numberOfLines={1}
+                    >
+                      {attachment.name}
+                    </Text>
+                    <Ionicons name="close" size={11} color={tokens.textLow.hex} />
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            <View className="flex-row items-end bg-surface1 rounded-2xl border border-border px-2 py-2">
+              <Pressable
+                className="w-8 h-8 rounded-full items-center justify-center mr-1"
+                onPress={() => setShowAttachmentPicker(true)}
+                disabled={uploadAttachment.isPending}
+                accessibilityRole="button"
+                accessibilityLabel="Add attachment"
+              >
+                {uploadAttachment.isPending ? (
+                  <ActivityIndicator size="small" color={tokens.brandText.hex} />
+                ) : (
+                  <Ionicons name="add" size={20} color={tokens.textMid.hex} />
+                )}
+              </Pressable>
               <TextInput
                 className="flex-1 text-text14 text-text-hi max-h-24 py-1"
                 value={messageText}
@@ -281,8 +417,10 @@ export default function SessionDetailScreen() {
                 multiline
               />
               <Pressable
-                className={`w-8 h-8 rounded-full items-center justify-center ml-2 ${messageText.trim() && !sendMessage.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
-                disabled={!messageText.trim() || sendMessage.isPending}
+                className={`w-8 h-8 rounded-full items-center justify-center ml-2 ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
+                disabled={
+                  !messageText.trim() || sendMessage.isPending || uploadAttachment.isPending
+                }
                 onPress={handleSend}
                 accessibilityRole="button"
                 accessibilityLabel="Send message"
@@ -293,10 +431,38 @@ export default function SessionDetailScreen() {
                   <Ionicons
                     name="arrow-up"
                     size={17}
-                    color={messageText.trim() ? tokens.textAlwaysWhite.hex : tokens.textLow.hex}
+                    color={
+                      messageText.trim() && !uploadAttachment.isPending
+                        ? tokens.textAlwaysWhite.hex
+                        : tokens.textLow.hex
+                    }
                   />
                 )}
               </Pressable>
+            </View>
+            <View className="flex-row items-center px-1 pt-2">
+              <View className="flex-row items-center mr-4">
+                <Ionicons name="cloud-outline" size={14} color={tokens.textLow.hex} />
+                <Text className="text-text-low text-text12 ml-1.5">Devin Cloud</Text>
+              </View>
+              <View
+                className="flex-row items-center mr-4"
+                accessibilityLabel={`Session mode: ${sessionMode ? modeLabel(sessionMode) : 'Unavailable'}`}
+              >
+                <Ionicons name="speedometer-outline" size={14} color={tokens.textLow.hex} />
+                <Text className="text-text-low text-text12 ml-1.5">
+                  {sessionMode ? `${modeLabel(sessionMode)} mode` : 'Mode unavailable'}
+                </Text>
+              </View>
+              <View
+                className="flex-row items-center flex-1"
+                accessibilityLabel={`Repository: ${sessionRepository ?? 'Unavailable'}`}
+              >
+                <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
+                <Text className="text-text-mid text-text12 ml-1.5 flex-1" numberOfLines={1}>
+                  {sessionRepositoryName}
+                </Text>
+              </View>
             </View>
             {sendMessage.isError && (
               <Text className="text-failed text-text12 mt-1 px-1">
@@ -307,10 +473,25 @@ export default function SessionDetailScreen() {
         )}
       </KeyboardAvoidingView>
 
+      <AttachmentPickerSheet
+        visible={showAttachmentPicker}
+        onClose={() => setShowAttachmentPicker(false)}
+        onPick={handleAttachment}
+      />
+
       {/* Tag editor modal */}
-      <Modal statusBarTranslucent visible={showTagEditor} animationType="slide" transparent onRequestClose={() => setShowTagEditor(false)}>
+      <Modal
+        statusBarTranslucent
+        visible={showTagEditor}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowTagEditor(false)}
+      >
         <View className="flex-1 bg-scrim justify-end">
-          <View className="bg-surface2 rounded-t-sheet px-5 pt-4" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+          <View
+            className="bg-surface2 rounded-t-sheet px-5 pt-4"
+            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+          >
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-text-hi text-text17">Edit tags</Text>
               <Pressable
@@ -355,9 +536,7 @@ export default function SessionDetailScreen() {
                 }}
               />
             </View>
-            {tagError && (
-              <Text className="text-failed text-text12 mb-2">{tagError}</Text>
-            )}
+            {tagError && <Text className="text-failed text-text12 mb-2">{tagError}</Text>}
             {editedTags && editedTags.length > 0 ? (
               <View className="flex-row flex-wrap mb-2">
                 {editedTags.map((tag) => (
@@ -372,7 +551,9 @@ export default function SessionDetailScreen() {
                 ))}
               </View>
             ) : (
-              <Text className="text-text-mid text-text13 mb-2">No tags. Type above to add one.</Text>
+              <Text className="text-text-mid text-text13 mb-2">
+                No tags. Type above to add one.
+              </Text>
             )}
           </View>
         </View>
@@ -388,9 +569,12 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
   const { tokens } = useTheme();
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => {
-    if (refetchTimer.current) clearTimeout(refetchTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    },
+    [],
+  );
 
   if (isLoading) {
     return (
@@ -436,7 +620,9 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
             {generate.isPending ? (
               <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
             ) : (
-              <Text className="text-text-always-white text-text14 font-medium">Generate insights</Text>
+              <Text className="text-text-always-white text-text14 font-medium">
+                Generate insights
+              </Text>
             )}
           </Pressable>
         )}
@@ -458,7 +644,11 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
     <ScrollView
       className="flex-1 px-4 py-3"
       refreshControl={
-        <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={tokens.brand.hex} />
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={() => refetch()}
+          tintColor={tokens.brand.hex}
+        />
       }
     >
       {/* Classification */}
@@ -467,8 +657,12 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
         <Text className="text-text-hi text-text14">{analysis.classification}</Text>
         <View className="flex-row mt-2">
           <Text className="text-text-low text-text12">Size: {insights.session_size}</Text>
-          <Text className="text-text-low text-text12 ml-3">{insights.num_devin_messages} Devin msgs</Text>
-          <Text className="text-text-low text-text12 ml-3">{insights.num_user_messages} user msgs</Text>
+          <Text className="text-text-low text-text12 ml-3">
+            {insights.num_devin_messages} Devin msgs
+          </Text>
+          <Text className="text-text-low text-text12 ml-3">
+            {insights.num_user_messages} user msgs
+          </Text>
         </View>
       </View>
 
@@ -479,10 +673,17 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
             Issues ({analysis.issues.length})
           </Text>
           {analysis.issues.map((issue, i) => (
-            <View key={i} className={`py-2 ${i < analysis.issues.length - 1 ? 'border-b border-border-subtle' : ''}`}>
+            <View
+              key={i}
+              className={`py-2 ${i < analysis.issues.length - 1 ? 'border-b border-border-subtle' : ''}`}
+            >
               <View className="flex-row items-center mb-1">
-                <View className={`rounded-chip px-2 py-0.5 mr-2 ${issue.severity === 'high' ? 'bg-tint-red' : issue.severity === 'medium' ? 'bg-tint-orange' : 'bg-tint-secondary'}`}>
-                  <Text className={`text-text11 font-medium ${issue.severity === 'high' ? 'text-failed' : issue.severity === 'medium' ? 'text-blocked' : 'text-text-mid'}`}>
+                <View
+                  className={`rounded-chip px-2 py-0.5 mr-2 ${issue.severity === 'high' ? 'bg-tint-red' : issue.severity === 'medium' ? 'bg-tint-orange' : 'bg-tint-secondary'}`}
+                >
+                  <Text
+                    className={`text-text11 font-medium ${issue.severity === 'high' ? 'text-failed' : issue.severity === 'medium' ? 'text-blocked' : 'text-text-mid'}`}
+                  >
                     {issue.severity}
                   </Text>
                 </View>
@@ -497,7 +698,9 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
       {/* Suggested actions */}
       {analysis.action.length > 0 && (
         <View className="bg-surface1 rounded-card px-4 py-3 mb-3">
-          <Text className="text-text-low text-text12 font-medium uppercase mb-2">Suggested actions</Text>
+          <Text className="text-text-low text-text12 font-medium uppercase mb-2">
+            Suggested actions
+          </Text>
           {analysis.action.map((action, i) => (
             <Text key={i} className="text-text-mid text-text13 py-1">
               {'•'} {action}
@@ -511,7 +714,10 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
         <View className="bg-surface1 rounded-card px-4 py-3 mb-3">
           <Text className="text-text-low text-text12 font-medium uppercase mb-2">Timeline</Text>
           {analysis.timeline.map((entry, i) => (
-            <View key={i} className={`py-2 ${i < analysis.timeline.length - 1 ? 'border-b border-border-subtle' : ''}`}>
+            <View
+              key={i}
+              className={`py-2 ${i < analysis.timeline.length - 1 ? 'border-b border-border-subtle' : ''}`}
+            >
               <Text className="text-text-hi text-text13 font-medium mb-0.5">{entry.title}</Text>
               <Text className="text-text-mid text-text13">{entry.description}</Text>
             </View>
@@ -524,7 +730,10 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
         <View className="bg-surface1 rounded-card px-4 py-3 mb-3">
           <Text className="text-text-low text-text12 font-medium uppercase mb-2">Prompt tips</Text>
           {analysis.prompts.map((p, i) => (
-            <View key={i} className={`py-2 ${i < (analysis.prompts?.length ?? 0) - 1 ? 'border-b border-border-subtle' : ''}`}>
+            <View
+              key={i}
+              className={`py-2 ${i < (analysis.prompts?.length ?? 0) - 1 ? 'border-b border-border-subtle' : ''}`}
+            >
               <Text className="text-text-hi text-text13 font-medium mb-0.5">{p.title}</Text>
               <Text className="text-text-mid text-text13">{p.description}</Text>
             </View>
@@ -667,7 +876,10 @@ function WorklogTab({ session }: { session: NonNullable<ReturnType<typeof useSes
       <View className="bg-surface1 rounded-card px-4 py-3 mb-4">
         <Text className="text-text-low text-text12 font-medium uppercase mb-3">Session info</Text>
         {rows.map(({ label, value }, i) => (
-          <View key={label} className={`flex-row py-2 ${i < rows.length - 1 ? 'border-b border-border-subtle' : ''}`}>
+          <View
+            key={label}
+            className={`flex-row py-2 ${i < rows.length - 1 ? 'border-b border-border-subtle' : ''}`}
+          >
             <Text className="text-text-mid text-text13 flex-1">{label}</Text>
             <Text className="text-text-hi text-text13 flex-1 text-right">{value}</Text>
           </View>
@@ -691,7 +903,9 @@ function ChangesTab({ session }: { session: NonNullable<ReturnType<typeof useSes
   if (session.pull_requests.length === 0) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-text-mid text-text14">No pull requests associated with this session.</Text>
+        <Text className="text-text-mid text-text14">
+          No pull requests associated with this session.
+        </Text>
       </View>
     );
   }
@@ -705,13 +919,17 @@ function ChangesTab({ session }: { session: NonNullable<ReturnType<typeof useSes
           onPress={() => pr.pr_url && Linking.openURL(pr.pr_url)}
         >
           <View className="flex-row items-center mb-2">
-            <View className={`flex-row items-center rounded-chip px-pillX py-pillY mr-2 ${pr.state === 'merged' ? 'bg-tint-purple' : 'bg-tint-green'}`}>
+            <View
+              className={`flex-row items-center rounded-chip px-pillX py-pillY mr-2 ${pr.state === 'merged' ? 'bg-tint-purple' : 'bg-tint-green'}`}
+            >
               <Ionicons
                 name={pr.state === 'merged' ? 'git-merge-outline' : 'git-pull-request-outline'}
                 size={12}
                 color={pr.state === 'merged' ? tokens.merged.hex : tokens.finished.hex}
               />
-              <Text className={`text-text12 font-medium ml-1 capitalize ${pr.state === 'merged' ? 'text-merged' : 'text-finished'}`}>
+              <Text
+                className={`text-text12 font-medium ml-1 capitalize ${pr.state === 'merged' ? 'text-merged' : 'text-finished'}`}
+              >
                 {pr.state ?? 'open'}
               </Text>
             </View>
@@ -721,7 +939,9 @@ function ChangesTab({ session }: { session: NonNullable<ReturnType<typeof useSes
             {pr.pr_url}
           </Text>
           {pr.merged_at && (
-            <Text className="text-text-low text-text12 mt-1">Merged {relativeTime(pr.merged_at)}</Text>
+            <Text className="text-text-low text-text12 mt-1">
+              Merged {relativeTime(pr.merged_at)}
+            </Text>
           )}
         </Pressable>
       ))}
