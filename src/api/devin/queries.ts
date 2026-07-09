@@ -6,7 +6,8 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { AppState } from 'react-native';
 import { useAuth } from '@auth/AuthContext';
-import { shouldRetryQuery } from './client';
+import { shouldRetryQuery, ApiError } from './client';
+import { saveSessions, loadCachedSessions } from '@cache/index';
 import { listSessions, getSession, listMessages, sendMessage, createSession, listPlaybooks, listKnowledge, listSecrets, archiveSession, terminateSession, getDailyConsumption, getInsights, generateInsights, replaceTags, uploadAttachment, listSchedules, createSchedule, updateSchedule, deleteSchedule, triggerPrReview, getPrReview, listCodeScanFindings, remediateFinding, createKnowledgeNote, updateKnowledgeNote, deleteKnowledgeNote, createPlaybook, updatePlaybook, deletePlaybook, createSecret, deleteSecret, getSessionMetrics, getPrMetrics, getSearchMetrics, getWeeklyActiveUsers, listRepositories, getSelf, getSessionConsumption, listIndexedRepositories, indexRepository } from './endpoints';
 import { queryKeys } from './queryKeys';
 import { pollingPolicy, scalePolling, type ScreenContext } from '@lib/polling';
@@ -30,16 +31,28 @@ export function useSessions(screen: ScreenContext = 'board') {
     queryKey: queryKeys.sessions,
     queryFn: async () => {
       if (!provider) throw new Error('Not authenticated');
-      // Follow pagination — a single page silently capped the board at 100.
-      const items: SessionResponse[] = [];
-      let cursor: Cursor | null = null;
-      for (let page = 0; page < MAX_SESSION_PAGES; page++) {
-        const result = await listSessions(provider, { first: 100, after: cursor });
-        items.push(...result.items);
-        if (!result.hasNextPage || !result.endCursor) break;
-        cursor = result.endCursor;
+      try {
+        // Follow pagination — a single page silently capped the board at 100.
+        const items: SessionResponse[] = [];
+        let cursor: Cursor | null = null;
+        for (let page = 0; page < MAX_SESSION_PAGES; page++) {
+          const result = await listSessions(provider, { first: 100, after: cursor });
+          items.push(...result.items);
+          if (!result.hasNextPage || !result.endCursor) break;
+          cursor = result.endCursor;
+        }
+        // Persist the board for offline / cold-start hydration (no secrets).
+        saveSessions(items.map((s) => ({ ...s, session_id: s.session_id, status: s.status, updated_at: s.updated_at }))).catch(() => {});
+        return items;
+      } catch (e) {
+        // Offline (or transient network) — fall back to the last cached board
+        // instead of an error with no data.
+        if (e instanceof ApiError && e.code === 'network') {
+          const cached = await loadCachedSessions<SessionResponse>();
+          if (cached.length > 0) return cached;
+        }
+        throw e;
       }
-      return items;
     },
     enabled: isAuthenticated && !!provider,
     placeholderData: keepPreviousData,

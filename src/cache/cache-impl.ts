@@ -58,3 +58,39 @@ export async function cacheIsEmpty(): Promise<boolean> {
   );
   return (row?.c ?? 0) === 0;
 }
+
+/** Persist the sessions board for offline / cold-start hydration (no secrets). */
+export async function saveSessions(sessions: { session_id: string; status: string; updated_at: number }[]): Promise<void> {
+  try {
+    const database = await openCache();
+    const now = new Date().toISOString();
+    await database.withTransactionAsync(async () => {
+      await database.execAsync('DELETE FROM sessions');
+      for (const s of sessions) {
+        await database.runAsync(
+          'INSERT OR REPLACE INTO sessions (id, payload, status, updated_at, fetched_at) VALUES (?, ?, ?, ?, ?)',
+          s.session_id,
+          JSON.stringify(s),
+          s.status,
+          String(s.updated_at),
+          now,
+        );
+      }
+    });
+  } catch {
+    // Cache writes are best-effort; never break the UI over them.
+  }
+}
+
+/** Read the last-persisted sessions board (offline fallback). */
+export async function loadCachedSessions<T>(): Promise<T[]> {
+  try {
+    const database = await openCache();
+    const rows = await database.getAllAsync<{ payload: string }>(
+      'SELECT payload FROM sessions ORDER BY CAST(updated_at AS INTEGER) DESC',
+    );
+    return rows.map((r) => JSON.parse(r.payload) as T);
+  } catch {
+    return [];
+  }
+}

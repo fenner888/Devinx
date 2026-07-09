@@ -16,3 +16,11 @@ export async function purgeCache(): Promise<void> {
 export async function cacheIsEmpty(): Promise<boolean> {
   return true;
 }
+
+export async function saveSessions(): Promise<void> {
+  // No-op on web.
+}
+
+export async function loadCachedSessions<T>(): Promise<T[]> {
+  return [];
+}

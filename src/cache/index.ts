@@ -13,4 +13,4 @@
 // Re-export from the platform-specific implementation.
 // On native: ./index.native.ts (real SQLite)
 // On web: ./index.web.ts (no-op stub)
-export { openCache, purgeCache, cacheIsEmpty } from './cache-impl';
+export { openCache, purgeCache, cacheIsEmpty, saveSessions, loadCachedSessions } from './cache-impl';
