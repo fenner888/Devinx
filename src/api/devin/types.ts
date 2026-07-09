@@ -49,7 +49,14 @@ export type SessionStatusDetail =
   | 'user_request'
   | 'usage_limit_exceeded'
   | 'out_of_credits'
-  | 'out_of_quota';
+  | 'out_of_quota'
+  | 'no_quota_allocation'
+  | 'payment_declined'
+  | 'org_usage_limit_exceeded'
+  | 'total_session_limit_exceeded'
+  | 'error'
+  // May carry values beyond this list — treat as an open string set.
+  | (string & {});
 
 export type SessionOrigin =
   | 'webapp'
@@ -110,7 +117,7 @@ export interface PaginatedResponse<T> {
 // ---------------------------------------------------------------------------
 
 export interface PullRequest {
-  pr_state: string;
+  pr_state: string | null;
   pr_url: string;
   /** Present in some v3 responses (draft flag). */
   draft?: boolean;
@@ -160,7 +167,7 @@ export interface SessionResponse {
   service_user_id: string | null;
   session_id: string;
   status: SessionStatus;
-  status_detail: SessionStatusDetail | null;
+  status_detail?: SessionStatusDetail | null;
   tags: string[];
   title: string | null;
   updated_at: UnixTimestamp;
@@ -609,5 +616,5 @@ export interface RepositoryResponse {
   repo_description: string | null;
   repo_language: string | null;
   last_updated_at: string | number | null;
-  indexing_status: string | null;
+  indexing_status?: unknown;
 }

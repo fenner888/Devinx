@@ -6,6 +6,17 @@
 import type { SessionResponse, DevinMode } from '@api/devin/types';
 import { statusLabels, type StatusLabelKey } from '@theme/tokens';
 
+/** status_detail values that mean the session hit a billing/usage limit. */
+const LIMIT_DETAILS = new Set([
+  'usage_limit_exceeded',
+  'out_of_credits',
+  'out_of_quota',
+  'no_quota_allocation',
+  'payment_declined',
+  'org_usage_limit_exceeded',
+  'total_session_limit_exceeded',
+]);
+
 /** Derive the status label key from a session (mirrors web app state machine). */
 export function deriveStatusKey(s: SessionResponse): StatusLabelKey {
   if (s.status === 'error') return 'crashed';
@@ -21,8 +32,8 @@ export function deriveStatusKey(s: SessionResponse): StatusLabelKey {
     return 'closed';
   }
   if (s.status === 'suspended') {
-    if (s.status_detail === 'usage_limit_exceeded') return 'exceededLimit';
-    if (s.status_detail === 'inactivity') return 'sleeping';
+    // Any billing/quota-limit detail reads as "Exceeded limit", not "Sleeping".
+    if (LIMIT_DETAILS.has(s.status_detail ?? '')) return 'exceededLimit';
     return 'sleeping';
   }
   if (s.status_detail === 'waiting_for_user') return 'waitingForResponse';

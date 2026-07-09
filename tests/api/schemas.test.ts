@@ -53,6 +53,25 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(() => sessionResponseSchema.parse(bad)).toThrow();
   });
 
+  it('accepts an unlisted status_detail and a null pr_state (contract drift)', () => {
+    const out = sessionResponseSchema.parse({
+      ...sessionFixture,
+      status: 'suspended',
+      status_detail: 'org_usage_limit_exceeded', // not in the original enum
+      pull_requests: [{ pr_state: null, pr_url: 'not-a-url' }],
+    });
+    expect(out.status_detail).toBe('org_usage_limit_exceeded');
+    expect(out.pull_requests[0]?.pr_state).toBeNull();
+  });
+
+  it('tolerates optional nullable session fields being omitted entirely', () => {
+    const minimal = { ...sessionFixture } as Record<string, unknown>;
+    for (const k of ['category', 'origin', 'child_session_ids', 'parent_session_id', 'playbook_id', 'service_user_id', 'status_detail', 'title']) {
+      delete minimal[k];
+    }
+    expect(() => sessionResponseSchema.parse(minimal)).not.toThrow();
+  });
+
   it('parses a paginated session list', () => {
     const out = sessionListResponseSchema.parse({
       end_cursor: 'cur1',

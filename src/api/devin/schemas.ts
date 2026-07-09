@@ -42,7 +42,16 @@ export const sessionStatusDetailSchema = z.enum([
   'usage_limit_exceeded',
   'out_of_credits',
   'out_of_quota',
+  // Additional billing/limit states in the live contract.
+  'no_quota_allocation',
+  'payment_declined',
+  'org_usage_limit_exceeded',
+  'total_session_limit_exceeded',
+  'error',
 ]);
+
+/** status_detail can carry values beyond the known enum — never fail on it. */
+export const sessionStatusDetailLoose = z.string();
 
 export const sessionOriginSchema = z.enum([
   'webapp',
@@ -123,8 +132,8 @@ export const paginatedResponseSchema = <T extends z.ZodTypeAny>(item: T) =>
 
 export const pullRequestSchema = z
   .object({
-    pr_state: z.string(),
-    pr_url: z.string().url(),
+    pr_state: z.string().nullable(),
+    pr_url: z.string(),
     draft: z.boolean().optional(),
     state: prStateSchema.optional(),
     merged_at: unixTimestampSchema.nullable().optional(),
@@ -162,21 +171,25 @@ export const sessionCreateRequestSchema = z
 export const sessionResponseSchema = z
   .object({
     acus_consumed: acuCountSchema,
-    category: sessionCategorySchema.nullable(),
-    child_session_ids: z.array(z.string()).nullable(),
+    // These are nullable AND may be omitted entirely (not in the contract's
+    // required set) — use nullish so a missing key doesn't fail the parse.
+    category: sessionCategorySchema.nullish(),
+    child_session_ids: z.array(z.string()).nullish(),
     created_at: unixTimestampSchema,
     is_archived: z.boolean().default(false),
     org_id: z.string(),
-    origin: sessionOriginSchema.nullable(),
-    parent_session_id: z.string().nullable(),
-    playbook_id: z.string().nullable(),
+    origin: sessionOriginSchema.nullish(),
+    parent_session_id: z.string().nullish(),
+    playbook_id: z.string().nullish(),
     pull_requests: z.array(pullRequestSchema),
-    service_user_id: z.string().nullable(),
+    service_user_id: z.string().nullish(),
     session_id: z.string(),
     status: sessionStatusSchema,
-    status_detail: sessionStatusDetailSchema.nullable(),
+    // Accept any string — status_detail carries billing/limit values that
+    // drift beyond the known enum.
+    status_detail: sessionStatusDetailLoose.nullish(),
     tags: z.array(z.string()),
-    title: z.string().nullable(),
+    title: z.string().nullish(),
     updated_at: unixTimestampSchema,
     url: z.string(),
     subcategory: z.string().nullable().optional(),
@@ -283,7 +296,8 @@ export const sessionTagsResponseSchema = z
 
 export const insightsGenerateResponseSchema = z
   .object({
-    status: z.enum(['already_exists', 'started']),
+    // Contract types this as a plain string (no enum) — don't hard-fail.
+    status: z.string(),
   })
   .passthrough();
 
@@ -395,7 +409,7 @@ export const knowledgeNoteListResponseSchema = paginatedResponseSchema(
 export const secretResponseSchema = z
   .object({
     secret_id: z.string(),
-    key: z.string(),
+    key: z.string().nullable(),
     note: z.string().nullable().optional(),
     secret_type: secretTypeSchema.catch('key-value'),
     access_type: accessTypeSchema.optional(),
@@ -544,7 +558,7 @@ export const codeScanFindingSchema = z
   .object({
     finding_id: z.string(),
     scan_id: z.string(),
-    title: z.string(),
+    title: z.string().nullable(),
     description: z.string().nullable().optional(),
     recommendation: z.string().nullable().optional(),
     severity: z.enum(['critical', 'high', 'medium', 'low']).catch('medium'),
@@ -664,7 +678,9 @@ export const repositoryResponseSchema = z
     repo_description: z.string().nullable().optional(),
     repo_language: z.string().nullable().optional(),
     last_updated_at: z.union([z.string(), z.number()]).nullable().optional(),
-    indexing_status: z.string().nullable().optional(),
+    // Contract types this as an object (RepoIndexingStatusResponse) | null,
+    // not a string — accept anything so indexed repos aren't dropped.
+    indexing_status: z.unknown().optional(),
   })
   .passthrough();
 

@@ -172,7 +172,7 @@ export default function SecretsScreen() {
                   <Ionicons name="lock-closed-outline" size={14} color={tokens.textMid.hex} />
                 </View>
                 <View className="flex-1 mr-3">
-                  <Text className="text-text-hi text-text14 font-mono" numberOfLines={1}>{s.key}</Text>
+                  <Text className="text-text-hi text-text14 font-mono" numberOfLines={1}>{s.key ?? '—'}</Text>
                   <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>
                     {s.secret_type}{s.note ? ` · ${s.note}` : ''}
                   </Text>

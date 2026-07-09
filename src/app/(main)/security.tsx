@@ -146,7 +146,7 @@ export default function SecurityScreen() {
                     <Text className={`text-text11 font-medium ${sev.text}`}>{f.severity}</Text>
                   </View>
                   <Text className="text-text-hi text-text13 font-medium flex-1" numberOfLines={expanded ? undefined : 1}>
-                    {f.title}
+                    {f.title ?? 'Untitled finding'}
                   </Text>
                   <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={tokens.textLow.hex} />
                 </View>
