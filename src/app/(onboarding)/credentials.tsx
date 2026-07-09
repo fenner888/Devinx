@@ -33,8 +33,9 @@ export default function CredentialsScreen() {
 
   function handleSubmit() {
     setError(null);
-    if (mode === 'service_user' && !apiKey.startsWith(branding.serviceKeyPrefix)) {
-      setError(`API key must start with ${branding.serviceKeyPrefix}`);
+    // Both service-user keys and PATs use the cog_ prefix.
+    if (!apiKey.startsWith(branding.serviceKeyPrefix)) {
+      setError(`${mode === 'pat' ? 'Personal access token' : 'API key'} must start with ${branding.serviceKeyPrefix}`);
       return;
     }
     if (!orgId.startsWith(branding.orgIdPrefix)) {
@@ -73,7 +74,7 @@ export default function CredentialsScreen() {
               onPress={() => setMode('pat')}
             >
               <Text className={`text-center text-text14 ${mode === 'pat' ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
-                Personal token (beta)
+                Personal token
               </Text>
             </Pressable>
           ) : (
@@ -92,7 +93,7 @@ export default function CredentialsScreen() {
             className="bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
             value={apiKey}
             onChangeText={setApiKey}
-            placeholder={mode === 'service_user' ? 'cog_...' : 'your PAT'}
+            placeholder="cog_..."
             placeholderTextColor={tokens.textLow.hex}
             secureTextEntry
             autoCapitalize="none"

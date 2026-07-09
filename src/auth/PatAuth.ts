@@ -14,7 +14,9 @@ import type { AuthProvider, ValidationResult } from './AuthProvider';
 let cached: StoredCredentials | null = null;
 
 export function isPatEnabled(): boolean {
-  return process.env.EXPO_PUBLIC_ENABLE_PAT === 'true';
+  // PATs are GA-usable (same cog_ Bearer auth as service keys). Enabled by
+  // default; set EXPO_PUBLIC_ENABLE_PAT=false to hide the option.
+  return process.env.EXPO_PUBLIC_ENABLE_PAT !== 'false';
 }
 
 export async function connectPat(params: { token: string; orgId: string }): Promise<void> {

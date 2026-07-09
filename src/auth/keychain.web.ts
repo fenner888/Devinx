@@ -12,7 +12,22 @@ import { branding } from '@lib/branding';
 
 const PREFIX = 'devinx_';
 
+/**
+ * Hard block in production: localStorage is plaintext and readable by any
+ * XSS. The web target is a DEV PREVIEW only — a production web build must
+ * not store real API keys this way. `__DEV__` is false in production bundles.
+ */
+function assertDevPreview(): void {
+  // eslint-disable-next-line no-undef
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+    throw new Error(
+      'Web credential storage is disabled in production builds — the web target is a dev preview only. Use the iOS/Android app, where secrets are stored in the device Keychain.',
+    );
+  }
+}
+
 export async function storeSecret(key: string, value: string): Promise<void> {
+  assertDevPreview();
   localStorage.setItem(PREFIX + key, value);
 }
 
