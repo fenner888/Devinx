@@ -34,7 +34,7 @@ describe('Desktop Bridge pairing core', () => {
     }).toString('base64url');
     registeredDevices = new Map();
     registry = {
-      register: (device) => {
+      register: async (device) => {
         if (registeredDevices.has(device.deviceId)) return false;
         registeredDevices.set(device.deviceId, device);
         return true;
@@ -82,7 +82,7 @@ describe('Desktop Bridge pairing core', () => {
     expect(Buffer.from(offer.pairingSecret, 'base64url')).toHaveLength(32);
   });
 
-  it('requires desktop approval and grants only read-only defaults', () => {
+  it('requires desktop approval and grants only read-only defaults', async () => {
     const offer = manager.createOffer(NOW);
     const request = pairingRequest(offer);
 
@@ -101,7 +101,7 @@ describe('Desktop Bridge pairing core', () => {
       body: { error: 'not_found' },
     });
 
-    const approval = manager.approve(offer.pairingId, NOW + 3_000);
+    const approval = await manager.approve(offer.pairingId, NOW + 3_000);
     expect(approval).toMatchObject({
       ok: true,
       device: {
@@ -179,24 +179,24 @@ describe('Desktop Bridge pairing core', () => {
     expect(manager.submit(pairingRequest(offer), NOW + 2)).toMatchObject({ ok: false, status: 404 });
   });
 
-  it('supports explicit denial and prevents later approval', () => {
+  it('supports explicit denial and prevents later approval', async () => {
     const offer = manager.createOffer(NOW);
     expect(manager.submit(pairingRequest(offer), NOW + 1).ok).toBe(true);
 
     expect(manager.deny(offer.pairingId)).toBe(true);
-    expect(manager.approve(offer.pairingId, NOW + 2)).toEqual({
+    await expect(manager.approve(offer.pairingId, NOW + 2)).resolves.toEqual({
       ok: false,
       status: 404,
       body: { error: 'not_found' },
     });
   });
 
-  it('does not overwrite an existing device public key', () => {
+  it('does not overwrite an existing device public key', async () => {
     registeredDevices.set(DEVICE_ID, { existing: true });
     const offer = manager.createOffer(NOW);
     manager.submit(pairingRequest(offer), NOW + 1);
 
-    expect(manager.approve(offer.pairingId, NOW + 2)).toEqual({
+    await expect(manager.approve(offer.pairingId, NOW + 2)).resolves.toEqual({
       ok: false,
       status: 404,
       body: { error: 'not_found' },
@@ -204,10 +204,10 @@ describe('Desktop Bridge pairing core', () => {
     expect(registeredDevices.get(DEVICE_ID)).toEqual({ existing: true });
   });
 
-  it('detects a tampered approval receipt', () => {
+  it('detects a tampered approval receipt', async () => {
     const offer = manager.createOffer(NOW);
     manager.submit(pairingRequest(offer), NOW + 1);
-    const approval = manager.approve(offer.pairingId, NOW + 2);
+    const approval = await manager.approve(offer.pairingId, NOW + 2);
     if (!approval.ok) throw new Error('Expected pairing approval');
 
     const tampered = {
@@ -220,10 +220,10 @@ describe('Desktop Bridge pairing core', () => {
     );
   });
 
-  it('supports explicit permission updates and revocation', () => {
+  it('supports explicit permission updates and revocation', async () => {
     const offer = manager.createOffer(NOW);
     manager.submit(pairingRequest(offer), NOW + 1);
-    const approval = manager.approve(offer.pairingId, NOW + 2);
+    const approval = await manager.approve(offer.pairingId, NOW + 2);
     if (!approval.ok) throw new Error('Expected pairing approval');
 
     const updated = updateDevicePermissions(approval.device, {
@@ -237,10 +237,10 @@ describe('Desktop Bridge pairing core', () => {
     expect(revokeDeviceRecord(updated).status).toBe('revoked');
   });
 
-  it('rejects duplicate permission or session-scope updates', () => {
+  it('rejects duplicate permission or session-scope updates', async () => {
     const offer = manager.createOffer(NOW);
     manager.submit(pairingRequest(offer), NOW + 1);
-    const approval = manager.approve(offer.pairingId, NOW + 2);
+    const approval = await manager.approve(offer.pairingId, NOW + 2);
     if (!approval.ok) throw new Error('Expected pairing approval');
 
     expect(() =>

@@ -131,7 +131,7 @@ export interface PairingManagerOptions {
 }
 
 export interface PairingDeviceRegistry {
-  register(device: DeviceRecord): boolean;
+  register(device: DeviceRecord): Promise<boolean>;
 }
 
 export type PairingOffer = z.infer<typeof pairingOfferSchema>;
@@ -355,7 +355,7 @@ export class PairingManager {
     };
   }
 
-  approve(pairingId: string, now = Date.now()): PairingApprovalResult {
+  async approve(pairingId: string, now = Date.now()): Promise<PairingApprovalResult> {
     this.cleanup(now);
     const pairingIdResult = opaqueIdSchema.safeParse(pairingId);
     if (!pairingIdResult.success) {
@@ -387,7 +387,7 @@ export class PairingManager {
       permissions: [...device.permissions],
       allowedSessionIds: device.allowedSessionIds ? [...device.allowedSessionIds] : undefined,
     };
-    if (!this.devices.register(storedDevice)) {
+    if (!(await this.devices.register(storedDevice))) {
       return { ok: false, status: 404, body: { error: 'not_found' } };
     }
     const signedReceipt = signedPairingReceiptSchema.parse({

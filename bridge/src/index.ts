@@ -13,6 +13,19 @@ export {
 } from './rate-limit';
 export { SessionHandleRegistry } from './session-handles';
 export {
+  MacOSKeychainSecretStore,
+  type KeychainSecretStore,
+  type MacOSKeychainOptions,
+} from './macos-keychain';
+export {
+  DesktopBridgeStateRepository,
+  PersistentDeviceRegistry,
+  loadDesktopBridgeRuntime,
+  type DesktopBridgeRuntimeState,
+  type DesktopBridgeState,
+  type DeviceSummary,
+} from './state';
+export {
   BridgeService,
   type BridgeRequestContext,
   type BridgeServiceOptions,
