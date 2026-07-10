@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="background" cx="50%" cy="42%" r="72%">
+      <stop offset="0" stop-color="#0b1632"/>
+      <stop offset="0.58" stop-color="#050914"/>
+      <stop offset="1" stop-color="#020409"/>
+    </radialGradient>
+    <linearGradient id="mark" x1="100" y1="220" x2="920" y2="800" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1847ff"/>
+      <stop offset="0.55" stop-color="#087ff5"/>
+      <stop offset="1" stop-color="#10c4ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#background)"/>
+  <g fill="url(#mark)">
+    <path fill-rule="evenodd" d="M104 218H260C421 218 505 330 505 512S421 806 260 806H104V218ZM222 332V692H260C342 692 389 632 389 512S342 332 260 332H222Z"/>
+    <path d="M520 224H610L750 512L610 800H520L650 512L520 224Z"/>
+    <path d="M830 224H920L785 449L735 398L830 224Z"/>
+    <path d="M735 626L785 575L920 800H830L735 626Z"/>
+  </g>
+</svg>
