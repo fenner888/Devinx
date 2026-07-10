@@ -11,6 +11,7 @@ import {
   collectTags,
   relativeTime,
   prNumber,
+  removeSessionFromBoard,
 } from '../../src/lib/session-utils';
 import type { SessionResponse } from '../../src/api/devin/types';
 
@@ -113,6 +114,19 @@ describe('session-utils', () => {
       expect(deriveStatusKey(makeSession({ status: 'running', status_detail: 'working' }))).toBe(
         'working',
       );
+    });
+  });
+
+  describe('removeSessionFromBoard', () => {
+    it('removes the archived session across prefixed and bare API ids', () => {
+      const sessions = [
+        makeSession({ session_id: 'devin-archive-me' }),
+        makeSession({ session_id: 'keep-me' }),
+      ];
+
+      expect(
+        removeSessionFromBoard(sessions, 'archive-me')?.map((session) => session.session_id),
+      ).toEqual(['keep-me']);
     });
   });
 

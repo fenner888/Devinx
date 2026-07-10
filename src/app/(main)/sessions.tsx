@@ -75,8 +75,8 @@ export default function SessionsScreen() {
 
   function handleContextAction(action: ContextAction) {
     const s = contextSession;
-    setContextSession(null);
     if (!s) return;
+    if (action !== 'archive' && action !== 'terminate') setContextSession(null);
     switch (action) {
       case 'open':
         hapticLight();
@@ -100,11 +100,14 @@ export default function SessionsScreen() {
               'Removes it from your board (Devin has no permanent delete). You can unarchive it from the Devin web app.',
             confirmLabel: 'Archive',
           },
-          () =>
+          () => {
+            setContextSession(null);
             archiveMutation.mutate(s.session_id, {
               onError: (e) =>
                 setActionNote(`Could not archive "${s.title || 'session'}": ${e.message}`),
-            }),
+            });
+          },
+          () => setContextSession(null),
         );
         break;
       case 'terminate':
@@ -117,11 +120,14 @@ export default function SessionsScreen() {
             confirmLabel: 'Terminate',
             destructive: true,
           },
-          () =>
+          () => {
+            setContextSession(null);
             terminateMutation.mutate(s.session_id, {
               onError: (e) =>
                 setActionNote(`Could not terminate "${s.title || 'session'}": ${e.message}`),
-            }),
+            });
+          },
+          () => setContextSession(null),
         );
         break;
     }

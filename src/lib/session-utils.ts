@@ -42,6 +42,15 @@ export function deriveStatusKey(s: SessionResponse): StatusLabelKey {
   return 'working';
 }
 
+export function removeSessionFromBoard(
+  sessions: SessionResponse[] | undefined,
+  sessionId: string,
+): SessionResponse[] | undefined {
+  if (!sessions) return sessions;
+  const normalizedId = sessionId.replace(/^devin-/, '');
+  return sessions.filter((session) => session.session_id.replace(/^devin-/, '') !== normalizedId);
+}
+
 /** Section keys for the board. */
 export type SectionKey = 'needs_input' | 'working' | 'recent' | 'sleeping';
 
