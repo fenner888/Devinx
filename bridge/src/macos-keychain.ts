@@ -1,12 +1,12 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { isAbsolute } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 import { z } from 'zod';
 
-const DEFAULT_SECURITY_PATH = '/usr/bin/security';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_SECRET_BYTES = 1024 * 1024;
 const ITEM_NOT_FOUND_EXIT_CODE = 44;
+const DEFAULT_HELPER_PATH = join(__dirname, 'macos-keychain-helper');
 
 const optionsSchema = z
   .object({
@@ -15,14 +15,9 @@ const optionsSchema = z
       .min(1)
       .max(4096)
       .refine(isAbsolute, 'security executable path must be absolute')
-      .default(DEFAULT_SECURITY_PATH),
+      .default(DEFAULT_HELPER_PATH),
     service: z.string().min(1).max(255).default('com.devinx.desktop-bridge'),
     account: z.string().min(1).max(255).default('bridge-state-v1'),
-    trustedApplicationPath: z
-      .string()
-      .max(4096)
-      .refine((value) => value === '' || isAbsolute(value), 'trusted application path must be absolute')
-      .default(''),
     timeoutMs: z.number().int().min(1_000).max(60_000).default(DEFAULT_TIMEOUT_MS),
   })
   .strict();
@@ -37,7 +32,6 @@ export interface MacOSKeychainOptions {
   executablePath?: string;
   service?: string;
   account?: string;
-  trustedApplicationPath?: string;
   timeoutMs?: number;
 }
 
@@ -66,14 +60,7 @@ export class MacOSKeychainSecretStore implements KeychainSecretStore {
   }
 
   async get(): Promise<string | null> {
-    const result = await this.run([
-      'find-generic-password',
-      '-a',
-      this.options.account,
-      '-s',
-      this.options.service,
-      '-w',
-    ]);
+    const result = await this.run(['get', this.options.service, this.options.account]);
     if (result.code === ITEM_NOT_FOUND_EXIT_CODE) return null;
     if (result.code !== 0) throw new Error('macOS Keychain read failed');
     return result.stdout.replace(/\r?\n$/, '');
@@ -83,31 +70,12 @@ export class MacOSKeychainSecretStore implements KeychainSecretStore {
     if (!value || Buffer.byteLength(value, 'utf8') > MAX_SECRET_BYTES) {
       throw new Error('macOS Keychain value is invalid');
     }
-    const result = await this.run(
-      [
-        'add-generic-password',
-        '-a',
-        this.options.account,
-        '-s',
-        this.options.service,
-        '-U',
-        '-T',
-        this.options.trustedApplicationPath,
-        '-w',
-      ],
-      value,
-    );
+    const result = await this.run(['set', this.options.service, this.options.account], value);
     if (result.code !== 0) throw new Error('macOS Keychain write failed');
   }
 
   async delete(): Promise<void> {
-    const result = await this.run([
-      'delete-generic-password',
-      '-a',
-      this.options.account,
-      '-s',
-      this.options.service,
-    ]);
+    const result = await this.run(['delete', this.options.service, this.options.account]);
     if (result.code !== 0 && result.code !== ITEM_NOT_FOUND_EXIT_CODE) {
       throw new Error('macOS Keychain delete failed');
     }
@@ -197,7 +165,7 @@ export class MacOSKeychainSecretStore implements KeychainSecretStore {
       });
 
       if (input === undefined) child.stdin.end();
-      else child.stdin.end(`${input}\n`, 'utf8');
+      else child.stdin.end(input, 'utf8');
     });
   }
 }

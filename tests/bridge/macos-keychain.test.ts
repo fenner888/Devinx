@@ -28,17 +28,17 @@ const argumentLog = ${JSON.stringify(argumentLog)};
 const args = process.argv.slice(2);
 fs.appendFileSync(argumentLog, JSON.stringify(args) + '\\n');
 const command = args[0];
-if (command === 'find-generic-password') {
+if (command === 'get') {
   if (!fs.existsSync(valuePath)) process.exit(44);
   process.stdout.write(fs.readFileSync(valuePath));
   process.stdout.write('\\n');
-} else if (command === 'add-generic-password') {
+} else if (command === 'set') {
   let input = '';
   process.stdin.on('data', (chunk) => { input += chunk.toString('utf8'); });
   process.stdin.on('end', () => {
     fs.writeFileSync(valuePath, input.replace(/\\r?\\n$/, ''), { mode: 0o600 });
   });
-} else if (command === 'delete-generic-password') {
+} else if (command === 'delete') {
   if (!fs.existsSync(valuePath)) process.exit(44);
   fs.unlinkSync(valuePath);
 } else {
@@ -72,9 +72,8 @@ if (command === 'find-generic-password') {
       .trim()
       .split('\n')
       .map((line) => JSON.parse(line) as string[])
-      .find((args) => args[0] === 'add-generic-password');
-    expect(addArguments?.at(-1)).toBe('-w');
-    expect(addArguments).toEqual(expect.arrayContaining(['-T', '']));
+      .find((args) => args[0] === 'set');
+    expect(addArguments).toEqual(['set', 'com.devinx.test', 'bridge-state-test']);
 
     await keychain.delete();
     await expect(keychain.get()).resolves.toBeNull();
