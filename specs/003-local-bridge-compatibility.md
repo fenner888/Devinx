@@ -11,6 +11,8 @@ Observed July 10, 2026 on macOS. This report contains only version information a
 - Probe: `npm run bridge:discover`
 - Machine-readable fixture: `specs/bridge-compatibility/cli-2026.8.18-acp.json`
 
+Two repeated probes after the schema-mode implementation returned the capability set below. An earlier probe from the same reported CLI version also returned audio and MCP HTTP/SSE capabilities. The agent implementation can therefore vary without a CLI marketing-version change; every connection must negotiate and gate features from the live initialization response.
+
 ## Advertised capabilities
 
 | Capability | Phase implication |
@@ -19,10 +21,7 @@ Observed July 10, 2026 on macOS. This report contains only version information a
 | `loadSession` | The bridge may be able to load history after an explicit user selection and content grant. Exact request/update behavior must be proven in an isolated test workspace. |
 | `sessionCapabilities.additionalDirectories` | Multi-root access exists but materially expands filesystem scope; defer until workspace permissions and path-boundary tests exist. |
 | `promptCapabilities.image` | The ACP agent can accept image prompt content, but mobile attachment transfer remains unsupported until transport and size/path rules are specified. |
-| `promptCapabilities.audio` | Audio is agent-capable but outside the initial bridge scope. |
 | `promptCapabilities.embeddedContext` | Embedded context is available but must be treated as untrusted, size-bounded content. |
-| `mcpCapabilities.http` | ACP can receive HTTP MCP configuration; the bridge must not forward arbitrary mobile-provided MCP endpoints. |
-| `mcpCapabilities.sse` | ACP can receive SSE MCP configuration; the same endpoint and credential restrictions apply. |
 
 ## Not advertised
 
@@ -32,6 +31,9 @@ The initialization response did not advertise:
 - `sessionCapabilities.close`
 - `sessionCapabilities.delete`
 - `sessionCapabilities.fork`
+- `promptCapabilities.audio`
+- `mcpCapabilities.http`
+- `mcpCapabilities.sse`
 
 Absence means unavailable. DevinX must not call or emulate these operations against this CLI version. `loadSession` may cover the product's reconnect requirement, but that is an inference to test, not a contract to assume.
 
@@ -39,14 +41,15 @@ Absence means unavailable. DevinX must not call or emulate these operations agai
 
 The Phase 3 architecture is feasible enough to continue to a read-only session-list experiment. The production bridge should adapt negotiated ACP rather than mirror Hermex REST endpoints or inspect Devin storage. Feature availability must be computed per connected computer because users may run different Devin CLI versions and agent implementations.
 
-## Next safe experiment
+## Session-list schema probe
 
-Add an explicit, opt-in discovery mode that calls `session/list` and records only:
+An explicit, opt-in `--session-schema` mode is implemented and covered by a synthetic ACP server. It calls `session/list` and records only:
 
 - request success/failure;
 - item count;
-- response field names;
+- recognized public response/session field presence;
+- unknown field counts, never unknown field names;
 - pagination presence;
 - whether IDs, titles, paths, and timestamps are present, without printing their values.
 
-Do not call `loadSession` until a dedicated disposable test workspace/session is selected. Do not send prompts or answer permission requests during discovery.
+The synthetic test deliberately returns secret IDs, paths, titles, timestamps, cursors, extension fields, and `_meta` data and verifies that none appears in the report. A real-account invocation is intentionally pending explicit user approval. Do not call `loadSession` until a dedicated disposable test workspace/session is selected. Do not send prompts or answer permission requests during discovery.

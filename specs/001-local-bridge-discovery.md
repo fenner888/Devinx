@@ -36,6 +36,7 @@ Primary references, reviewed July 10, 2026:
 - <https://docs.devin.ai/cli/extensibility/hooks/overview>
 - <https://docs.devin.ai/cli/handoff>
 - <https://agentclientprotocol.com/get-started/architecture>
+- <https://agentclientprotocol.com/protocol/v1/session-list>
 - <https://agentclientprotocol.com/updates>
 - <https://github.com/agentclientprotocol/agent-client-protocol>
 - <https://hermexapp.com/setup>
@@ -81,12 +82,18 @@ Create a dependency-free Node script under `scripts/bridge/` that:
 - starts exactly `devin acp` with a minimal environment;
 - sends only ACP `initialize` using protocol version `1` and empty client capabilities;
 - validates the JSON-RPC response shape;
-- prints only CLI version, negotiated protocol version, implementation metadata, and capability names;
+- prints only CLI version, negotiated protocol version, implementation metadata, recognized capability names, and the count of unknown capability fields;
 - redacts all other `_meta` values and never calls `session/list` by default;
 - terminates the child on success, timeout, signal, parse error, or protocol mismatch;
 - never prints the child environment or stderr without redaction.
 
-An explicit future flag may probe `session/list`, but it must output counts and field names only unless the user separately authorizes local session inspection.
+The probe now includes an explicit `--session-schema` mode. It calls only the first page of `session/list` after initialization and only when `sessionCapabilities.list` is advertised. Its report contains the item count, pagination presence, recognized public schema fields, and an unknown-field count. It never emits session IDs, titles, paths, timestamps, cursor values, extension field names, or `_meta` keys/values.
+
+```bash
+npm run bridge:discover -- --session-schema
+```
+
+This mode is covered with a synthetic CLI fixture. Running it against a real account remains a user-approved checkpoint because even a value-free count and field-presence report confirms private session metadata exists.
 
 ## Compatibility policy
 

@@ -4,9 +4,32 @@ import { spawn } from 'node:child_process';
 
 const PROBE_VERSION = 1;
 const ACP_PROTOCOL_VERSION = 1;
-const REQUEST_ID = 'devinx-discovery-initialize';
+const INITIALIZE_REQUEST_ID = 'devinx-discovery-initialize';
+const SESSION_LIST_REQUEST_ID = 'devinx-discovery-session-list';
 const DEFAULT_TIMEOUT_MS = 5_000;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
+const KNOWN_CAPABILITY_NAMES = new Set([
+  'loadSession',
+  'mcpCapabilities.http',
+  'mcpCapabilities.sse',
+  'promptCapabilities.audio',
+  'promptCapabilities.embeddedContext',
+  'promptCapabilities.image',
+  'sessionCapabilities.additionalDirectories',
+  'sessionCapabilities.close',
+  'sessionCapabilities.delete',
+  'sessionCapabilities.fork',
+  'sessionCapabilities.list',
+  'sessionCapabilities.resume',
+]);
+const KNOWN_SESSION_FIELDS = [
+  '_meta',
+  'additionalDirectories',
+  'cwd',
+  'sessionId',
+  'title',
+  'updatedAt',
+];
 const SAFE_ENV_KEYS = [
   'HOME',
   'LANG',
@@ -38,6 +61,13 @@ function timeoutMs() {
 
 function cliExecutable() {
   return process.env.DEVIN_CLI_PATH || 'devin';
+}
+
+function includeSessionSchema() {
+  const args = process.argv.slice(2);
+  if (args.length === 0) return false;
+  if (args.length === 1 && args[0] === '--session-schema') return true;
+  throw new Error('Usage: discover-acp.mjs [--session-schema]');
 }
 
 function stopChild(child) {
@@ -72,6 +102,74 @@ function capabilityNames(value, prefix = '') {
     }
     return [path];
   });
+}
+
+function summarizeCapabilities(agentCapabilities) {
+  const names = [...new Set(capabilityNames(agentCapabilities))];
+  return {
+    capabilities: names.filter((name) => KNOWN_CAPABILITY_NAMES.has(name)).sort(),
+    unknownCapabilityCount: names.filter((name) => !KNOWN_CAPABILITY_NAMES.has(name)).length,
+  };
+}
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasSessionListCapability(agentCapabilities) {
+  const list = agentCapabilities?.sessionCapabilities?.list;
+  return isRecord(list);
+}
+
+function summarizeSessionList(result) {
+  if (!isRecord(result) || !Array.isArray(result.sessions)) {
+    throw new Error('ACP session list omitted the sessions array');
+  }
+  if (result.nextCursor !== undefined && typeof result.nextCursor !== 'string') {
+    throw new Error('ACP session list returned an invalid pagination cursor');
+  }
+
+  const recognizedFields = new Set();
+  const unknownFields = new Set();
+  for (const session of result.sessions) {
+    if (!isRecord(session)) throw new Error('ACP session list returned an invalid session');
+    if (typeof session.sessionId !== 'string' || session.sessionId.length === 0) {
+      throw new Error('ACP session list returned a session without an ID');
+    }
+    if (typeof session.cwd !== 'string' || session.cwd.length === 0) {
+      throw new Error('ACP session list returned a session without a working directory');
+    }
+    for (const optionalString of ['title', 'updatedAt']) {
+      if (session[optionalString] !== undefined && typeof session[optionalString] !== 'string') {
+        throw new Error(`ACP session list returned an invalid ${optionalString} field`);
+      }
+    }
+    if (
+      session.additionalDirectories !== undefined &&
+      (!Array.isArray(session.additionalDirectories) ||
+        session.additionalDirectories.some(
+          (directory) => typeof directory !== 'string' || directory.length === 0,
+        ))
+    ) {
+      throw new Error('ACP session list returned invalid additional directories');
+    }
+    if (session._meta !== undefined && !isRecord(session._meta)) {
+      throw new Error('ACP session list returned invalid metadata');
+    }
+
+    for (const field of Object.keys(session)) {
+      if (KNOWN_SESSION_FIELDS.includes(field)) recognizedFields.add(field);
+      else unknownFields.add(field);
+    }
+  }
+
+  return {
+    itemCount: result.sessions.length,
+    responseFields: ['sessions', ...(result.nextCursor === undefined ? [] : ['nextCursor'])],
+    recognizedSessionFields: [...recognizedFields].sort(),
+    unknownSessionFieldCount: unknownFields.size,
+    hasNextPage: result.nextCursor !== undefined,
+  };
 }
 
 async function readCliVersion(executable, environment, timeout) {
@@ -122,7 +220,7 @@ async function readCliVersion(executable, environment, timeout) {
   });
 }
 
-async function initializeAcp(executable, environment, timeout) {
+async function probeAcp(executable, environment, timeout, sessionSchemaRequested) {
   return new Promise((resolve, reject) => {
     const child = spawn(executable, ['acp'], {
       env: environment,
@@ -132,6 +230,11 @@ async function initializeAcp(executable, environment, timeout) {
     let buffer = '';
     let outputBytes = 0;
     let settled = false;
+    let initialization;
+    let expectedRequestId = INITIALIZE_REQUEST_ID;
+
+    const operationName = () =>
+      expectedRequestId === INITIALIZE_REQUEST_ID ? 'initialization' : 'session list';
 
     const finish = (callback) => {
       if (settled) return;
@@ -142,19 +245,22 @@ async function initializeAcp(executable, environment, timeout) {
     };
 
     const timer = setTimeout(() => {
-      finish(() => reject(new Error('ACP initialization timed out')));
+      finish(() => reject(new Error(`ACP ${operationName()} timed out`)));
     }, timeout);
 
     child.on('error', () => {
       finish(() => reject(new Error('Devin ACP process could not be started')));
     });
+    child.stdin.on('error', () => {
+      finish(() => reject(new Error('Devin ACP input stream closed unexpectedly')));
+    });
     child.on('close', () => {
-      if (!settled) finish(() => reject(new Error('Devin ACP exited before initialization')));
+      if (!settled) finish(() => reject(new Error(`Devin ACP exited before ${operationName()}`)));
     });
     child.stdout.on('data', (chunk) => {
       outputBytes += chunk.length;
       if (outputBytes > MAX_OUTPUT_BYTES) {
-        finish(() => reject(new Error('ACP initialization exceeded the output limit')));
+        finish(() => reject(new Error(`ACP ${operationName()} exceeded the output limit`)));
         return;
       }
 
@@ -170,40 +276,73 @@ async function initializeAcp(executable, environment, timeout) {
           finish(() => reject(new Error('ACP returned an invalid JSON-RPC message')));
           return;
         }
-        if (message?.id !== REQUEST_ID) continue;
+        if (!isRecord(message) || message.jsonrpc !== '2.0') {
+          finish(() => reject(new Error('ACP returned an invalid JSON-RPC message')));
+          return;
+        }
+        if (message?.id !== expectedRequestId) continue;
         if (message.error) {
           const code = typeof message.error.code === 'number' ? message.error.code : 'unknown';
-          finish(() => reject(new Error(`ACP initialization failed with code ${code}`)));
+          finish(() => reject(new Error(`ACP ${operationName()} failed with code ${code}`)));
           return;
         }
 
-        const result = message.result;
-        if (!result || result.protocolVersion !== ACP_PROTOCOL_VERSION) {
-          finish(() => reject(new Error('ACP negotiated an unsupported protocol version')));
-          return;
-        }
-        if (!result.agentCapabilities || typeof result.agentCapabilities !== 'object') {
-          finish(() => reject(new Error('ACP initialization omitted agent capabilities')));
-          return;
-        }
+        if (expectedRequestId === INITIALIZE_REQUEST_ID) {
+          const result = message.result;
+          if (!isRecord(result) || result.protocolVersion !== ACP_PROTOCOL_VERSION) {
+            finish(() => reject(new Error('ACP negotiated an unsupported protocol version')));
+            return;
+          }
+          if (!isRecord(result.agentCapabilities)) {
+            finish(() => reject(new Error('ACP initialization omitted agent capabilities')));
+            return;
+          }
 
-        finish(() =>
-          resolve({
+          initialization = {
             negotiatedProtocolVersion: result.protocolVersion,
             agent: {
               name: sanitizedText(result.agentInfo?.name, 'unknown'),
               version: sanitizedText(result.agentInfo?.version, 'unknown'),
             },
-            capabilities: [...new Set(capabilityNames(result.agentCapabilities))].sort(),
-          }),
-        );
+            ...summarizeCapabilities(result.agentCapabilities),
+          };
+          if (!sessionSchemaRequested) {
+            finish(() => resolve(initialization));
+            return;
+          }
+          if (!hasSessionListCapability(result.agentCapabilities)) {
+            finish(() => reject(new Error('ACP agent does not advertise session listing')));
+            return;
+          }
+
+          expectedRequestId = SESSION_LIST_REQUEST_ID;
+          child.stdin.write(
+            `${JSON.stringify({
+              jsonrpc: '2.0',
+              id: SESSION_LIST_REQUEST_ID,
+              method: 'session/list',
+              params: {},
+            })}\n`,
+          );
+          continue;
+        }
+
+        let sessionList;
+        try {
+          sessionList = summarizeSessionList(message.result);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : 'ACP returned an invalid session list';
+          finish(() => reject(new Error(reason)));
+          return;
+        }
+        finish(() => resolve({ ...initialization, sessionList }));
         return;
       }
     });
 
     const request = {
       jsonrpc: '2.0',
-      id: REQUEST_ID,
+      id: INITIALIZE_REQUEST_ID,
       method: 'initialize',
       params: {
         protocolVersion: ACP_PROTOCOL_VERSION,
@@ -216,11 +355,12 @@ async function initializeAcp(executable, environment, timeout) {
 }
 
 async function main() {
+  const sessionSchemaRequested = includeSessionSchema();
   const executable = cliExecutable();
   const environment = safeEnvironment();
   const timeout = timeoutMs();
   const cliVersion = await readCliVersion(executable, environment, timeout);
-  const acp = await initializeAcp(executable, environment, timeout);
+  const acp = await probeAcp(executable, environment, timeout, sessionSchemaRequested);
   process.stdout.write(
     `${JSON.stringify(
       {

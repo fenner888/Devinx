@@ -14,13 +14,11 @@
     },
     "capabilities": [
       "loadSession",
-      "mcpCapabilities.http",
-      "mcpCapabilities.sse",
-      "promptCapabilities.audio",
       "promptCapabilities.embeddedContext",
       "promptCapabilities.image",
       "sessionCapabilities.additionalDirectories",
       "sessionCapabilities.list"
-    ]
+    ],
+    "unknownCapabilityCount": 0
   }
 }
