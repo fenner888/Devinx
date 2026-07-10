@@ -2,7 +2,7 @@ import { basename } from 'node:path';
 
 import { z } from 'zod';
 
-import type { AcpSessionPage } from './acp';
+import type { AcpLoadedSession, AcpSessionPage } from './acp';
 import type { RateLimiter, RateLimitRule } from './rate-limit';
 import type { ReplayGuard } from './replay';
 import {
@@ -11,8 +11,15 @@ import {
   type RequestAuthorization,
   type RequestRejection,
 } from './security';
-import { BRIDGE_PROTOCOL_VERSION, opaqueIdSchema, sessionListBodySchema } from './schemas';
+import {
+  BRIDGE_PROTOCOL_VERSION,
+  opaqueIdSchema,
+  sessionListBodySchema,
+  sessionLoadBodySchema,
+} from './schemas';
 import type { SessionHandleRegistry } from './session-handles';
+
+const MAX_LOCAL_SESSION_RESPONSE_BYTES = 192 * 1024;
 
 const requestContextSchema = z
   .object({
@@ -63,9 +70,35 @@ const localSessionPageSchema = z
   })
   .strict();
 
+const localHistoryMessageSchema = z
+  .object({
+    sequence: z.number().int().positive(),
+    source: z.enum(['user', 'devin']),
+    text: z.string().max(100_000),
+  })
+  .strict();
+
+const localLoadedSessionSchema = z
+  .object({
+    session: z
+      .object({
+        id: z.string().regex(/^local_[A-Za-z0-9_-]{43}$/),
+        origin: z.literal('computer'),
+        workspaceName: z.string().min(1).max(160),
+      })
+      .strict(),
+    messages: z.array(localHistoryMessageSchema).max(200),
+    truncated: z.boolean(),
+  })
+  .strict();
+
+type LocalLoadedSession = z.infer<typeof localLoadedSessionSchema>;
+
 export interface SessionDiscoveryAdapter {
   isSessionListSupported(): boolean;
   listSessions(input?: unknown): Promise<AcpSessionPage>;
+  isSessionLoadSupported(): boolean;
+  loadSession(sessionId: string): Promise<AcpLoadedSession>;
 }
 
 export interface BridgeServiceOptions {
@@ -106,10 +139,61 @@ function cleanDisplayText(value: string, maximumLength: number, fallback: string
   return clean || fallback;
 }
 
+function serializedBytes(value: unknown): number {
+  return Buffer.byteLength(JSON.stringify(value), 'utf8');
+}
+
+function withRenumberedMessages(
+  response: LocalLoadedSession,
+  messages: LocalLoadedSession['messages'],
+  truncated: boolean,
+): LocalLoadedSession {
+  return {
+    ...response,
+    messages: messages.map((message, index) => ({ ...message, sequence: index + 1 })),
+    truncated,
+  };
+}
+
+function fitLoadedSessionResponse(input: LocalLoadedSession): LocalLoadedSession {
+  let response = input;
+  while (
+    serializedBytes(response) > MAX_LOCAL_SESSION_RESPONSE_BYTES &&
+    response.messages.length > 1
+  ) {
+    response = withRenumberedMessages(response, response.messages.slice(1), true);
+  }
+  if (serializedBytes(response) <= MAX_LOCAL_SESSION_RESPONSE_BYTES) return response;
+
+  const message = response.messages[0];
+  if (!message) throw new Error('Local session response exceeded its byte limit');
+  const characters = [...message.text];
+  let minimumRemoved = 0;
+  let maximumRemoved = characters.length;
+  let fitted: LocalLoadedSession | null = null;
+  while (minimumRemoved <= maximumRemoved) {
+    const removed = Math.floor((minimumRemoved + maximumRemoved) / 2);
+    const candidate = withRenumberedMessages(
+      response,
+      [{ ...message, text: characters.slice(removed).join('') }],
+      true,
+    );
+    if (serializedBytes(candidate) <= MAX_LOCAL_SESSION_RESPONSE_BYTES) {
+      fitted = candidate;
+      maximumRemoved = removed - 1;
+    } else {
+      minimumRemoved = removed + 1;
+    }
+  }
+  if (!fitted) throw new Error('Local session response exceeded its byte limit');
+  return fitted;
+}
+
 export class BridgeService {
   private readonly bridgeId: string;
   private readonly rates: z.infer<typeof serviceOptionsSchema>;
   private listing = false;
+  private loading = false;
 
   constructor(private readonly dependencies: BridgeServiceOptions) {
     this.bridgeId = opaqueIdSchema.parse(dependencies.bridgeId);
@@ -164,7 +248,7 @@ export class BridgeService {
           status: 'ready',
           capabilities: {
             sessionList: this.dependencies.sessions.isSessionListSupported(),
-            sessionLoad: false,
+            sessionLoad: this.dependencies.sessions.isSessionLoadSupported(),
             sessionPrompt: false,
           },
         }),
@@ -172,6 +256,9 @@ export class BridgeService {
     }
     if (authorization.request.method === 'session.list') {
       return this.listSessions(authorization, context.now);
+    }
+    if (authorization.request.method === 'session.load') {
+      return this.loadSession(authorization, context.now);
     }
     return { status: 404, body: { error: 'not_found' } };
   }
@@ -215,6 +302,45 @@ export class BridgeService {
       return { status: 503, body: { error: 'temporarily_unavailable' } };
     } finally {
       this.listing = false;
+    }
+  }
+
+  private async loadSession(
+    authorization: RequestAuthorization,
+    now: number,
+  ): Promise<BridgeServiceResponse> {
+    if (!this.dependencies.sessions.isSessionLoadSupported()) {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+    const body = sessionLoadBodySchema.parse(authorization.request.body);
+    const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
+    if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
+    if (this.loading) return { status: 429, body: { error: 'busy' } };
+
+    this.loading = true;
+    try {
+      const loaded = await this.dependencies.sessions.loadSession(rawSessionId);
+      if (loaded.sessionId !== rawSessionId) {
+        throw new Error('Loaded ACP session did not match the requested session');
+      }
+      const response = localLoadedSessionSchema.parse({
+        session: {
+          id: body.sessionId,
+          origin: 'computer',
+          workspaceName: cleanDisplayText(basename(loaded.cwd), 160, 'Workspace'),
+        },
+        messages: loaded.messages.map((message, index) => ({
+          sequence: index + 1,
+          source: message.source,
+          text: message.text,
+        })),
+        truncated: loaded.truncated,
+      });
+      return { status: 200, body: fitLoadedSessionResponse(response) };
+    } catch {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    } finally {
+      this.loading = false;
     }
   }
 }

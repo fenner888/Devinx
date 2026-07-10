@@ -336,7 +336,21 @@ export default function SessionsScreen() {
           )}
           renderItem={({ item }) =>
             item.kind === 'computer' ? (
-              <ComputerSessionRow session={item.session} />
+              <ComputerSessionRow
+                session={item.session}
+                onPress={
+                  item.session.canLoad
+                    ? () =>
+                        router.push({
+                          pathname: '/(main)/computer-session/[bridgeId]/[id]',
+                          params: {
+                            bridgeId: item.session.bridgeId,
+                            id: item.session.id,
+                          },
+                        })
+                    : undefined
+                }
+              />
             ) : (
               <SessionRow
                 session={item.session}

@@ -1,5 +1,6 @@
 const mockGetComputerBridgeHealth = jest.fn();
 const mockListComputerSessions = jest.fn();
+const mockLoadComputerSession = jest.fn();
 
 jest.mock('../../src/auth/computerBridge', () => {
   class MockComputerBridgeError extends Error {
@@ -20,6 +21,7 @@ jest.mock('../../src/auth/computerBridge', () => {
             bridgeId,
             getHealth: () => mockGetComputerBridgeHealth(bridgeId),
             listSessions: (input: unknown) => mockListComputerSessions(bridgeId, input),
+            loadSession: (sessionId: string) => mockLoadComputerSession(bridgeId, sessionId),
           },
         ]),
       ),
@@ -99,11 +101,34 @@ describe('Computer session board query', () => {
       bridgeId: FIRST.bridgeId,
       computerName: FIRST.computerName,
       origin: 'computer',
+      canLoad: false,
     });
     expect(result.computers).toEqual([
       { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'ready' },
       { bridgeId: SECOND.bridgeId, computerName: SECOND.computerName, state: 'ready' },
     ]);
+  });
+
+  it('marks rows loadable only when both the Mac and device grant allow history', async () => {
+    mockGetComputerBridgeHealth.mockResolvedValue({
+      protocolVersion: 1,
+      status: 'ready',
+      capabilities: { sessionList: true, sessionLoad: true, sessionPrompt: false },
+    });
+    mockListComputerSessions.mockResolvedValue({
+      sessions: [session('A', '2027-01-15T10:00:00.000Z')],
+    });
+    const granted: PairedComputerSummary = {
+      ...FIRST,
+      permissions: [...FIRST.permissions, 'session:content:read'],
+    };
+
+    await expect(loadComputerSessionBoard([granted])).resolves.toMatchObject({
+      sessions: [{ canLoad: true }],
+    });
+    await expect(loadComputerSessionBoard([FIRST])).resolves.toMatchObject({
+      sessions: [{ canLoad: false }],
+    });
   });
 
   it('reports pairing-only bridges without requesting a session list', async () => {

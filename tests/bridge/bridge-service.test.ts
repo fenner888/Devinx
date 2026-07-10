@@ -1,6 +1,6 @@
 import { generateKeyPairSync, randomBytes, randomUUID, sign } from 'node:crypto';
 
-import type { AcpSessionPage } from '../../bridge/src/acp';
+import type { AcpLoadedSession, AcpSessionPage } from '../../bridge/src/acp';
 import { FixedWindowRateLimiter } from '../../bridge/src/rate-limit';
 import { InMemoryReplayGuard } from '../../bridge/src/replay';
 import { BridgeService, type SessionDiscoveryAdapter } from '../../bridge/src/service';
@@ -20,7 +20,9 @@ const DEVICE_ID = 'device_1234567890';
 
 class FakeSessionAdapter implements SessionDiscoveryAdapter {
   supported = true;
+  loadSupported = true;
   calls = 0;
+  loadCalls = 0;
   page: AcpSessionPage = {
     sessions: [
       {
@@ -35,6 +37,17 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   };
   pending: Promise<AcpSessionPage> | null = null;
   failure: Error | null = null;
+  loaded: AcpLoadedSession = {
+    sessionId: 'raw-private-session-id',
+    cwd: '/Users/frank/Secret Project',
+    messages: [
+      { source: 'user', text: 'Please review this.' },
+      { source: 'devin', text: 'The review is complete.' },
+    ],
+    truncated: false,
+  };
+  loadPending: Promise<AcpLoadedSession> | null = null;
+  loadFailure: Error | null = null;
 
   isSessionListSupported(): boolean {
     return this.supported;
@@ -45,6 +58,17 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     if (this.failure) throw this.failure;
     if (this.pending) return this.pending;
     return this.page;
+  }
+
+  isSessionLoadSupported(): boolean {
+    return this.loadSupported;
+  }
+
+  async loadSession(): Promise<AcpLoadedSession> {
+    this.loadCalls += 1;
+    if (this.loadFailure) throw this.loadFailure;
+    if (this.loadPending) return this.loadPending;
+    return this.loaded;
   }
 }
 
@@ -119,7 +143,7 @@ describe('authenticated Desktop Bridge service', () => {
       body: {
         protocolVersion: 1,
         status: 'ready',
-        capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+        capabilities: { sessionList: true, sessionLoad: true, sessionPrompt: false },
       },
     });
   });
@@ -176,6 +200,123 @@ describe('authenticated Desktop Bridge service', () => {
 
     expect(result).toEqual({ status: 404, body: { error: 'not_found' } });
     expect(adapter.calls).toBe(0);
+  });
+
+  it('loads only a previously listed opaque handle and minimizes replay content', async () => {
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id;
+
+    const result = await bridge.handle(
+      envelope('session.load', { sessionId: handle }, [
+        'bridge:health',
+        'session:metadata:read',
+        'session:content:read',
+      ]),
+      context(),
+    );
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        session: { id: handle, origin: 'computer', workspaceName: 'Secret Project' },
+        messages: [
+          { sequence: 1, source: 'user', text: 'Please review this.' },
+          { sequence: 2, source: 'devin', text: 'The review is complete.' },
+        ],
+        truncated: false,
+      },
+    });
+    expect(adapter.loadCalls).toBe(1);
+    expect(JSON.stringify(result)).not.toContain('raw-private-session-id');
+    expect(JSON.stringify(result)).not.toContain('/Users/frank');
+  });
+
+  it('conceals missing permission, unknown handles, and denied session scopes with 404', async () => {
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+
+    await expect(
+      bridge.handle(envelope('session.load', { sessionId: handle }), context()),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
+    await expect(
+      bridge.handle(
+        envelope('session.load', { sessionId: `local_${'U'.repeat(43)}` }, [
+          'session:content:read',
+        ]),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
+    device.allowedSessionIds = [`local_${'D'.repeat(43)}`];
+    await expect(
+      bridge.handle(
+        envelope('session.load', { sessionId: handle }, ['session:content:read']),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
+    expect(adapter.loadCalls).toBe(0);
+  });
+
+  it('allows only one ACP session-load operation at a time', async () => {
+    let resolveLoad: ((loaded: AcpLoadedSession) => void) | undefined;
+    adapter.loadPending = new Promise((resolve) => {
+      resolveLoad = resolve;
+    });
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+    const permissions: BridgePermission[] = ['session:content:read'];
+    const first = bridge.handle(
+      envelope('session.load', { sessionId: handle }, permissions),
+      context('peer-one'),
+    );
+    await Promise.resolve();
+
+    await expect(
+      bridge.handle(
+        envelope('session.load', { sessionId: handle }, permissions),
+        context('peer-two'),
+      ),
+    ).resolves.toEqual({ status: 429, body: { error: 'busy' } });
+    resolveLoad?.(adapter.loaded);
+    await expect(first).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('bounds escaped replay content below the local response limit and reports truncation', async () => {
+    adapter.loaded.messages = [{ source: 'devin', text: '\\'.repeat(100_000) }];
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+
+    const result = await bridge.handle(
+      envelope('session.load', { sessionId: handle }, ['session:content:read']),
+      context(),
+    );
+
+    expect(result).toMatchObject({ status: 200, body: { truncated: true } });
+    expect(Buffer.byteLength(JSON.stringify(result.body), 'utf8')).toBeLessThanOrEqual(192 * 1024);
+  });
+
+  it('returns a generic availability error for invalid or failed session loads', async () => {
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+    adapter.loaded = { ...adapter.loaded, sessionId: 'wrong-raw-session-id' };
+
+    const mismatch = await bridge.handle(
+      envelope('session.load', { sessionId: handle }, ['session:content:read']),
+      context(),
+    );
+    expect(mismatch).toEqual({ status: 503, body: { error: 'temporarily_unavailable' } });
+    adapter.loaded = { ...adapter.loaded, sessionId: 'raw-private-session-id' };
+    adapter.loadFailure = new Error('/private/path and raw ACP details');
+    const failed = await bridge.handle(
+      envelope('session.load', { sessionId: handle }, ['session:content:read']),
+      context(),
+    );
+    expect(failed).toEqual({ status: 503, body: { error: 'temporarily_unavailable' } });
+    expect(JSON.stringify(failed)).not.toContain('/private/path');
   });
 
   it('rate-limits malformed requests by transport peer before authentication', async () => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 
@@ -8,6 +8,7 @@ jest.mock('../../src/theme/index', () => ({
     tokens: {
       brandText: { hex: '#0088ff' },
       textMid: { hex: '#777777' },
+      textLow: { hex: '#555555' },
     },
   }),
 }));
@@ -25,6 +26,7 @@ const SESSION = {
   updatedAt: '2027-01-15T12:00:00.000Z',
   bridgeId: 'bridge_1234567890',
   computerName: 'Studio Mac',
+  canLoad: false,
 };
 
 describe('Computer session presentation', () => {
@@ -52,6 +54,16 @@ describe('Computer session presentation', () => {
     expect(screen.getByText('Review the release branch')).toBeTruthy();
     expect(screen.getByText('DevinX')).toBeTruthy();
     expect(screen.queryByText('Session title hidden')).toBeNull();
+  });
+
+  it('becomes a button only when an authorized history action is supplied', () => {
+    const onPress = jest.fn();
+    const screen = render(
+      <ComputerSessionRow session={{ ...SESSION, canLoad: true }} onPress={onPress} />,
+    );
+
+    fireEvent.press(screen.getByRole('button'));
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   it('keeps ready computers quiet and explains safe degraded states', () => {

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -37,6 +38,7 @@ process.stdin.on('data', (chunk) => {
       { encoding: 'utf8' },
     );
     chmodSync(executable, 0o700);
+    execFileSync(process.execPath, ['--check', executable]);
     return executable;
   }
 
@@ -118,6 +120,170 @@ if (request.method === 'initialize') {
     } finally {
       await client.stop();
     }
+  });
+
+  it('capability-gates load, uses listed cwd with no MCP roots, and minimizes replayed history', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0',
+    id: request.id,
+    result: {
+      protocolVersion: 1,
+      agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+    }
+  }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: request.id,
+    result: { sessions: [{ sessionId: 'session-load', cwd: '/Users/example/project' }] }
+  }) + '\\n');
+} else if (request.method === 'session/load') {
+  if (request.params.cwd !== '/Users/example/project' ||
+      request.params.sessionId !== 'session-load' ||
+      JSON.stringify(request.params.mcpServers) !== '[]' ||
+      'additionalDirectories' in request.params) process.exit(12);
+  const updates = [
+    { sessionUpdate: 'user_message_chunk', messageId: 'raw-user-id', content: { type: 'text', text: 'Hello ' } },
+    { sessionUpdate: 'user_message_chunk', messageId: 'raw-user-id', content: { type: 'text', text: 'Devin' } },
+    { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'private-reasoning' } },
+    { sessionUpdate: 'tool_call', toolCallId: 'tool-secret', title: 'Private tool', rawInput: { token: 'private-token' } },
+    { sessionUpdate: 'agent_message_chunk', messageId: 'raw-agent-id', content: { type: 'image', data: 'private-image' } },
+    { sessionUpdate: 'agent_message_chunk', messageId: 'raw-agent-id', content: { type: 'text', text: 'Ready.' }, privateExtension: 'drop-me' },
+  ];
+  for (const update of updates) {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0', method: 'session/update',
+      params: { sessionId: 'session-load', update, _meta: { private: 'drop-meta' } }
+    }) + '\\n');
+  }
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    try {
+      await client.start();
+      expect(client.isSessionLoadSupported()).toBe(true);
+      await expect(client.loadSession('session-load')).rejects.toThrow('listed before loading');
+      await client.listSessions();
+      const loaded = await client.loadSession('session-load');
+      expect(loaded).toEqual({
+        sessionId: 'session-load',
+        cwd: '/Users/example/project',
+        messages: [
+          { source: 'user', text: 'Hello Devin' },
+          { source: 'devin', text: 'Ready.' },
+        ],
+        truncated: false,
+      });
+      expect(JSON.stringify(loaded)).not.toMatch(
+        /raw-user-id|raw-agent-id|private-reasoning|private-token|private-image|drop-me|drop-meta/,
+      );
+    } finally {
+      await client.stop();
+    }
+  });
+
+  it('does not invoke session/load when the capability is absent', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: request.id,
+    result: { protocolVersion: 1, agentCapabilities: { sessionCapabilities: { list: {} } } }
+  }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: request.id,
+    result: { sessions: [{ sessionId: 'session-no-load', cwd: '/tmp' }] }
+  }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.exit(13);
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    try {
+      await client.start();
+      await client.listSessions();
+      expect(client.isSessionLoadSupported()).toBe(false);
+      await expect(client.loadSession('session-no-load')).rejects.toThrow(
+        'does not support session loading',
+      );
+    } finally {
+      await client.stop();
+    }
+  });
+
+  it('bounds replayed text history to the newest 200 messages', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: request.id,
+    result: { protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } } }
+  }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: request.id,
+    result: { sessions: [{ sessionId: 'session-many', cwd: '/tmp/project' }] }
+  }) + '\\n');
+} else if (request.method === 'session/load') {
+  for (let index = 0; index < 201; index += 1) {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0', method: 'session/update',
+      params: {
+        sessionId: 'session-many',
+        update: {
+          sessionUpdate: index % 2 === 0 ? 'user_message_chunk' : 'agent_message_chunk',
+          messageId: 'message-' + index,
+          content: { type: 'text', text: 'message-' + index }
+        }
+      }
+    }) + '\\n');
+  }
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {} }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 2_000 });
+
+    try {
+      await client.start();
+      await client.listSessions();
+      const loaded = await client.loadSession('session-many');
+      expect(loaded.messages).toHaveLength(200);
+      expect(loaded.messages[0]?.text).toBe('message-1');
+      expect(loaded.messages.at(-1)?.text).toBe('message-200');
+      expect(loaded.truncated).toBe(true);
+    } finally {
+      await client.stop();
+    }
+  });
+
+  it('fails closed when replay is associated with a different session', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: request.id,
+    result: { protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } } }
+  }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: request.id,
+    result: { sessions: [{ sessionId: 'session-right', cwd: '/tmp/project' }] }
+  }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', method: 'session/update',
+    params: {
+      sessionId: 'session-wrong',
+      update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'wrong' } }
+    }
+  }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    await client.start();
+    await client.listSessions();
+    await expect(client.loadSession('session-right')).rejects.toThrow('replay failed validation');
+    expect(client.isSessionLoadSupported()).toBe(false);
+    await client.stop();
   });
 
   it('decodes UTF-8 JSON safely when a character spans stdout chunks', async () => {

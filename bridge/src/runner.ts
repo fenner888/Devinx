@@ -74,6 +74,8 @@ export interface StartedDesktopBridge {
 const unavailableSessions: SessionDiscoveryAdapter = {
   isSessionListSupported: () => false,
   listSessions: () => Promise.reject(new Error('Session discovery is not enabled')),
+  isSessionLoadSupported: () => false,
+  loadSession: () => Promise.reject(new Error('Session loading is not enabled')),
 };
 
 export function createProductionRunnerDependencies(

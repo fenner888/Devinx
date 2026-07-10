@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import type { ComputerDiscoveryStatus, ComputerSessionListItem } from '@api/bridge/queries';
 import { relativeTime } from '@lib/session-utils';
@@ -15,9 +15,11 @@ function sessionTime(updatedAt: string | undefined): string | null {
 export function ComputerSessionRow({
   session,
   compact = false,
+  onPress,
 }: {
   session: ComputerSessionListItem;
   compact?: boolean;
+  onPress?: () => void;
 }) {
   const { tokens } = useTheme();
   const time = sessionTime(session.updatedAt);
@@ -29,12 +31,9 @@ export function ComputerSessionRow({
       ? 'Session title hidden'
       : 'Local session';
 
-  return (
-    <View
-      className={`flex-row items-center bg-surface1 rounded-card border border-border-subtle px-4 ${compact ? 'py-3' : 'py-3.5'} mb-2`}
-      accessible
-      accessibilityLabel={`${primaryText}, on ${session.computerName}, ${detailText}${time ? `, ${time}` : ''}`}
-    >
+  const accessibilityLabel = `${primaryText}, on ${session.computerName}, ${detailText}${time ? `, ${time}` : ''}${onPress ? ', open read-only history' : ''}`;
+  const content = (
+    <>
       <View className="w-8 h-8 rounded-card bg-tint-blue items-center justify-center mr-3">
         <Ionicons name="desktop-outline" size={15} color={tokens.brandText.hex} />
       </View>
@@ -53,6 +52,26 @@ export function ComputerSessionRow({
           {time && <Text className="text-text-low text-text12 ml-2">{time}</Text>}
         </View>
       </View>
+      {onPress && <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />}
+    </>
+  );
+
+  const className = `flex-row items-center bg-surface1 rounded-card border border-border-subtle px-4 ${compact ? 'py-3' : 'py-3.5'} mb-2`;
+  if (onPress) {
+    return (
+      <Pressable
+        className={className}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+  return (
+    <View className={className} accessible accessibilityLabel={accessibilityLabel}>
+      {content}
     </View>
   );
 }

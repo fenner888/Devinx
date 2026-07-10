@@ -22,9 +22,11 @@ const bridgeIdListSchema = z
       context.addIssue({ code: z.ZodIssueCode.custom, message: 'Bridge IDs must be unique' });
     }
   });
-const bridgeMethodSchema = z.enum(['bridge.health', 'session.list']);
+const localSessionIdSchema = z.string().regex(/^local_[A-Za-z0-9_-]{43}$/);
+const bridgeMethodSchema = z.enum(['bridge.health', 'session.list', 'session.load']);
 const bridgeHealthBodySchema = z.object({}).strict();
 const sessionListBodySchema = z.object({ cursor: cursorSchema.optional() }).strict();
+const sessionLoadBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
 
 const unsignedRequestSchema = z
   .object({
@@ -68,7 +70,7 @@ export const computerBridgeHealthSchema = z
 
 export const computerSessionSummarySchema = z
   .object({
-    id: z.string().regex(/^local_[A-Za-z0-9_-]{43}$/),
+    id: localSessionIdSchema,
     origin: z.literal('computer'),
     workspaceName: z.string().min(1).max(160),
     hasTitle: z.boolean(),
@@ -84,6 +86,41 @@ export const computerSessionSummarySchema = z
         message: 'A title cannot be returned when hasTitle is false',
       });
     }
+  });
+
+export const computerLoadedSessionSchema = z
+  .object({
+    session: z
+      .object({
+        id: localSessionIdSchema,
+        origin: z.literal('computer'),
+        workspaceName: z.string().min(1).max(160),
+      })
+      .strict(),
+    messages: z
+      .array(
+        z
+          .object({
+            sequence: z.number().int().positive(),
+            source: z.enum(['user', 'devin']),
+            text: z.string().max(100_000),
+          })
+          .strict(),
+      )
+      .max(200),
+    truncated: z.boolean(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    value.messages.forEach((message, index) => {
+      if (message.sequence !== index + 1) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['messages', index, 'sequence'],
+          message: 'Message sequence must be contiguous',
+        });
+      }
+    });
   });
 
 export const computerSessionPageSchema = z
@@ -102,6 +139,7 @@ export const computerSessionPageSchema = z
 export type ComputerBridgeHealth = z.infer<typeof computerBridgeHealthSchema>;
 export type ComputerSessionSummary = z.infer<typeof computerSessionSummarySchema>;
 export type ComputerSessionPage = z.infer<typeof computerSessionPageSchema>;
+export type ComputerLoadedSession = z.infer<typeof computerLoadedSessionSchema>;
 
 export type ComputerBridgeErrorCode =
   | 'not_paired'
@@ -126,12 +164,13 @@ type SupportedMethod = z.infer<typeof bridgeMethodSchema>;
 const permissionByMethod = {
   'bridge.health': 'bridge:health',
   'session.list': 'session:metadata:read',
+  'session.load': 'session:content:read',
 } as const satisfies Record<SupportedMethod, PairedComputerCredential['permissions'][number]>;
 
 function bodyForMethod(method: SupportedMethod, input: unknown): object {
-  return method === 'bridge.health'
-    ? bridgeHealthBodySchema.parse(input)
-    : sessionListBodySchema.parse(input);
+  if (method === 'bridge.health') return bridgeHealthBodySchema.parse(input);
+  if (method === 'session.list') return sessionListBodySchema.parse(input);
+  return sessionLoadBodySchema.parse(input);
 }
 
 function publicResponseError(status: number): ComputerBridgeError {
@@ -244,10 +283,27 @@ async function requestSessionList(
   return result.data;
 }
 
+async function requestSessionLoad(
+  credential: PairedComputerCredential,
+  input: { sessionId: string },
+): Promise<ComputerLoadedSession> {
+  const body = sessionLoadBodySchema.parse(input);
+  const response = await requestComputer(credential, 'session.load', body);
+  const result = computerLoadedSessionSchema.safeParse(response.body);
+  if (!result.success || result.data.session.id !== body.sessionId) {
+    throw new ComputerBridgeError(
+      'The paired Mac returned an invalid session history.',
+      'invalid_response',
+    );
+  }
+  return result.data;
+}
+
 export interface ComputerBridgeConnection {
   bridgeId: string;
   getHealth(): Promise<ComputerBridgeHealth>;
   listSessions(input?: { cursor?: string }): Promise<ComputerSessionPage>;
+  loadSession(sessionId: string): Promise<ComputerLoadedSession>;
 }
 
 function connectionForCredential(credential: PairedComputerCredential): ComputerBridgeConnection {
@@ -255,6 +311,7 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
     bridgeId: credential.bridgeId,
     getHealth: () => requestHealth(credential),
     listSessions: (input = {}) => requestSessionList(credential, input),
+    loadSession: (sessionId) => requestSessionLoad(credential, { sessionId }),
   };
 }
 
@@ -289,4 +346,11 @@ export async function listComputerSessions(
   input: { cursor?: string } = {},
 ): Promise<ComputerSessionPage> {
   return (await openComputerBridge(bridgeId)).listSessions(input);
+}
+
+export async function loadComputerSession(
+  bridgeId: string,
+  sessionId: string,
+): Promise<ComputerLoadedSession> {
+  return (await openComputerBridge(bridgeId)).loadSession(sessionId);
 }

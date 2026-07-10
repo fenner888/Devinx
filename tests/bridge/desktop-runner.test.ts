@@ -181,6 +181,10 @@ describe('Desktop Bridge development runner', () => {
       stop: acpStop,
       isSessionListSupported: () => true,
       listSessions: async () => ({ sessions: [] }),
+      isSessionLoadSupported: () => false,
+      loadSession: async () => {
+        throw new Error('Session loading is disabled');
+      },
     };
     const createAcpClient = jest.fn<AcpSessionLifecycle, [string]>(() => acp);
     const createListener = jest.fn<BridgeListenerLifecycle, [HttpsBridgeListenerOptions]>(

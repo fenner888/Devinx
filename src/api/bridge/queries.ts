@@ -4,7 +4,9 @@ import { AppState } from 'react-native';
 import { useConnections } from '@auth/ConnectionContext';
 import {
   ComputerBridgeError,
+  loadComputerSession,
   openComputerBridges,
+  type ComputerLoadedSession,
   type ComputerBridgeConnection,
   type ComputerSessionSummary,
 } from '@auth/computerBridge';
@@ -17,6 +19,7 @@ const MAXIMUM_SESSIONS_PER_COMPUTER = 5_000;
 export interface ComputerSessionListItem extends ComputerSessionSummary {
   bridgeId: string;
   computerName: string;
+  canLoad: boolean;
 }
 
 export type ComputerDiscoveryState =
@@ -81,6 +84,9 @@ async function discoverComputer(
           ...session,
           bridgeId: computer.bridgeId,
           computerName: computer.computerName,
+          canLoad:
+            health.capabilities.sessionLoad &&
+            computer.permissions.includes('session:content:read'),
         });
       }
       if (!page.nextCursor) break;
@@ -178,6 +184,23 @@ export function useComputerSessions() {
     staleTime: 15_000,
     gcTime: 5 * 60_000,
     refetchInterval: () => (AppState.currentState === 'active' ? 30_000 : false),
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: false,
+  });
+}
+
+export function useComputerSessionDetail(
+  bridgeId: string,
+  sessionId: string,
+  enabled = true,
+) {
+  return useQuery<ComputerLoadedSession, Error>({
+    queryKey: ['computerSession', bridgeId, sessionId],
+    queryFn: () => loadComputerSession(bridgeId, sessionId),
+    enabled,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: false,

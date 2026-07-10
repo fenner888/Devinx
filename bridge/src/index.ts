@@ -2,6 +2,8 @@ export { canonicalJson } from './canonical';
 export {
   AcpSessionClient,
   type AcpClientOptions,
+  type AcpHistoryMessage,
+  type AcpLoadedSession,
   type AcpSessionMetadata,
   type AcpSessionPage,
 } from './acp';

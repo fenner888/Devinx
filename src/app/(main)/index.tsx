@@ -483,6 +483,18 @@ export default function HomeScreen() {
                       key={`computer:${item.session.bridgeId}:${item.session.id}`}
                       session={item.session}
                       compact
+                      onPress={
+                        item.session.canLoad
+                          ? () =>
+                              router.push({
+                                pathname: '/(main)/computer-session/[bridgeId]/[id]',
+                                params: {
+                                  bridgeId: item.session.bridgeId,
+                                  id: item.session.id,
+                                },
+                              })
+                          : undefined
+                      }
                     />
                   ) : (
                     <Pressable

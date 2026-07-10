@@ -25,6 +25,7 @@ import {
   ComputerBridgeError,
   getComputerBridgeHealth,
   listComputerSessions,
+  loadComputerSession,
   openComputerBridge,
   openComputerBridges,
 } from '../../src/auth/computerBridge';
@@ -137,6 +138,10 @@ describe('authenticated mobile Computer Bridge client', () => {
       sessions: {
         isSessionListSupported: () => true,
         listSessions: async () => ({ sessions: [] }),
+        isSessionLoadSupported: () => false,
+        loadSession: async () => {
+          throw new Error('Session loading is disabled');
+        },
       },
     });
     mockPostPinnedBridgeJson.mockImplementation(
@@ -184,6 +189,72 @@ describe('authenticated mobile Computer Bridge client', () => {
     });
     const envelope = mockPostPinnedBridgeJson.mock.calls[0]?.[3] as Record<string, unknown>;
     expect(envelope).toMatchObject({ method: 'session.list', body: { cursor: 'current-page' } });
+  });
+
+  it('signs a content-gated load request and validates minimized history', async () => {
+    const sessionId = `local_${'L'.repeat(43)}`;
+    mockLoadPairedComputers.mockResolvedValue([
+      { ...COMPUTER, permissions: [...COMPUTER.permissions, 'session:content:read'] },
+    ]);
+    mockPostPinnedBridgeJson.mockResolvedValue({
+      status: 200,
+      body: {
+        session: { id: sessionId, origin: 'computer', workspaceName: 'DevinX' },
+        messages: [
+          { sequence: 1, source: 'user', text: 'Review this.' },
+          { sequence: 2, source: 'devin', text: 'Review complete.' },
+        ],
+        truncated: false,
+      },
+    });
+
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).resolves.toMatchObject({
+      session: { id: sessionId, workspaceName: 'DevinX' },
+      messages: [{ source: 'user' }, { source: 'devin' }],
+    });
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[3]).toMatchObject({
+      method: 'session.load',
+      body: { sessionId },
+    });
+  });
+
+  it('fails local history closed for absent grants, handle mismatch, or invalid sequence', async () => {
+    const sessionId = `local_${'L'.repeat(43)}`;
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).rejects.toMatchObject({
+      code: 'permission_denied',
+    });
+    expect(mockSign).not.toHaveBeenCalled();
+
+    mockLoadPairedComputers.mockResolvedValue([
+      { ...COMPUTER, permissions: [...COMPUTER.permissions, 'session:content:read'] },
+    ]);
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        session: {
+          id: `local_${'M'.repeat(43)}`,
+          origin: 'computer',
+          workspaceName: 'DevinX',
+        },
+        messages: [],
+        truncated: false,
+      },
+    });
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        session: { id: sessionId, origin: 'computer', workspaceName: 'DevinX' },
+        messages: [{ sequence: 2, source: 'devin', text: 'Out of sequence' }],
+        truncated: false,
+      },
+    });
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
   });
 
   it('validates the Keychain credential once for a multi-request discovery cycle', async () => {

@@ -4,11 +4,16 @@ import { StringDecoder } from 'node:string_decoder';
 
 import { z, type ZodType } from 'zod';
 
-import { BRIDGE_PROTOCOL_VERSION, sessionListBodySchema } from './schemas';
+import { BRIDGE_PROTOCOL_VERSION, sessionIdSchema, sessionListBodySchema } from './schemas';
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 5_000;
 const MAX_JSON_RPC_BYTES = 1024 * 1024;
 const MAX_UNMATCHED_MESSAGES = 100;
+const MAX_CACHED_SESSIONS = 10_000;
+const MAX_REPLAY_NOTIFICATIONS = 10_000;
+const MAX_REPLAY_MESSAGES = 200;
+const MAX_REPLAY_TEXT_BYTES = 160 * 1024;
+const MAX_MESSAGE_TEXT_BYTES = 100 * 1024;
 const SAFE_ENVIRONMENT_KEYS = [
   'HOME',
   'LANG',
@@ -87,6 +92,43 @@ const listSessionsResultSchema = z
     }
   });
 
+const loadSessionResultSchema = z.union([
+  z.null(),
+  z
+    .object({
+      modes: z.unknown().nullable().optional(),
+      configOptions: z.array(z.unknown()).max(1_000).nullable().optional(),
+      _meta: z.record(z.unknown()).nullable().optional(),
+    })
+    .passthrough(),
+]);
+
+const sessionUpdateNotificationSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    update: z
+      .object({
+        sessionUpdate: z.string().min(1).max(128),
+      })
+      .passthrough(),
+    _meta: z.record(z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
+const textReplayUpdateSchema = z
+  .object({
+    sessionUpdate: z.enum(['user_message_chunk', 'agent_message_chunk']),
+    messageId: z.string().min(1).max(512).nullable().optional(),
+    content: z
+      .object({
+        type: z.literal('text'),
+        text: z.string().max(MAX_JSON_RPC_BYTES),
+      })
+      .passthrough(),
+    _meta: z.record(z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
 export interface AcpClientOptions {
   executablePath: string;
   requestTimeoutMs?: number;
@@ -103,6 +145,36 @@ export interface AcpSessionMetadata {
 export interface AcpSessionPage {
   sessions: AcpSessionMetadata[];
   nextCursor?: string;
+}
+
+export interface AcpHistoryMessage {
+  source: 'user' | 'devin';
+  text: string;
+}
+
+export interface AcpLoadedSession {
+  sessionId: string;
+  cwd: string;
+  messages: AcpHistoryMessage[];
+  truncated: boolean;
+}
+
+interface CachedSessionMetadata {
+  cwd: string;
+}
+
+interface CollectedReplayMessage extends AcpHistoryMessage {
+  messageId?: string;
+}
+
+interface ReplayCollector {
+  sessionId: string;
+  notifications: number;
+  messages: CollectedReplayMessage[];
+  textBytes: number;
+  truncated: boolean;
+  accepting: boolean;
+  failed: boolean;
 }
 
 interface PendingRequest {
@@ -134,6 +206,26 @@ function supportsSessionList(agentCapabilities: Record<string, unknown>): boolea
   return Boolean(list) && typeof list === 'object' && !Array.isArray(list);
 }
 
+function supportsSessionLoad(agentCapabilities: Record<string, unknown>): boolean {
+  return agentCapabilities.loadSession === true;
+}
+
+function utf8Tail(value: string, maximumBytes: number): { text: string; truncated: boolean } {
+  const bytes = Buffer.from(value, 'utf8');
+  try {
+    if (bytes.length <= maximumBytes) return { text: value, truncated: false };
+    let text = bytes.subarray(bytes.length - maximumBytes).toString('utf8');
+    while (text.startsWith('\uFFFD')) text = text.slice(1);
+    return { text, truncated: true };
+  } finally {
+    bytes.fill(0);
+  }
+}
+
+function messageBytes(message: AcpHistoryMessage): number {
+  return Buffer.byteLength(message.text, 'utf8');
+}
+
 export class AcpSessionClient {
   private readonly options: z.infer<typeof acpClientOptionsSchema>;
   private child: ChildProcessWithoutNullStreams | null = null;
@@ -143,6 +235,9 @@ export class AcpSessionClient {
   private unmatchedMessages = 0;
   private readonly pending = new Map<string | number, PendingRequest>();
   private canListSessions = false;
+  private canLoadSessions = false;
+  private readonly listedSessions = new Map<string, CachedSessionMetadata>();
+  private activeLoad: ReplayCollector | null = null;
 
   constructor(options: AcpClientOptions) {
     this.options = acpClientOptionsSchema.parse(options);
@@ -158,6 +253,8 @@ export class AcpSessionClient {
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;
+    this.listedSessions.clear();
+    this.activeLoad = null;
     const child = spawn(this.options.executablePath, ['acp'], {
       cwd: workingDirectory,
       env: environment,
@@ -183,6 +280,7 @@ export class AcpSessionClient {
         'initialization',
       );
       this.canListSessions = supportsSessionList(initialization.agentCapabilities);
+      this.canLoadSessions = supportsSessionLoad(initialization.agentCapabilities);
     } catch (error) {
       await this.stop();
       throw error;
@@ -199,6 +297,15 @@ export class AcpSessionClient {
       listSessionsResultSchema,
       'session list',
     );
+    const newSessionIds = result.sessions.filter(
+      (session) => !this.listedSessions.has(session.sessionId),
+    );
+    if (this.listedSessions.size + newSessionIds.length > MAX_CACHED_SESSIONS) {
+      throw new Error('ACP listed session cache capacity reached');
+    }
+    for (const session of result.sessions) {
+      this.listedSessions.set(session.sessionId, { cwd: session.cwd });
+    }
     return {
       sessions: result.sessions.map((session) => ({
         sessionId: session.sessionId,
@@ -217,10 +324,55 @@ export class AcpSessionClient {
     return Boolean(this.child) && this.canListSessions;
   }
 
+  isSessionLoadSupported(): boolean {
+    return Boolean(this.child) && this.canLoadSessions;
+  }
+
+  async loadSession(input: unknown): Promise<AcpLoadedSession> {
+    if (!this.child) throw new Error('ACP client is not started');
+    if (!this.canLoadSessions) throw new Error('ACP agent does not support session loading');
+    if (this.activeLoad) throw new Error('ACP session loading is busy');
+    const sessionId = sessionIdSchema.parse(input);
+    const metadata = this.listedSessions.get(sessionId);
+    if (!metadata) throw new Error('ACP session must be listed before loading');
+
+    const collector: ReplayCollector = {
+      sessionId,
+      notifications: 0,
+      messages: [],
+      textBytes: 0,
+      truncated: false,
+      accepting: true,
+      failed: false,
+    };
+    this.activeLoad = collector;
+    try {
+      await this.request(
+        'session/load',
+        { sessionId, cwd: metadata.cwd, mcpServers: [] },
+        loadSessionResultSchema,
+        'session load',
+      );
+      collector.accepting = false;
+      if (collector.failed) throw new Error('ACP session replay failed validation');
+      return {
+        sessionId,
+        cwd: metadata.cwd,
+        messages: collector.messages.map(({ source, text }) => ({ source, text })),
+        truncated: collector.truncated,
+      };
+    } finally {
+      if (this.activeLoad === collector) this.activeLoad = null;
+    }
+  }
+
   async stop(): Promise<void> {
     const child = this.child;
     this.child = null;
     this.canListSessions = false;
+    this.canLoadSessions = false;
+    this.listedSessions.clear();
+    this.activeLoad = null;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;
@@ -308,6 +460,14 @@ export class AcpSessionClient {
       return;
     }
     const message = messageResult.data;
+    if (message.method === 'session/update' && message.id === undefined) {
+      this.handleSessionUpdate(child, message.params);
+      return;
+    }
+    if (message.method && message.id !== undefined) {
+      this.abort(child, new Error('ACP agent requests are not supported'));
+      return;
+    }
     if (message.id === undefined || !this.pending.has(message.id)) {
       this.unmatchedMessages += 1;
       if (this.unmatchedMessages > MAX_UNMATCHED_MESSAGES) {
@@ -335,6 +495,80 @@ export class AcpSessionClient {
     pending.resolve(result.data);
   }
 
+  private handleSessionUpdate(child: ChildProcessWithoutNullStreams, input: unknown): void {
+    const collector = this.activeLoad;
+    if (!collector || !collector.accepting) {
+      this.unmatchedMessages += 1;
+      if (this.unmatchedMessages > MAX_UNMATCHED_MESSAGES) {
+        this.abort(child, new Error('ACP returned too many unsolicited messages'));
+      }
+      return;
+    }
+    collector.notifications += 1;
+    if (collector.notifications > MAX_REPLAY_NOTIFICATIONS) {
+      collector.failed = true;
+      this.abort(child, new Error('ACP session replay exceeded the notification limit'));
+      return;
+    }
+    const notificationResult = sessionUpdateNotificationSchema.safeParse(input);
+    if (!notificationResult.success || notificationResult.data.sessionId !== collector.sessionId) {
+      collector.failed = true;
+      this.abort(child, new Error('ACP session replay failed validation'));
+      return;
+    }
+    const updateType = notificationResult.data.update.sessionUpdate;
+    if (updateType !== 'user_message_chunk' && updateType !== 'agent_message_chunk') return;
+    const contentType = (notificationResult.data.update.content as { type?: unknown } | undefined)
+      ?.type;
+    if (contentType !== 'text') return;
+    const updateResult = textReplayUpdateSchema.safeParse(notificationResult.data.update);
+    if (!updateResult.success) {
+      collector.failed = true;
+      this.abort(child, new Error('ACP session replay failed validation'));
+      return;
+    }
+    this.collectReplayText(collector, {
+      source: updateResult.data.sessionUpdate === 'user_message_chunk' ? 'user' : 'devin',
+      text: updateResult.data.content.text,
+      messageId: updateResult.data.messageId ?? undefined,
+    });
+  }
+
+  private collectReplayText(collector: ReplayCollector, input: CollectedReplayMessage): void {
+    if (input.text.length === 0) return;
+    const clipped = utf8Tail(input.text, MAX_MESSAGE_TEXT_BYTES);
+    collector.truncated ||= clipped.truncated;
+    const last = collector.messages.at(-1);
+    const shouldMerge =
+      last?.source === input.source &&
+      ((last.messageId !== undefined && last.messageId === input.messageId) ||
+        (last.messageId === undefined && input.messageId === undefined));
+    if (shouldMerge && last) {
+      collector.textBytes -= messageBytes(last);
+      const merged = utf8Tail(`${last.text}${clipped.text}`, MAX_MESSAGE_TEXT_BYTES);
+      last.text = merged.text;
+      collector.truncated ||= merged.truncated;
+      collector.textBytes += messageBytes(last);
+    } else {
+      const message: CollectedReplayMessage = {
+        source: input.source,
+        text: clipped.text,
+        messageId: input.messageId,
+      };
+      collector.messages.push(message);
+      collector.textBytes += messageBytes(message);
+    }
+    while (
+      collector.messages.length > MAX_REPLAY_MESSAGES ||
+      collector.textBytes > MAX_REPLAY_TEXT_BYTES
+    ) {
+      const removed = collector.messages.shift();
+      if (!removed) break;
+      collector.textBytes -= messageBytes(removed);
+      collector.truncated = true;
+    }
+  }
+
   private rejectPending(error: Error): void {
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
@@ -347,6 +581,10 @@ export class AcpSessionClient {
     if (child !== this.child) return;
     this.child = null;
     this.canListSessions = false;
+    this.canLoadSessions = false;
+    this.listedSessions.clear();
+    if (this.activeLoad) this.activeLoad.failed = true;
+    this.activeLoad = null;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;
@@ -364,6 +602,10 @@ export class AcpSessionClient {
     if (child !== this.child) return;
     this.child = null;
     this.canListSessions = false;
+    this.canLoadSessions = false;
+    this.listedSessions.clear();
+    if (this.activeLoad) this.activeLoad.failed = true;
+    this.activeLoad = null;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;

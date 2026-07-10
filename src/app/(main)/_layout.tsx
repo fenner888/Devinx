@@ -9,6 +9,7 @@ export default function MainGroup() {
       <Stack.Screen name="settings" />
       <Stack.Screen name="computer" />
       <Stack.Screen name="session/[id]" />
+      <Stack.Screen name="computer-session/[bridgeId]/[id]" />
       <Stack.Screen name="compose" options={{ presentation: 'modal' }} />
       <Stack.Screen name="usage" />
       <Stack.Screen name="analytics" />
