@@ -18,6 +18,11 @@ export {
   type MacOSKeychainOptions,
 } from './macos-keychain';
 export {
+  HttpsBridgeListener,
+  type HttpsBridgeListenerAddress,
+  type HttpsBridgeListenerOptions,
+} from './listener';
+export {
   DesktopBridgeStateRepository,
   PersistentDeviceRegistry,
   loadDesktopBridgeRuntime,

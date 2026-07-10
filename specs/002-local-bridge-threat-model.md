@@ -1,6 +1,6 @@
 # Phase 3A — Local Bridge Threat Model
 
-Status: required security gate. No LAN, VPN, tunnel, or remote listener may be implemented until this model is reviewed and the open decisions are resolved.
+Status: reviewed for the private-LAN HTTPS transport core. Public listeners, VPN/tunnel support, and relays remain gated.
 
 ## Security objective
 
@@ -143,13 +143,15 @@ The phone, network, bridge, ACP child, filesystem, and future relay are distinct
 - Fuzz/schema tests for every inbound request and ACP response.
 - Independent security review before remote access or approval actions.
 
-## Open decisions
+## Resolved decisions for the first private-LAN release
 
-1. Production bridge language and packaging model.
-2. Pairing key exchange and certificate/public-key pinning design.
-3. Whether LAN discovery uses Bonjour, manual host entry, or both.
-4. Whether local session titles/paths are shown before the content permission grant.
-5. Mobile cache policy for local sessions.
-6. CLI licensing/terms for third-party invocation and whether bundling is prohibited.
-7. Minimum supported Devin CLI and ACP versions.
-8. Whether the first bridge release supports Tailscale or LAN only.
+1. Strict TypeScript on pinned Node for the protocol/runtime; signed and notarized macOS packaging is still required before distribution.
+2. A separate self-signed TLS identity and the Ed25519 bridge identity are both fingerprint-pinned from the physical QR. No system trust-store installation.
+3. The physical QR supplies the explicit host and port first. Bonjour is deferred.
+4. Titles require `session:content:read`; paths are never returned.
+5. No local session-content cache in the first release.
+6. Use a user-installed Devin CLI and do not bundle it without explicit supported distribution terms.
+7. Negotiate ACP capabilities at every launch and fail closed; record tested CLI builds in compatibility documentation instead of trusting marketing version alone.
+8. Private LAN first. Tailscale compatibility, public tunnels, and relays are separate later gates.
+
+See `011-encrypted-bridge-listener.md` for the concrete transport contract.
