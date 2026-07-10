@@ -25,6 +25,8 @@ jest.mock('../../src/auth/deviceSigning', () => ({
 import { branding } from '../../src/lib/branding';
 import {
   clearPairedComputers,
+  computerTransportKind,
+  computerTransportLabel,
   loadPairedComputers,
   loadPairedComputerSummaries,
   storePairedComputers,
@@ -61,6 +63,16 @@ describe('paired computer credential storage', () => {
     await expect(loadPairedComputers()).resolves.toEqual([COMPUTER]);
   });
 
+  it('labels Tailscale addresses without changing the stored credential', () => {
+    expect(computerTransportKind('https://100.127.166.87:45831/')).toBe('tailscale_vpn');
+    expect(computerTransportKind('https://studio.tail1234.ts.net:45831/')).toBe(
+      'tailscale_vpn',
+    );
+    expect(computerTransportLabel('tailscale_vpn')).toBe('Tailscale/VPN');
+    expect(computerTransportKind(COMPUTER.endpoint)).toBe('local_network');
+    expect(computerTransportLabel('local_network')).toBe('Same Wi-Fi');
+  });
+
   it('exposes only non-secret computer summaries to React state', async () => {
     await storePairedComputers([COMPUTER]);
 
@@ -71,6 +83,7 @@ describe('paired computer credential storage', () => {
         computerName: COMPUTER.computerName,
         pairedAt: COMPUTER.pairedAt,
         permissions: COMPUTER.permissions,
+        transportKind: 'local_network',
       },
     ]);
     expect(JSON.stringify(summaries)).not.toContain(COMPUTER.deviceKeyId);

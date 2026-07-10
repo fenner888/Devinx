@@ -7,7 +7,7 @@ import type { HttpsBridgeListenerAddress, HttpsBridgeListenerOptions } from './l
 import { HttpsBridgeListener } from './listener';
 import type { KeychainSecretStore } from './macos-keychain';
 import { MacOSKeychainSecretStore } from './macos-keychain';
-import { isPrivateLanIPv4 } from './network';
+import { isPrivateLanIPv4, privateTransportKind, type PrivateTransportKind } from './network';
 import {
   PairingManager,
   type PairingApprovalOptions,
@@ -73,6 +73,7 @@ export interface StartedDesktopBridge {
   endpoint: string;
   pairingOfferExpiresAt: number;
   sessionDiscoveryEnabled: boolean;
+  transportKind: PrivateTransportKind;
 }
 
 const unavailableSessions: SessionDiscoveryAdapter = {
@@ -154,7 +155,7 @@ export class DesktopBridgeRunner {
         pairing,
         tlsCertificatePem: tlsIdentity.certificatePem,
         tlsPrivateKeyPem: tlsIdentity.privateKeyPem,
-        host: '0.0.0.0',
+        host: options.advertisedHost,
         port: options.port,
         allowLan: true,
         allowedHosts: [options.advertisedHost],
@@ -174,6 +175,7 @@ export class DesktopBridgeRunner {
         endpoint,
         pairingOfferExpiresAt,
         sessionDiscoveryEnabled: sessions.isSessionListSupported(),
+        transportKind: privateTransportKind(options.advertisedHost),
       };
     } catch (error) {
       await this.stopAfterFailure();

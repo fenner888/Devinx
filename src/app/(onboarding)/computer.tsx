@@ -25,11 +25,22 @@ import { DevinXQrScanner } from '@components/connections/DevinXQrScanner';
 import { useAppPreferences } from '@store/preferences';
 import { useTheme } from '@theme/index';
 
-const STEPS = [
-  'Open DevinX Desktop Bridge on your Mac.',
-  'Choose Pair a phone to show a short-lived code.',
-  'Scan it here, then approve this iPhone and its read access on your Mac.',
-];
+type NetworkPath = 'tailscale' | 'local';
+
+const STEPS: Record<NetworkPath, string[]> = {
+  tailscale: [
+    'Connect this iPhone and your Mac to the same Tailscale network.',
+    'Start Desktop Bridge with the detected 100.x Tailscale address.',
+    'Scan its code, then approve this iPhone and its read access on your Mac.',
+  ],
+  local: [
+    'Connect this iPhone and your Mac to the same private Wi-Fi.',
+    'Start Desktop Bridge with the detected local-network address.',
+    'Scan its code, then approve this iPhone and its read access on your Mac.',
+  ],
+};
+
+const TAILSCALE_IOS_GUIDE = 'https://tailscale.com/docs/install/ios';
 
 const STATUS_COPY: Record<ComputerPairingStatus, string> = {
   validating: 'Checking the pairing code…',
@@ -56,6 +67,7 @@ export default function ComputerConnectionScreen() {
   const [pairingStatus, setPairingStatus] = useState<ComputerPairingStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [networkPath, setNetworkPath] = useState<NetworkPath>('tailscale');
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
@@ -178,11 +190,58 @@ export default function ComputerConnectionScreen() {
           Pair directly with a bridge you control. Your Devin CLI credentials stay on your Mac.
         </Text>
 
+        <Text className="text-text-mid text-text13 mb-2">Private connection</Text>
+        <View className="flex-row bg-tint-secondary rounded-button p-1 mb-3">
+          {(
+            [
+              { key: 'tailscale', label: 'Tailscale' },
+              { key: 'local', label: 'Same Wi-Fi' },
+            ] as const
+          ).map((option) => (
+            <Pressable
+              key={option.key}
+              className={`flex-1 rounded-button py-2.5 ${networkPath === option.key ? 'bg-surface2' : ''}`}
+              onPress={() => setNetworkPath(option.key)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: networkPath === option.key }}
+              accessibilityLabel={`${option.label} computer connection`}
+            >
+              <Text
+                className={`text-center text-text13 ${networkPath === option.key ? 'text-text-hi font-medium' : 'text-text-mid'}`}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {networkPath === 'tailscale' && (
+          <View className="bg-tint-blue rounded-card px-4 py-3 mb-4">
+            <View className="flex-row items-start">
+              <Ionicons name="shield-checkmark-outline" size={16} color={tokens.brandText.hex} />
+              <Text className="text-brand-text text-text12 leading-4 ml-2 flex-1">
+                Recommended for private access away from home. Tailscale supplies the network;
+                DevinX still verifies the Mac and this iPhone for every request.
+              </Text>
+            </View>
+            <Pressable
+              className="mt-2 self-start"
+              onPress={() => Linking.openURL(TAILSCALE_IOS_GUIDE).catch(() => {})}
+              accessibilityRole="link"
+              accessibilityLabel="Open Tailscale setup guide"
+            >
+              <Text className="text-brand-text text-text12 font-medium">
+                Open Tailscale setup guide
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         <View className="bg-surface1 border border-border-subtle rounded-card px-4 py-2 mb-5">
-          {STEPS.map((step, index) => (
+          {STEPS[networkPath].map((step, index) => (
             <View
               key={step}
-              className={`flex-row items-start py-3 ${index < STEPS.length - 1 ? 'border-b border-border-subtle' : ''}`}
+              className={`flex-row items-start py-3 ${index < STEPS[networkPath].length - 1 ? 'border-b border-border-subtle' : ''}`}
             >
               <View className="w-6 h-6 rounded-full bg-tint-blue items-center justify-center mr-3 mt-0.5">
                 <Text className="text-brand-text text-text12 font-medium">{index + 1}</Text>

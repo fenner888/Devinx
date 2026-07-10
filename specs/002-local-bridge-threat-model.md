@@ -1,6 +1,6 @@
 # Phase 3A — Local Bridge Threat Model
 
-Status: reviewed for the private-LAN HTTPS transport core. Public listeners, VPN/tunnel support, and relays remain gated.
+Status: reviewed for exact-interface private-LAN and user-managed Tailscale/VPN transport. Public listeners, public tunnels, and relays remain gated.
 
 ## Security objective
 
@@ -94,7 +94,7 @@ The phone, network, bridge, ACP child, filesystem, and future relay are distinct
 
 | Threat | Example | Required mitigation | Initial disposition |
 |---|---|---|---|
-| Unauthenticated LAN access | Peer lists sessions after bridge binds to `0.0.0.0` | Loopback default, mutual auth, TLS, firewall guidance | Must mitigate before LAN |
+| Unauthenticated network access | Peer lists sessions after reaching the bridge interface | Exact selected-interface binding, per-device signatures, TLS pinning, replay protection, rate limits | Mitigated and tested; external review still required before public release |
 | Replay | Captured prompt request is resent | Nonce/sequence, short expiry, authenticated session binding | Must mitigate before mutation |
 | Device theft | Lost phone still controls CLI | Per-device key, revocation, biometric/app lock evaluation | Must mitigate before pairing release |
 | Credential theft | Bridge endpoint returns CLI auth | Never expose child credentials; redact env/errors | Prohibited design |
@@ -152,6 +152,6 @@ The phone, network, bridge, ACP child, filesystem, and future relay are distinct
 5. No local session-content cache in the first release.
 6. Use a user-installed Devin CLI and do not bundle it without explicit supported distribution terms.
 7. Negotiate ACP capabilities at every launch and fail closed; record tested CLI builds in compatibility documentation instead of trusting marketing version alone.
-8. Private LAN first. Tailscale compatibility, public tunnels, and relays are separate later gates.
+8. Private LAN and user-managed Tailscale are supported transports. Both retain bridge-level pairing and authorization. Public tunnels and relays remain separate later gates.
 
 See `011-encrypted-bridge-listener.md` for the concrete transport contract.

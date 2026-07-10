@@ -28,7 +28,12 @@ const rows = [
   {
     title: 'Local Desktop sessions',
     detail:
-      'DevinX cannot access Devin Local, Cascade, local files, or uncommitted desktop work. It only accesses cloud resources exposed by the Devin API.',
+      'Only after you pair and approve an iPhone, DevinX can request minimized Devin CLI session data directly from your Mac over pinned TLS. Metadata is the default; message text requires a separate read grant. Local files, tool payloads, thoughts, and credentials are not returned.',
+  },
+  {
+    title: 'Tailscale and private networks',
+    detail:
+      'If you choose Tailscale, it supplies private network reachability between your devices. DevinX still authenticates every bridge request, and no DevinX-operated relay receives the session.',
   },
 ] as const;
 
@@ -53,8 +58,8 @@ export default function PrivacyScreen() {
           What data leaves your device?
         </Text>
         <Text className="text-text-mid text-text14 leading-5 mb-5">
-          DevinX has no intermediary backend. Cloud actions are sent directly to Cognition's Devin
-          API.
+          DevinX has no intermediary backend. Cloud actions go directly to Cognition's Devin API;
+          approved local-session requests go directly to your paired Mac.
         </Text>
         <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-5">
           {rows.map((row, index) => (

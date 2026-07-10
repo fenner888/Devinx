@@ -13,8 +13,11 @@ export { SessionHandleRegistry } from './session-handles';
 export {
   discoverPrivateLanAddresses,
   isPrivateLanIPv4,
+  privateTransportKind,
+  privateTransportLabel,
   validateAdvertisedLanHost,
   type NetworkInterfaceMap,
+  type PrivateTransportKind,
 } from './network';
 export {
   MacOSKeychainSecretStore,

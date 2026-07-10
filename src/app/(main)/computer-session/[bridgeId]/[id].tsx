@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useComputerSessionDetail } from '@api/bridge/queries';
 import { ComputerBridgeError, type ComputerLoadedSession } from '@auth/computerBridge';
 import { useConnections } from '@auth/ConnectionContext';
+import { computerTransportLabel } from '@auth/pairedComputers';
 import { DevinCompanion } from '@components/pets';
 import { useTheme } from '@theme/index';
 
@@ -116,6 +117,14 @@ export default function ComputerSessionDetailScreen() {
             </Text>
             <Text className="mx-1.5 text-text-low text-text12">·</Text>
             <Text className="text-text-low text-text12">Read only</Text>
+            {computer && (
+              <>
+                <Text className="mx-1.5 text-text-low text-text12">·</Text>
+                <Text className="text-text-low text-text12">
+                  {computerTransportLabel(computer.transportKind)}
+                </Text>
+              </>
+            )}
           </View>
         </View>
       </View>

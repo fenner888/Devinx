@@ -5,6 +5,8 @@ import type { HttpsBridgeListenerOptions } from '../../bridge/src/listener';
 import type { KeychainSecretStore } from '../../bridge/src/macos-keychain';
 import {
   discoverPrivateLanAddresses,
+  privateTransportKind,
+  privateTransportLabel,
   validateAdvertisedLanHost,
   type NetworkInterfaceMap,
 } from '../../bridge/src/network';
@@ -65,6 +67,10 @@ describe('Desktop Bridge development runner', () => {
       '192.168.1.141',
     ]);
     expect(validateAdvertisedLanHost('192.168.1.141', interfaces())).toBe('192.168.1.141');
+    expect(privateTransportKind('100.127.166.87')).toBe('tailscale_vpn');
+    expect(privateTransportLabel('100.127.166.87')).toBe('Tailscale/VPN');
+    expect(privateTransportKind('192.168.1.141')).toBe('local_network');
+    expect(privateTransportLabel('192.168.1.141')).toBe('Same Wi-Fi');
     expect(() => validateAdvertisedLanHost('8.8.8.8', interfaces())).toThrow('private');
     expect(() => validateAdvertisedLanHost('192.168.1.200', interfaces())).toThrow('not active');
   });
@@ -140,6 +146,7 @@ describe('Desktop Bridge development runner', () => {
     expect(started).toMatchObject({
       endpoint: 'https://192.168.1.141:45831/',
       sessionDiscoveryEnabled: false,
+      transportKind: 'local_network',
     });
     expect(offer).toMatchObject({
       bridgeEndpoint: started.endpoint,
@@ -154,7 +161,7 @@ describe('Desktop Bridge development runner', () => {
     expect(Buffer.byteLength(renderedPayloads[0] ?? '', 'utf8')).toBeLessThan(2_048);
     expect(secretStore.value).not.toContain(String(offer.pairingSecret));
     expect(listenerOptions).toMatchObject({
-      host: '0.0.0.0',
+      host: '192.168.1.141',
       allowLan: true,
       allowedHosts: ['192.168.1.141'],
     });

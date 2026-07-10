@@ -86,11 +86,23 @@ describe('Computer connection onboarding', () => {
 
     expect(screen.getByText('Connect your Mac')).toBeTruthy();
     expect(screen.getByText('Name this Mac')).toBeTruthy();
+    expect(screen.getByText('Open Tailscale setup guide')).toBeTruthy();
+    expect(screen.getByText(/100.x Tailscale address/)).toBeTruthy();
     expect(screen.queryByText('Pairing transport pending')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Scan Desktop Bridge pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
     expect(mockGetPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers same-Wi-Fi instructions without weakening QR pairing', () => {
+    const screen = render(<ComputerConnectionScreen />);
+
+    fireEvent.press(screen.getByLabelText('Same Wi-Fi computer connection'));
+    expect(screen.getByText(/same private Wi-Fi/)).toBeTruthy();
+    expect(screen.getByText(/local-network address/)).toBeTruthy();
+    expect(screen.queryByText('Open Tailscale setup guide')).toBeNull();
+    expect(screen.getByLabelText('Scan Desktop Bridge pairing code')).toBeTruthy();
   });
 
   it('requests first-use permission and sends a scanned payload directly to pairing', async () => {

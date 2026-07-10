@@ -10,6 +10,7 @@ import {
   verify,
 } from './deviceSigning';
 import {
+  computerTransportKind,
   loadPairedComputers,
   pairedComputerCredentialSchema,
   storePairedComputers,
@@ -250,6 +251,7 @@ function summary(credential: PairedComputerCredential): PairedComputerSummary {
     computerName: credential.computerName,
     pairedAt: credential.pairedAt,
     permissions: [...credential.permissions],
+    transportKind: computerTransportKind(credential.endpoint),
   };
 }
 

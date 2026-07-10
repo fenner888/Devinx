@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@auth/AuthContext';
 import { useConnections } from '@auth/ConnectionContext';
+import { computerTransportLabel } from '@auth/pairedComputers';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCodeScanFindings, useSelf } from '@api/devin/queries';
 import { purgeCache } from '@cache/index';
@@ -159,7 +160,7 @@ export default function SettingsScreen() {
               </Text>
               <Text className="text-text-low text-text12 mt-0.5">
                 {hasComputerConnection
-                  ? `${computers.length} paired ${computers.length === 1 ? 'computer' : 'computers'}`
+                  ? `${computers.length} paired ${computers.length === 1 ? `computer · ${computerTransportLabel(computers[0]!.transportKind)}` : 'computers'}`
                   : 'No paired computers'}
               </Text>
             </View>

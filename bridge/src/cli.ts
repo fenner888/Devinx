@@ -4,7 +4,11 @@ import { createInterface } from 'node:readline/promises';
 
 import { z } from 'zod';
 
-import { discoverPrivateLanAddresses, validateAdvertisedLanHost } from './network';
+import {
+  discoverPrivateLanAddresses,
+  privateTransportLabel,
+  validateAdvertisedLanHost,
+} from './network';
 import { createProductionRunnerDependencies, DesktopBridgeRunner } from './runner';
 import { TerminalQrRenderer } from './terminal-qr';
 
@@ -68,14 +72,19 @@ export function safeTerminalText(input: string, maximumLength = 80): string {
 }
 
 function helpText(addresses: string[]): string {
-  const detected = addresses.length > 0 ? addresses.join(', ') : 'none detected';
+  const detected =
+    addresses.length > 0
+      ? addresses.map((address) => `${address} (${privateTransportLabel(address)})`).join(', ')
+      : 'none detected';
   return [
     'DevinX Desktop Bridge',
     '',
     'Usage:',
     '  npm run bridge:start -- --host <private-ip> [--port 45831] [--devin-cli /absolute/path]',
     '',
-    'The --devin-cli option explicitly enables read-only ACP session discovery.',
+    'Use a 100.64.0.0/10 Tailscale address for private access away from home.',
+    'The iPhone must be signed into the same tailnet; bridge pairing is still required.',
+    'The --devin-cli option explicitly enables read-only ACP session discovery and loading.',
     `Private addresses detected on this Mac: ${detected}`,
   ].join('\n');
 }
@@ -127,6 +136,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   try {
     const started = await runner.start();
     process.stdout.write(`DevinX Desktop Bridge is listening securely at ${started.endpoint}\n`);
+    process.stdout.write(
+      started.transportKind === 'tailscale_vpn'
+        ? 'Tailscale/VPN transport selected. Keep Tailscale connected on this Mac and iPhone.\n'
+        : 'Same-Wi-Fi transport selected. The iPhone must remain on this private network.\n',
+    );
     process.stdout.write(
       started.sessionDiscoveryEnabled
         ? 'Read-only Devin ACP session discovery is enabled.\n'

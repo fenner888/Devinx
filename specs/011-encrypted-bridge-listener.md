@@ -11,7 +11,7 @@ Status: implemented transport and bridge-side pairing routes; mobile pinning pen
 - Local mobile session content is not cached in the first release.
 - Devin CLI is discovered as a user-installed executable and is not bundled.
 - ACP capabilities are negotiated at every launch because observed capabilities can differ without a marketing-version change.
-- The first remote surface is private LAN only. Public tunnels and relays remain deferred; Tailscale is a later explicit compatibility phase.
+- The listener core began as private-LAN only. Spec 020 adds user-managed Tailscale compatibility with exact-interface binding; public tunnels and relays remain deferred.
 
 These decisions close the listener prerequisites in `002-local-bridge-threat-model.md` and `005-local-bridge-pairing.md` for the transport core. They do not authorize public binding, certificate installation, background launch, or a relay.
 

@@ -117,6 +117,7 @@ describe('mobile computer pairing orchestration', () => {
       computerName: 'Frank’s MacBook',
       pairedAt: RECEIPT.pairedAt,
       permissions: RECEIPT.permissions,
+      transportKind: 'local_network',
     });
 
     expect(statuses).toEqual([

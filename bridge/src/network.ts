@@ -24,6 +24,24 @@ export function isPrivateLanIPv4(address: string): boolean {
   );
 }
 
+export type PrivateTransportKind = 'local_network' | 'tailscale_vpn';
+
+export function privateTransportKind(address: string): PrivateTransportKind {
+  if (!isPrivateLanIPv4(address)) {
+    throw new Error('Transport classification requires a private IPv4 address');
+  }
+  const [first, second] = address.split('.').map(Number);
+  return first === 100 && second !== undefined && second >= 64 && second <= 127
+    ? 'tailscale_vpn'
+    : 'local_network';
+}
+
+export function privateTransportLabel(address: string): string {
+  return privateTransportKind(address) === 'tailscale_vpn'
+    ? 'Tailscale/VPN'
+    : 'Same Wi-Fi';
+}
+
 function isIPv4Record(
   record: NetworkInterfaceInfo,
 ): record is NetworkInterfaceInfoIPv4 {

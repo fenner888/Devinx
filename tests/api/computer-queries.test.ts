@@ -41,12 +41,14 @@ const FIRST: PairedComputerSummary = {
   computerName: 'Studio Mac',
   pairedAt: 1_800_000_000_000,
   permissions: ['bridge:health', 'session:metadata:read'],
+  transportKind: 'local_network',
 };
 const SECOND: PairedComputerSummary = {
   bridgeId: 'bridge_0987654321',
   computerName: 'Travel Mac',
   pairedAt: 1_800_000_000_001,
   permissions: ['bridge:health', 'session:metadata:read'],
+  transportKind: 'tailscale_vpn',
 };
 
 function session(idCharacter: string, updatedAt: string) {

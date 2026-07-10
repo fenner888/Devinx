@@ -89,11 +89,27 @@ const pairedComputerListSchema = z
 
 export type PairedComputerCredential = z.infer<typeof pairedComputerCredentialSchema>;
 
+export type ComputerTransportKind = 'local_network' | 'tailscale_vpn';
+
+export function computerTransportKind(endpoint: string): ComputerTransportKind {
+  const hostname = new URL(endpoint).hostname.toLowerCase();
+  if (hostname.endsWith('.ts.net')) return 'tailscale_vpn';
+  const [first, second] = hostname.split('.').map(Number);
+  return first === 100 && second !== undefined && second >= 64 && second <= 127
+    ? 'tailscale_vpn'
+    : 'local_network';
+}
+
+export function computerTransportLabel(kind: ComputerTransportKind): string {
+  return kind === 'tailscale_vpn' ? 'Tailscale/VPN' : 'Same Wi-Fi';
+}
+
 export interface PairedComputerSummary {
   bridgeId: string;
   computerName: string;
   pairedAt: number;
   permissions: PairedComputerCredential['permissions'];
+  transportKind: ComputerTransportKind;
 }
 
 export async function loadPairedComputers(): Promise<PairedComputerCredential[]> {
@@ -121,11 +137,12 @@ export async function loadPairedComputers(): Promise<PairedComputerCredential[]>
 
 export async function loadPairedComputerSummaries(): Promise<PairedComputerSummary[]> {
   const computers = await loadPairedComputers();
-  return computers.map(({ bridgeId, computerName, pairedAt, permissions }) => ({
+  return computers.map(({ bridgeId, computerName, pairedAt, permissions, endpoint }) => ({
     bridgeId,
     computerName,
     pairedAt,
     permissions: [...permissions],
+    transportKind: computerTransportKind(endpoint),
   }));
 }
 
