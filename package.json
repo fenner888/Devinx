@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
+    "bridge:discover": "node scripts/bridge/discover-acp.mjs",
     "build": "echo 'EAS build is invoked via eas build; this script is a CI placeholder that typechecks' && tsc --noEmit",
     "audit": "npm audit --audit-level=high",
     "ci": "npm run lint && npm run typecheck && npm run test && npm run build && npm run audit"

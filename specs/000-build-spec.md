@@ -119,8 +119,10 @@ Hermex = native iOS thin client → self-hosted bridge server (hermes-webui) →
 
 ### 2.2 Devin's Three Surfaces
 - **Devin Cloud** — hosted REST API at `api.devin.ai`. Full session lifecycle. **This is the v1 target.**
-- **Devin CLI** — local agent, no hosted API. The Hermex bridge pattern WOULD apply here (Phase 3, only if demand exists). Pragmatic v1 answer: the CLI's `/handoff` escalates local work to a cloud session, which DevinX then picks up. CLI coverage for free.
-- **Devin Desktop** (formerly Windsurf) — local IDE; only analytics API. Out of scope. Positioning line: "Desktop is the hands-on surface; DevinX is the async surface."
+- **Devin CLI** — local agent with a supported ACP JSON-RPC server over stdio (`devin acp`), machine-readable session listing, ATIF export, lifecycle hooks, and `/handoff`. Phase 3 adds a user-controlled Desktop Bridge that adapts this supported CLI surface to an authenticated mobile connection; it never scrapes CLI storage or private process state.
+- **Devin Desktop** (formerly Windsurf) — may install the `devin` CLI, but direct Desktop session access remains out of scope until Cognition publishes a supported interface. DevinX connects to the CLI surface, not private Desktop data, databases, or IPC.
+
+**Public-release scope decision (July 10, 2026):** public distribution waits until users can choose Cloud only, Computer only, or both. Development and internal TestFlight builds still ship in phases so each trust boundary is reviewed independently.
 
 ### 2.3 API Facts That Drive Design
 - **Base:** `https://api.devin.ai/v3/organizations/{org_id}/...` for sessions, knowledge, playbooks, secrets. v1 (`/v1/sessions`) remains available; use v3 as primary.
@@ -449,7 +451,9 @@ One session per phase. Each session: reads `/specs/000-build-spec.md` + its phas
 
 **Session 6 (Phase 2, post-meetup, demand-gated)** — Notifier mini-spec first (§10.10), then Vercel service + Expo Push integration + in-app watch toggles.
 
-**Session 7 (Phase 3, optional)** — CLI bridge exploration per §2.2: hermes-webui-style local server wrapping Devin CLI hooks + Tailscale. Only if real users ask.
+**Session 7 (Phase 3A, required before public release)** — ACP discovery and threat model: negotiate `devin acp` capabilities, verify read-only session discovery on pinned CLI versions, specify pairing/auth/permissions, and build a localhost-only probe. No network listener or session mutation until the threat-model gate passes.
+
+**Session 8 (Phase 3B, required before public release)** — macOS Computer Connection: a user-controlled bridge wrapping the supported ACP subprocess, QR pairing, per-device credentials and permissions, read-only session browsing first, then explicitly authorized message steering. LAN/Tailscale follows localhost validation; public tunnels and relays remain deferred.
 
 ---
 
@@ -458,7 +462,7 @@ One session per phase. Each session: reads `/specs/000-build-spec.md` + its phas
 **Must (MVP/TestFlight):** connect/validate/Keychain, session board with blocked-first triage, session detail + message steering, new session composer (prompt/playbook/tags/ACU), archive/terminate, adaptive polling, offline cache, disconnect-wipe, dark theme with extracted tokens, all §10 gates.
 **Should (≤30 days post):** consumption view, insights, attachments both directions, light theme polish, Android build, composer templates.
 **Could:** push notifier (Phase 2), scheduled sessions management, PAT mode GA flip, iPad layout, widgets (blocked-session count on home screen — sleeper hit), Apple Watch glance.
-**Won't (write it down):** any Devin Desktop integration, enterprise/* endpoints, playbook/knowledge/secret WRITES, multi-org switching in v1, storing any user data server-side in v1, Android-first anything.
+**Won't (write it down):** undocumented Devin Desktop integration, scraping CLI/Desktop files or IPC, enterprise/* endpoints, playbook/knowledge/secret WRITES, a DevinX-operated relay in v1, storing bridge session content on DevinX infrastructure, Android-first anything.
 
 ---
 
