@@ -4,11 +4,11 @@ Status: mode model, onboarding choice, secure paired-computer registry, route gu
 
 ## Supported modes
 
-| Mode | Configuration requirement | Session sources |
-|---|---|---|
-| Cloud | Valid Devin Cloud credential in iOS Keychain | Devin API |
-| Computer | At least one validated paired-computer credential in iOS Keychain | Desktop Bridge only |
-| Cloud + Computer | Both requirements above | Unified UI with explicit origin/computer labels |
+| Mode             | Configuration requirement                                         | Session sources                                 |
+| ---------------- | ----------------------------------------------------------------- | ----------------------------------------------- |
+| Cloud            | Valid Devin Cloud credential in iOS Keychain                      | Devin API                                       |
+| Computer         | At least one validated paired-computer credential in iOS Keychain | Desktop Bridge only                             |
+| Cloud + Computer | Both requirements above                                           | Unified UI with explicit origin/computer labels |
 
 The selected mode is a non-sensitive UI preference and may be stored in AsyncStorage. Cloud API credentials, device private keys, bridge public-key pins, pairing receipts, and endpoint records are secret/security-sensitive and remain under `src/auth` in Secure Store.
 
@@ -28,9 +28,9 @@ The Secure Store boundary validates every record with Zod and caps the registry 
 
 - bridge and device IDs;
 - user-facing computer name;
-- encrypted transport endpoint;
+- canonical private-network HTTPS endpoint and pinned TLS certificate fingerprint;
 - pinned bridge public key and fingerprint;
-- per-device public and private signing keys;
+- per-device public key and opaque ID for the private signing key held in iOS Keychain;
 - server-approved grants; and
 - pairing timestamp.
 

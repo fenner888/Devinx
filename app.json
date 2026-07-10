@@ -12,6 +12,7 @@
       "bundleIdentifier": "com.fenner888.devinx",
       "infoPlist": {
         "NSFileProtection": "NSFileProtectionComplete",
+        "NSLocalNetworkUsageDescription": "Allow DevinX to connect securely to the DevinX Desktop Bridge on your Mac.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false
         },

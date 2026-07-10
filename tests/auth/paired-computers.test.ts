@@ -12,10 +12,14 @@ jest.mock('../../src/auth/keychain', () => ({
 
 const mockDeleteAllDeviceIdentities = jest.fn(async () => {});
 const mockIsDeviceCryptoAvailable = jest.fn(() => true);
+const mockIsPinnedBridgeTransportAvailable = jest.fn(() => true);
+const mockHasDeviceIdentity = jest.fn(async (_keyId: string) => true);
 
 jest.mock('../../src/auth/deviceSigning', () => ({
   deleteAllDeviceIdentities: () => mockDeleteAllDeviceIdentities(),
+  hasDeviceIdentity: (keyId: string) => mockHasDeviceIdentity(keyId),
   isDeviceCryptoAvailable: () => mockIsDeviceCryptoAvailable(),
+  isPinnedBridgeTransportAvailable: () => mockIsPinnedBridgeTransportAvailable(),
 }));
 
 import { branding } from '../../src/lib/branding';
@@ -28,10 +32,11 @@ import {
 import { storeSecret } from '../../src/auth/keychain';
 
 const COMPUTER = {
-  version: 1 as const,
+  version: 2 as const,
   bridgeId: 'bridge_1234567890',
   computerName: 'Frank’s MacBook',
-  endpoint: 'https://devinx-bridge.local:45831',
+  endpoint: 'https://192.168.1.20:45831/',
+  tlsCertificateFingerprint: 'T'.repeat(43),
   bridgePublicKeySpki: 'A'.repeat(59),
   bridgeKeyFingerprint: 'B'.repeat(43),
   deviceId: 'device_1234567890',
@@ -46,6 +51,8 @@ describe('paired computer credential storage', () => {
     jest.clearAllMocks();
     mockSecureValues.clear();
     mockIsDeviceCryptoAvailable.mockReturnValue(true);
+    mockIsPinnedBridgeTransportAvailable.mockReturnValue(true);
+    mockHasDeviceIdentity.mockResolvedValue(true);
   });
 
   it('round-trips validated credentials through the secure-store boundary', async () => {
@@ -75,10 +82,7 @@ describe('paired computer credential storage', () => {
     await expect(loadPairedComputers()).rejects.toThrow('corrupted');
 
     await expect(
-      storePairedComputers([
-        COMPUTER,
-        { ...COMPUTER, computerName: 'Duplicate computer' },
-      ]),
+      storePairedComputers([COMPUTER, { ...COMPUTER, computerName: 'Duplicate computer' }]),
     ).rejects.toThrow();
   });
 
@@ -95,6 +99,16 @@ describe('paired computer credential storage', () => {
     await expect(
       storePairedComputers([{ ...COMPUTER, devicePrivateKeyPkcs8: 'C'.repeat(64) }]),
     ).rejects.toThrow();
+  });
+
+  it('fails closed when the native signing identity or pinned transport is unavailable', async () => {
+    await storePairedComputers([COMPUTER]);
+    mockHasDeviceIdentity.mockResolvedValue(false);
+    await expect(loadPairedComputers()).rejects.toThrow('signing identity is missing');
+
+    mockHasDeviceIdentity.mockResolvedValue(true);
+    mockIsPinnedBridgeTransportAvailable.mockReturnValue(false);
+    await expect(loadPairedComputers()).rejects.toThrow('current secure transport');
   });
 
   it('clears native signing keys before paired-computer credentials', async () => {

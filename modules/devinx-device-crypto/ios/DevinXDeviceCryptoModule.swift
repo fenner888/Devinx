@@ -74,6 +74,27 @@ public final class DevinXDeviceCryptoModule: Module {
     AsyncFunction("deleteAllDeviceIdentities") { () throws in
       try Self.deleteAllPrivateKeys()
     }
+
+    AsyncFunction("postPinnedJson") {
+      (
+        endpoint: String,
+        path: String,
+        certificateFingerprint: String,
+        body: String,
+        promise: Promise
+      ) in
+      do {
+        let request = try PinnedHTTPSRequest(
+          endpoint: endpoint,
+          path: path,
+          certificateFingerprint: certificateFingerprint,
+          body: body
+        )
+        PinnedHTTPSClient.start(request: request, promise: promise)
+      } catch {
+        promise.reject(error)
+      }
+    }
   }
 
   private static func validatedKeyId(_ keyId: String) throws -> String {

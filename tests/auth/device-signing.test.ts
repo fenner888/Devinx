@@ -5,6 +5,8 @@ import {
   hasDeviceIdentity,
   hmacSha256,
   isDeviceCryptoAvailable,
+  isPinnedBridgeTransportAvailable,
+  postPinnedBridgeJson,
   setDeviceCryptoNativeModuleForTests,
   sign,
   verify,
@@ -25,6 +27,7 @@ function createNativeModule() {
     hasDeviceIdentity: jest.fn(async () => true),
     deleteDeviceIdentity: jest.fn(async () => {}),
     deleteAllDeviceIdentities: jest.fn(async () => {}),
+    postPinnedJson: jest.fn(async () => ({ status: 202, body: '{"status":"pending"}' })),
   };
 }
 
@@ -66,6 +69,46 @@ describe('iOS device signing boundary', () => {
     await expect(createDeviceIdentity()).rejects.toThrow();
     await expect(sign(KEY_ID, 'request')).rejects.toThrow();
     await expect(verify(PUBLIC_KEY, 'receipt', SIGNATURE)).rejects.toThrow();
+  });
+
+  it('validates and delegates only canonical pinned bridge requests', async () => {
+    const nativeModule = createNativeModule();
+    setDeviceCryptoNativeModuleForTests(nativeModule);
+
+    expect(isPinnedBridgeTransportAvailable()).toBe(true);
+    await expect(
+      postPinnedBridgeJson('https://192.168.1.20:45831/', '/v1/pair/submit', 'F'.repeat(43), {
+        pairing: 'request',
+      }),
+    ).resolves.toEqual({ status: 202, body: { status: 'pending' } });
+    expect(nativeModule.postPinnedJson).toHaveBeenCalledWith(
+      'https://192.168.1.20:45831/',
+      '/v1/pair/submit',
+      'F'.repeat(43),
+      '{"pairing":"request"}',
+    );
+
+    await expect(
+      postPinnedBridgeJson('http://192.168.1.20:45831/', '/v1/pair/submit', 'F'.repeat(43), {}),
+    ).rejects.toThrow();
+    await expect(
+      postPinnedBridgeJson(
+        'https://192.168.1.20:45831/not-an-origin',
+        '/v1/pair/submit',
+        'F'.repeat(43),
+        {},
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('fails closed on malformed native bridge responses', async () => {
+    const nativeModule = createNativeModule();
+    nativeModule.postPinnedJson.mockResolvedValueOnce({ status: 200, body: 'not json' });
+    setDeviceCryptoNativeModuleForTests(nativeModule);
+
+    await expect(
+      postPinnedBridgeJson('https://192.168.1.20:45831/', '/v1/pair/status', 'F'.repeat(43), {}),
+    ).rejects.toThrow('not valid JSON');
   });
 
   it('rejects malformed or oversized inputs before calling native code', async () => {
