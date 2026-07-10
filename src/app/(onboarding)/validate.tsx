@@ -11,11 +11,13 @@ import { useAuth } from '@auth/AuthContext';
 import { takePendingCredentials } from '@auth/pendingCredentials';
 import type { ValidationResult } from '@auth/AuthProvider';
 import { useTheme } from '@theme/index';
+import { useAppPreferences } from '@store/preferences';
 
 export default function ValidateScreen() {
   const router = useRouter();
   const { connect } = useAuth();
   const { tokens } = useTheme();
+  const connectionMode = useAppPreferences((state) => state.connectionMode);
 
   const [status, setStatus] = useState<'validating' | 'success' | 'error'>('validating');
   const [result, setResult] = useState<ValidationResult | null>(null);
@@ -35,17 +37,21 @@ export default function ValidateScreen() {
       setResult(r);
       setStatus(r.ok ? 'success' : 'error');
       if (r.ok) {
-        // Route guard will redirect to (main) automatically.
-        // Small delay so the user sees the success state.
-        timer = setTimeout(() => router.replace('/(main)'), 600);
+        // Combined mode continues to computer pairing; Cloud-only lands in main.
+        timer = setTimeout(
+          () =>
+            router.replace(
+              connectionMode === 'both' ? '/(onboarding)/computer' : '/(main)',
+            ),
+          600,
+        );
       }
     })();
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [connect, connectionMode, router]);
 
   return (
     <SafeAreaView className="flex-1 bg-surface0 items-center justify-center px-6" edges={['top', 'bottom']}>

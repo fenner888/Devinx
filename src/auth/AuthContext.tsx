@@ -9,9 +9,14 @@ import { PatAuth, connectPat, disconnectPat, isPatEnabled } from './PatAuth';
 import { loadCredentials } from './keychain';
 import type { AuthProvider, ValidationResult } from './AuthProvider';
 import { branding } from '@lib/branding';
+import { shouldEnableCloudRequests } from '@lib/connections';
+import { useAppPreferences } from '@store/preferences';
 
 interface AuthContextValue {
   provider: AuthProvider | null;
+  /** Cloud credentials exist in Keychain, whether or not the selected mode uses them. */
+  hasCloudCredentials: boolean;
+  /** Cloud credentials exist and the selected connection mode permits Cloud requests. */
   isAuthenticated: boolean;
   /** True while the initial Keychain check is still running. */
   isLoading: boolean;
@@ -26,8 +31,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [provider, setProvider] = useState<AuthProvider | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasCloudCredentials, setHasCloudCredentials] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const connectionMode = useAppPreferences((state) => state.connectionMode);
+  const preferencesHydrated = useAppPreferences((state) => state.hasHydrated);
+  const isAuthenticated = shouldEnableCloudRequests(
+    connectionMode,
+    hasCloudCredentials,
+    preferencesHydrated,
+  );
 
   useEffect(() => {
     // On mount, check if credentials exist and prime the provider.
@@ -37,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (creds) {
           const p = creds.authKind === 'pat' ? new PatAuth() : new ServiceUserAuth();
           setProvider(p);
-          setIsAuthenticated(true);
+          setHasCloudCredentials(true);
         }
       } finally {
         setIsLoading(false);
@@ -57,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await p.validate();
       if (result.ok) {
         setProvider(p);
-        setIsAuthenticated(true);
+        setHasCloudCredentials(true);
       } else {
         // Validation failed — wipe the partial credentials.
         if (params.kind === 'pat') await disconnectPat();
@@ -74,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await disconnectService();
     await disconnectPat();
     setProvider(null);
-    setIsAuthenticated(false);
+    setHasCloudCredentials(false);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -83,17 +95,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const creds = await loadCredentials();
       if (creds) {
         setProvider(creds.authKind === 'pat' ? new PatAuth() : new ServiceUserAuth());
-        setIsAuthenticated(true);
+        setHasCloudCredentials(true);
       }
     } else if (!ok) {
       clearCache();
       setProvider(null);
-      setIsAuthenticated(false);
+      setHasCloudCredentials(false);
     }
   }, [provider]);
 
   return (
-    <AuthContext.Provider value={{ provider, isAuthenticated, isLoading, isPatAvailable: isPatEnabled(), connect, disconnect, refresh }}>
+    <AuthContext.Provider
+      value={{
+        provider,
+        hasCloudCredentials,
+        isAuthenticated,
+        isLoading,
+        isPatAvailable: isPatEnabled(),
+        connect,
+        disconnect,
+        refresh,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

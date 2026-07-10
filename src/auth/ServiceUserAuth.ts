@@ -8,7 +8,7 @@
 
 import * as Sentry from '@sentry/react-native';
 import { branding } from '@lib/branding';
-import { loadCredentials, storeSecret, wipeAllSecrets, type StoredCredentials } from './keychain';
+import { loadCredentials, storeSecret, wipeCloudSecrets, type StoredCredentials } from './keychain';
 import type { AuthProvider, ValidationResult } from './AuthProvider';
 
 let cached: StoredCredentials | null = null;
@@ -147,7 +147,7 @@ export class ServiceUserAuth implements AuthProvider {
  */
 export async function disconnect(): Promise<void> {
   cached = null;
-  await wipeAllSecrets();
+  await wipeCloudSecrets();
 }
 
 /** Clear the in-memory cache (called on app background to minimize secret lifetime). */

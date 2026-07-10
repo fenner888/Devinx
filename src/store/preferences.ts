@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type { PollingMode } from '@lib/polling';
 import type { PollingMode } from '@lib/polling';
+import { normalizeConnectionMode, type ConnectionMode } from '@lib/connections';
 
 export function normalizeDefaultTags(input: string): string[] {
   return [
@@ -38,6 +39,8 @@ interface AppPreferencesState {
   pinnedSessionIds: string[];
   watchedSessionIds: string[];
   composerTemplates: ComposerTemplate[];
+  connectionMode: ConnectionMode;
+  hasHydrated: boolean;
   setPollingMode: (m: PollingMode) => void;
   setHaptics: (v: boolean) => void;
   setDefaultTags: (tags: string[]) => void;
@@ -45,6 +48,8 @@ interface AppPreferencesState {
   toggleWatch: (id: string) => void;
   addTemplate: (t: ComposerTemplate) => void;
   removeTemplate: (id: string) => void;
+  setConnectionMode: (mode: ConnectionMode) => void;
+  setHasHydrated: (value: boolean) => void;
 }
 
 export const useAppPreferences = create<AppPreferencesState>()(
@@ -56,6 +61,8 @@ export const useAppPreferences = create<AppPreferencesState>()(
       pinnedSessionIds: [],
       watchedSessionIds: [],
       composerTemplates: [],
+      connectionMode: 'cloud',
+      hasHydrated: false,
       setPollingMode: (pollingMode) => set({ pollingMode }),
       setHaptics: (hapticsEnabled) => set({ hapticsEnabled }),
       setDefaultTags: (defaultTags) => set({ defaultTags }),
@@ -74,10 +81,40 @@ export const useAppPreferences = create<AppPreferencesState>()(
       addTemplate: (t) => set((s) => ({ composerTemplates: [...s.composerTemplates, t] })),
       removeTemplate: (id) =>
         set((s) => ({ composerTemplates: s.composerTemplates.filter((t) => t.id !== id) })),
+      setConnectionMode: (connectionMode) => set({ connectionMode }),
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
     }),
     {
       name: 'devinx-prefs',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 2,
+      migrate: (persistedState) => {
+        const state = (persistedState ?? {}) as Partial<AppPreferencesState>;
+        return {
+          ...state,
+          connectionMode: normalizeConnectionMode(state.connectionMode),
+          hasHydrated: false,
+        } as AppPreferencesState;
+      },
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<AppPreferencesState>;
+        return {
+          ...currentState,
+          ...persisted,
+          connectionMode: normalizeConnectionMode(persisted.connectionMode),
+          hasHydrated: currentState.hasHydrated,
+        };
+      },
+      partialize: (state) => ({
+        pollingMode: state.pollingMode,
+        hapticsEnabled: state.hapticsEnabled,
+        defaultTags: state.defaultTags,
+        pinnedSessionIds: state.pinnedSessionIds,
+        watchedSessionIds: state.watchedSessionIds,
+        composerTemplates: state.composerTemplates,
+        connectionMode: state.connectionMode,
+      }),
+      onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
     },
   ),
 );

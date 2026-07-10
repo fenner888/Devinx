@@ -31,6 +31,7 @@ export const branding = {
     orgId: 'devin_org_id',
     attributionUserId: 'attribution_user_id',
     authKind: 'auth_kind',
+    pairedComputers: 'paired_computers_v1',
   },
   /** Fallback product names if Apple rejects "DevinX". */
   fallbackNames: ['Cockpit', 'Dispatch', 'Overwatch'] as const,

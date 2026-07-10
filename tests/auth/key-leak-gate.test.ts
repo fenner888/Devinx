@@ -69,4 +69,9 @@ describe('key-leak grep gate (§10.1)', () => {
     }
     expect(violations).toEqual([]);
   });
+
+  it('never stores web-preview auth credentials in localStorage', () => {
+    const webKeychain = fs.readFileSync(path.join(SRC, 'auth', 'keychain.web.ts'), 'utf8');
+    expect(webKeychain).not.toMatch(/localStorage\s*\.\s*(setItem|getItem|removeItem)/);
+  });
 });

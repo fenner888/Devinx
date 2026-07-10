@@ -1,6 +1,6 @@
 /**
  * Welcome screen — spec §7.1 step 1.
- * Value prop, disclaimer footer (§1.4), "Connect your Devin account" CTA.
+ * Value prop, disclaimer footer (§1.4), connection-choice CTA.
  */
 import { View, Text, Pressable, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -37,10 +37,12 @@ export default function WelcomeScreen() {
 
         <Pressable
           className="bg-brand rounded-button px-buttonPrimaryX py-buttonPrimaryY"
-          onPress={() => router.push('/(onboarding)/credentials')}
+          onPress={() => router.push('/(onboarding)/connections')}
+          accessibilityRole="button"
+          accessibilityLabel="Choose how to connect DevinX"
         >
           <Text className="text-text-always-white text-text14 font-medium">
-            Connect your Devin account
+            Choose how to connect
           </Text>
         </Pressable>
 

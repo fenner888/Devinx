@@ -19,7 +19,8 @@ import NetInfo from '@react-native-community/netinfo';
 import { ThemeProvider, useTheme, loadThemePreference } from '@theme/index';
 import { initSentry } from '@lib/sentry';
 import { shouldRetryQuery } from '@api/devin/client';
-import { AuthProvider, useAuth } from '@auth/AuthContext';
+import { AuthProvider } from '@auth/AuthContext';
+import { ConnectionProvider, useConnections } from '@auth/ConnectionContext';
 import { getPushToken, setupNotificationListener } from '@lib/notifications';
 import { ErrorBoundary } from '@components/ErrorBoundary';
 import { PrivacyShield } from '@components/PrivacyShield';
@@ -57,26 +58,28 @@ const queryClient = new QueryClient({
 
 /** Initial route — declarative redirect based on auth state. */
 function InitialRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isConfigured, isLoading, hasCloudConnection, usesCloud } = useConnections();
   const segments = useSegments();
   const router = useRouter();
 
   // Register for push notifications when authenticated.
   useEffect(() => {
-    if (isAuthenticated) {
+    if (hasCloudConnection && usesCloud) {
       getPushToken().catch(() => {
         /* ignore */
       });
     }
-  }, [isAuthenticated]);
+  }, [hasCloudConnection, usesCloud]);
 
   // Listen for notification taps → navigate to session detail.
   useEffect(() => {
     const unsubscribe = setupNotificationListener((sessionId) => {
-      router.push(`/(main)/session/${sessionId}`);
+      if (hasCloudConnection && usesCloud) {
+        router.push(`/(main)/session/${sessionId}`);
+      }
     });
     return unsubscribe;
-  }, [router]);
+  }, [hasCloudConnection, router, usesCloud]);
 
   const inOnboarding = segments[0] === '(onboarding)';
 
@@ -84,10 +87,10 @@ function InitialRoute() {
   // authenticated cold start flashes the onboarding screen.
   if (isLoading) return null;
 
-  if (!isAuthenticated && !inOnboarding) {
+  if (!isConfigured && !inOnboarding) {
     return <Redirect href="/(onboarding)" />;
   }
-  if (isAuthenticated && inOnboarding) {
+  if (isConfigured && inOnboarding) {
     return <Redirect href="/(main)" />;
   }
   return null;
@@ -118,9 +121,11 @@ export default function RootLayout() {
         <ErrorBoundary>
           <ThemeProvider>
             <AuthProvider>
-              <InitialRoute />
-              <ThemedStack />
-              <PrivacyShield />
+              <ConnectionProvider>
+                <InitialRoute />
+                <ThemedStack />
+                <PrivacyShield />
+              </ConnectionProvider>
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>

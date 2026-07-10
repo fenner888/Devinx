@@ -8,7 +8,7 @@
 
 import * as Sentry from '@sentry/react-native';
 import { branding } from '@lib/branding';
-import { storeSecret, loadCredentials, wipeAllSecrets, type StoredCredentials } from './keychain';
+import { storeSecret, loadCredentials, wipeCloudSecrets, type StoredCredentials } from './keychain';
 import type { AuthProvider, ValidationResult } from './AuthProvider';
 
 let cached: StoredCredentials | null = null;
@@ -90,5 +90,5 @@ export class PatAuth implements AuthProvider {
 
 export async function disconnectPat(): Promise<void> {
   cached = null;
-  await wipeAllSecrets();
+  await wipeCloudSecrets();
 }
