@@ -1,6 +1,12 @@
 const mockUploadAttachment = jest.fn();
 const mockCreateSession = jest.fn();
 const mockDevinCompanion = jest.fn((_props: unknown) => null);
+let mockConnection = { mode: 'cloud', hasCloudConnection: true, usesCloud: true };
+let mockCloudSessions: Array<Record<string, unknown>> = [];
+let mockComputerBoard: {
+  sessions: Array<Record<string, unknown>>;
+  computers: Array<Record<string, unknown>>;
+} = { sessions: [], computers: [] };
 
 jest.mock('react-native-safe-area-context', () => ({
   ...jest.requireActual('react-native-safe-area-context'),
@@ -23,7 +29,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 jest.mock('@api/devin/queries', () => ({
-  useSessions: jest.fn(() => ({ data: [] })),
+  useSessions: jest.fn(() => ({ data: mockCloudSessions })),
   useCreateSession: jest.fn(() => ({ isPending: false, mutate: mockCreateSession })),
   usePlaybooks: jest.fn(() => ({ data: [] })),
   useRepositories: jest.fn(() => ({
@@ -42,6 +48,14 @@ jest.mock('@api/devin/queries', () => ({
   })),
   useCodeScanFindings: jest.fn(() => ({ data: [] })),
   useUploadAttachment: jest.fn(() => ({ isPending: false, mutateAsync: mockUploadAttachment })),
+}));
+
+jest.mock('@api/bridge/queries', () => ({
+  useComputerSessions: () => ({ data: mockComputerBoard }),
+}));
+
+jest.mock('@auth/ConnectionContext', () => ({
+  useConnections: () => mockConnection,
 }));
 
 jest.mock('@components/OfflineBanner', () => ({
@@ -76,6 +90,9 @@ import { ThemeProvider } from '../../src/theme/ThemeProvider';
 describe('home attachment control', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConnection = { mode: 'cloud', hasCloudConnection: true, usesCloud: true };
+    mockCloudSessions = [];
+    mockComputerBoard = { sessions: [], computers: [] };
   });
 
   it('uses Devin as the prominent home-screen visual anchor', () => {
@@ -91,10 +108,77 @@ describe('home attachment control', () => {
       queryByText('Describe a task — it runs in the cloud and you can steer it here.'),
     ).toBeNull();
     const props = mockDevinCompanion.mock.calls[0]?.[0] as
-      | { size?: number; state?: string }
-      | undefined;
+      { size?: number; state?: string } | undefined;
     expect(props?.state).toBe('idle');
     expect(props?.size).toBeGreaterThanOrEqual(164);
+  });
+
+  it('shows paired-Mac sessions without presenting the Cloud composer as active', () => {
+    mockConnection = { mode: 'computer', hasCloudConnection: false, usesCloud: false };
+    mockComputerBoard = {
+      sessions: [
+        {
+          id: `local_${'L'.repeat(43)}`,
+          origin: 'computer',
+          workspaceName: 'DevinX',
+          hasTitle: false,
+          bridgeId: 'bridge_1234567890',
+          computerName: 'Studio Mac',
+        },
+      ],
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac', state: 'ready' }],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText('Computer connection')).toBeTruthy();
+    expect(screen.getByPlaceholderText(/Start a task from Devin CLI/)).toBeTruthy();
+    expect(screen.getByText('Studio Mac')).toBeTruthy();
+    expect(screen.getByText('DevinX')).toBeTruthy();
+    expect(screen.queryByText('What should Devin build?')).toBeNull();
+  });
+
+  it('does not render cached sessions from a connection source excluded by the mode', () => {
+    mockComputerBoard = {
+      sessions: [
+        {
+          id: `local_${'L'.repeat(43)}`,
+          origin: 'computer',
+          workspaceName: 'Hidden local workspace',
+          hasTitle: false,
+          bridgeId: 'bridge_1234567890',
+          computerName: 'Hidden Mac',
+        },
+      ],
+      computers: [],
+    };
+    const cloudScreen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+    expect(cloudScreen.queryByText('Hidden Mac')).toBeNull();
+    cloudScreen.unmount();
+
+    mockConnection = { mode: 'computer', hasCloudConnection: true, usesCloud: false };
+    mockCloudSessions = [
+      {
+        session_id: 'devin-hidden',
+        title: 'Hidden Cloud session',
+        updated_at: 1,
+        pull_requests: [],
+      },
+    ];
+    mockComputerBoard = { sessions: [], computers: [] };
+    const computerScreen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+    expect(computerScreen.queryByText('Hidden Cloud session')).toBeNull();
   });
 
   it('opens attachment sources without opening the execution mode picker', () => {

@@ -52,6 +52,18 @@ jest.mock('@api/devin/queries', () => ({
   useArchiveSession: () => ({ mutate: mockArchive }),
   useTerminateSession: () => ({ mutate: jest.fn() }),
 }));
+jest.mock('@api/bridge/queries', () => ({
+  useComputerSessions: () => ({
+    data: { sessions: [], computers: [] },
+    isLoading: false,
+    error: null,
+    refetch: jest.fn(),
+    isRefetching: false,
+  }),
+}));
+jest.mock('@auth/ConnectionContext', () => ({
+  useConnections: () => ({ mode: 'cloud' }),
+}));
 
 import React from 'react';
 import { Alert } from 'react-native';

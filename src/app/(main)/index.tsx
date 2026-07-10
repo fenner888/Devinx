@@ -3,7 +3,7 @@
  * Top-left menu (slide-over) for navigation, a friendly prompt, a large
  * rounded composer, and a compact recent-sessions list.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
+import { useComputerSessions, type ComputerSessionListItem } from '@api/bridge/queries';
 import {
   useSessions,
   useCreateSession,
@@ -35,7 +36,13 @@ import { NavMenu } from '@components/NavMenu';
 import { ModeSettings } from '@components/ModeSettings';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
 import { DevinCompanion } from '@components/pets';
+import {
+  ComputerDiscoveryNotices,
+  ComputerSessionRow,
+} from '@components/sessions/ComputerSessionRow';
+import { useConnections } from '@auth/ConnectionContext';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
+import { connectionModeUsesComputer } from '@lib/connections';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
 import {
   deriveStatusKey,
@@ -46,11 +53,16 @@ import {
   modeLabel,
 } from '@lib/session-utils';
 import type { DevinMode } from '@api/devin/types';
+import type { SessionResponse } from '@api/devin/types';
 import { useAppPreferences } from '@store/preferences';
 import WORDMARK_DARK from '../../../assets/wordmark.png';
 import WORDMARK_LIGHT from '../../../assets/wordmark-light.png';
 
 const MAX_PROMPT = 10000;
+
+type RecentSession =
+  | { kind: 'cloud'; session: SessionResponse; updatedAt: number }
+  | { kind: 'computer'; session: ComputerSessionListItem; updatedAt: number };
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -59,6 +71,10 @@ export default function HomeScreen() {
   const { width, height } = useWindowDimensions();
   const defaultTags = useAppPreferences((state) => state.defaultTags);
   const { data: sessions } = useSessions('board');
+  const computerSessions = useComputerSessions();
+  const { mode: connectionMode, hasCloudConnection, usesCloud } = useConnections();
+  const usesComputer = connectionModeUsesComputer(connectionMode);
+  const canCreateCloudSession = usesCloud && hasCloudConnection;
   const createSession = useCreateSession();
   const uploadAttachment = useUploadAttachment();
   const { data: playbooks } = usePlaybooks();
@@ -89,7 +105,23 @@ export default function HomeScreen() {
     }, []),
   );
 
-  const recent = (sessions ?? []).slice(0, 5);
+  const recent = useMemo<RecentSession[]>(() => {
+    const cloudItems: RecentSession[] = (usesCloud ? (sessions ?? []) : []).map((session) => ({
+      kind: 'cloud',
+      session,
+      updatedAt: session.updated_at * 1_000,
+    }));
+    const computerItems: RecentSession[] = (
+      usesComputer ? (computerSessions.data?.sessions ?? []) : []
+    ).map((session) => ({
+      kind: 'computer',
+      session,
+      updatedAt: session.updatedAt ? Date.parse(session.updatedAt) : 0,
+    }));
+    return [...cloudItems, ...computerItems]
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .slice(0, 5);
+  }, [computerSessions.data?.sessions, sessions, usesCloud, usesComputer]);
   const selectedPlaybookTitle = selectedPlaybook
     ? (playbooks?.find((p) => p.playbook_id === selectedPlaybook)?.title ?? 'Playbook')
     : null;
@@ -128,7 +160,14 @@ export default function HomeScreen() {
   }
 
   function handleSend() {
-    if (!prompt.trim() || createSession.isPending || uploadAttachment.isPending) return;
+    if (
+      !canCreateCloudSession ||
+      !prompt.trim() ||
+      createSession.isPending ||
+      uploadAttachment.isPending
+    ) {
+      return;
+    }
     hapticLight();
     setComposerError(null);
     createSession.mutate(
@@ -185,7 +224,17 @@ export default function HomeScreen() {
           />
         </View>
         <View className="w-10 h-10 items-center justify-center" accessible={false}>
-          <Ionicons name="cloud-outline" size={23} color={tokens.textMid.hex} />
+          <Ionicons
+            name={
+              connectionMode === 'computer'
+                ? 'desktop-outline'
+                : connectionMode === 'both'
+                  ? 'layers-outline'
+                  : 'cloud-outline'
+            }
+            size={23}
+            color={tokens.textMid.hex}
+          />
         </View>
       </View>
 
@@ -215,7 +264,11 @@ export default function HomeScreen() {
                   Devin is ready to build
                 </Text>
                 <Text className="mt-1 text-text-mid text-text13">
-                  Ask anything. Devin runs in the cloud.
+                  {connectionMode === 'computer'
+                    ? 'Monitor sessions running through your paired Mac.'
+                    : connectionMode === 'both'
+                      ? 'Cloud and paired-Mac sessions appear together.'
+                      : 'Ask anything. Devin runs in the cloud.'}
                 </Text>
               </View>
             </View>
@@ -233,14 +286,19 @@ export default function HomeScreen() {
 
           {/* One clean composer surface; no additional card around it. */}
           <Text className="mb-3 text-text-hi text-text17 font-medium">
-            What should Devin build?
+            {canCreateCloudSession ? 'What should Devin build?' : 'Computer connection'}
           </Text>
           <View className="rounded-cardLg border border-border bg-surface1">
             <TextInput
               className="text-text-hi text-text16 px-5 pt-5 pb-3 min-h-[112px]"
               value={prompt}
               onChangeText={(v) => setPrompt(v.slice(0, MAX_PROMPT))}
-              placeholder="Ask Devin to build features, fix bugs, or work on your code…"
+              editable={canCreateCloudSession}
+              placeholder={
+                canCreateCloudSession
+                  ? 'Ask Devin to build features, fix bugs, or work on your code…'
+                  : 'Start a task from Devin CLI or desktop, then monitor it here.'
+              }
               placeholderTextColor={tokens.textLow.hex}
               multiline
               maxLength={MAX_PROMPT}
@@ -295,7 +353,7 @@ export default function HomeScreen() {
                 <Pressable
                   className="w-9 h-9 rounded-full items-center justify-center"
                   onPress={() => setShowAttachmentPicker(true)}
-                  disabled={uploadAttachment.isPending}
+                  disabled={!canCreateCloudSession || uploadAttachment.isPending}
                   accessibilityRole="button"
                   accessibilityLabel="Add attachment"
                 >
@@ -308,6 +366,7 @@ export default function HomeScreen() {
                 <Pressable
                   className="flex-row items-center rounded-full px-3 py-2"
                   onPress={() => setShowModePicker(true)}
+                  disabled={!canCreateCloudSession}
                   accessibilityRole="button"
                   accessibilityLabel="Execution mode"
                 >
@@ -317,6 +376,7 @@ export default function HomeScreen() {
                 <Pressable
                   className="flex-row items-center rounded-full px-3 py-2"
                   onPress={() => setShowPlaybookPicker(true)}
+                  disabled={!canCreateCloudSession}
                   accessibilityRole="button"
                   accessibilityLabel="Select playbook"
                 >
@@ -334,9 +394,14 @@ export default function HomeScreen() {
                 </Pressable>
               </View>
               <Pressable
-                className={`w-10 h-10 rounded-full items-center justify-center ${prompt.trim() && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
+                className={`w-10 h-10 rounded-full items-center justify-center ${canCreateCloudSession && prompt.trim() && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
                 onPress={handleSend}
-                disabled={!prompt.trim() || createSession.isPending || uploadAttachment.isPending}
+                disabled={
+                  !canCreateCloudSession ||
+                  !prompt.trim() ||
+                  createSession.isPending ||
+                  uploadAttachment.isPending
+                }
                 accessibilityRole="button"
                 accessibilityLabel="Start session"
               >
@@ -347,7 +412,7 @@ export default function HomeScreen() {
                     name="arrow-up"
                     size={20}
                     color={
-                      prompt.trim() && !uploadAttachment.isPending
+                      canCreateCloudSession && prompt.trim() && !uploadAttachment.isPending
                         ? tokens.textAlwaysWhite.hex
                         : tokens.textLow.hex
                     }
@@ -356,33 +421,48 @@ export default function HomeScreen() {
               </Pressable>
             </View>
           </View>
-          <View className="flex-row items-center px-2 pt-2">
-            <View className="flex-row items-center mr-4">
-              <Ionicons name="cloud-outline" size={14} color={tokens.textLow.hex} />
-              <Text className="text-text-low text-text12 ml-1.5">Devin Cloud</Text>
+          {canCreateCloudSession ? (
+            <View className="flex-row items-center px-2 pt-2">
+              <View className="flex-row items-center mr-4">
+                <Ionicons name="cloud-outline" size={14} color={tokens.textLow.hex} />
+                <Text className="text-text-low text-text12 ml-1.5">Devin Cloud</Text>
+              </View>
+              <Pressable
+                className="flex-row items-center flex-1"
+                onPress={() => {
+                  setRepoQuery('');
+                  setShowRepoPicker(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Repository: ${selectedRepo ?? 'Any repository'}`}
+              >
+                <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
+                <Text className="text-text-mid text-text12 ml-1.5 flex-1" numberOfLines={1}>
+                  {selectedRepoName}
+                </Text>
+                <Ionicons name="chevron-down" size={13} color={tokens.textLow.hex} />
+              </Pressable>
             </View>
-            <Pressable
-              className="flex-row items-center flex-1"
-              onPress={() => {
-                setRepoQuery('');
-                setShowRepoPicker(true);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Repository: ${selectedRepo ?? 'Any repository'}`}
-            >
-              <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
-              <Text className="text-text-mid text-text12 ml-1.5 flex-1" numberOfLines={1}>
-                {selectedRepoName}
+          ) : (
+            <View className="flex-row items-center px-2 pt-2">
+              <Ionicons name="desktop-outline" size={14} color={tokens.textLow.hex} />
+              <Text className="text-text-low text-text12 ml-1.5">
+                New local tasks start from Devin CLI or desktop
               </Text>
-              <Ionicons name="chevron-down" size={13} color={tokens.textLow.hex} />
-            </Pressable>
-          </View>
+            </View>
+          )}
           {composerError && (
             <View className="flex-row items-center bg-tint-red rounded-card px-3 py-2 mt-3">
               <Ionicons name="alert-circle-outline" size={14} color={tokens.failed.hex} />
               <Text className="text-failed text-text12 ml-2 flex-1">{composerError}</Text>
             </View>
           )}
+
+          <View className="mt-3">
+            <ComputerDiscoveryNotices
+              computers={usesComputer ? (computerSessions.data?.computers ?? []) : []}
+            />
+          </View>
 
           {/* Recent */}
           {recent.length > 0 && (
@@ -397,39 +477,49 @@ export default function HomeScreen() {
                 </Pressable>
               </View>
               <View className="gap-2">
-                {recent.map((session) => (
-                  <Pressable
-                    key={session.session_id}
-                    className="bg-surface1 rounded-card border border-border-subtle px-4 py-3.5"
-                    onPress={() => router.push(`/(main)/session/${session.session_id}`)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${session.title || 'Untitled session'}, ${statusLabel(session)}`}
-                  >
-                    <Text className="text-text-hi text-text14" numberOfLines={1}>
-                      {session.title || 'Untitled session'}
-                    </Text>
-                    <View className="flex-row items-center mt-1">
-                      <Text className={`text-text12 ${statusColorClass(deriveStatusKey(session))}`}>
-                        {statusLabel(session)}
+                {recent.map((item) =>
+                  item.kind === 'computer' ? (
+                    <ComputerSessionRow
+                      key={`computer:${item.session.bridgeId}:${item.session.id}`}
+                      session={item.session}
+                      compact
+                    />
+                  ) : (
+                    <Pressable
+                      key={`cloud:${item.session.session_id}`}
+                      className="bg-surface1 rounded-card border border-border-subtle px-4 py-3.5"
+                      onPress={() => router.push(`/(main)/session/${item.session.session_id}`)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${item.session.title || 'Untitled session'}, ${statusLabel(item.session)}`}
+                    >
+                      <Text className="text-text-hi text-text14" numberOfLines={1}>
+                        {item.session.title || 'Untitled session'}
                       </Text>
-                      <Text className="text-text-low text-text12 ml-2">
-                        {relativeTime(session.updated_at)}
-                      </Text>
-                      {session.pull_requests[0] && (
-                        <View className="flex-row items-center ml-auto">
-                          <Ionicons
-                            name="git-pull-request-outline"
-                            size={12}
-                            color={tokens.merged.hex}
-                          />
-                          <Text className="text-merged text-text12 ml-1">
-                            #{prNumber(session.pull_requests[0].pr_url)}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </Pressable>
-                ))}
+                      <View className="flex-row items-center mt-1">
+                        <Text
+                          className={`text-text12 ${statusColorClass(deriveStatusKey(item.session))}`}
+                        >
+                          {statusLabel(item.session)}
+                        </Text>
+                        <Text className="text-text-low text-text12 ml-2">
+                          {relativeTime(item.session.updated_at)}
+                        </Text>
+                        {item.session.pull_requests[0] && (
+                          <View className="flex-row items-center ml-auto">
+                            <Ionicons
+                              name="git-pull-request-outline"
+                              size={12}
+                              color={tokens.merged.hex}
+                            />
+                            <Text className="text-merged text-text12 ml-1">
+                              #{prNumber(item.session.pull_requests[0].pr_url)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </Pressable>
+                  ),
+                )}
               </View>
             </View>
           )}

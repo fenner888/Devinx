@@ -1,5 +1,6 @@
 import {
   createDeviceIdentity,
+  createRequestIdentity,
   deleteAllDeviceIdentities,
   deleteDeviceIdentity,
   fingerprintPublicKeySpki,
@@ -25,6 +26,10 @@ const HMAC = 'D'.repeat(43);
 function createNativeModule() {
   return {
     createDeviceIdentity: jest.fn(async () => ({ keyId: KEY_ID, publicKeySpki: PUBLIC_KEY })),
+    createRequestIdentity: jest.fn(async () => ({
+      requestId: 'd9428888-122b-11e1-b85c-61cd3cbb3210',
+      nonce: 'N'.repeat(32),
+    })),
     sign: jest.fn(async () => SIGNATURE),
     verify: jest.fn(async () => true),
     hmacSha256: jest.fn(async () => HMAC),
@@ -62,6 +67,10 @@ describe('iOS device signing boundary', () => {
     await expect(hmacSha256(PAIRING_SECRET, 'canonical proof')).resolves.toBe(HMAC);
     await expect(fingerprintPublicKeySpki(PUBLIC_KEY)).resolves.toBe('F'.repeat(43));
     await expect(hasDeviceIdentity(KEY_ID)).resolves.toBe(true);
+    await expect(createRequestIdentity()).resolves.toEqual({
+      requestId: 'd9428888-122b-11e1-b85c-61cd3cbb3210',
+      nonce: 'N'.repeat(32),
+    });
   });
 
   it('validates all values returned by native code', async () => {
@@ -72,11 +81,13 @@ describe('iOS device signing boundary', () => {
     });
     nativeModule.sign.mockResolvedValueOnce('short');
     nativeModule.verify.mockResolvedValueOnce('yes' as never);
+    nativeModule.createRequestIdentity.mockResolvedValueOnce({ requestId: 'bad', nonce: 'short' });
     setDeviceCryptoNativeModuleForTests(nativeModule);
 
     await expect(createDeviceIdentity()).rejects.toThrow();
     await expect(sign(KEY_ID, 'request')).rejects.toThrow();
     await expect(verify(PUBLIC_KEY, 'receipt', SIGNATURE)).rejects.toThrow();
+    await expect(createRequestIdentity()).rejects.toThrow();
   });
 
   it('validates and delegates only canonical pinned bridge requests', async () => {

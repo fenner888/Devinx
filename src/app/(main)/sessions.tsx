@@ -19,7 +19,13 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
 import { useSessions, useArchiveSession, useTerminateSession } from '@api/devin/queries';
+import { useComputerSessions, type ComputerSessionListItem } from '@api/bridge/queries';
 import { BoardSkeleton, EmptyState, ErrorState } from '@components/Skeletons';
+import {
+  ComputerDiscoveryNotices,
+  ComputerSessionRow,
+} from '@components/sessions/ComputerSessionRow';
+import { useConnections } from '@auth/ConnectionContext';
 import { hapticLight, hapticMedium, hapticWarning } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
 import {
@@ -34,17 +40,32 @@ import {
   filterBySearch,
   filterByTags,
   collectTags,
+  type SectionKey,
 } from '@lib/session-utils';
+import { connectionModeUsesCloud, connectionModeUsesComputer } from '@lib/connections';
 import type { SessionResponse } from '@api/devin/types';
 import { useAppPreferences } from '@store/preferences';
 
 type ContextAction = 'open' | 'pin' | 'share_link' | 'archive' | 'terminate';
 
+type BoardRow =
+  | { kind: 'cloud'; session: SessionResponse }
+  | { kind: 'computer'; session: ComputerSessionListItem };
+
+interface BoardSection {
+  section: SectionKey | 'computer';
+  data: BoardRow[];
+}
+
 export default function SessionsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
-  const { data, isLoading, error, refetch, isRefetching } = useSessions('board');
+  const cloudQuery = useSessions('board');
+  const computerQuery = useComputerSessions();
+  const { mode } = useConnections();
+  const usesCloud = connectionModeUsesCloud(mode);
+  const usesComputer = connectionModeUsesComputer(mode);
   const archiveMutation = useArchiveSession();
   const terminateMutation = useTerminateSession();
   const pinnedSessionIds = useAppPreferences((state) => state.pinnedSessionIds);
@@ -56,16 +77,60 @@ export default function SessionsScreen() {
   const [contextSession, setContextSession] = useState<SessionResponse | null>(null);
   const [actionNote, setActionNote] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    if (!data) return [];
-    return filterByTags(filterBySearch(data, search), selectedTags);
-  }, [data, search, selectedTags]);
+  const filteredCloud = useMemo(() => {
+    if (!cloudQuery.data || !usesCloud) return [];
+    return filterByTags(filterBySearch(cloudQuery.data, search), selectedTags);
+  }, [cloudQuery.data, search, selectedTags, usesCloud]);
 
-  const sections = useMemo(
-    () => sectionSessions(filtered, pinnedSessionIds),
-    [filtered, pinnedSessionIds],
+  const filteredComputer = useMemo(() => {
+    if (!usesComputer || (usesCloud && selectedTags.length > 0)) return [];
+    const query = search.trim().toLowerCase();
+    const sessions = computerQuery.data?.sessions ?? [];
+    if (!query) return sessions;
+    return sessions.filter(
+      (session) =>
+        session.workspaceName.toLowerCase().includes(query) ||
+        (session.title ?? '').toLowerCase().includes(query) ||
+        session.computerName.toLowerCase().includes(query),
+    );
+  }, [computerQuery.data?.sessions, search, selectedTags.length, usesCloud, usesComputer]);
+
+  const sections = useMemo<BoardSection[]>(() => {
+    const computerSections: BoardSection[] =
+      filteredComputer.length > 0
+        ? [
+            {
+              section: 'computer',
+              data: filteredComputer.map((session) => ({ kind: 'computer' as const, session })),
+            },
+          ]
+        : [];
+    const cloudSections: BoardSection[] = sectionSessions(filteredCloud, pinnedSessionIds).map(
+      (section) => ({
+        section: section.section,
+        data: section.data.map((session) => ({ kind: 'cloud' as const, session })),
+      }),
+    );
+    return [...computerSections, ...cloudSections];
+  }, [filteredCloud, filteredComputer, pinnedSessionIds]);
+  const allTags = useMemo(
+    () => (usesCloud && cloudQuery.data ? collectTags(cloudQuery.data) : []),
+    [cloudQuery.data, usesCloud],
   );
-  const allTags = useMemo(() => (data ? collectTags(data) : []), [data]);
+  const isLoading =
+    (usesCloud && cloudQuery.isLoading) || (usesComputer && computerQuery.isLoading);
+  const isRefetching =
+    (usesCloud && cloudQuery.isRefetching) || (usesComputer && computerQuery.isRefetching);
+  const hasUnfilteredSessions =
+    (usesCloud && (cloudQuery.data?.length ?? 0) > 0) ||
+    (usesComputer && (computerQuery.data?.sessions.length ?? 0) > 0);
+
+  const refreshAll = useCallback(() => {
+    const refreshes: Promise<unknown>[] = [];
+    if (usesCloud) refreshes.push(cloudQuery.refetch());
+    if (usesComputer) refreshes.push(computerQuery.refetch());
+    Promise.all(refreshes).catch(() => {});
+  }, [cloudQuery, computerQuery, usesCloud, usesComputer]);
 
   const toggleTag = useCallback((tag: string) => {
     setSelectedTags((prev) =>
@@ -147,16 +212,18 @@ export default function SessionsScreen() {
           <Ionicons name="chevron-back" size={18} color={tokens.textMid.hex} />
         </Pressable>
         <Text className="text-text-hi text-text20 flex-1">Sessions</Text>
-        <Pressable
-          className={`rounded-full px-3.5 py-2 ${selectedTags.length > 0 ? 'bg-brand' : 'bg-tint-secondary'}`}
-          onPress={() => setShowTagFilter(true)}
-        >
-          <Text
-            className={`text-text13 font-medium ${selectedTags.length > 0 ? 'text-text-always-white' : 'text-text-mid'}`}
+        {usesCloud && (
+          <Pressable
+            className={`rounded-full px-3.5 py-2 ${selectedTags.length > 0 ? 'bg-brand' : 'bg-tint-secondary'}`}
+            onPress={() => setShowTagFilter(true)}
           >
-            Tags{selectedTags.length > 0 ? ` (${selectedTags.length})` : ''}
-          </Text>
-        </Pressable>
+            <Text
+              className={`text-text13 font-medium ${selectedTags.length > 0 ? 'text-text-always-white' : 'text-text-mid'}`}
+            >
+              Tags{selectedTags.length > 0 ? ` (${selectedTags.length})` : ''}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {actionNote && (
@@ -184,7 +251,7 @@ export default function SessionsScreen() {
       </View>
 
       {/* Active tags */}
-      {selectedTags.length > 0 && (
+      {usesCloud && selectedTags.length > 0 && (
         <View className="px-5 pb-2">
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {selectedTags.map((tag) => (
@@ -202,51 +269,87 @@ export default function SessionsScreen() {
       )}
 
       {isLoading && <BoardSkeleton />}
-      {error && (
+      {!isLoading && usesCloud && !usesComputer && cloudQuery.error && sections.length === 0 && (
         <ErrorState
           title="Could not load sessions"
-          message={error.message}
-          onRetry={() => refetch()}
+          message={cloudQuery.error.message}
+          onRetry={refreshAll}
         />
       )}
-      {!isLoading && !error && filtered.length === 0 && (
-        <EmptyState
-          icon=">_"
-          title={data && data.length > 0 ? 'No matches' : 'No sessions yet'}
-          message={
-            data && data.length > 0
-              ? 'No sessions match your search or tag filters.'
-              : 'Start a new session from Home.'
-          }
-        />
-      )}
+      {!isLoading &&
+        !(usesCloud && !usesComputer && cloudQuery.error && sections.length === 0) &&
+        sections.length === 0 && (
+          <View className="flex-1 px-5">
+            <ComputerDiscoveryNotices computers={computerQuery.data?.computers ?? []} />
+            {usesCloud && usesComputer && cloudQuery.error && (
+              <View className="rounded-card border border-border-subtle bg-surface1 px-3 py-2.5 mb-2">
+                <Text className="text-text-mid text-text12">
+                  Devin Cloud sessions could not be refreshed.
+                </Text>
+              </View>
+            )}
+            <EmptyState
+              icon=">_"
+              title={hasUnfilteredSessions ? 'No matches' : 'No sessions yet'}
+              message={
+                hasUnfilteredSessions
+                  ? 'No sessions match your search or tag filters.'
+                  : usesComputer && !usesCloud
+                    ? 'Start or resume a session on your paired Mac.'
+                    : 'Start a new session from Home.'
+              }
+            />
+          </View>
+        )}
 
-      {!error && filtered.length > 0 && (
-        <SectionList
+      {sections.length > 0 && (
+        <SectionList<BoardRow, BoardSection>
           className="flex-1 px-5"
           contentContainerClassName="pb-6"
           sections={sections}
-          keyExtractor={(item) => item.session_id}
-          renderSectionHeader={({ section: { section } }) => (
+          keyExtractor={(item) =>
+            item.kind === 'cloud'
+              ? `cloud:${item.session.session_id}`
+              : `computer:${item.session.bridgeId}:${item.session.id}`
+          }
+          ListHeaderComponent={
+            <View>
+              <ComputerDiscoveryNotices computers={computerQuery.data?.computers ?? []} />
+              {usesCloud && cloudQuery.error && (
+                <View className="rounded-card border border-border-subtle bg-surface1 px-3 py-2.5 mb-2">
+                  <Text className="text-text-mid text-text12">
+                    Devin Cloud sessions could not be refreshed.
+                  </Text>
+                </View>
+              )}
+            </View>
+          }
+          renderSectionHeader={({ section: boardSection }) => (
             <View className="py-2 bg-surface0">
               <Text className="text-text-low text-text12 font-medium uppercase tracking-wider">
-                {sectionTitles[section]} (
-                {sections.find((s) => s.section === section)?.data.length ?? 0})
+                {boardSection.section === 'computer'
+                  ? 'Computer'
+                  : sectionTitles[boardSection.section]}{' '}
+                ({boardSection.data.length})
               </Text>
             </View>
           )}
-          renderItem={({ item }) => (
-            <SessionRow
-              session={item}
-              pinned={pinnedSessionIds.includes(item.session_id)}
-              onPress={() => router.push(`/(main)/session/${item.session_id}`)}
-              onLongPress={() => setContextSession(item)}
-            />
-          )}
+          renderItem={({ item }) =>
+            item.kind === 'computer' ? (
+              <ComputerSessionRow session={item.session} />
+            ) : (
+              <SessionRow
+                session={item.session}
+                pinned={pinnedSessionIds.includes(item.session.session_id)}
+                onPress={() => router.push(`/(main)/session/${item.session.session_id}`)}
+                onLongPress={() => setContextSession(item.session)}
+              />
+            )
+          }
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
-              onRefresh={() => refetch()}
+              onRefresh={refreshAll}
               tintColor={tokens.brand.hex}
             />
           }

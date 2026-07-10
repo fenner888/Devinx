@@ -1,6 +1,6 @@
 # Phase 3C — Mobile Connection Modes
 
-Status: mode model, onboarding choice, secure paired-computer registry, pinned iOS transport, pairing coordinator, and in-app scanner UI are implemented. Desktop approval UI and local-session data adapters remain pending.
+Status: mode model, onboarding choice, secure paired-computer registry, pinned iOS transport, pairing and desktop approval, and privacy-minimized local session discovery are implemented. Local session loading, steering, and per-computer removal remain pending.
 
 ## Supported modes
 
@@ -47,8 +47,10 @@ React context receives summaries only. Device private keys, bridge keys, endpoin
 
 Computer onboarding and Settings both reach the same in-app QR pairing flow. A Cloud-only user who adds a Mac moves to Cloud + Computer mode after the credential is securely stored. The camera starts only after an explicit Scan action and permission grant; cancel, background, scan completion, and view removal stop capture.
 
+Computer and Cloud + Computer modes issue signed, pinned health requests and list local sessions only when the bridge advertises read-only discovery. Home and the full Sessions screen render local rows with an explicit Mac name and collision-proof `local_` handle. Default metadata grants expose only workspace basename, title presence, and update time; the UI labels a withheld title instead of inventing or leaking it. Computer-only mode does not present its disabled Cloud composer as a working local-session creator.
+
 ## Remaining acceptance gates
 
-- Render Cloud and local session sources with collision-proof namespaced identifiers.
 - Add per-computer revocation/removal and complete mode switching without trapping a configured user.
+- Add separately authorized local session loading and steering; keep local discovery rows non-interactive until then.
 - Validate cold start, corrupt Secure Store, revoked device, offline computer, Cloud-only regression, and combined mode on real iPhone hardware.

@@ -1,5 +1,6 @@
 export {
   createDeviceIdentity,
+  createRequestIdentity,
   deleteAllDeviceIdentities,
   deleteDeviceIdentity,
   fingerprintPublicKeySpki,

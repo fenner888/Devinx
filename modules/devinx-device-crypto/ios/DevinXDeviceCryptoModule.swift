@@ -64,6 +64,24 @@ public final class DevinXDeviceCryptoModule: Module {
       return Self.base64UrlEncode(Data(SHA256.hash(data: spki)))
     }
 
+    AsyncFunction("createRequestIdentity") { () throws -> [String: String] in
+      let nonceByteCount = 24
+      var nonce = Data(count: nonceByteCount)
+      let status = nonce.withUnsafeMutableBytes { bytes in
+        guard let baseAddress = bytes.baseAddress else { return errSecParam }
+        return SecRandomCopyBytes(kSecRandomDefault, nonceByteCount, baseAddress)
+      }
+      guard status == errSecSuccess else {
+        Self.zeroize(&nonce)
+        throw DeviceCryptoError.randomFailure
+      }
+      defer { Self.zeroize(&nonce) }
+      return [
+        "requestId": UUID().uuidString.lowercased(),
+        "nonce": Self.base64UrlEncode(nonce),
+      ]
+    }
+
     AsyncFunction("getQrScannerPermissionStatus") { () -> String in
       Self.cameraPermissionStatus()
     }
@@ -258,6 +276,7 @@ public final class DevinXDeviceCryptoModule: Module {
 private enum DeviceCryptoError: CodedError {
   case invalidInput
   case keyNotFound
+  case randomFailure
   case keychainFailure
 
   var code: String {
@@ -266,6 +285,8 @@ private enum DeviceCryptoError: CodedError {
       return "ERR_DEVICE_CRYPTO_INVALID_INPUT"
     case .keyNotFound:
       return "ERR_DEVICE_CRYPTO_KEY_NOT_FOUND"
+    case .randomFailure:
+      return "ERR_DEVICE_CRYPTO_RANDOM"
     case .keychainFailure:
       return "ERR_DEVICE_CRYPTO_KEYCHAIN"
     }
@@ -277,6 +298,8 @@ private enum DeviceCryptoError: CodedError {
       return "Device signing input is invalid"
     case .keyNotFound:
       return "Device signing identity was not found"
+    case .randomFailure:
+      return "Secure request identity generation failed"
     case .keychainFailure:
       return "Device signing Keychain operation failed"
     }

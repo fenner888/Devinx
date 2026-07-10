@@ -40,6 +40,10 @@ export function connectionModeUsesCloud(mode: ConnectionMode): boolean {
   return mode === 'cloud' || mode === 'both';
 }
 
+export function connectionModeUsesComputer(mode: ConnectionMode): boolean {
+  return mode === 'computer' || mode === 'both';
+}
+
 export function shouldEnableCloudRequests(
   mode: ConnectionMode,
   hasCloudCredentials: boolean,

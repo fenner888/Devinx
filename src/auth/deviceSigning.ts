@@ -59,12 +59,20 @@ const deviceIdentitySchema = z
   })
   .strict();
 
+const requestIdentitySchema = z
+  .object({
+    requestId: z.string().uuid(),
+    nonce: base64UrlSchema.length(32),
+  })
+  .strict();
+
 interface DevinXDeviceCryptoNativeModule {
   createDeviceIdentity(): Promise<unknown>;
   sign(keyId: string, message: string): Promise<unknown>;
   verify(publicKeySpki: string, message: string, signature: string): Promise<unknown>;
   hmacSha256(secret: string, message: string): Promise<unknown>;
   fingerprintPublicKeySpki?(publicKeySpki: string): Promise<unknown>;
+  createRequestIdentity?(): Promise<unknown>;
   getQrScannerPermissionStatus?(): Promise<unknown>;
   requestQrScannerPermission?(): Promise<unknown>;
   hasDeviceIdentity(keyId: string): Promise<unknown>;
@@ -81,6 +89,11 @@ interface DevinXDeviceCryptoNativeModule {
 export interface DeviceIdentity {
   keyId: string;
   publicKeySpki: string;
+}
+
+export interface RequestIdentity {
+  requestId: string;
+  nonce: string;
 }
 
 export type QrScannerPermission = z.infer<typeof qrScannerPermissionSchema>;
@@ -151,6 +164,14 @@ export async function fingerprintPublicKeySpki(publicKeySpki: string): Promise<s
   return certificateFingerprintSchema.parse(
     await nativeModule.fingerprintPublicKeySpki(publicKeySpkiSchema.parse(publicKeySpki)),
   );
+}
+
+export async function createRequestIdentity(): Promise<RequestIdentity> {
+  const nativeModule = getNativeModule();
+  if (!nativeModule.createRequestIdentity) {
+    throw new Error('Computer requests require a current DevinX iOS build');
+  }
+  return requestIdentitySchema.parse(await nativeModule.createRequestIdentity());
 }
 
 export async function hasDeviceIdentity(keyId: string): Promise<boolean> {

@@ -6,6 +6,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import {
   normalizeConnectionMode,
+  connectionModeUsesComputer,
   isConnectionModeConfigured,
   shouldEnableCloudRequests,
 } from '../../src/lib/connections';
@@ -50,5 +51,11 @@ describe('preferences', () => {
     expect(shouldEnableCloudRequests('cloud', true, true)).toBe(true);
     expect(shouldEnableCloudRequests('both', true, true)).toBe(true);
     expect(shouldEnableCloudRequests('cloud', true, false)).toBe(false);
+  });
+
+  it('enables Computer requests only in Computer and combined modes', () => {
+    expect(connectionModeUsesComputer('cloud')).toBe(false);
+    expect(connectionModeUsesComputer('computer')).toBe(true);
+    expect(connectionModeUsesComputer('both')).toBe(true);
   });
 });
