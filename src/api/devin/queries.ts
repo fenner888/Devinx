@@ -55,6 +55,7 @@ import { queryKeys } from './queryKeys';
 import { pollingPolicy, scalePolling, type ScreenContext } from '@lib/polling';
 import { useAppPreferences } from '@store/preferences';
 import { findPotentialCreatedSession } from '@lib/session-create';
+import { removeSessionFromBoard } from '@lib/session-utils';
 import type {
   Cursor,
   SessionCreateRequest,
@@ -91,7 +92,11 @@ export function useSessions(screen: ScreenContext = 'board') {
         const items: SessionResponse[] = [];
         let cursor: Cursor | null = null;
         for (let page = 0; page < MAX_SESSION_PAGES; page++) {
-          const result = await listSessions(provider, { first: 100, after: cursor });
+          const result = await listSessions(provider, {
+            first: 100,
+            after: cursor,
+            is_archived: false,
+          });
           items.push(...result.items);
           if (!result.hasNextPage || !result.endCursor) break;
           cursor = result.endCursor;
@@ -361,7 +366,18 @@ export function useArchiveSession() {
       if (!provider) throw new Error('Not authenticated');
       await archiveSession(provider, sessionId);
     },
-    onSuccess: (_data, sessionId) => {
+    onMutate: async (sessionId) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.sessions });
+      const previous = queryClient.getQueryData<SessionResponse[]>(queryKeys.sessions);
+      queryClient.setQueryData<SessionResponse[]>(queryKeys.sessions, (sessions) =>
+        removeSessionFromBoard(sessions, sessionId),
+      );
+      return { previous };
+    },
+    onError: (_error, _sessionId, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.sessions, context.previous);
+    },
+    onSettled: (_data, _error, sessionId) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
       queryClient.invalidateQueries({ queryKey: queryKeys.session(sessionId) });
     },

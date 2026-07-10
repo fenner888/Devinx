@@ -15,16 +15,19 @@ export interface ConfirmOptions {
 export function confirmAction(
   { title, message, confirmLabel, destructive }: ConfirmOptions,
   onConfirm: () => void,
+  onCancel?: () => void,
 ): void {
   if (Platform.OS === 'web') {
     // eslint-disable-next-line no-alert
     if (typeof window !== 'undefined' && window.confirm(`${title}\n\n${message}`)) {
       onConfirm();
+    } else {
+      onCancel?.();
     }
     return;
   }
   Alert.alert(title, message, [
-    { text: 'Cancel', style: 'cancel' },
+    { text: 'Cancel', style: 'cancel', onPress: onCancel },
     { text: confirmLabel, style: destructive ? 'destructive' : 'default', onPress: onConfirm },
   ]);
 }
