@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const BRIDGE_PROTOCOL_VERSION = 1 as const;
 
-const opaqueIdSchema = z
+export const opaqueIdSchema = z
   .string()
   .min(16)
   .max(128)
@@ -10,6 +10,18 @@ const opaqueIdSchema = z
 
 const sessionIdSchema = z.string().min(1).max(512);
 const cursorSchema = z.string().min(1).max(4096);
+export const deviceNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .refine(
+    (value) => [...value].every((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint >= 32 && codePoint !== 127;
+    }),
+    'Device name contains control characters',
+  );
 
 export const bridgeMethodSchema = z.enum([
   'bridge.health',
@@ -78,16 +90,29 @@ export const deviceRecordSchema = z
   .object({
     bridgeId: opaqueIdSchema,
     deviceId: opaqueIdSchema,
+    deviceName: deviceNameSchema,
     publicKeySpki: z
       .string()
       .min(32)
       .max(1024)
       .regex(/^[A-Za-z0-9_-]+$/),
     status: z.enum(['active', 'revoked']),
+    pairedAt: z.number().int().nonnegative(),
     permissions: z.array(bridgePermissionSchema).max(bridgePermissionSchema.options.length),
     allowedSessionIds: z.array(sessionIdSchema).max(10_000).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (new Set(value.permissions).size !== value.permissions.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Permissions must be unique' });
+    }
+    if (
+      value.allowedSessionIds &&
+      new Set(value.allowedSessionIds).size !== value.allowedSessionIds.length
+    ) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Session scopes must be unique' });
+    }
+  });
 
 export const bodySchemas = {
   'bridge.health': bridgeHealthBodySchema,

@@ -30,8 +30,10 @@ describe('Desktop Bridge security core', () => {
     device = {
       bridgeId: BRIDGE_ID,
       deviceId: DEVICE_ID,
+      deviceName: 'Frank’s iPhone',
       publicKeySpki: publicKey.export({ format: 'der', type: 'spki' }).toString('base64url'),
       status: 'active',
+      pairedAt: NOW - 60_000,
       permissions: [...ALL_PERMISSIONS],
     };
     devices = {
