@@ -1,4 +1,10 @@
 export { canonicalJson } from './canonical';
+export {
+  AcpSessionClient,
+  type AcpClientOptions,
+  type AcpSessionMetadata,
+  type AcpSessionPage,
+} from './acp';
 export { InMemoryReplayGuard, type ReplayGuard } from './replay';
 export {
   PairingManager,
