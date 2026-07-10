@@ -14,7 +14,8 @@
         "NSFileProtection": "NSFileProtectionComplete",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false
-        }
+        },
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -22,7 +23,10 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#141414"
-      }
+      },
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -84,17 +88,18 @@
     },
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "ca40fc46-e834-4b20-8214-a47de532a426"
       },
       "router": {
         "origin": "devinx://"
       }
     },
     "updates": {
-      "url": ""
+      "url": "https://u.expo.dev/ca40fc46-e834-4b20-8214-a47de532a426"
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "owner": "fenner888"
   }
 }
