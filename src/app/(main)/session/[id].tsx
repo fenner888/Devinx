@@ -7,7 +7,7 @@
  * Message steering: send message to session.
  * Polls with useSession + useMessages hooks.
  */
-import { useState, useRef, useEffect } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,11 +22,12 @@ import {
   RefreshControl,
   Alert,
   Image,
+  Keyboard,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
   useSession,
@@ -53,7 +54,10 @@ import type { DevinMode, SessionMessage } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
+import { DevinCompanion } from '@components/pets';
 import { getSessionMode, getSessionRepository } from '@lib/session-repository';
+import { devinStateForStatusKey } from '@/pets/devin/model';
+import type { DevinPetState } from '@/pets/devin/types';
 
 type Tab = 'timeline' | 'worklog' | 'changes' | 'insights';
 
@@ -90,6 +94,8 @@ export default function SessionDetailScreen() {
   const [tagError, setTagError] = useState<string | null>(null);
   // Optimistically-echoed user message, shown instantly until the real one lands.
   const [pendingText, setPendingText] = useState<string | null>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [companionActive, setCompanionActive] = useState(false);
 
   const validId = id && isValidSessionId(id) ? id : undefined;
   const { data: session, isLoading, error, refetch } = useSession(validId);
@@ -100,6 +106,13 @@ export default function SessionDetailScreen() {
   const updateTags = useUpdateTags(validId);
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
+
+  useFocusEffect(
+    useCallback(() => {
+      setCompanionActive(true);
+      return () => setCompanionActive(false);
+    }, []),
+  );
 
   // Clear the optimistic echo once the real user message shows up in the list.
   useEffect(() => {
@@ -125,9 +138,22 @@ export default function SessionDetailScreen() {
     };
   }, [session]);
 
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   if (!validId) {
     return (
-      <SafeAreaView className="flex-1 bg-surface0 items-center justify-center" edges={['top']}>
+      <SafeAreaView className="flex-1 bg-canvas items-center justify-center" edges={['top']}>
         <Text className="text-failed text-text14">Invalid session ID</Text>
         <Pressable className="mt-4" onPress={() => router.back()}>
           <Text className="text-brand-text text-text14">Go back</Text>
@@ -138,7 +164,7 @@ export default function SessionDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
+      <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
         <View className="flex-row items-center px-4 py-3">
           <BackButton onPress={() => router.back()} />
         </View>
@@ -149,7 +175,7 @@ export default function SessionDetailScreen() {
 
   if (error || !session) {
     return (
-      <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
+      <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
         <View className="flex-row items-center px-4 py-3">
           <BackButton onPress={() => router.back()} />
         </View>
@@ -198,6 +224,9 @@ export default function SessionDetailScreen() {
     const text = messageText.trim();
     if (!text || sendMessage.isPending || uploadAttachment.isPending) return;
     hapticLight();
+    // Give the timeline back the full viewport as soon as the user sends so
+    // the response and Devin's walking state are not hidden by the keyboard.
+    Keyboard.dismiss();
     // Echo the message immediately, clear the input, then send.
     const attachments = messageAttachments;
     setPendingText(text);
@@ -230,9 +259,17 @@ export default function SessionDetailScreen() {
     session.status === 'running' ||
     session.status === 'resuming' ||
     session.status_detail === 'working';
+  // Optimistic sends may briefly lead server polling. Otherwise the canonical
+  // status key must win so running/waiting sessions do not look active.
+  const companionIsSending = sendMessage.isPending || !!pendingText;
+  const canonicalCompanionState = devinStateForStatusKey(statusKey);
+  const companionState =
+    companionIsSending || canonicalCompanionState === 'working'
+      ? 'thinking'
+      : canonicalCompanionState;
 
   return (
-    <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
       {/* Header */}
       <View className="px-4 py-3 border-b border-border-subtle">
         <View className="flex-row items-center mb-2">
@@ -335,6 +372,10 @@ export default function SessionDetailScreen() {
               pendingText={pendingText}
               isSending={sendMessage.isPending}
               isWorking={isWorking}
+              companionState={companionState}
+              companionSize={keyboardVisible ? 72 : 104}
+              companionActive={companionActive}
+              companionAccessibilityLabel={`Devin companion, ${label}`}
             />
           )}
           {tab === 'worklog' && <WorklogTab session={session} />}
@@ -346,7 +387,7 @@ export default function SessionDetailScreen() {
             Bottom inset clears the iOS home indicator without sitting too low. */}
         {canSend && (
           <View
-            className="px-3 pt-2 border-t border-border-subtle bg-surface0"
+            className="px-3 pt-2 border-t border-border-subtle bg-canvas"
             style={{ paddingBottom: Math.max(insets.bottom, 8) }}
           >
             {session.status === 'suspended' && (
@@ -748,12 +789,20 @@ function TimelineTab({
   pendingText,
   isSending,
   isWorking,
+  companionState,
+  companionSize,
+  companionActive,
+  companionAccessibilityLabel,
 }: {
   messages: SessionMessage[];
   isLoading: boolean;
   pendingText: string | null;
   isSending: boolean;
   isWorking: boolean;
+  companionState: DevinPetState;
+  companionSize: number;
+  companionActive: boolean;
+  companionAccessibilityLabel: string;
 }) {
   const listRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
@@ -781,6 +830,14 @@ function TimelineTab({
     return (
       <View className="flex-1 items-center justify-center px-6">
         <Text className="text-text-mid text-text14">No messages yet.</Text>
+        <View className="mt-4">
+          <DevinCompanion
+            state={companionState}
+            size={companionSize}
+            active={companionActive}
+            accessibilityLabel={companionAccessibilityLabel}
+          />
+        </View>
       </View>
     );
   }
@@ -815,6 +872,18 @@ function TimelineTab({
       )}
       {/* Live "Devin is working" indicator. */}
       {isWorking && <WorkingIndicator />}
+      {/* Devin traverses the response-feed edge directly above the composer
+          while active, without adding a separate shelf or background bar. */}
+      <View className="mb-2">
+        <DevinCompanion
+          state={companionState}
+          size={companionSize}
+          active={companionActive}
+          travel={isWorking && companionState === 'thinking'}
+          travelTrack
+          accessibilityLabel={companionAccessibilityLabel}
+        />
+      </View>
     </ScrollView>
   );
 }

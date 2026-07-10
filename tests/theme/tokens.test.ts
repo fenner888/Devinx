@@ -6,6 +6,11 @@
 import { dark, light, statusLabels, radii, fonts, typeScale } from '../../src/theme/tokens';
 
 describe('design tokens (§5.0 extraction)', () => {
+  it('uses a true-black product canvas in dark mode', () => {
+    expect(dark.canvas.hex).toBe('#000000');
+    expect(light.canvas.hex).toBe('#FCFCFC');
+  });
+
   it('dark surface0 is the extracted #141414, not the fallback #0B0E14', () => {
     expect(dark.surface0.hex).toBe('#141414');
     expect(dark.surface0.hex).not.toBe('#0B0E14');

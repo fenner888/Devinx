@@ -1,5 +1,6 @@
 const mockSendMessage = jest.fn();
 const mockUploadAttachment = jest.fn();
+const mockDevinCompanion = jest.fn((_props: unknown) => null);
 const mockSession = {
   acus_consumed: 0,
   category: null,
@@ -14,6 +15,7 @@ const mockSession = {
   service_user_id: null,
   session_id: 'session-1',
   status: 'running',
+  status_detail: 'working',
   tags: [],
   title: 'Test session',
   updated_at: 1,
@@ -30,6 +32,7 @@ jest.mock('@expo/vector-icons', () => ({
 }));
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: jest.fn(),
   useLocalSearchParams: jest.fn(() => ({ id: 'session-1' })),
   useRouter: jest.fn(() => ({ back: jest.fn() })),
 }));
@@ -95,6 +98,11 @@ jest.mock('@lib/haptics', () => ({
   hapticError: jest.fn(),
 }));
 
+jest.mock('@components/pets', () => ({
+  DevinCompanion: (props: unknown) => mockDevinCompanion(props),
+}));
+
+import { Keyboard } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
 import SessionDetailScreen from '../../src/app/(main)/session/[id]';
@@ -107,6 +115,8 @@ const imagePicker = ImagePicker.launchImageLibraryAsync as jest.MockedFunction<
 describe('active session composer', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSession.status = 'running';
+    mockSession.status_detail = 'working';
   });
 
   it('shows cloud and repository context', async () => {
@@ -122,6 +132,7 @@ describe('active session composer', () => {
   });
 
   it('uploads an image and sends it with the follow-up message', async () => {
+    const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
     imagePicker.mockResolvedValue({
       canceled: false,
       assets: [
@@ -169,5 +180,41 @@ describe('active session composer', () => {
       },
       expect.any(Object),
     );
+    expect(dismissKeyboard).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => {
+      const calls = mockDevinCompanion.mock.calls;
+      const props = calls[calls.length - 1]?.[0] as
+        { state?: string; travel?: boolean; travelTrack?: boolean } | undefined;
+      expect(props).toEqual(
+        expect.objectContaining({ state: 'thinking', travel: true, travelTrack: true }),
+      );
+    });
+  });
+
+  it('shows a calm waiting companion for a running session that needs user input', async () => {
+    mockSession.status_detail = 'waiting_for_user';
+
+    render(
+      <ThemeProvider>
+        <SessionDetailScreen />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      const calls = mockDevinCompanion.mock.calls;
+      const props = calls[calls.length - 1]?.[0] as
+        {
+          accessibilityLabel?: string;
+          size?: number;
+          state?: string;
+          travel?: boolean;
+          travelTrack?: boolean;
+        } | undefined;
+      expect(props).toEqual(
+        expect.objectContaining({ size: 104, state: 'waiting', travel: false, travelTrack: true }),
+      );
+      expect(props?.accessibilityLabel).toBe('Devin companion, Waiting for response');
+    });
   });
 });

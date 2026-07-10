@@ -26,6 +26,8 @@ export interface ColorToken {
 }
 
 export interface ThemeTokens {
+  /** Full-screen canvas used where the product calls for true black in dark mode. */
+  canvas: ColorToken;
   /** App background (Devin `--bg-page`). */
   surface0: ColorToken;
   /** Cards / sidebar / list rows (Devin `--bg-wash`). */
@@ -125,6 +127,7 @@ const c = (channels: string, hex: string): ColorToken => ({ channels, hex });
 // [FALLBACK-REPLACED §1.1] surface1 #11151F → #191919 (Devin --bg-wash dark)
 // [FALLBACK-REPLACED §1.1] surface2 #1A2029 → #1F1F1F (Devin --bg-elevated dark)
 export const dark: ThemeTokens = {
+  canvas: c('0 0 0', '#000000'),
   surface0: c('20 20 20', '#141414'),
   surface1: c('25 25 25', '#191919'),
   surface2: c('31 31 31', '#1F1F1F'),
@@ -189,6 +192,7 @@ export const dark: ThemeTokens = {
 // [FALLBACK-REPLACED §1.1] surface1 #FFFFFF → #F8F8F8 (Devin --bg-wash light)
 // [FALLBACK-REPLACED §1.1] surface2 #F1EDE6 → #FFFFFF (Devin --bg-elevated light)
 export const light: ThemeTokens = {
+  canvas: c('252 252 252', '#FCFCFC'),
   surface0: c('252 252 252', '#FCFCFC'),
   surface1: c('248 248 248', '#F8F8F8'),
   surface2: c('255 255 255', '#FFFFFF'),

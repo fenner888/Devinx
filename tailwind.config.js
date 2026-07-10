@@ -10,6 +10,7 @@ module.exports = {
         // by ThemeProvider. Raw hexes live ONLY in tokens.ts (spec §5.1).
         // Alpha is baked into the channel values (e.g. "255 255 255 / .9")
         // so we don't use <alpha-value> here — it would conflict.
+        canvas: 'rgb(var(--color-canvas))',
         surface0: 'rgb(var(--color-surface0))',
         surface1: 'rgb(var(--color-surface1))',
         surface2: 'rgb(var(--color-surface2))',

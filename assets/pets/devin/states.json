@@ -1,0 +1,216 @@
+{
+  "schema": "agent_pets.mobile.states.v1",
+  "petId": "devin",
+  "defaultState": "idle",
+  "atlas": {
+    "asset": "assets/sprites/devin-spritesheet.webp",
+    "framesRoot": "assets/frames",
+    "cellWidth": 192,
+    "cellHeight": 208,
+    "columns": 8
+  },
+  "states": [
+    {
+      "id": "idle",
+      "label": "Idle",
+      "description": "Devin sits cross-legged and types calmly on the laptop.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "idle",
+        "framesDir": "assets/frames/idle",
+        "rowIndex": 0,
+        "frames": 6,
+        "loop": true,
+        "recommendedFps": 4
+      }
+    },
+    {
+      "id": "thinking",
+      "label": "Thinking",
+      "description": "Devin walks in place with the laptop while thinking through the next step.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "running",
+        "framesDir": "assets/frames/running",
+        "rowIndex": 7,
+        "frames": 6,
+        "loop": true,
+        "recommendedFps": 5
+      }
+    },
+    {
+      "id": "working",
+      "label": "Working",
+      "description": "Devin focuses on the laptop and reviews active work.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "review",
+        "framesDir": "assets/frames/review",
+        "rowIndex": 8,
+        "frames": 6,
+        "loop": true,
+        "recommendedFps": 6
+      }
+    },
+    {
+      "id": "success",
+      "label": "Success",
+      "description": "Devin does a small happy bounce while keeping the laptop secure.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "jumping",
+        "framesDir": "assets/frames/jumping",
+        "rowIndex": 4,
+        "frames": 5,
+        "loop": false,
+        "recommendedFps": 8
+      },
+      "fallback": "idle"
+    },
+    {
+      "id": "blocked",
+      "label": "Blocked",
+      "description": "Devin pauses and shows a worried laptop moment when approval or clarification is needed.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "failed",
+        "framesDir": "assets/frames/failed",
+        "rowIndex": 5,
+        "frames": 8,
+        "loop": true,
+        "recommendedFps": 5
+      }
+    },
+    {
+      "id": "warning",
+      "label": "Warning",
+      "description": "Devin uses the same worried laptop reaction for risky or destructive actions.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "failed",
+        "framesDir": "assets/frames/failed",
+        "rowIndex": 5,
+        "frames": 8,
+        "loop": true,
+        "recommendedFps": 5
+      },
+      "fallback": "blocked"
+    },
+    {
+      "id": "error",
+      "label": "Error",
+      "description": "Devin reacts gently when a task fails or needs recovery.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "failed",
+        "framesDir": "assets/frames/failed",
+        "rowIndex": 5,
+        "frames": 8,
+        "loop": false,
+        "recommendedFps": 6
+      },
+      "fallback": "blocked"
+    },
+    {
+      "id": "reminding",
+      "label": "Reminding",
+      "description": "Devin waves while holding the laptop for a friendly nudge.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "waving",
+        "framesDir": "assets/frames/waving",
+        "rowIndex": 3,
+        "frames": 4,
+        "loop": true,
+        "recommendedFps": 5
+      }
+    },
+    {
+      "id": "sleeping",
+      "label": "Sleeping",
+      "description": "Devin settles into a quiet low-motion seated state.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "waiting",
+        "framesDir": "assets/frames/waiting",
+        "rowIndex": 6,
+        "frames": 6,
+        "loop": true,
+        "recommendedFps": 3
+      },
+      "fallback": "idle"
+    },
+    {
+      "id": "waiting",
+      "label": "Waiting",
+      "description": "Devin sits with the laptop open while waiting for input or background completion.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "waiting",
+        "framesDir": "assets/frames/waiting",
+        "rowIndex": 6,
+        "frames": 6,
+        "loop": true,
+        "recommendedFps": 4
+      }
+    },
+    {
+      "id": "celebrating",
+      "label": "Celebrating",
+      "description": "Devin uses the small bounce for milestone or completion moments.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "jumping",
+        "framesDir": "assets/frames/jumping",
+        "rowIndex": 4,
+        "frames": 5,
+        "loop": false,
+        "recommendedFps": 8
+      },
+      "fallback": "success"
+    },
+    {
+      "id": "focused",
+      "label": "Focused",
+      "description": "Devin stays low-noise and focused on the laptop.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "review",
+        "framesDir": "assets/frames/review",
+        "rowIndex": 8,
+        "frames": 6,
+        "loop": true,
+        "recommendedFps": 4
+      },
+      "fallback": "working"
+    },
+    {
+      "id": "walkingRight",
+      "label": "Walking Right",
+      "description": "Internal locomotion row for moving Devin across an app surface.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "running-right",
+        "framesDir": "assets/frames/running-right",
+        "rowIndex": 1,
+        "frames": 8,
+        "loop": true,
+        "recommendedFps": 8
+      }
+    },
+    {
+      "id": "walkingLeft",
+      "label": "Walking Left",
+      "description": "Internal locomotion row for moving Devin across an app surface.",
+      "animation": {
+        "kind": "atlas-row",
+        "row": "running-left",
+        "framesDir": "assets/frames/running-left",
+        "rowIndex": 2,
+        "frames": 8,
+        "loop": true,
+        "recommendedFps": 8
+      }
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "schema": "agent_pets.mobile.pet.v1",
+  "id": "devin",
+  "displayName": "Devin",
+  "speciesInspiration": "beaver/otter",
+  "role": "mobile builder companion",
+  "platform": "ios-react-native",
+  "description": "A cheerful beaver/otter mobile AI companion holding a laptop, designed to make app work visible inside DevinX.",
+  "personality": [
+    "helpful",
+    "curious",
+    "builder-minded",
+    "gentle",
+    "focused"
+  ],
+  "visualIdentity": {
+    "body": "warm tan rounded beaver/otter body with a white muzzle and thick black outline",
+    "face": "simple black oval eyes with white highlights, rounded black nose, and cheerful whisker marks",
+    "prop": "silver laptop held, carried, or opened on Devin's lap",
+    "tail": "flat brown beaver-style tail with subtle crosshatch texture",
+    "style": "Codex-compatible pixel-adjacent mascot sprite, readable at small mobile sizes"
+  },
+  "defaultState": "idle",
+  "supportedStates": [
+    "idle",
+    "thinking",
+    "working",
+    "success",
+    "blocked",
+    "warning",
+    "error",
+    "reminding",
+    "sleeping",
+    "waiting",
+    "celebrating",
+    "focused"
+  ],
+  "assetStatus": "animated-atlas-ready",
+  "atlas": {
+    "format": "codex-pet-8x9",
+    "cellWidth": 192,
+    "cellHeight": 208,
+    "columns": 8,
+    "rows": 9,
+    "rowOrder": [
+      "idle",
+      "running-right",
+      "running-left",
+      "waving",
+      "jumping",
+      "failed",
+      "waiting",
+      "running",
+      "review"
+    ]
+  },
+  "assets": {
+    "reference": "assets/reference/devin-source.png",
+    "spritesheetPng": "assets/sprites/devin-spritesheet.png",
+    "spritesheetWebp": "assets/sprites/devin-spritesheet.webp",
+    "framesRoot": "assets/frames",
+    "contactSheet": "qa/contact-sheet.png"
+  },
+  "notes": [
+    "This package contains a real animated 8x9 Codex-style sprite atlas.",
+    "For DevinX, use this as an in-app companion asset rather than a macOS-style system overlay.",
+    "The current rows include seated laptop typing, laptop walk cycles, wave, bounce, failed, waiting, and review behavior."
+  ]
+}

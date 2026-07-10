@@ -1,5 +1,6 @@
 const mockUploadAttachment = jest.fn();
 const mockCreateSession = jest.fn();
+const mockDevinCompanion = jest.fn((_props: unknown) => null);
 
 jest.mock('react-native-safe-area-context', () => ({
   ...jest.requireActual('react-native-safe-area-context'),
@@ -11,6 +12,7 @@ jest.mock('@expo/vector-icons', () => ({
 }));
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: jest.fn(),
   useRouter: jest.fn(() => ({ push: jest.fn() })),
 }));
 
@@ -54,6 +56,10 @@ jest.mock('@components/ModeSettings', () => ({
   ModeSettings: () => null,
 }));
 
+jest.mock('@components/pets', () => ({
+  DevinCompanion: (props: unknown) => mockDevinCompanion(props),
+}));
+
 jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: jest.fn(),
 }));
@@ -70,6 +76,25 @@ import { ThemeProvider } from '../../src/theme/ThemeProvider';
 describe('home attachment control', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('uses Devin as the prominent home-screen visual anchor', () => {
+    const { getByText, queryByText } = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(getByText('Devin is ready to build')).toBeTruthy();
+    expect(getByText('What should Devin build?')).toBeTruthy();
+    expect(
+      queryByText('Describe a task — it runs in the cloud and you can steer it here.'),
+    ).toBeNull();
+    const props = mockDevinCompanion.mock.calls[0]?.[0] as
+      | { size?: number; state?: string }
+      | undefined;
+    expect(props?.state).toBe('idle');
+    expect(props?.size).toBeGreaterThanOrEqual(164);
   });
 
   it('opens attachment sources without opening the execution mode picker', () => {
@@ -100,6 +125,20 @@ describe('home attachment control', () => {
     fireEvent.press(getByLabelText('Use repository fenner888/Devinx'));
 
     expect(getByLabelText('Repository: fenner888/Devinx')).toBeTruthy();
+  });
+
+  it('filters repository rows from the picker search field', () => {
+    const { getByLabelText, queryByLabelText, getByText } = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(getByLabelText('Repository: Any repository'));
+    fireEvent.changeText(getByLabelText('Search repositories'), 'missing');
+
+    expect(queryByLabelText('Use repository fenner888/Devinx')).toBeNull();
+    expect(getByText('No repositories match your search.')).toBeTruthy();
   });
 
   it('includes the selected repository when starting a session', () => {

@@ -3,7 +3,7 @@
  * Top-left menu (slide-over) for navigation, a friendly prompt, a large
  * rounded composer, and a compact recent-sessions list.
  */
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,10 @@ import {
   ActivityIndicator,
   Image,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
 import {
@@ -33,6 +34,7 @@ import { OfflineBanner } from '@components/OfflineBanner';
 import { NavMenu } from '@components/NavMenu';
 import { ModeSettings } from '@components/ModeSettings';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
+import { DevinCompanion } from '@components/pets';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
 import {
@@ -54,12 +56,13 @@ export default function HomeScreen() {
   const router = useRouter();
   const { name, tokens } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const defaultTags = useAppPreferences((state) => state.defaultTags);
   const { data: sessions } = useSessions('board');
   const createSession = useCreateSession();
   const uploadAttachment = useUploadAttachment();
   const { data: playbooks } = usePlaybooks();
-  const { data: repositories } = useRepositories();
+  const { data: repositories, isLoading: repositoriesLoading } = useRepositories();
   const { data: scanFindings } = useCodeScanFindings();
 
   const [prompt, setPrompt] = useState('');
@@ -68,6 +71,7 @@ export default function HomeScreen() {
   const [mode, setMode] = useState<DevinMode>('normal');
   const [showPlaybookPicker, setShowPlaybookPicker] = useState(false);
   const [showRepoPicker, setShowRepoPicker] = useState(false);
+  const [repoQuery, setRepoQuery] = useState('');
   const [showModePicker, setShowModePicker] = useState(false);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -76,12 +80,29 @@ export default function HomeScreen() {
   >([]);
   const [uploadingAttachmentName, setUploadingAttachmentName] = useState<string | null>(null);
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [companionActive, setCompanionActive] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setCompanionActive(true);
+      return () => setCompanionActive(false);
+    }, []),
+  );
 
   const recent = (sessions ?? []).slice(0, 5);
   const selectedPlaybookTitle = selectedPlaybook
     ? (playbooks?.find((p) => p.playbook_id === selectedPlaybook)?.title ?? 'Playbook')
     : null;
   const selectedRepoName = selectedRepo?.split('/').filter(Boolean).pop() ?? 'Any repository';
+  const companionState = composerError ? 'error' : createSession.isPending ? 'working' : 'idle';
+  const normalizedRepoQuery = repoQuery.trim().toLowerCase();
+  const filteredRepositories = (repositories ?? []).filter(
+    (repository) =>
+      normalizedRepoQuery.length === 0 ||
+      repository.repo_name.toLowerCase().includes(normalizedRepoQuery) ||
+      repository.repo_path.toLowerCase().includes(normalizedRepoQuery),
+  );
+  const companionSize = Math.round(Math.min(height < 700 ? 184 : 220, Math.max(164, width * 0.54)));
 
   async function handleAttachment(file: PickedAttachment) {
     setComposerError(null);
@@ -143,9 +164,9 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
-      {/* Top bar — menu + wordmark */}
-      <View className="flex-row items-center px-4 pt-2 pb-1">
+    <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
+      {/* Balanced top bar keeps the wordmark centered at every width. */}
+      <View className="flex-row items-center px-4 pt-2 pb-2">
         <Pressable
           className="w-10 h-10 rounded-full items-center justify-center"
           onPress={() => setShowMenu(true)}
@@ -155,12 +176,17 @@ export default function HomeScreen() {
         >
           <Ionicons name="menu" size={24} color={tokens.textMid.hex} />
         </Pressable>
-        <Image
-          source={name === 'light' ? WORDMARK_LIGHT : WORDMARK_DARK}
-          className="w-28 h-7 ml-1"
-          resizeMode="contain"
-          accessibilityLabel="DevinX"
-        />
+        <View className="flex-1 items-center">
+          <Image
+            source={name === 'light' ? WORDMARK_LIGHT : WORDMARK_DARK}
+            className="w-28 h-7"
+            resizeMode="contain"
+            accessibilityLabel="DevinX"
+          />
+        </View>
+        <View className="w-10 h-10 items-center justify-center" accessible={false}>
+          <Ionicons name="cloud-outline" size={23} color={tokens.textMid.hex} />
+        </View>
       </View>
 
       <NavMenu
@@ -177,19 +203,41 @@ export default function HomeScreen() {
       >
         <ScrollView
           className="flex-1"
-          contentContainerClassName="flex-grow px-5 pt-6 pb-10"
+          contentContainerClassName="flex-grow px-5 pt-4 pb-10"
           keyboardShouldPersistTaps="handled"
         >
-          {/* Hero prompt */}
-          <Text className="text-text-hi text-text28 mb-1">What should Devin build?</Text>
-          <Text className="text-text-mid text-text14 mb-6">
-            Describe a task — it runs in the cloud and you can steer it here.
-          </Text>
+          {/* Readiness context is informational, not a misleading tap target. */}
+          <View className="rounded-cardLg border border-border-subtle bg-surface1 px-4 py-3">
+            <View className="flex-row items-start">
+              <View className="mt-1.5 mr-3 h-2 w-2 rounded-full bg-brand" />
+              <View className="flex-1">
+                <Text className="text-text-hi text-text15 font-medium">
+                  Devin is ready to build
+                </Text>
+                <Text className="mt-1 text-text-mid text-text13">
+                  Ask anything. Devin runs in the cloud.
+                </Text>
+              </View>
+            </View>
+          </View>
 
-          {/* Composer */}
-          <View className="bg-surface1 rounded-cardLg border border-border">
+          {/* Devin is the home-screen visual anchor, not a floating overlay. */}
+          <View className="items-center justify-center py-3">
+            <DevinCompanion
+              state={companionState}
+              size={companionSize}
+              active={companionActive}
+              accessibilityLabel={`Devin companion, ${companionState}`}
+            />
+          </View>
+
+          {/* One clean composer surface; no additional card around it. */}
+          <Text className="mb-3 text-text-hi text-text17 font-medium">
+            What should Devin build?
+          </Text>
+          <View className="rounded-cardLg border border-border bg-surface1">
             <TextInput
-              className="text-text-hi text-text16 px-5 pt-5 pb-2 min-h-[88px]"
+              className="text-text-hi text-text16 px-5 pt-5 pb-3 min-h-[112px]"
               value={prompt}
               onChangeText={(v) => setPrompt(v.slice(0, MAX_PROMPT))}
               placeholder="Ask Devin to build features, fix bugs, or work on your code…"
@@ -242,7 +290,7 @@ export default function HomeScreen() {
                 ))}
               </View>
             )}
-            <View className="flex-row items-center justify-between px-3 pb-3">
+            <View className="flex-row items-center justify-between px-4 pb-4">
               <View className="flex-row items-center gap-1">
                 <Pressable
                   className="w-9 h-9 rounded-full items-center justify-center"
@@ -315,7 +363,10 @@ export default function HomeScreen() {
             </View>
             <Pressable
               className="flex-row items-center flex-1"
-              onPress={() => setShowRepoPicker(true)}
+              onPress={() => {
+                setRepoQuery('');
+                setShowRepoPicker(true);
+              }}
               accessibilityRole="button"
               accessibilityLabel={`Repository: ${selectedRepo ?? 'Any repository'}`}
             >
@@ -394,65 +445,163 @@ export default function HomeScreen() {
       >
         <View className="flex-1 bg-scrim justify-end">
           <View
-            className="bg-surface2 rounded-t-sheet px-5 pt-4 max-h-[70%]"
+            className="bg-surface2 rounded-t-sheet pt-3 max-h-[78%]"
             style={{ paddingBottom: Math.max(insets.bottom, 16) }}
             accessibilityViewIsModal
           >
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-text-hi text-text17">Select repository</Text>
+            <View className="self-center h-1 w-10 rounded-full bg-border mb-3" />
+            <View className="flex-row items-center justify-between px-5 mb-4">
+              <View>
+                <Text className="text-text-hi text-text17 font-medium">Select repository</Text>
+                <Text className="text-text-low text-text12 mt-0.5">
+                  Choose the codebase Devin should work in
+                </Text>
+              </View>
               <Pressable
+                className="w-10 h-10 rounded-full items-center justify-center bg-tint-secondary"
                 onPress={() => setShowRepoPicker(false)}
                 accessibilityRole="button"
                 accessibilityLabel="Close repository picker"
               >
-                <Text className="text-brand-text text-text14">Done</Text>
+                <Ionicons name="close" size={19} color={tokens.textMid.hex} />
               </Pressable>
             </View>
-            <ScrollView>
-              <Pressable
-                className={`px-4 py-3 rounded-card mb-2 ${selectedRepo === null ? 'bg-tint-blue' : 'bg-surface1'}`}
-                onPress={() => {
-                  setSelectedRepo(null);
-                  setShowRepoPicker(false);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Use any repository"
-              >
-                <Text
-                  className={`text-text14 ${selectedRepo === null ? 'text-brand-text font-medium' : 'text-text-hi'}`}
-                >
-                  Any repository
-                </Text>
-                <Text className="text-text-low text-text12 mt-0.5">
-                  Let Devin choose from connected repositories
-                </Text>
-              </Pressable>
-              {repositories?.map((repository) => (
+
+            <View className="mx-5 mb-4 h-11 flex-row items-center rounded-card border border-border bg-surface1 px-3">
+              <Ionicons name="search" size={17} color={tokens.textLow.hex} />
+              <TextInput
+                className="ml-2 flex-1 text-text-hi text-text14"
+                value={repoQuery}
+                onChangeText={setRepoQuery}
+                placeholder="Search repositories"
+                placeholderTextColor={tokens.textLow.hex}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                accessibilityLabel="Search repositories"
+              />
+              {repoQuery.length > 0 && (
                 <Pressable
-                  key={repository.provider_repository_id}
-                  className={`px-4 py-3 rounded-card mb-2 ${selectedRepo === repository.repo_path ? 'bg-tint-blue' : 'bg-surface1'}`}
+                  className="w-8 h-8 items-center justify-center"
+                  onPress={() => setRepoQuery('')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear repository search"
+                >
+                  <Ionicons name="close-circle" size={17} color={tokens.textLow.hex} />
+                </Pressable>
+              )}
+            </View>
+
+            <View className="flex-row items-center justify-between px-5 mb-2">
+              <Text className="text-text-low text-text12 font-medium uppercase tracking-wide">
+                Connected repositories
+              </Text>
+              {!repositoriesLoading && (
+                <Text className="text-text-low text-text12">{filteredRepositories.length}</Text>
+              )}
+            </View>
+
+            <ScrollView contentContainerClassName="px-5 pb-2" keyboardShouldPersistTaps="handled">
+              <View className="overflow-hidden rounded-cardLg border border-border-subtle bg-surface1">
+                <Pressable
+                  className={`min-h-16 flex-row items-center px-4 py-3 border-b border-border-subtle ${selectedRepo === null ? 'bg-tint-blue' : ''}`}
                   onPress={() => {
-                    setSelectedRepo(repository.repo_path);
+                    setSelectedRepo(null);
+                    setRepoQuery('');
                     setShowRepoPicker(false);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={`Use repository ${repository.repo_path}`}
+                  accessibilityLabel="Use any repository"
                 >
-                  <Text
-                    className={`text-text14 ${selectedRepo === repository.repo_path ? 'text-brand-text font-medium' : 'text-text-hi'}`}
+                  <View
+                    className={`w-9 h-9 rounded-card items-center justify-center mr-3 ${selectedRepo === null ? 'bg-brand' : 'bg-tint-secondary'}`}
                   >
-                    {repository.repo_name}
-                  </Text>
-                  <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>
-                    {repository.repo_path}
-                  </Text>
+                    <Ionicons
+                      name="git-branch-outline"
+                      size={17}
+                      color={
+                        selectedRepo === null ? tokens.textAlwaysWhite.hex : tokens.textMid.hex
+                      }
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className={`text-text14 ${selectedRepo === null ? 'text-brand-text font-medium' : 'text-text-hi'}`}
+                    >
+                      Any repository
+                    </Text>
+                    <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>
+                      Let Devin choose from connected repositories
+                    </Text>
+                  </View>
+                  {selectedRepo === null && (
+                    <Ionicons name="checkmark-circle" size={20} color={tokens.brandText.hex} />
+                  )}
                 </Pressable>
-              ))}
-              {repositories && repositories.length === 0 && (
-                <Text className="text-text-mid text-text14 py-4">
-                  No connected repositories found.
-                </Text>
-              )}
+
+                {repositoriesLoading && (
+                  <View className="items-center justify-center py-8">
+                    <ActivityIndicator color={tokens.brandText.hex} />
+                  </View>
+                )}
+
+                {!repositoriesLoading &&
+                  filteredRepositories.map((repository, index) => {
+                    const isSelected = selectedRepo === repository.repo_path;
+                    return (
+                      <Pressable
+                        key={repository.provider_repository_id}
+                        className={`min-h-16 flex-row items-center px-4 py-3 ${index < filteredRepositories.length - 1 ? 'border-b border-border-subtle' : ''} ${isSelected ? 'bg-tint-blue' : ''}`}
+                        onPress={() => {
+                          setSelectedRepo(repository.repo_path);
+                          setRepoQuery('');
+                          setShowRepoPicker(false);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Use repository ${repository.repo_path}`}
+                      >
+                        <View
+                          className={`w-9 h-9 rounded-card items-center justify-center mr-3 ${isSelected ? 'bg-brand' : 'bg-tint-secondary'}`}
+                        >
+                          <Ionicons
+                            name="folder-outline"
+                            size={17}
+                            color={isSelected ? tokens.textAlwaysWhite.hex : tokens.textMid.hex}
+                          />
+                        </View>
+                        <View className="flex-1 min-w-0">
+                          <Text
+                            className={`text-text14 ${isSelected ? 'text-brand-text font-medium' : 'text-text-hi'}`}
+                            numberOfLines={1}
+                          >
+                            {repository.repo_name}
+                          </Text>
+                          <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>
+                            {repository.repo_path}
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={20}
+                            color={tokens.brandText.hex}
+                          />
+                        )}
+                      </Pressable>
+                    );
+                  })}
+
+                {!repositoriesLoading && filteredRepositories.length === 0 && (
+                  <View className="items-center px-5 py-8">
+                    <Ionicons name="search-outline" size={22} color={tokens.textLow.hex} />
+                    <Text className="text-text-mid text-text14 mt-2">
+                      {repoQuery.trim()
+                        ? 'No repositories match your search.'
+                        : 'No connected repositories found.'}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </ScrollView>
           </View>
         </View>

@@ -26,6 +26,7 @@ the toggle. Light theme follows system preference.
 
 | Token (Devin)        | Dark (RGB channels)     | Light (RGB channels)    | Hex (dark) | Hex (light) | DevinX semantic name |
 |----------------------|-------------------------|-------------------------|------------|-------------|----------------------|
+| Product canvas       | `0 0 0`                 | `252 252 252`           | `#000000`  | `#FCFCFC`   | `canvas`             |
 | `--bg-page`          | `20 20 20`              | `252 252 252`           | `#141414`  | `#FCFCFC`   | `surface0`           |
 | `--bg-wash`          | `25 25 25`              | `248 248 248`           | `#191919`  | `#F8F8F8`   | `surface1`           |
 | `--bg-elevated`      | `31 31 31`              | `255 255 255`           | `#1F1F1F`  | `#FFFFFF`   | `surface2`           |
