@@ -83,18 +83,13 @@ describe('endpoints — path building & response shaping', () => {
     expect(lastUrl()).not.toContain('devin-devin-');
   });
 
-  it('sendMessage maps attribution to message_as_user_id (not create_as_user_id)', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 204,
-      headers: new Headers(),
-      text: async () => '',
-      json: async () => undefined,
-    });
-    await sendMessage(mockAuth, 'devin-abc', 'hello');
+  it('sendMessage maps attribution and returns the resumed session', async () => {
+    mockFetch.mockResolvedValue(ok({ ...sessionFixture, status: 'resuming' }));
+    const resumed = await sendMessage(mockAuth, 'devin-abc', 'hello');
     const body = lastBody() as Record<string, unknown>;
     expect(body.message_as_user_id).toBe('user-42');
     expect(body.create_as_user_id).toBeUndefined();
+    expect(resumed.status).toBe('resuming');
   });
 
   it('getDailyConsumption normalizes the envelope (unix date → YYYY-MM-DD, null products → 0)', async () => {

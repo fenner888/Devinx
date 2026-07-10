@@ -333,6 +333,7 @@ export default function SessionDetailScreen() {
               messages={messages ?? []}
               isLoading={isLoading}
               pendingText={pendingText}
+              isSending={sendMessage.isPending}
               isWorking={isWorking}
             />
           )}
@@ -654,7 +655,9 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
       {/* Classification */}
       <View className="bg-surface1 rounded-card px-4 py-3 mb-3">
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">Classification</Text>
-        <Text className="text-text-hi text-text14">{analysis.classification}</Text>
+        <Text className="text-text-hi text-text14">
+          {analysis.classification?.category ?? 'Unclassified'}
+        </Text>
         <View className="flex-row mt-2">
           <Text className="text-text-low text-text12">Size: {insights.session_size}</Text>
           <Text className="text-text-low text-text12 ml-3">
@@ -678,32 +681,26 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
               className={`py-2 ${i < analysis.issues.length - 1 ? 'border-b border-border-subtle' : ''}`}
             >
               <View className="flex-row items-center mb-1">
-                <View
-                  className={`rounded-chip px-2 py-0.5 mr-2 ${issue.severity === 'high' ? 'bg-tint-red' : issue.severity === 'medium' ? 'bg-tint-orange' : 'bg-tint-secondary'}`}
-                >
-                  <Text
-                    className={`text-text11 font-medium ${issue.severity === 'high' ? 'text-failed' : issue.severity === 'medium' ? 'text-blocked' : 'text-text-mid'}`}
-                  >
-                    {issue.severity}
-                  </Text>
+                <View className="rounded-chip px-2 py-0.5 mr-2 bg-tint-orange">
+                  <Text className="text-text11 font-medium text-blocked">{issue.label}</Text>
                 </View>
-                <Text className="text-text-hi text-text13 font-medium flex-1">{issue.title}</Text>
+                <Text className="text-text-hi text-text13 font-medium flex-1">{issue.issue}</Text>
               </View>
-              <Text className="text-text-mid text-text13">{issue.description}</Text>
+              <Text className="text-text-mid text-text13">{issue.impact}</Text>
             </View>
           ))}
         </View>
       )}
 
       {/* Suggested actions */}
-      {analysis.action.length > 0 && (
+      {analysis.action_items.length > 0 && (
         <View className="bg-surface1 rounded-card px-4 py-3 mb-3">
           <Text className="text-text-low text-text12 font-medium uppercase mb-2">
             Suggested actions
           </Text>
-          {analysis.action.map((action, i) => (
+          {analysis.action_items.map((action, i) => (
             <Text key={i} className="text-text-mid text-text13 py-1">
-              {'•'} {action}
+              {'•'} {action.action_item}
             </Text>
           ))}
         </View>
@@ -726,18 +723,14 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
       )}
 
       {/* Prompt suggestions */}
-      {analysis.prompts && analysis.prompts.length > 0 && (
+      {analysis.suggested_prompt && (
         <View className="bg-surface1 rounded-card px-4 py-3 mb-3">
-          <Text className="text-text-low text-text12 font-medium uppercase mb-2">Prompt tips</Text>
-          {analysis.prompts.map((p, i) => (
-            <View
-              key={i}
-              className={`py-2 ${i < (analysis.prompts?.length ?? 0) - 1 ? 'border-b border-border-subtle' : ''}`}
-            >
-              <Text className="text-text-hi text-text13 font-medium mb-0.5">{p.title}</Text>
-              <Text className="text-text-mid text-text13">{p.description}</Text>
-            </View>
-          ))}
+          <Text className="text-text-low text-text12 font-medium uppercase mb-2">
+            Suggested prompt
+          </Text>
+          <Text className="text-text-mid text-text13">
+            {analysis.suggested_prompt.suggested_prompt}
+          </Text>
         </View>
       )}
     </ScrollView>
@@ -753,11 +746,13 @@ function TimelineTab({
   messages,
   isLoading,
   pendingText,
+  isSending,
   isWorking,
 }: {
   messages: SessionMessage[];
   isLoading: boolean;
   pendingText: string | null;
+  isSending: boolean;
   isWorking: boolean;
 }) {
   const listRef = useRef<ScrollView>(null);
@@ -813,7 +808,9 @@ function TimelineTab({
           <View className="rounded-2xl px-4 py-3 bg-tint-primary">
             <Text className="text-text14 text-text-hi">{pendingText}</Text>
           </View>
-          <Text className="text-text-low text-text11 mt-1 text-right">Sending…</Text>
+          <Text className="text-text-low text-text11 mt-1 text-right">
+            {isSending ? 'Sending…' : 'Sent — waiting for Devin'}
+          </Text>
         </View>
       )}
       {/* Live "Devin is working" indicator. */}

@@ -52,7 +52,12 @@ import {
   indexRepository,
 } from './endpoints';
 import { queryKeys } from './queryKeys';
-import { pollingPolicy, scalePolling, type ScreenContext } from '@lib/polling';
+import {
+  messagePollingInterval,
+  pollingPolicy,
+  scalePolling,
+  type ScreenContext,
+} from '@lib/polling';
 import { useAppPreferences } from '@store/preferences';
 import { findPotentialCreatedSession } from '@lib/session-create';
 import { removeSessionFromBoard } from '@lib/session-utils';
@@ -200,6 +205,11 @@ export function useMessages(sessionId: string | undefined) {
       // steady-state polls only pull NEW messages after the stored cursor
       // instead of re-downloading every page every 5 seconds.
       const prev = queryClient.getQueryData<MessagesData>(queryKeys.messages(sessionId));
+      const previousDevinIds = new Set(
+        prev?.items
+          .filter((message) => message.source === 'devin')
+          .map((message) => message.event_id),
+      );
       const items = prev ? [...prev.items] : [];
       let cursor: Cursor | null = prev?.endCursor ?? null;
       for (let page = 0; page < MAX_MESSAGE_PAGES; page++) {
@@ -215,6 +225,14 @@ export function useMessages(sessionId: string | undefined) {
         seen.add(m.event_id);
         return true;
       });
+      if (
+        prev &&
+        deduped.some(
+          (message) => message.source === 'devin' && !previousDevinIds.has(message.event_id),
+        )
+      ) {
+        queryClient.removeQueries({ queryKey: queryKeys.messageFollowUp(sessionId), exact: true });
+      }
       return { items: deduped, endCursor: cursor };
     },
     enabled: isAuthenticated && !!provider && !!sessionId,
@@ -222,15 +240,18 @@ export function useMessages(sessionId: string | undefined) {
     staleTime: 10_000,
     gcTime: 5 * 60_000,
     refetchInterval: () => {
-      if (AppState.currentState !== 'active') return false;
-      // Read the session's cached status — finished/terminated sessions get
-      // no new messages, so polling them forever just burns battery and API.
+      const followUpUntil = sessionId
+        ? queryClient.getQueryData<number>(queryKeys.messageFollowUp(sessionId))
+        : undefined;
       const session = sessionId
         ? queryClient.getQueryData<SessionResponse>(queryKeys.session(sessionId))
         : undefined;
-      if (session && !isActiveStatus(session.status)) return false;
-      // Snappier while a session is live so Devin's replies appear quickly.
-      return scalePolling(2_500, useAppPreferences.getState().pollingMode);
+      return messagePollingInterval({
+        appState: AppState.currentState === 'active' ? 'active' : 'background',
+        followUpUntil,
+        sessionStatus: session?.status,
+        mode: useAppPreferences.getState().pollingMode,
+      });
     },
     refetchOnWindowFocus: true,
     retry: shouldRetryQuery,
@@ -245,13 +266,21 @@ export function useSendMessage(sessionId: string | undefined) {
     mutationFn: async (params: { message: string; attachmentUrls?: string[] }) => {
       if (!provider) throw new Error('Not authenticated');
       if (!sessionId) throw new Error('No session ID');
-      await sendMessage(provider, sessionId, params.message, params.attachmentUrls);
+      return sendMessage(provider, sessionId, params.message, params.attachmentUrls);
     },
-    onSuccess: () => {
+    onMutate: () => {
       if (sessionId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.messages(sessionId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.session(sessionId) });
+        queryClient.setQueryData(queryKeys.messageFollowUp(sessionId), Date.now() + 2 * 60_000);
       }
+    },
+    onSuccess: (session) => {
+      if (sessionId) {
+        queryClient.setQueryData(queryKeys.session(sessionId), session);
+        queryClient.invalidateQueries({ queryKey: queryKeys.messages(sessionId) });
+      }
+    },
+    onError: () => {
+      if (sessionId) queryClient.removeQueries({ queryKey: queryKeys.messageFollowUp(sessionId) });
     },
   });
 }

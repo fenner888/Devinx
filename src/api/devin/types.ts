@@ -247,27 +247,45 @@ export interface InsightsGenerateResponse {
   status: 'already_exists' | 'started';
 }
 
-export interface InsightIssue {
-  description: string;
-  severity: InsightSeverity;
-  title: string;
+export interface InsightActionItem {
+  action_item: string;
+  issue_id: string | null;
+  type: string;
 }
 
-export interface InsightPrompt {
-  description: string;
-  title: string;
+export interface InsightClassification {
+  category: string;
+  confidence: number;
+  programming_languages: string[];
+  tools_and_frameworks: string[];
+}
+
+export interface InsightIssue {
+  id: string;
+  impact: string;
+  issue: string;
+  label: string;
+}
+
+export interface InsightSuggestedPrompt {
+  feedback_items: unknown[];
+  original_prompt: string;
+  suggested_prompt: string;
 }
 
 export interface InsightTimelineEntry {
+  color: string;
   description: string;
+  issue_id: string | null;
   title: string;
 }
 
 export interface SessionInsightsAnalysis {
-  action: string[];
-  classification: string;
+  action_items: InsightActionItem[];
+  classification: InsightClassification | null;
   issues: InsightIssue[];
-  prompts: InsightPrompt[] | null;
+  note_usage: unknown | null;
+  suggested_prompt: InsightSuggestedPrompt | null;
   timeline: InsightTimelineEntry[];
 }
 

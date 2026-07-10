@@ -88,7 +88,11 @@ export async function listSessions(
   params?: SessionsQueryParams,
 ): Promise<{ items: SessionResponse[]; endCursor: Cursor | null; hasNextPage: boolean }> {
   const orgPath = await auth.orgPath();
-  const data = await apiRequest<{ items: SessionResponse[]; end_cursor: Cursor | null; has_next_page: boolean }>(auth, paths.sessions(orgPath.replace('/v3/organizations/', '')), {
+  const data = await apiRequest<{
+    items: SessionResponse[];
+    end_cursor: Cursor | null;
+    has_next_page: boolean;
+  }>(auth, paths.sessions(orgPath.replace('/v3/organizations/', '')), {
     method: 'GET',
     query: params as Record<string, string | number | boolean | string[] | null | undefined>,
     schema: sessionListResponseSchema,
@@ -130,7 +134,11 @@ export async function listMessages(
 ): Promise<{ items: SessionMessage[]; endCursor: Cursor | null; hasNextPage: boolean }> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  const data = await apiRequest<{ items: SessionMessage[]; end_cursor: Cursor | null; has_next_page: boolean }>(auth, paths.messages(orgId, toDevinId(sessionId)), {
+  const data = await apiRequest<{
+    items: SessionMessage[];
+    end_cursor: Cursor | null;
+    has_next_page: boolean;
+  }>(auth, paths.messages(orgId, toDevinId(sessionId)), {
     method: 'GET',
     query: { after: params?.after, first: params?.first },
     schema: sessionMessageListResponseSchema,
@@ -143,7 +151,7 @@ export async function sendMessage(
   sessionId: string,
   message: string,
   attachmentUrls?: string[],
-): Promise<void> {
+): Promise<SessionResponse> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   // The message endpoint attributes via message_as_user_id (the session-create
@@ -153,14 +161,13 @@ export async function sendMessage(
   const body = {
     message,
     attachment_urls: attachmentUrls,
-    ...(attribution.create_as_user_id
-      ? { message_as_user_id: attribution.create_as_user_id }
-      : {}),
+    ...(attribution.create_as_user_id ? { message_as_user_id: attribution.create_as_user_id } : {}),
   };
   sessionMessageCreateRequestSchema.parse(body);
-  await apiRequest(auth, paths.messages(orgId, toDevinId(sessionId)), {
+  return apiRequest<SessionResponse>(auth, paths.messages(orgId, toDevinId(sessionId)), {
     method: 'POST',
     body,
+    schema: sessionResponseSchema,
   });
 }
 
@@ -170,7 +177,11 @@ export async function archiveSession(auth: AuthProvider, sessionId: string): Pro
   await apiRequest(auth, paths.archive(orgId, toDevinId(sessionId)), { method: 'POST' });
 }
 
-export async function terminateSession(auth: AuthProvider, sessionId: string, archive = false): Promise<void> {
+export async function terminateSession(
+  auth: AuthProvider,
+  sessionId: string,
+  archive = false,
+): Promise<void> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   await apiRequest(auth, paths.session(orgId, toDevinId(sessionId)), {
@@ -189,7 +200,11 @@ export async function getTags(auth: AuthProvider, sessionId: string): Promise<st
   return data.tags;
 }
 
-export async function addTags(auth: AuthProvider, sessionId: string, tags: string[]): Promise<string[]> {
+export async function addTags(
+  auth: AuthProvider,
+  sessionId: string,
+  tags: string[],
+): Promise<string[]> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   // POST appends tags.
@@ -203,7 +218,11 @@ export async function addTags(auth: AuthProvider, sessionId: string, tags: strin
   return data.tags;
 }
 
-export async function replaceTags(auth: AuthProvider, sessionId: string, tags: string[]): Promise<string[]> {
+export async function replaceTags(
+  auth: AuthProvider,
+  sessionId: string,
+  tags: string[],
+): Promise<string[]> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   // PUT replaces all tags (used for remove — spec §8.5, api-deltas D5).
@@ -217,16 +236,26 @@ export async function replaceTags(auth: AuthProvider, sessionId: string, tags: s
   return data.tags;
 }
 
-export async function generateInsights(auth: AuthProvider, sessionId: string): Promise<InsightsGenerateResponse> {
+export async function generateInsights(
+  auth: AuthProvider,
+  sessionId: string,
+): Promise<InsightsGenerateResponse> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  return apiRequest<InsightsGenerateResponse>(auth, paths.insightsGenerate(orgId, toDevinId(sessionId)), {
-    method: 'POST',
-    schema: insightsGenerateResponseSchema,
-  });
+  return apiRequest<InsightsGenerateResponse>(
+    auth,
+    paths.insightsGenerate(orgId, toDevinId(sessionId)),
+    {
+      method: 'POST',
+      schema: insightsGenerateResponseSchema,
+    },
+  );
 }
 
-export async function getInsights(auth: AuthProvider, sessionId: string): Promise<SessionInsightsResponse> {
+export async function getInsights(
+  auth: AuthProvider,
+  sessionId: string,
+): Promise<SessionInsightsResponse> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   return apiRequest<SessionInsightsResponse>(auth, paths.insights(orgId, toDevinId(sessionId)), {
@@ -238,7 +267,11 @@ export async function getInsights(auth: AuthProvider, sessionId: string): Promis
 export async function listPlaybooks(auth: AuthProvider): Promise<PlaybookResponse[]> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  const data = await apiRequest<{ items: PlaybookResponse[]; end_cursor: Cursor | null; has_next_page: boolean }>(auth, paths.playbooks(orgId), {
+  const data = await apiRequest<{
+    items: PlaybookResponse[];
+    end_cursor: Cursor | null;
+    has_next_page: boolean;
+  }>(auth, paths.playbooks(orgId), {
     method: 'GET',
     schema: playbookListResponseSchema,
   });
@@ -248,7 +281,11 @@ export async function listPlaybooks(auth: AuthProvider): Promise<PlaybookRespons
 export async function listKnowledge(auth: AuthProvider): Promise<KnowledgeNoteResponse[]> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  const data = await apiRequest<{ items: KnowledgeNoteResponse[]; end_cursor: Cursor | null; has_next_page: boolean }>(auth, paths.knowledge(orgId), {
+  const data = await apiRequest<{
+    items: KnowledgeNoteResponse[];
+    end_cursor: Cursor | null;
+    has_next_page: boolean;
+  }>(auth, paths.knowledge(orgId), {
     method: 'GET',
     schema: knowledgeNoteListResponseSchema,
   });
@@ -258,14 +295,21 @@ export async function listKnowledge(auth: AuthProvider): Promise<KnowledgeNoteRe
 export async function listSecrets(auth: AuthProvider): Promise<SecretResponse[]> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  const data = await apiRequest<{ items: SecretResponse[]; end_cursor: Cursor | null; has_next_page: boolean }>(auth, paths.secrets(orgId), {
+  const data = await apiRequest<{
+    items: SecretResponse[];
+    end_cursor: Cursor | null;
+    has_next_page: boolean;
+  }>(auth, paths.secrets(orgId), {
     method: 'GET',
     schema: secretListResponseSchema,
   });
   return data.items;
 }
 
-export async function uploadAttachment(auth: AuthProvider, file: { name: string; type: string; uri: string }): Promise<AttachmentResponse> {
+export async function uploadAttachment(
+  auth: AuthProvider,
+  file: { name: string; type: string; uri: string },
+): Promise<AttachmentResponse> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   const headers = await auth.authHeaders();
@@ -300,7 +344,10 @@ interface ConsumptionEnvelope {
   }[];
 }
 
-export async function getDailyConsumption(auth: AuthProvider, params?: { time_after?: number; time_before?: number }): Promise<DailyConsumptionResponse[]> {
+export async function getDailyConsumption(
+  auth: AuthProvider,
+  params?: { time_after?: number; time_before?: number },
+): Promise<DailyConsumptionResponse[]> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   const data = await apiRequest<ConsumptionEnvelope>(auth, paths.consumptionDaily(orgId), {
@@ -313,9 +360,10 @@ export async function getDailyConsumption(auth: AuthProvider, params?: { time_af
   // null product values → 0.
   return data.consumption_by_date
     .map((d) => ({
-      date: typeof d.date === 'number'
-        ? new Date(d.date * 1000).toISOString().slice(0, 10)
-        : d.date.slice(0, 10),
+      date:
+        typeof d.date === 'number'
+          ? new Date(d.date * 1000).toISOString().slice(0, 10)
+          : d.date.slice(0, 10),
       acus: d.acus,
       acus_by_product: Object.fromEntries(
         Object.entries(d.acus_by_product).map(([product, acus]) => [product, acus ?? 0]),
@@ -340,12 +388,15 @@ export async function listSchedules(auth: AuthProvider): Promise<ScheduleRespons
   const items: Record<string, unknown>[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < 5; page++) {
-    const data: { items: Record<string, unknown>[]; end_cursor?: string | null; has_next_page?: boolean } =
-      await apiRequest(auth, paths.schedules(orgId), {
-        method: 'GET',
-        query: { first: 100, after: cursor },
-        schema: scheduleListResponseSchema,
-      });
+    const data: {
+      items: Record<string, unknown>[];
+      end_cursor?: string | null;
+      has_next_page?: boolean;
+    } = await apiRequest(auth, paths.schedules(orgId), {
+      method: 'GET',
+      query: { first: 100, after: cursor },
+      schema: scheduleListResponseSchema,
+    });
     items.push(...data.items);
     if (!data.has_next_page || !data.end_cursor) break;
     cursor = data.end_cursor;
@@ -353,7 +404,10 @@ export async function listSchedules(auth: AuthProvider): Promise<ScheduleRespons
   return items.map(normalizeSchedule);
 }
 
-export async function createSchedule(auth: AuthProvider, body: ScheduleCreateRequest): Promise<ScheduleResponse> {
+export async function createSchedule(
+  auth: AuthProvider,
+  body: ScheduleCreateRequest,
+): Promise<ScheduleResponse> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   const raw = await apiRequest<Record<string, unknown>>(auth, paths.schedules(orgId), {
@@ -364,7 +418,11 @@ export async function createSchedule(auth: AuthProvider, body: ScheduleCreateReq
   return normalizeSchedule(raw);
 }
 
-export async function updateSchedule(auth: AuthProvider, scheduleId: string, body: ScheduleUpdateRequest): Promise<ScheduleResponse> {
+export async function updateSchedule(
+  auth: AuthProvider,
+  scheduleId: string,
+  body: ScheduleUpdateRequest,
+): Promise<ScheduleResponse> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   const raw = await apiRequest<Record<string, unknown>>(auth, paths.schedule(orgId, scheduleId), {
@@ -385,7 +443,10 @@ export async function deleteSchedule(auth: AuthProvider, scheduleId: string): Pr
 // PR Reviews (Devin Review)
 // ---------------------------------------------------------------------------
 
-export async function triggerPrReview(auth: AuthProvider, prUrl: string): Promise<PrReviewResponse> {
+export async function triggerPrReview(
+  auth: AuthProvider,
+  prUrl: string,
+): Promise<PrReviewResponse> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   return apiRequest<PrReviewResponse>(auth, paths.prReviews(orgId), {
@@ -426,7 +487,11 @@ export async function listCodeScanFindings(auth: AuthProvider): Promise<CodeScan
   return items;
 }
 
-export async function remediateFinding(auth: AuthProvider, scanId: string, findingId: string): Promise<void> {
+export async function remediateFinding(
+  auth: AuthProvider,
+  scanId: string,
+  findingId: string,
+): Promise<void> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   await apiRequest(auth, paths.codeScanRemediate(orgId, scanId, findingId), { method: 'POST' });
@@ -440,7 +505,10 @@ async function orgIdOf(auth: AuthProvider): Promise<string> {
   return (await auth.orgPath()).replace('/v3/organizations/', '');
 }
 
-export async function createKnowledgeNote(auth: AuthProvider, body: KnowledgeNoteCreateRequest): Promise<KnowledgeNoteResponse> {
+export async function createKnowledgeNote(
+  auth: AuthProvider,
+  body: KnowledgeNoteCreateRequest,
+): Promise<KnowledgeNoteResponse> {
   knowledgeNoteCreateRequestSchema.parse(body);
   return apiRequest<KnowledgeNoteResponse>(auth, paths.knowledge(await orgIdOf(auth)), {
     method: 'POST',
@@ -449,7 +517,11 @@ export async function createKnowledgeNote(auth: AuthProvider, body: KnowledgeNot
   });
 }
 
-export async function updateKnowledgeNote(auth: AuthProvider, noteId: string, body: KnowledgeNoteUpdateRequest): Promise<KnowledgeNoteResponse> {
+export async function updateKnowledgeNote(
+  auth: AuthProvider,
+  noteId: string,
+  body: KnowledgeNoteUpdateRequest,
+): Promise<KnowledgeNoteResponse> {
   return apiRequest<KnowledgeNoteResponse>(auth, paths.knowledgeNote(await orgIdOf(auth), noteId), {
     method: 'PUT',
     body,
@@ -461,7 +533,10 @@ export async function deleteKnowledgeNote(auth: AuthProvider, noteId: string): P
   await apiRequest(auth, paths.knowledgeNote(await orgIdOf(auth), noteId), { method: 'DELETE' });
 }
 
-export async function createPlaybook(auth: AuthProvider, body: PlaybookCreateRequest): Promise<PlaybookResponse> {
+export async function createPlaybook(
+  auth: AuthProvider,
+  body: PlaybookCreateRequest,
+): Promise<PlaybookResponse> {
   playbookCreateRequestSchema.parse(body);
   return apiRequest<PlaybookResponse>(auth, paths.playbooks(await orgIdOf(auth)), {
     method: 'POST',
@@ -470,7 +545,11 @@ export async function createPlaybook(auth: AuthProvider, body: PlaybookCreateReq
   });
 }
 
-export async function updatePlaybook(auth: AuthProvider, playbookId: string, body: PlaybookUpdateRequest): Promise<PlaybookResponse> {
+export async function updatePlaybook(
+  auth: AuthProvider,
+  playbookId: string,
+  body: PlaybookUpdateRequest,
+): Promise<PlaybookResponse> {
   return apiRequest<PlaybookResponse>(auth, paths.playbook(await orgIdOf(auth), playbookId), {
     method: 'PUT',
     body,
@@ -482,7 +561,10 @@ export async function deletePlaybook(auth: AuthProvider, playbookId: string): Pr
   await apiRequest(auth, paths.playbook(await orgIdOf(auth), playbookId), { method: 'DELETE' });
 }
 
-export async function createSecret(auth: AuthProvider, body: SecretCreateRequest): Promise<SecretResponse> {
+export async function createSecret(
+  auth: AuthProvider,
+  body: SecretCreateRequest,
+): Promise<SecretResponse> {
   secretCreateRequestSchema.parse(body);
   return apiRequest<SecretResponse>(auth, paths.secrets(await orgIdOf(auth)), {
     method: 'POST',
@@ -499,7 +581,10 @@ export async function deleteSecret(auth: AuthProvider, secretId: string): Promis
 // Org metrics (Analytics)
 // ---------------------------------------------------------------------------
 
-export async function getSessionMetrics(auth: AuthProvider, query?: MetricsQuery): Promise<SessionMetrics> {
+export async function getSessionMetrics(
+  auth: AuthProvider,
+  query?: MetricsQuery,
+): Promise<SessionMetrics> {
   return apiRequest<SessionMetrics>(auth, paths.metricsSessions(await orgIdOf(auth)), {
     method: 'GET',
     query: { time_after: query?.time_after, time_before: query?.time_before },
@@ -515,7 +600,10 @@ export async function getPrMetrics(auth: AuthProvider, query?: MetricsQuery): Pr
   });
 }
 
-export async function getSearchMetrics(auth: AuthProvider, query?: MetricsQuery): Promise<SearchMetrics> {
+export async function getSearchMetrics(
+  auth: AuthProvider,
+  query?: MetricsQuery,
+): Promise<SearchMetrics> {
   return apiRequest<SearchMetrics>(auth, paths.metricsSearches(await orgIdOf(auth)), {
     method: 'GET',
     query: { time_after: query?.time_after, time_before: query?.time_before },
@@ -523,12 +611,19 @@ export async function getSearchMetrics(auth: AuthProvider, query?: MetricsQuery)
   });
 }
 
-export async function getWeeklyActiveUsers(auth: AuthProvider, query?: MetricsQuery): Promise<ActiveUserPeriod[]> {
-  const data = await apiRequest<ActiveUserPeriod[] | { items: ActiveUserPeriod[] }>(auth, paths.metricsWau(await orgIdOf(auth)), {
-    method: 'GET',
-    query: { time_after: query?.time_after, time_before: query?.time_before },
-    schema: activeUsersResponseSchema,
-  });
+export async function getWeeklyActiveUsers(
+  auth: AuthProvider,
+  query?: MetricsQuery,
+): Promise<ActiveUserPeriod[]> {
+  const data = await apiRequest<ActiveUserPeriod[] | { items: ActiveUserPeriod[] }>(
+    auth,
+    paths.metricsWau(await orgIdOf(auth)),
+    {
+      method: 'GET',
+      query: { time_after: query?.time_after, time_before: query?.time_before },
+      schema: activeUsersResponseSchema,
+    },
+  );
   return Array.isArray(data) ? data : data.items;
 }
 
@@ -537,11 +632,15 @@ export async function getWeeklyActiveUsers(auth: AuthProvider, query?: MetricsQu
 // ---------------------------------------------------------------------------
 
 export async function listRepositories(auth: AuthProvider): Promise<RepositoryResponse[]> {
-  const data = await apiRequest<{ items: RepositoryResponse[] }>(auth, paths.repositories(await orgIdOf(auth)), {
-    method: 'GET',
-    query: { first: 100 },
-    schema: repositoryListResponseSchema,
-  });
+  const data = await apiRequest<{ items: RepositoryResponse[] }>(
+    auth,
+    paths.repositories(await orgIdOf(auth)),
+    {
+      method: 'GET',
+      query: { first: 100 },
+      schema: repositoryListResponseSchema,
+    },
+  );
   return data.items;
 }
 
@@ -550,19 +649,29 @@ export async function listRepositories(auth: AuthProvider): Promise<RepositoryRe
 // ---------------------------------------------------------------------------
 
 export async function getSelf(auth: AuthProvider): Promise<SelfResponse> {
-  return apiRequest<SelfResponse>(auth, paths.self(), { method: 'GET', schema: selfResponseSchema });
+  return apiRequest<SelfResponse>(auth, paths.self(), {
+    method: 'GET',
+    schema: selfResponseSchema,
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Per-session ACU consumption
 // ---------------------------------------------------------------------------
 
-export async function getSessionConsumption(auth: AuthProvider, sessionId: string): Promise<number> {
+export async function getSessionConsumption(
+  auth: AuthProvider,
+  sessionId: string,
+): Promise<number> {
   const orgId = await orgIdOf(auth);
-  const data = await apiRequest<{ total_acus?: number }>(auth, paths.sessionConsumption(orgId, toDevinId(sessionId)), {
-    method: 'GET',
-    schema: consumptionResponseSchema,
-  });
+  const data = await apiRequest<{ total_acus?: number }>(
+    auth,
+    paths.sessionConsumption(orgId, toDevinId(sessionId)),
+    {
+      method: 'GET',
+      schema: consumptionResponseSchema,
+    },
+  );
   return data.total_acus ?? 0;
 }
 
@@ -580,7 +689,11 @@ export async function listIndexedRepositories(auth: AuthProvider): Promise<Repos
   return data.items;
 }
 
-export async function indexRepository(auth: AuthProvider, repoPath: string, branches?: string[]): Promise<RepositoryIndexing> {
+export async function indexRepository(
+  auth: AuthProvider,
+  repoPath: string,
+  branches?: string[],
+): Promise<RepositoryIndexing> {
   const orgId = await orgIdOf(auth);
   return apiRequest<RepositoryIndexing>(auth, paths.repoIndex(orgId, repoPath), {
     method: 'PUT',

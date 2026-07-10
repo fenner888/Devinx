@@ -296,36 +296,56 @@ export const insightsGenerateResponseSchema = z
   })
   .passthrough();
 
-export const insightIssueSchema = z
+export const insightActionItemSchema = z
   .object({
-    description: z.string(),
-    severity: insightSeveritySchema,
-    title: z.string(),
+    action_item: z.string(),
+    issue_id: z.string().nullable().optional().default(null),
+    type: z.string().optional().default('other'),
   })
   .passthrough();
 
-export const insightPromptSchema = z
+export const insightClassificationSchema = z
   .object({
-    description: z.string(),
-    title: z.string(),
+    category: z.string(),
+    confidence: z.number(),
+    programming_languages: z.array(z.string()).optional().default([]),
+    tools_and_frameworks: z.array(z.string()).optional().default([]),
+  })
+  .passthrough();
+
+export const insightIssueSchema = z
+  .object({
+    id: z.string().optional().default(''),
+    impact: z.string(),
+    issue: z.string(),
+    label: z.string(),
+  })
+  .passthrough();
+
+export const insightSuggestedPromptSchema = z
+  .object({
+    feedback_items: z.array(z.unknown()).optional().default([]),
+    original_prompt: z.string(),
+    suggested_prompt: z.string(),
   })
   .passthrough();
 
 export const insightTimelineEntrySchema = z
   .object({
+    color: z.string().optional().default(''),
     description: z.string(),
+    issue_id: z.string().nullable().optional().default(null),
     title: z.string(),
   })
   .passthrough();
 
-// Analysis fields default to empty so a partial/omitted analysis renders
-// gracefully instead of failing the whole insights response.
 export const sessionInsightsAnalysisSchema = z
   .object({
-    action: z.array(z.string()).optional().default([]),
-    classification: z.string().optional().default(''),
+    action_items: z.array(insightActionItemSchema).optional().default([]),
+    classification: insightClassificationSchema.nullable().optional().default(null),
     issues: z.array(insightIssueSchema).optional().default([]),
-    prompts: z.array(insightPromptSchema).nullable().optional(),
+    note_usage: z.unknown().nullable().optional().default(null),
+    suggested_prompt: insightSuggestedPromptSchema.nullable().optional().default(null),
     timeline: z.array(insightTimelineEntrySchema).optional().default([]),
   })
   .passthrough();

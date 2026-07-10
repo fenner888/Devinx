@@ -2,7 +2,12 @@
  * Polling policy tests (§8.4 / ADR-003).
  */
 
-import { pollingPolicy, backoffDelay, scalePolling } from '../../src/lib/polling';
+import {
+  pollingPolicy,
+  backoffDelay,
+  scalePolling,
+  messagePollingInterval,
+} from '../../src/lib/polling';
 
 describe('pollingPolicy (§8.4)', () => {
   it('never polls terminal statuses', () => {
@@ -37,6 +42,24 @@ describe('pollingPolicy (§8.4)', () => {
     expect(scalePolling(10_000, 'fast')).toBe(5_000);
     expect(scalePolling(false, 'fast')).toBe(false);
     expect(pollingPolicy('running', 'active', 'session_detail', 'battery_saver')).toBe(10_000);
+  });
+});
+
+describe('messagePollingInterval', () => {
+  it('polls a suspended session quickly after sending a follow-up', () => {
+    expect(
+      messagePollingInterval({
+        appState: 'active',
+        followUpUntil: 120_000,
+        now: 1_000,
+        sessionStatus: 'suspended',
+      }),
+    ).toBe(1_000);
+  });
+
+  it('stops polling terminal or sleeping sessions without a pending follow-up', () => {
+    expect(messagePollingInterval({ appState: 'active', sessionStatus: 'suspended' })).toBe(false);
+    expect(messagePollingInterval({ appState: 'active', sessionStatus: 'exit' })).toBe(false);
   });
 });
 
