@@ -20,6 +20,12 @@ import {
   type PairingDeviceRegistry,
 } from './pairing';
 import { deviceRecordSchema, opaqueIdSchema, type DeviceRecord } from './schemas';
+import {
+  parseTlsIdentity,
+  tlsIdentitySchema,
+  type TlsIdentity,
+  type TlsIdentityGenerator,
+} from './tls-identity';
 
 const base64UrlSchema = z
   .string()
@@ -27,7 +33,7 @@ const base64UrlSchema = z
   .max(4096)
   .regex(/^[A-Za-z0-9_-]+$/);
 
-const bridgeStateSchema = z
+const legacyBridgeStateSchema = z
   .object({
     version: z.literal(1),
     bridgeId: opaqueIdSchema,
@@ -35,6 +41,18 @@ const bridgeStateSchema = z
     publicKeySpki: base64UrlSchema,
     sessionHandleKey: base64UrlSchema.length(43),
     devices: z.array(deviceRecordSchema).max(100),
+  })
+  .strict();
+
+const bridgeStateSchema = z
+  .object({
+    version: z.literal(2),
+    bridgeId: opaqueIdSchema,
+    privateKeyPkcs8: base64UrlSchema,
+    publicKeySpki: base64UrlSchema,
+    sessionHandleKey: base64UrlSchema.length(43),
+    devices: z.array(deviceRecordSchema).max(100),
+    tlsIdentity: tlsIdentitySchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -62,6 +80,7 @@ export interface DesktopBridgeRuntimeState {
   bridgeId: string;
   identity: BridgePairingIdentity;
   sessionHandleKey: Buffer;
+  tlsIdentity?: TlsIdentity;
   devices: PersistentDeviceRegistry;
 }
 
@@ -74,7 +93,11 @@ function cloneDevice(device: DeviceRecord): DeviceRecord {
 }
 
 function cloneState(state: DesktopBridgeState): DesktopBridgeState {
-  return { ...state, devices: state.devices.map(cloneDevice) };
+  return {
+    ...state,
+    devices: state.devices.map(cloneDevice),
+    tlsIdentity: state.tlsIdentity ? { ...state.tlsIdentity } : undefined,
+  };
 }
 
 function identityKeys(state: DesktopBridgeState): { privateKey: KeyObject; publicKey: KeyObject } {
@@ -113,9 +136,14 @@ function identityKeys(state: DesktopBridgeState): { privateKey: KeyObject; publi
 }
 
 function parseState(input: unknown): DesktopBridgeState {
-  const result = bridgeStateSchema.safeParse(input);
+  const legacy = legacyBridgeStateSchema.safeParse(input);
+  const candidate = legacy.success ? { ...legacy.data, version: 2 as const } : input;
+  const result = bridgeStateSchema.safeParse(candidate);
   if (!result.success) throw new Error('Desktop Bridge state failed validation');
   identityKeys(result.data);
+  if (result.data.tlsIdentity) {
+    parseTlsIdentity(result.data.tlsIdentity, { requireCurrentlyValid: false });
+  }
   return result.data;
 }
 
@@ -126,7 +154,7 @@ function createState(): DesktopBridgeState {
   const sessionHandleKeyBytes = randomBytes(32);
   try {
     return parseState({
-      version: 1,
+      version: 2,
       bridgeId: `bridge_${randomBytes(18).toString('base64url')}`,
       privateKeyPkcs8: privateKeyBytes.toString('base64url'),
       publicKeySpki: publicKeyBytes.toString('base64url'),
@@ -156,7 +184,9 @@ export class DesktopBridgeStateRepository {
     } catch {
       throw new Error('Desktop Bridge state is corrupted');
     }
-    return cloneState(parseState(decoded));
+    const state = parseState(decoded);
+    if (legacyBridgeStateSchema.safeParse(decoded).success) await this.save(state);
+    return cloneState(state);
   }
 
   async save(input: unknown): Promise<void> {
@@ -243,6 +273,31 @@ export class PersistentDeviceRegistry implements PairingDeviceRegistry {
     });
   }
 
+  ensureTlsIdentity(generator: TlsIdentityGenerator, now = Date.now()): Promise<TlsIdentity> {
+    return this.enqueue(async () => {
+      if (!Number.isSafeInteger(now) || now < 0) {
+        throw new Error('TLS identity provisioning time is invalid');
+      }
+      if (this.state.tlsIdentity) {
+        const existing = parseTlsIdentity(this.state.tlsIdentity, {
+          now,
+          requireCurrentlyValid: false,
+        });
+        if (existing.validFrom > now + 5_000) {
+          throw new Error('Desktop Bridge TLS identity is not yet valid');
+        }
+        if (existing.validTo > now) return existing;
+      }
+      const generated = parseTlsIdentity(await generator.generate(), { now });
+      await this.commit({ ...this.state, tlsIdentity: generated });
+      return { ...generated };
+    });
+  }
+
+  getTlsIdentity(): TlsIdentity | undefined {
+    return this.state.tlsIdentity ? { ...this.state.tlsIdentity } : undefined;
+  }
+
   bridgeState(): DesktopBridgeState {
     return cloneState(this.state);
   }
@@ -276,6 +331,7 @@ export async function loadDesktopBridgeRuntime(
       publicKeySpki: state.publicKeySpki,
     },
     sessionHandleKey: Buffer.from(state.sessionHandleKey, 'base64url'),
+    tlsIdentity: state.tlsIdentity ? { ...state.tlsIdentity } : undefined,
     devices,
   };
 }

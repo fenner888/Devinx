@@ -26,11 +26,9 @@ const DEFAULT_OFFER_LIFETIME_MS = 120_000;
 const DEFAULT_APPROVAL_LIFETIME_MS = 300_000;
 const DEFAULT_MAXIMUM_OFFERS = 5;
 const DEFAULT_MAXIMUM_PENDING = 20;
+const DEFAULT_RECEIPT_LIFETIME_MS = 120_000;
 const MAXIMUM_PROOF_ATTEMPTS = 3;
-const DEFAULT_PAIRING_PERMISSIONS: BridgePermission[] = [
-  'bridge:health',
-  'session:metadata:read',
-];
+const DEFAULT_PAIRING_PERMISSIONS: BridgePermission[] = ['bridge:health', 'session:metadata:read'];
 
 const base64UrlSchema = z
   .string()
@@ -38,6 +36,35 @@ const base64UrlSchema = z
   .max(1024)
   .regex(/^[A-Za-z0-9_-]+$/);
 const pairingSecretSchema = base64UrlSchema.length(43);
+const pollTokenSchema = base64UrlSchema.length(43);
+
+const bridgeEndpointSchema = z
+  .string()
+  .url()
+  .max(2_048)
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return (
+        url.protocol === 'https:' &&
+        url.username === '' &&
+        url.password === '' &&
+        url.pathname === '/' &&
+        url.search === '' &&
+        url.hash === '' &&
+        url.toString() === value
+      );
+    } catch {
+      return false;
+    }
+  }, 'Bridge endpoint must be an HTTPS origin');
+
+export const pairingTransportSchema = z
+  .object({
+    bridgeEndpoint: bridgeEndpointSchema,
+    tlsCertificateFingerprint: base64UrlSchema.length(43),
+  })
+  .strict();
 
 export const pairingOfferSchema = z
   .object({
@@ -45,6 +72,8 @@ export const pairingOfferSchema = z
     bridgeId: opaqueIdSchema,
     bridgePublicKeySpki: base64UrlSchema,
     bridgeKeyFingerprint: base64UrlSchema.length(43),
+    bridgeEndpoint: bridgeEndpointSchema,
+    tlsCertificateFingerprint: base64UrlSchema.length(43),
     pairingId: opaqueIdSchema,
     pairingSecret: pairingSecretSchema,
     expiresAt: z.number().int().positive(),
@@ -56,6 +85,9 @@ export const unsignedPairingRequestSchema = z
     protocolVersion: z.literal(BRIDGE_PROTOCOL_VERSION),
     bridgeId: opaqueIdSchema,
     pairingId: opaqueIdSchema,
+    bridgeKeyFingerprint: base64UrlSchema.length(43),
+    bridgeEndpoint: bridgeEndpointSchema,
+    tlsCertificateFingerprint: base64UrlSchema.length(43),
     deviceId: opaqueIdSchema,
     deviceName: deviceNameSchema,
     devicePublicKeySpki: base64UrlSchema,
@@ -73,6 +105,8 @@ export const pairingReceiptSchema = z
     protocolVersion: z.literal(BRIDGE_PROTOCOL_VERSION),
     bridgeId: opaqueIdSchema,
     bridgeKeyFingerprint: base64UrlSchema.length(43),
+    bridgeEndpoint: bridgeEndpointSchema,
+    tlsCertificateFingerprint: base64UrlSchema.length(43),
     deviceId: opaqueIdSchema,
     pairedAt: z.number().int().nonnegative(),
     permissions: z.array(bridgePermissionSchema).max(bridgePermissionSchema.options.length),
@@ -81,7 +115,16 @@ export const pairingReceiptSchema = z
 
 export const signedPairingReceiptSchema = pairingReceiptSchema
   .extend({
-    signature: base64UrlSchema.min(80).max(128),
+    signature: base64UrlSchema.length(86),
+  })
+  .strict();
+
+export const pairingPollRequestSchema = z
+  .object({
+    protocolVersion: z.literal(BRIDGE_PROTOCOL_VERSION),
+    bridgeId: opaqueIdSchema,
+    pairingId: opaqueIdSchema,
+    pollToken: pollTokenSchema,
   })
   .strict();
 
@@ -96,6 +139,12 @@ const pairingOptionsSchema = z
       .default(DEFAULT_APPROVAL_LIFETIME_MS),
     maximumOffers: z.number().int().min(1).max(100).default(DEFAULT_MAXIMUM_OFFERS),
     maximumPending: z.number().int().min(1).max(100).default(DEFAULT_MAXIMUM_PENDING),
+    receiptLifetimeMs: z
+      .number()
+      .int()
+      .min(10_000)
+      .max(600_000)
+      .default(DEFAULT_RECEIPT_LIFETIME_MS),
   })
   .strict();
 
@@ -128,6 +177,7 @@ export interface PairingManagerOptions {
   approvalLifetimeMs?: number;
   maximumOffers?: number;
   maximumPending?: number;
+  receiptLifetimeMs?: number;
 }
 
 export interface PairingDeviceRegistry {
@@ -137,6 +187,8 @@ export interface PairingDeviceRegistry {
 export type PairingOffer = z.infer<typeof pairingOfferSchema>;
 export type UnsignedPairingRequest = z.infer<typeof unsignedPairingRequestSchema>;
 export type PairingRequest = z.infer<typeof pairingRequestSchema>;
+export type PairingTransport = z.infer<typeof pairingTransportSchema>;
+export type PairingPollRequest = z.infer<typeof pairingPollRequestSchema>;
 export type PairingReceipt = z.infer<typeof pairingReceiptSchema>;
 export type SignedPairingReceipt = z.infer<typeof signedPairingReceiptSchema>;
 export type DevicePermissionUpdate = z.infer<typeof devicePermissionUpdateSchema>;
@@ -149,6 +201,13 @@ interface OfferState {
 interface PendingState {
   request: UnsignedPairingRequest;
   expiresAt: number;
+  pollTokenHash: Buffer;
+}
+
+interface CompletedState {
+  receipt: SignedPairingReceipt;
+  expiresAt: number;
+  pollTokenHash: Buffer;
 }
 
 export interface PendingPairingReview {
@@ -159,16 +218,29 @@ export interface PendingPairingReview {
 }
 
 export type PairingSubmissionResult =
-  | { ok: true; pending: PendingPairingReview }
-  | { ok: false; status: 400 | 404 | 429; body: { error: 'invalid_request' | 'not_found' | 'busy' } };
+  | { ok: true; pending: PendingPairingReview; pollToken: string }
+  | {
+      ok: false;
+      status: 400 | 404 | 429;
+      body: { error: 'invalid_request' | 'not_found' | 'busy' };
+    };
 
 export type PairingApprovalResult =
   | { ok: true; device: DeviceRecord; receipt: SignedPairingReceipt }
   | { ok: false; status: 404; body: { error: 'not_found' } };
 
+export type PairingPollResult =
+  | { ok: true; status: 202; body: { status: 'pending'; expiresAt: number } }
+  | { ok: true; status: 200; body: { status: 'approved'; receipt: SignedPairingReceipt } }
+  | { ok: false; status: 400 | 404; body: { error: 'invalid_request' | 'not_found' } };
+
 function publicKeyFromSpki(value: string): KeyObject | null {
   try {
-    const key = createPublicKey({ key: Buffer.from(value, 'base64url'), format: 'der', type: 'spki' });
+    const key = createPublicKey({
+      key: Buffer.from(value, 'base64url'),
+      format: 'der',
+      type: 'spki',
+    });
     return key.asymmetricKeyType === 'ed25519' ? key : null;
   } catch {
     return null;
@@ -180,28 +252,43 @@ function withoutProof(request: PairingRequest): UnsignedPairingRequest {
     protocolVersion: request.protocolVersion,
     bridgeId: request.bridgeId,
     pairingId: request.pairingId,
+    bridgeKeyFingerprint: request.bridgeKeyFingerprint,
+    bridgeEndpoint: request.bridgeEndpoint,
+    tlsCertificateFingerprint: request.tlsCertificateFingerprint,
     deviceId: request.deviceId,
     deviceName: request.deviceName,
     devicePublicKeySpki: request.devicePublicKeySpki,
   };
 }
 
-export function createPairingProof(
-  pairingSecret: string,
-  request: UnsignedPairingRequest,
-): string {
+function validateNow(now: number): number {
+  if (!Number.isSafeInteger(now) || now < 0) {
+    throw new Error('Pairing lifecycle time is invalid');
+  }
+  return now;
+}
+
+export function createPairingProof(pairingSecret: string, request: UnsignedPairingRequest): string {
   const secret = pairingSecretSchema.parse(pairingSecret);
   const parsedRequest = unsignedPairingRequestSchema.parse(request);
-  return createHmac('sha256', Buffer.from(secret, 'base64url'))
-    .update(canonicalJson(parsedRequest), 'utf8')
-    .digest('base64url');
+  const secretBytes = Buffer.from(secret, 'base64url');
+  try {
+    return createHmac('sha256', secretBytes)
+      .update(canonicalJson(parsedRequest), 'utf8')
+      .digest('base64url');
+  } finally {
+    secretBytes.fill(0);
+  }
 }
 
 function proofIsValid(secret: string, request: PairingRequest): boolean {
   try {
     const expected = Buffer.from(createPairingProof(secret, withoutProof(request)), 'base64url');
     const received = Buffer.from(request.proof, 'base64url');
-    return expected.length === received.length && timingSafeEqual(expected, received);
+    const valid = expected.length === received.length && timingSafeEqual(expected, received);
+    expected.fill(0);
+    received.fill(0);
+    return valid;
   } catch {
     return false;
   }
@@ -222,17 +309,23 @@ export function verifyPairingReceipt(
   receipt: unknown,
   bridgePublicKeySpki: string,
   expectedBridgeId: string,
+  expectedTransport: unknown,
 ): boolean {
   const result = signedPairingReceiptSchema.safeParse(receipt);
   const bridgeIdResult = opaqueIdSchema.safeParse(expectedBridgeId);
   const publicKey = publicKeyFromSpki(bridgePublicKeySpki);
-  if (!result.success || !bridgeIdResult.success || !publicKey) return false;
+  const transportResult = pairingTransportSchema.safeParse(expectedTransport);
+  if (!result.success || !bridgeIdResult.success || !transportResult.success || !publicKey) {
+    return false;
+  }
   const expectedFingerprint = createHash('sha256')
     .update(Buffer.from(bridgePublicKeySpki, 'base64url'))
     .digest('base64url');
   if (
     result.data.bridgeId !== bridgeIdResult.data ||
-    result.data.bridgeKeyFingerprint !== expectedFingerprint
+    result.data.bridgeKeyFingerprint !== expectedFingerprint ||
+    result.data.bridgeEndpoint !== transportResult.data.bridgeEndpoint ||
+    result.data.tlsCertificateFingerprint !== transportResult.data.tlsCertificateFingerprint
   ) {
     return false;
   }
@@ -252,6 +345,7 @@ export function verifyPairingReceipt(
 export class PairingManager {
   private readonly offers = new Map<string, OfferState>();
   private readonly pending = new Map<string, PendingState>();
+  private readonly completed = new Map<string, CompletedState>();
   private readonly options: z.infer<typeof pairingOptionsSchema>;
   private readonly bridgeKeyFingerprint: string;
   private readonly bridgeId: string;
@@ -265,7 +359,10 @@ export class PairingManager {
   ) {
     opaqueIdSchema.parse(identity.bridgeId);
     base64UrlSchema.parse(identity.publicKeySpki);
-    if (identity.privateKey.type !== 'private' || identity.privateKey.asymmetricKeyType !== 'ed25519') {
+    if (
+      identity.privateKey.type !== 'private' ||
+      identity.privateKey.asymmetricKeyType !== 'ed25519'
+    ) {
       throw new Error('Bridge pairing identity requires an Ed25519 private key');
     }
     const publicKey = publicKeyFromSpki(identity.publicKeySpki);
@@ -287,15 +384,20 @@ export class PairingManager {
 
   private cleanup(now: number): void {
     for (const [pairingId, state] of this.offers) {
-      if (state.offer.expiresAt <= now) this.offers.delete(pairingId);
+      if (state.offer.expiresAt <= now) this.deleteOffer(pairingId);
     }
     for (const [pairingId, state] of this.pending) {
-      if (state.expiresAt <= now) this.pending.delete(pairingId);
+      if (state.expiresAt <= now) this.deletePending(pairingId);
+    }
+    for (const [pairingId, state] of this.completed) {
+      if (state.expiresAt <= now) this.deleteCompleted(pairingId);
     }
   }
 
-  createOffer(now = Date.now()): PairingOffer {
+  createOffer(transportInput: unknown, now = Date.now()): PairingOffer {
+    validateNow(now);
     this.cleanup(now);
+    const transport = pairingTransportSchema.parse(transportInput);
     if (this.offers.size >= this.options.maximumOffers) {
       throw new Error('Pairing offer capacity reached');
     }
@@ -304,6 +406,7 @@ export class PairingManager {
       bridgeId: this.bridgeId,
       bridgePublicKeySpki: this.bridgePublicKeySpki,
       bridgeKeyFingerprint: this.bridgeKeyFingerprint,
+      ...transport,
       pairingId: randomBytes(18).toString('base64url'),
       pairingSecret: randomBytes(32).toString('base64url'),
       expiresAt: now + this.options.offerLifetimeMs,
@@ -313,6 +416,7 @@ export class PairingManager {
   }
 
   submit(input: unknown, now = Date.now()): PairingSubmissionResult {
+    validateNow(now);
     this.cleanup(now);
     const requestResult = pairingRequestSchema.safeParse(input);
     if (!requestResult.success) {
@@ -326,22 +430,32 @@ export class PairingManager {
     if (!proofIsValid(state.offer.pairingSecret, request)) {
       state.failedProofAttempts += 1;
       if (state.failedProofAttempts >= MAXIMUM_PROOF_ATTEMPTS) {
-        this.offers.delete(request.pairingId);
+        this.deleteOffer(request.pairingId);
       }
       return { ok: false, status: 404, body: { error: 'not_found' } };
     }
+    if (
+      request.bridgeKeyFingerprint !== state.offer.bridgeKeyFingerprint ||
+      request.bridgeEndpoint !== state.offer.bridgeEndpoint ||
+      request.tlsCertificateFingerprint !== state.offer.tlsCertificateFingerprint
+    ) {
+      this.deleteOffer(request.pairingId);
+      return { ok: false, status: 404, body: { error: 'not_found' } };
+    }
     if (!publicKeyFromSpki(request.devicePublicKeySpki)) {
-      this.offers.delete(request.pairingId);
+      this.deleteOffer(request.pairingId);
       return { ok: false, status: 400, body: { error: 'invalid_request' } };
     }
     if (this.pending.size >= this.options.maximumPending) {
       return { ok: false, status: 429, body: { error: 'busy' } };
     }
 
-    this.offers.delete(request.pairingId);
+    this.deleteOffer(request.pairingId);
+    const pollToken = randomBytes(32).toString('base64url');
     const pending: PendingState = {
       request: withoutProof(request),
       expiresAt: now + this.options.approvalLifetimeMs,
+      pollTokenHash: this.pollTokenHash(pollToken),
     };
     this.pending.set(request.pairingId, pending);
     return {
@@ -352,10 +466,12 @@ export class PairingManager {
         deviceName: request.deviceName,
         expiresAt: pending.expiresAt,
       },
+      pollToken,
     };
   }
 
   async approve(pairingId: string, now = Date.now()): Promise<PairingApprovalResult> {
+    validateNow(now);
     this.cleanup(now);
     const pairingIdResult = opaqueIdSchema.safeParse(pairingId);
     if (!pairingIdResult.success) {
@@ -365,57 +481,154 @@ export class PairingManager {
     if (!state) return { ok: false, status: 404, body: { error: 'not_found' } };
     this.pending.delete(pairingIdResult.data);
 
-    const device = deviceRecordSchema.parse({
-      bridgeId: this.bridgeId,
-      deviceId: state.request.deviceId,
-      deviceName: state.request.deviceName,
-      publicKeySpki: state.request.devicePublicKeySpki,
-      status: 'active',
-      pairedAt: now,
-      permissions: DEFAULT_PAIRING_PERMISSIONS,
-    });
-    const receipt = pairingReceiptSchema.parse({
-      protocolVersion: BRIDGE_PROTOCOL_VERSION,
-      bridgeId: this.bridgeId,
-      bridgeKeyFingerprint: this.bridgeKeyFingerprint,
-      deviceId: device.deviceId,
-      pairedAt: now,
-      permissions: device.permissions,
-    });
-    const storedDevice: DeviceRecord = {
-      ...device,
-      permissions: [...device.permissions],
-      allowedSessionIds: device.allowedSessionIds ? [...device.allowedSessionIds] : undefined,
-    };
-    if (!(await this.devices.register(storedDevice))) {
-      return { ok: false, status: 404, body: { error: 'not_found' } };
-    }
-    const signedReceipt = signedPairingReceiptSchema.parse({
-      ...receipt,
-      signature: sign(
-        null,
-        Buffer.from(canonicalJson(receipt), 'utf8'),
-        this.bridgePrivateKey,
-      ).toString('base64url'),
-    });
-    return {
-      ok: true,
-      device: {
+    try {
+      const device = deviceRecordSchema.parse({
+        bridgeId: this.bridgeId,
+        deviceId: state.request.deviceId,
+        deviceName: state.request.deviceName,
+        publicKeySpki: state.request.devicePublicKeySpki,
+        status: 'active',
+        pairedAt: now,
+        permissions: DEFAULT_PAIRING_PERMISSIONS,
+      });
+      const receipt = pairingReceiptSchema.parse({
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        bridgeId: this.bridgeId,
+        bridgeKeyFingerprint: this.bridgeKeyFingerprint,
+        bridgeEndpoint: state.request.bridgeEndpoint,
+        tlsCertificateFingerprint: state.request.tlsCertificateFingerprint,
+        deviceId: device.deviceId,
+        pairedAt: now,
+        permissions: device.permissions,
+      });
+      const storedDevice: DeviceRecord = {
         ...device,
         permissions: [...device.permissions],
         allowedSessionIds: device.allowedSessionIds ? [...device.allowedSessionIds] : undefined,
-      },
-      receipt: signedReceipt,
-    };
+      };
+      const signedReceipt = signedPairingReceiptSchema.parse({
+        ...receipt,
+        signature: sign(
+          null,
+          Buffer.from(canonicalJson(receipt), 'utf8'),
+          this.bridgePrivateKey,
+        ).toString('base64url'),
+      });
+      if (!(await this.devices.register(storedDevice))) {
+        state.pollTokenHash.fill(0);
+        return { ok: false, status: 404, body: { error: 'not_found' } };
+      }
+      this.completed.set(pairingIdResult.data, {
+        receipt: { ...signedReceipt, permissions: [...signedReceipt.permissions] },
+        expiresAt: now + this.options.receiptLifetimeMs,
+        pollTokenHash: state.pollTokenHash,
+      });
+      return {
+        ok: true,
+        device: {
+          ...device,
+          permissions: [...device.permissions],
+          allowedSessionIds: device.allowedSessionIds ? [...device.allowedSessionIds] : undefined,
+        },
+        receipt: signedReceipt,
+      };
+    } catch (error) {
+      state.pollTokenHash.fill(0);
+      throw error;
+    }
   }
 
   deny(pairingId: string): boolean {
     const pairingIdResult = opaqueIdSchema.safeParse(pairingId);
     if (!pairingIdResult.success) return false;
-    return this.pending.delete(pairingIdResult.data);
+    return this.deletePending(pairingIdResult.data);
   }
 
-  verifyReceipt(receipt: unknown): boolean {
-    return verifyPairingReceipt(receipt, this.bridgePublicKeySpki, this.bridgeId);
+  pendingReviews(now = Date.now()): PendingPairingReview[] {
+    validateNow(now);
+    this.cleanup(now);
+    return [...this.pending.entries()].map(([pairingId, state]) => ({
+      pairingId,
+      deviceId: state.request.deviceId,
+      deviceName: state.request.deviceName,
+      expiresAt: state.expiresAt,
+    }));
+  }
+
+  poll(input: unknown, now = Date.now()): PairingPollResult {
+    validateNow(now);
+    this.cleanup(now);
+    const requestResult = pairingPollRequestSchema.safeParse(input);
+    if (!requestResult.success) {
+      return { ok: false, status: 400, body: { error: 'invalid_request' } };
+    }
+    const request = requestResult.data;
+    if (request.bridgeId !== this.bridgeId) {
+      return { ok: false, status: 404, body: { error: 'not_found' } };
+    }
+    const pending = this.pending.get(request.pairingId);
+    if (pending && this.pollTokenIsValid(request.pollToken, pending.pollTokenHash)) {
+      return { ok: true, status: 202, body: { status: 'pending', expiresAt: pending.expiresAt } };
+    }
+    const completed = this.completed.get(request.pairingId);
+    if (completed && this.pollTokenIsValid(request.pollToken, completed.pollTokenHash)) {
+      const receipt = {
+        ...completed.receipt,
+        permissions: [...completed.receipt.permissions],
+      };
+      this.deleteCompleted(request.pairingId);
+      return { ok: true, status: 200, body: { status: 'approved', receipt } };
+    }
+    return { ok: false, status: 404, body: { error: 'not_found' } };
+  }
+
+  verifyReceipt(receipt: unknown, expectedTransport: unknown): boolean {
+    return verifyPairingReceipt(
+      receipt,
+      this.bridgePublicKeySpki,
+      this.bridgeId,
+      expectedTransport,
+    );
+  }
+
+  private pollTokenHash(pollToken: string): Buffer {
+    const tokenBytes = Buffer.from(pollTokenSchema.parse(pollToken), 'base64url');
+    try {
+      return createHash('sha256').update(tokenBytes).digest();
+    } finally {
+      tokenBytes.fill(0);
+    }
+  }
+
+  private deleteOffer(pairingId: string): boolean {
+    const state = this.offers.get(pairingId);
+    if (!state) return false;
+    state.offer.pairingSecret = '';
+    return this.offers.delete(pairingId);
+  }
+
+  private pollTokenIsValid(pollToken: string, expected: Buffer): boolean {
+    try {
+      const received = this.pollTokenHash(pollToken);
+      const valid = received.length === expected.length && timingSafeEqual(received, expected);
+      received.fill(0);
+      return valid;
+    } catch {
+      return false;
+    }
+  }
+
+  private deletePending(pairingId: string): boolean {
+    const state = this.pending.get(pairingId);
+    if (!state) return false;
+    state.pollTokenHash.fill(0);
+    return this.pending.delete(pairingId);
+  }
+
+  private deleteCompleted(pairingId: string): boolean {
+    const state = this.completed.get(pairingId);
+    if (!state) return false;
+    state.pollTokenHash.fill(0);
+    return this.completed.delete(pairingId);
   }
 }

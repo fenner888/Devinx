@@ -1,6 +1,6 @@
 # Phase 3B — Computer Pairing and Device Credential Contract
 
-Status: offline core implementation. Transport, persistence, and user-interface wiring remain pending.
+Status: bridge core, Keychain persistence, TLS channel binding, and submit/status routes implemented. iOS certificate pinning and user-interface wiring remain pending.
 
 ## Security properties
 
@@ -51,7 +51,7 @@ The offline contract does not make cleartext pairing safe. When transport is add
 
 - Bridge private identity: macOS Keychain, non-exportable where the chosen API permits.
 - Device public records and grants: integrity-protected local store with restrictive permissions; no private phone key.
-- Phone private device key: iOS Keychain/Secure Store, never AsyncStorage or localStorage.
+- Phone private device key: the local CryptoKit Expo module stores it in iOS Keychain and exposes only an opaque key ID, never AsyncStorage, SecureStore JSON, or localStorage.
 - Pairing offers, secrets, failed proof counters, and pending requests: memory only.
 - Logs and crash reports: never include QR payloads, pairing secrets, proofs, device public keys, device names, or signed receipts.
 
@@ -62,3 +62,5 @@ The offline contract does not make cleartext pairing safe. When transport is add
 - Confirm the desktop approval UI and exact device-name disclosure.
 - Confirm that read-only session metadata is acceptable as the default grant.
 - Run brute-force, replay, expiry, duplicate-device, denial, revocation, and wrong-bridge tests through the actual transport.
+
+The identity, discovery, title/path, cache, CLI distribution, capability negotiation, and private-LAN decisions are resolved in `011-encrypted-bridge-listener.md`. Bridge-side transport cases are automated; real-device TLS pinning and full Mac/iPhone approval tests remain required.

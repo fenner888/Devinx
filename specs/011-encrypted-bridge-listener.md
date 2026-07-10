@@ -1,6 +1,6 @@
 # 011 — Encrypted Desktop Bridge listener
 
-Status: implemented transport core; certificate provisioning and mobile pinning pending
+Status: implemented transport and bridge-side pairing routes; mobile pinning pending
 
 ## Gate decisions
 
@@ -22,7 +22,7 @@ These decisions close the listener prerequisites in `002-local-bridge-threat-mod
 - Default bind is `127.0.0.1`. A non-loopback bind requires `allowLan: true`, TLS material, and explicit allowed Host values.
 - LAN mode accepts only loopback, RFC 1918, link-local, IPv6 ULA/link-local, and carrier-grade NAT peers. Public source addresses are rejected before parsing.
 - The listener does not trust forwarding headers and derives a privacy-safe peer key from the actual TLS socket address.
-- The sole protected route is `POST /v1/request`. Authentication and authorization remain the signed-envelope responsibility of `BridgeService` on every call.
+- The protected route is `POST /v1/request`. Authentication and authorization remain the signed-envelope responsibility of `BridgeService` on every call. Narrow submit/status pairing routes use the QR HMAC and one-time poll token described in `012-tls-pairing-transport.md`; desktop approval is never network-exposed.
 - Browser-origin headers, cookies, ambient Authorization credentials, proxy credentials, WebSocket upgrades, and `Expect` flows are rejected.
 - Exactly one Host header must match an explicit allowed host and the bound port. This blocks Host confusion and DNS-rebinding routes.
 - JSON must be UTF-8 `application/json`, uncompressed, non-chunked, and have an exact positive Content-Length.
@@ -32,7 +32,5 @@ These decisions close the listener prerequisites in `002-local-bridge-threat-mod
 
 ## Pending integration
 
-- Generate and persist the TLS identity through explicit macOS setup with no command-line secret arguments.
-- Add the certificate fingerprint and endpoint to the short-lived QR offer.
 - Implement an iOS native pinned HTTPS client that accepts only the exact QR fingerprint; normal React Native networking must not bypass pinning.
 - Exercise pairing expiry, replay, Host/Origin, oversized/slow body, concurrency, revocation, wrong-certificate, and wrong-bridge cases end to end on a real Mac and iPhone.

@@ -6,11 +6,7 @@ export {
   type AcpSessionPage,
 } from './acp';
 export { InMemoryReplayGuard, type ReplayGuard } from './replay';
-export {
-  FixedWindowRateLimiter,
-  type RateLimiter,
-  type RateLimitRule,
-} from './rate-limit';
+export { FixedWindowRateLimiter, type RateLimiter, type RateLimitRule } from './rate-limit';
 export { SessionHandleRegistry } from './session-handles';
 export {
   MacOSKeychainSecretStore,
@@ -22,6 +18,16 @@ export {
   type HttpsBridgeListenerAddress,
   type HttpsBridgeListenerOptions,
 } from './listener';
+export {
+  OpenSslTlsIdentityGenerator,
+  parseTlsIdentity,
+  tlsIdentityFromPem,
+  tlsIdentitySchema,
+  type OpenSslTlsIdentityGeneratorOptions,
+  type ParseTlsIdentityOptions,
+  type TlsIdentity,
+  type TlsIdentityGenerator,
+} from './tls-identity';
 export {
   DesktopBridgeStateRepository,
   PersistentDeviceRegistry,
@@ -42,8 +48,10 @@ export {
   createPairingProof,
   devicePermissionUpdateSchema,
   pairingOfferSchema,
+  pairingPollRequestSchema,
   pairingReceiptSchema,
   pairingRequestSchema,
+  pairingTransportSchema,
   revokeDeviceRecord,
   signedPairingReceiptSchema,
   unsignedPairingRequestSchema,
@@ -55,9 +63,12 @@ export {
   type PairingDeviceRegistry,
   type PairingManagerOptions,
   type PairingOffer,
+  type PairingPollRequest,
+  type PairingPollResult,
   type PairingReceipt,
   type PairingRequest,
   type PairingSubmissionResult,
+  type PairingTransport,
   type PendingPairingReview,
   type SignedPairingReceipt,
   type UnsignedPairingRequest,

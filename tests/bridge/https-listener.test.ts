@@ -1,14 +1,17 @@
 import { execFileSync } from 'node:child_process';
+import { generateKeyPairSync } from 'node:crypto';
 import { readFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { request as httpsRequest } from 'node:https';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  HttpsBridgeListener,
-  type HttpsBridgeListenerAddress,
-} from '../../bridge/src/listener';
+import { HttpsBridgeListener, type HttpsBridgeListenerAddress } from '../../bridge/src/listener';
 import type { BridgeServiceResponse } from '../../bridge/src/service';
+import {
+  PairingManager,
+  createPairingProof,
+  type UnsignedPairingRequest,
+} from '../../bridge/src/pairing';
 
 interface TestResponse {
   status: number;
@@ -29,7 +32,10 @@ function deferred(): Deferred {
   return { promise, resolve: () => resolvePromise?.() };
 }
 
-function generateCertificate(directory: string, name: string): { certificate: string; key: string } {
+function generateCertificate(
+  directory: string,
+  name: string,
+): { certificate: string; key: string } {
   const certificatePath = join(directory, `${name}.crt`);
   const keyPath = join(directory, `${name}.key`);
   execFileSync(
@@ -62,13 +68,14 @@ function post(
   address: HttpsBridgeListenerAddress,
   body: string,
   headers: Record<string, string> = {},
+  path = '/v1/request',
 ): Promise<TestResponse> {
   return new Promise((resolve, reject) => {
     const request = httpsRequest(
       {
         host: '127.0.0.1',
         port: address.port,
-        path: '/v1/request',
+        path,
         method: 'POST',
         rejectUnauthorized: false,
         agent: false,
@@ -173,11 +180,15 @@ describe('encrypted Desktop Bridge listener', () => {
     const address = await createListener(bridgeService).start();
     const json = JSON.stringify({ signed: 'request' });
 
-    await expect(post(address, json, { Host: `attacker.invalid:${address.port}` })).resolves.toMatchObject({
+    await expect(
+      post(address, json, { Host: `attacker.invalid:${address.port}` }),
+    ).resolves.toMatchObject({
       status: 404,
       body: { error: 'not_found' },
     });
-    await expect(post(address, json, { Origin: 'https://attacker.invalid' })).resolves.toMatchObject({
+    await expect(
+      post(address, json, { Origin: 'https://attacker.invalid' }),
+    ).resolves.toMatchObject({
       status: 404,
       body: { error: 'not_found' },
     });
@@ -274,6 +285,78 @@ describe('encrypted Desktop Bridge listener', () => {
     expect(bridgeService.handle).toHaveBeenCalledTimes(1);
   });
 
+  it('carries a certificate-bound pairing through submit, approval, and single-use poll', async () => {
+    const bridgeKeys = generateKeyPairSync('ed25519');
+    const bridgeId = 'bridge_1234567890';
+    const devices = new Map<string, unknown>();
+    const pairing = new PairingManager(
+      {
+        bridgeId,
+        privateKey: bridgeKeys.privateKey,
+        publicKeySpki: bridgeKeys.publicKey
+          .export({ format: 'der', type: 'spki' })
+          .toString('base64url'),
+      },
+      {
+        register: async (device) => {
+          if (devices.has(device.deviceId)) return false;
+          devices.set(device.deviceId, device);
+          return true;
+        },
+      },
+    );
+    const address = await createListener(service(), {
+      pairing,
+      pairingSubmitLimitPerMinute: 1,
+      pairingStatusLimitPerMinute: 3,
+    }).start();
+    const transport = {
+      bridgeEndpoint: `https://127.0.0.1:${address.port}/`,
+      tlsCertificateFingerprint: address.certificateFingerprint,
+    };
+    const offer = pairing.createOffer(transport);
+    const phoneKeys = generateKeyPairSync('ed25519');
+    const unsigned: UnsignedPairingRequest = {
+      protocolVersion: 1,
+      bridgeId,
+      pairingId: offer.pairingId,
+      bridgeKeyFingerprint: offer.bridgeKeyFingerprint,
+      bridgeEndpoint: offer.bridgeEndpoint,
+      tlsCertificateFingerprint: offer.tlsCertificateFingerprint,
+      deviceId: 'device_1234567890',
+      deviceName: 'Frank’s iPhone',
+      devicePublicKeySpki: phoneKeys.publicKey
+        .export({ format: 'der', type: 'spki' })
+        .toString('base64url'),
+    };
+    const submission = await post(
+      address,
+      JSON.stringify({
+        ...unsigned,
+        proof: createPairingProof(offer.pairingSecret, unsigned),
+      }),
+      {},
+      '/v1/pair/submit',
+    );
+    expect(submission).toMatchObject({ status: 202, body: { status: 'pending' } });
+    const pollToken = (submission.body as { pollToken: string }).pollToken;
+    const pollBody = { protocolVersion: 1, bridgeId, pairingId: offer.pairingId, pollToken };
+
+    await expect(
+      post(address, JSON.stringify(pollBody), {}, '/v1/pair/status'),
+    ).resolves.toMatchObject({ status: 202, body: { status: 'pending' } });
+    await expect(pairing.approve(offer.pairingId)).resolves.toMatchObject({ ok: true });
+    await expect(
+      post(address, JSON.stringify(pollBody), {}, '/v1/pair/status'),
+    ).resolves.toMatchObject({ status: 200, body: { status: 'approved' } });
+    await expect(
+      post(address, JSON.stringify(pollBody), {}, '/v1/pair/status'),
+    ).resolves.toMatchObject({ status: 404, body: { error: 'not_found' } });
+    expect(devices.get(unsigned.deviceId)).toMatchObject({
+      permissions: ['bridge:health', 'session:metadata:read'],
+    });
+  });
+
   it('requires explicit LAN configuration and rejects a mismatched TLS private key', () => {
     const bridgeService = service();
     expect(
@@ -306,7 +389,7 @@ describe('encrypted Desktop Bridge listener', () => {
           tlsCertificatePem: tls.certificate,
           tlsPrivateKeyPem: secondTls.key,
         }),
-    ).toThrow('do not match');
+    ).toThrow('certificate is invalid');
 
     const lanListener = new HttpsBridgeListener({
       service: bridgeService,

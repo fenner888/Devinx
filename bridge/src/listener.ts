@@ -1,4 +1,4 @@
-import { createHash, createHmac, createPrivateKey, randomBytes, X509Certificate } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createServer, type Server as HttpsServer } from 'node:https';
 import { isIP } from 'node:net';
@@ -9,6 +9,8 @@ import { z } from 'zod';
 
 import { FixedWindowRateLimiter, type RateLimiter } from './rate-limit';
 import type { BridgeServiceResponse } from './service';
+import { tlsIdentityFromPem, type TlsIdentity } from './tls-identity';
+import type { PairingPollResult, PairingSubmissionResult } from './pairing';
 
 const DEFAULT_PORT = 45_831;
 const DEFAULT_MAXIMUM_BODY_BYTES = 256 * 1024;
@@ -35,13 +37,25 @@ const listenerOptionsSchema = z
     port: z.number().int().min(0).max(65_535),
     allowLan: z.boolean(),
     allowedHosts: z.array(hostNameSchema).min(1).max(32),
-    tlsCertificatePem: z.string().min(1).max(128 * 1024),
-    tlsPrivateKeyPem: z.string().min(1).max(128 * 1024),
-    maximumBodyBytes: z.number().int().min(1_024).max(1024 * 1024),
+    tlsCertificatePem: z
+      .string()
+      .min(1)
+      .max(128 * 1024),
+    tlsPrivateKeyPem: z
+      .string()
+      .min(1)
+      .max(128 * 1024),
+    maximumBodyBytes: z
+      .number()
+      .int()
+      .min(1_024)
+      .max(1024 * 1024),
     maximumConnections: z.number().int().min(1).max(1_000),
     maximumConcurrentRequests: z.number().int().min(1).max(1_000),
     maximumConcurrentRequestsPerPeer: z.number().int().min(1).max(100),
     requestLimitPerMinute: z.number().int().min(1).max(10_000),
+    pairingSubmitLimitPerMinute: z.number().int().min(1).max(1_000),
+    pairingStatusLimitPerMinute: z.number().int().min(1).max(1_000),
     bodyTimeoutMs: z.number().int().min(1_000).max(60_000),
   })
   .strict()
@@ -53,11 +67,7 @@ const listenerOptionsSchema = z
         message: 'Non-loopback binding requires explicit LAN enablement',
       });
     }
-    if (
-      value.allowLan &&
-      !isUnspecifiedAddress(value.host) &&
-      !isPrivatePeerAddress(value.host)
-    ) {
+    if (value.allowLan && !isUnspecifiedAddress(value.host) && !isPrivatePeerAddress(value.host)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['host'],
@@ -91,8 +101,14 @@ interface BridgeRequestHandler {
   handle(input: unknown, context: { peerKey: string; now: number }): Promise<BridgeServiceResponse>;
 }
 
+interface PairingRequestHandler {
+  submit(input: unknown, now?: number): PairingSubmissionResult;
+  poll(input: unknown, now?: number): PairingPollResult;
+}
+
 export interface HttpsBridgeListenerOptions {
   service: BridgeRequestHandler;
+  pairing?: PairingRequestHandler;
   tlsCertificatePem: string;
   tlsPrivateKeyPem: string;
   host?: string;
@@ -104,6 +120,8 @@ export interface HttpsBridgeListenerOptions {
   maximumConcurrentRequests?: number;
   maximumConcurrentRequestsPerPeer?: number;
   requestLimitPerMinute?: number;
+  pairingSubmitLimitPerMinute?: number;
+  pairingStatusLimitPerMinute?: number;
   bodyTimeoutMs?: number;
   rateLimiter?: RateLimiter;
 }
@@ -115,6 +133,12 @@ export interface HttpsBridgeListenerAddress {
 }
 
 type TransportStatus = 400 | 404 | 413 | 415 | 429 | 503;
+type TransportRoute = 'request' | 'pairing.submit' | 'pairing.status';
+
+interface TransportHandlerResponse {
+  status: 200 | 202 | 400 | 404 | 429 | 503;
+  body: unknown;
+}
 
 class TransportError extends Error {
   constructor(readonly status: TransportStatus) {
@@ -192,19 +216,6 @@ function parseHostHeader(value: string): { host: string; port?: number } | null 
   return { host: hostResult.data, port };
 }
 
-function keysMatch(certificate: X509Certificate, privateKeyPem: string): boolean {
-  try {
-    const privateKey = createPrivateKey(privateKeyPem);
-    return certificate.checkPrivateKey(privateKey);
-  } catch {
-    return false;
-  }
-}
-
-function certificateFingerprint(certificate: X509Certificate): string {
-  return createHash('sha256').update(certificate.raw).digest('base64url');
-}
-
 function publicBody(status: TransportStatus): { error: string } {
   if (status === 413) return { error: 'request_too_large' };
   if (status === 415) return { error: 'unsupported_media_type' };
@@ -216,6 +227,7 @@ function publicBody(status: TransportStatus): { error: string } {
 
 export class HttpsBridgeListener {
   private readonly service: BridgeRequestHandler;
+  private readonly pairing: PairingRequestHandler | undefined;
   private readonly options: Omit<
     z.infer<typeof listenerOptionsSchema>,
     'tlsCertificatePem' | 'tlsPrivateKeyPem'
@@ -232,6 +244,7 @@ export class HttpsBridgeListener {
 
   constructor(input: HttpsBridgeListenerOptions) {
     this.service = input.service;
+    this.pairing = input.pairing;
     const host = input.host ?? '127.0.0.1';
     const allowedHosts = input.allowedHosts ?? (isUnspecifiedAddress(host) ? [] : [host]);
     const parsedOptions = listenerOptionsSchema.parse({
@@ -246,35 +259,22 @@ export class HttpsBridgeListener {
       maximumConcurrentRequests: input.maximumConcurrentRequests ?? 16,
       maximumConcurrentRequestsPerPeer: input.maximumConcurrentRequestsPerPeer ?? 4,
       requestLimitPerMinute: input.requestLimitPerMinute ?? 120,
+      pairingSubmitLimitPerMinute: input.pairingSubmitLimitPerMinute ?? 10,
+      pairingStatusLimitPerMinute: input.pairingStatusLimitPerMinute ?? 120,
       bodyTimeoutMs: input.bodyTimeoutMs ?? 10_000,
     });
     const { tlsCertificatePem, tlsPrivateKeyPem, ...runtimeOptions } = parsedOptions;
     this.options = runtimeOptions;
     this.rateLimiter = input.rateLimiter ?? new FixedWindowRateLimiter(2_000);
 
-    let certificate: X509Certificate;
+    let tlsIdentity: TlsIdentity;
     try {
-      certificate = new X509Certificate(tlsCertificatePem);
+      tlsIdentity = tlsIdentityFromPem(tlsCertificatePem, tlsPrivateKeyPem);
     } catch {
       throw new Error('Bridge TLS certificate is invalid');
     }
-    if (!keysMatch(certificate, tlsPrivateKeyPem)) {
-      throw new Error('Bridge TLS certificate and private key do not match');
-    }
-    const validFrom = Date.parse(certificate.validFrom);
-    const validTo = Date.parse(certificate.validTo);
-    if (
-      !Number.isFinite(validFrom) ||
-      !Number.isFinite(validTo) ||
-      validFrom > Date.now() ||
-      validTo <= Date.now() ||
-      certificate.subject !== certificate.issuer ||
-      !certificate.verify(certificate.publicKey)
-    ) {
-      throw new Error('Bridge TLS certificate is not a valid self-signed certificate');
-    }
-    this.certificateValidTo = validTo;
-    this.fingerprint = certificateFingerprint(certificate);
+    this.certificateValidTo = tlsIdentity.validTo;
+    this.fingerprint = tlsIdentity.certificateFingerprint;
 
     this.server = createServer(
       {
@@ -343,19 +343,18 @@ export class HttpsBridgeListener {
   }
 
   async stop(): Promise<void> {
-    if (!this.server.listening) return;
-    for (const socket of this.sockets) socket.destroy();
-    await new Promise<void>((resolve) => this.server.close(() => resolve()));
+    if (this.stopped) return;
+    if (this.server.listening) {
+      for (const socket of this.sockets) socket.destroy();
+      await new Promise<void>((resolve) => this.server.close(() => resolve()));
+    }
     this.activeByPeer.clear();
     this.activeRequests = 0;
     this.peerHashKey.fill(0);
     this.stopped = true;
   }
 
-  private async handleRequest(
-    request: IncomingMessage,
-    response: ServerResponse,
-  ): Promise<void> {
+  private async handleRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
     let peerKey: string | null = null;
     let counted = false;
     try {
@@ -364,7 +363,7 @@ export class HttpsBridgeListener {
       peerKey = createHmac('sha256', this.peerHashKey)
         .update(normalizedAddress(peerAddress))
         .digest('base64url');
-      this.validateRequestMetadata(request, this.boundPort());
+      const route = this.validateRequestMetadata(request, this.boundPort());
       const now = Date.now();
       if (now >= this.certificateValidTo) throw new TransportError(503);
       if (
@@ -376,10 +375,26 @@ export class HttpsBridgeListener {
       ) {
         throw new TransportError(429);
       }
+      if (
+        route !== 'request' &&
+        !this.rateLimiter.consume(
+          `pairing:${route}:${peerKey}`,
+          {
+            limit:
+              route === 'pairing.submit'
+                ? this.options.pairingSubmitLimitPerMinute
+                : this.options.pairingStatusLimitPerMinute,
+            windowMs: 60_000,
+          },
+          now,
+        )
+      ) {
+        throw new TransportError(429);
+      }
       this.beginRequest(peerKey);
       counted = true;
       const input = await this.readJsonBody(request);
-      const result = await this.service.handle(input, { peerKey, now });
+      const result = await this.dispatch(route, input, peerKey, now);
       this.sendServiceResponse(response, result);
     } catch (error) {
       if (!response.headersSent && !response.destroyed) {
@@ -404,13 +419,14 @@ export class HttpsBridgeListener {
     return address.port;
   }
 
-  private validateRequestMetadata(
-    request: IncomingMessage,
-    port: number,
-  ): void {
-    if (request.method !== 'POST' || request.url !== '/v1/request') {
-      throw new TransportError(404);
-    }
+  private validateRequestMetadata(request: IncomingMessage, port: number): TransportRoute {
+    if (request.method !== 'POST') throw new TransportError(404);
+    let route: TransportRoute;
+    if (request.url === '/v1/request') route = 'request';
+    else if (request.url === '/v1/pair/submit') route = 'pairing.submit';
+    else if (request.url === '/v1/pair/status') route = 'pairing.status';
+    else throw new TransportError(404);
+    if (route !== 'request' && !this.pairing) throw new TransportError(404);
     if (countRawHeader(request.rawHeaders, 'host') !== 1) throw new TransportError(404);
     if (countRawHeader(request.rawHeaders, 'content-length') !== 1) {
       throw new TransportError(400);
@@ -445,6 +461,31 @@ export class HttpsBridgeListener {
     const length = Number(contentLength);
     if (!Number.isSafeInteger(length) || length < 1) throw new TransportError(400);
     if (length > this.options.maximumBodyBytes) throw new TransportError(413);
+    return route;
+  }
+
+  private async dispatch(
+    route: TransportRoute,
+    input: unknown,
+    peerKey: string,
+    now: number,
+  ): Promise<TransportHandlerResponse> {
+    if (route === 'request') return this.service.handle(input, { peerKey, now });
+    if (!this.pairing) return { status: 404, body: { error: 'not_found' } };
+    if (route === 'pairing.submit') {
+      const submission = this.pairing.submit(input, now);
+      if (!submission.ok) return { status: submission.status, body: submission.body };
+      return {
+        status: 202,
+        body: {
+          status: 'pending',
+          pollToken: submission.pollToken,
+          expiresAt: submission.pending.expiresAt,
+        },
+      };
+    }
+    const poll = this.pairing.poll(input, now);
+    return { status: poll.status, body: poll.body };
   }
 
   private beginRequest(peerKey: string): void {
@@ -466,9 +507,7 @@ export class HttpsBridgeListener {
     else this.activeByPeer.set(peerKey, peerCount - 1);
   }
 
-  private readJsonBody(
-    request: IncomingMessage,
-  ): Promise<unknown> {
+  private readJsonBody(request: IncomingMessage): Promise<unknown> {
     const declaredLength = Number(request.headers['content-length']);
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
@@ -543,7 +582,7 @@ export class HttpsBridgeListener {
 
   private sendServiceResponse(
     response: ServerResponse,
-    result: BridgeServiceResponse,
+    result: BridgeServiceResponse | TransportHandlerResponse,
   ): void {
     try {
       this.sendJson(response, result.status, result.body);
@@ -552,11 +591,7 @@ export class HttpsBridgeListener {
     }
   }
 
-  private send(
-    response: ServerResponse,
-    status: TransportStatus,
-    closeConnection = false,
-  ): void {
+  private send(response: ServerResponse, status: TransportStatus, closeConnection = false): void {
     this.sendJson(response, status, publicBody(status), closeConnection);
   }
 

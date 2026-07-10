@@ -16,6 +16,10 @@ import { BRIDGE_PROTOCOL_VERSION } from '../../bridge/src/schemas';
 const NOW = 1_800_000_000_000;
 const BRIDGE_ID = 'bridge_1234567890';
 const DEVICE_ID = 'device_1234567890';
+const TRANSPORT = {
+  bridgeEndpoint: 'https://192.168.1.20:45831/',
+  tlsCertificateFingerprint: 'T'.repeat(43),
+};
 
 describe('Desktop Bridge pairing core', () => {
   const bridgeKeys = generateKeyPairSync('ed25519');
@@ -28,10 +32,12 @@ describe('Desktop Bridge pairing core', () => {
   let manager: PairingManager;
 
   beforeEach(() => {
-    devicePublicKeySpki = generateKeyPairSync('ed25519').publicKey.export({
-      format: 'der',
-      type: 'spki',
-    }).toString('base64url');
+    devicePublicKeySpki = generateKeyPairSync('ed25519')
+      .publicKey.export({
+        format: 'der',
+        type: 'spki',
+      })
+      .toString('base64url');
     registeredDevices = new Map();
     registry = {
       register: async (device) => {
@@ -40,11 +46,14 @@ describe('Desktop Bridge pairing core', () => {
         return true;
       },
     };
-    manager = new PairingManager({
-      bridgeId: BRIDGE_ID,
-      privateKey: bridgeKeys.privateKey,
-      publicKeySpki: bridgePublicKeySpki,
-    }, registry);
+    manager = new PairingManager(
+      {
+        bridgeId: BRIDGE_ID,
+        privateKey: bridgeKeys.privateKey,
+        publicKeySpki: bridgePublicKeySpki,
+      },
+      registry,
+    );
   });
 
   function pairingRequest(
@@ -55,6 +64,9 @@ describe('Desktop Bridge pairing core', () => {
       protocolVersion: BRIDGE_PROTOCOL_VERSION,
       bridgeId: offer.bridgeId,
       pairingId: offer.pairingId,
+      bridgeKeyFingerprint: offer.bridgeKeyFingerprint,
+      bridgeEndpoint: offer.bridgeEndpoint,
+      tlsCertificateFingerprint: offer.tlsCertificateFingerprint,
       deviceId: DEVICE_ID,
       deviceName: 'Frank’s iPhone',
       devicePublicKeySpki,
@@ -67,7 +79,7 @@ describe('Desktop Bridge pairing core', () => {
   }
 
   it('creates a short-lived offer pinned to the bridge public key', () => {
-    const offer = manager.createOffer(NOW);
+    const offer = manager.createOffer(TRANSPORT, NOW);
     const fingerprint = createHash('sha256')
       .update(Buffer.from(bridgePublicKeySpki, 'base64url'))
       .digest('base64url');
@@ -77,13 +89,14 @@ describe('Desktop Bridge pairing core', () => {
       bridgeId: BRIDGE_ID,
       bridgePublicKeySpki,
       bridgeKeyFingerprint: fingerprint,
+      ...TRANSPORT,
       expiresAt: NOW + 120_000,
     });
     expect(Buffer.from(offer.pairingSecret, 'base64url')).toHaveLength(32);
   });
 
   it('requires desktop approval and grants only read-only defaults', async () => {
-    const offer = manager.createOffer(NOW);
+    const offer = manager.createOffer(TRANSPORT, NOW);
     const request = pairingRequest(offer);
 
     const submission = manager.submit(request, NOW + 1_000);
@@ -95,6 +108,27 @@ describe('Desktop Bridge pairing core', () => {
         deviceName: 'Frank’s iPhone',
       },
     });
+    if (!submission.ok) throw new Error('Expected pending pairing');
+    expect(manager.pendingReviews(NOW + 1_250)).toEqual([
+      {
+        pairingId: offer.pairingId,
+        deviceId: DEVICE_ID,
+        deviceName: 'Frank’s iPhone',
+        expiresAt: NOW + 1_000 + 300_000,
+      },
+    ]);
+    expect(JSON.stringify(manager.pendingReviews(NOW + 1_250))).not.toContain(submission.pollToken);
+    expect(
+      manager.poll(
+        {
+          protocolVersion: 1,
+          bridgeId: BRIDGE_ID,
+          pairingId: offer.pairingId,
+          pollToken: submission.pollToken,
+        },
+        NOW + 1_500,
+      ),
+    ).toMatchObject({ ok: true, status: 202, body: { status: 'pending' } });
     expect(manager.submit(request, NOW + 2_000)).toEqual({
       ok: false,
       status: 404,
@@ -121,12 +155,39 @@ describe('Desktop Bridge pairing core', () => {
     expect(registeredDevices.get(DEVICE_ID)).toMatchObject({
       permissions: ['bridge:health', 'session:metadata:read'],
     });
-    expect(manager.verifyReceipt(approval.receipt)).toBe(true);
-    expect(verifyPairingReceipt(approval.receipt, bridgePublicKeySpki, BRIDGE_ID)).toBe(true);
+    expect(manager.verifyReceipt(approval.receipt, TRANSPORT)).toBe(true);
+    expect(verifyPairingReceipt(approval.receipt, bridgePublicKeySpki, BRIDGE_ID, TRANSPORT)).toBe(
+      true,
+    );
+    const approvedPoll = manager.poll(
+      {
+        protocolVersion: 1,
+        bridgeId: BRIDGE_ID,
+        pairingId: offer.pairingId,
+        pollToken: submission.pollToken,
+      },
+      NOW + 3_001,
+    );
+    expect(approvedPoll).toMatchObject({
+      ok: true,
+      status: 200,
+      body: { status: 'approved', receipt: approval.receipt },
+    });
+    expect(
+      manager.poll(
+        {
+          protocolVersion: 1,
+          bridgeId: BRIDGE_ID,
+          pairingId: offer.pairingId,
+          pollToken: submission.pollToken,
+        },
+        NOW + 3_002,
+      ),
+    ).toMatchObject({ ok: false, status: 404 });
   });
 
   it('invalidates an offer after repeated incorrect proofs', () => {
-    const offer = manager.createOffer(NOW);
+    const offer = manager.createOffer(TRANSPORT, NOW);
     const request = pairingRequest(offer);
     request.proof = randomBytes(32).toString('base64url');
 
@@ -146,7 +207,7 @@ describe('Desktop Bridge pairing core', () => {
   });
 
   it('keeps the stored offer isolated from mutations to the returned QR object', () => {
-    const offer = manager.createOffer(NOW);
+    const offer = manager.createOffer(TRANSPORT, NOW);
     const request = pairingRequest(offer);
     offer.pairingSecret = randomBytes(32).toString('base64url');
     offer.expiresAt = NOW;
@@ -155,7 +216,7 @@ describe('Desktop Bridge pairing core', () => {
   });
 
   it('rejects expired offers without disclosing their state', () => {
-    const offer = manager.createOffer(NOW);
+    const offer = manager.createOffer(TRANSPORT, NOW);
 
     expect(manager.submit(pairingRequest(offer), NOW + 120_001)).toEqual({
       ok: false,
@@ -164,10 +225,30 @@ describe('Desktop Bridge pairing core', () => {
     });
   });
 
+  it('rejects invalid lifecycle clocks before changing pairing state', () => {
+    expect(() => manager.createOffer(TRANSPORT, Number.NaN)).toThrow('lifecycle time');
+    const offer = manager.createOffer(TRANSPORT, NOW);
+    expect(() => manager.submit(pairingRequest(offer), Number.MAX_VALUE)).toThrow('lifecycle time');
+    expect(manager.submit(pairingRequest(offer), NOW + 1).ok).toBe(true);
+  });
+
+  it('binds a valid pairing proof to the QR endpoint and TLS fingerprint', () => {
+    const offer = manager.createOffer(TRANSPORT, NOW);
+    const request = pairingRequest(offer, {
+      bridgeEndpoint: 'https://192.168.1.99:45831/',
+    });
+
+    expect(manager.submit(request, NOW + 1)).toMatchObject({ ok: false, status: 404 });
+    expect(manager.submit(pairingRequest(offer), NOW + 2)).toMatchObject({
+      ok: false,
+      status: 404,
+    });
+  });
+
   it('rejects a non-Ed25519 device key and consumes the offer', () => {
-    const offer = manager.createOffer(NOW);
-    const rsaPublicKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey
-      .export({ format: 'der', type: 'spki' })
+    const offer = manager.createOffer(TRANSPORT, NOW);
+    const rsaPublicKey = generateKeyPairSync('rsa', { modulusLength: 2048 })
+      .publicKey.export({ format: 'der', type: 'spki' })
       .toString('base64url');
     const request = pairingRequest(offer, { devicePublicKeySpki: rsaPublicKey });
 
@@ -176,12 +257,17 @@ describe('Desktop Bridge pairing core', () => {
       status: 400,
       body: { error: 'invalid_request' },
     });
-    expect(manager.submit(pairingRequest(offer), NOW + 2)).toMatchObject({ ok: false, status: 404 });
+    expect(manager.submit(pairingRequest(offer), NOW + 2)).toMatchObject({
+      ok: false,
+      status: 404,
+    });
   });
 
   it('supports explicit denial and prevents later approval', async () => {
-    const offer = manager.createOffer(NOW);
-    expect(manager.submit(pairingRequest(offer), NOW + 1).ok).toBe(true);
+    const offer = manager.createOffer(TRANSPORT, NOW);
+    const submission = manager.submit(pairingRequest(offer), NOW + 1);
+    expect(submission.ok).toBe(true);
+    if (!submission.ok) throw new Error('Expected pending pairing');
 
     expect(manager.deny(offer.pairingId)).toBe(true);
     await expect(manager.approve(offer.pairingId, NOW + 2)).resolves.toEqual({
@@ -189,11 +275,22 @@ describe('Desktop Bridge pairing core', () => {
       status: 404,
       body: { error: 'not_found' },
     });
+    expect(
+      manager.poll(
+        {
+          protocolVersion: 1,
+          bridgeId: BRIDGE_ID,
+          pairingId: offer.pairingId,
+          pollToken: submission.pollToken,
+        },
+        NOW + 3,
+      ),
+    ).toMatchObject({ ok: false, status: 404 });
   });
 
   it('does not overwrite an existing device public key', async () => {
     registeredDevices.set(DEVICE_ID, { existing: true });
-    const offer = manager.createOffer(NOW);
+    const offer = manager.createOffer(TRANSPORT, NOW);
     manager.submit(pairingRequest(offer), NOW + 1);
 
     await expect(manager.approve(offer.pairingId, NOW + 2)).resolves.toEqual({
@@ -205,7 +302,7 @@ describe('Desktop Bridge pairing core', () => {
   });
 
   it('detects a tampered approval receipt', async () => {
-    const offer = manager.createOffer(NOW);
+    const offer = manager.createOffer(TRANSPORT, NOW);
     manager.submit(pairingRequest(offer), NOW + 1);
     const approval = await manager.approve(offer.pairingId, NOW + 2);
     if (!approval.ok) throw new Error('Expected pairing approval');
@@ -214,14 +311,20 @@ describe('Desktop Bridge pairing core', () => {
       ...approval.receipt,
       permissions: [...approval.receipt.permissions, 'session:prompt:send'],
     };
-    expect(verifyPairingReceipt(tampered, bridgePublicKeySpki, BRIDGE_ID)).toBe(false);
-    expect(verifyPairingReceipt(approval.receipt, bridgePublicKeySpki, 'bridge_0987654321')).toBe(
-      false,
-    );
+    expect(verifyPairingReceipt(tampered, bridgePublicKeySpki, BRIDGE_ID, TRANSPORT)).toBe(false);
+    expect(
+      verifyPairingReceipt(approval.receipt, bridgePublicKeySpki, 'bridge_0987654321', TRANSPORT),
+    ).toBe(false);
+    expect(
+      verifyPairingReceipt(approval.receipt, bridgePublicKeySpki, BRIDGE_ID, {
+        ...TRANSPORT,
+        tlsCertificateFingerprint: 'W'.repeat(43),
+      }),
+    ).toBe(false);
   });
 
   it('supports explicit permission updates and revocation', async () => {
-    const offer = manager.createOffer(NOW);
+    const offer = manager.createOffer(TRANSPORT, NOW);
     manager.submit(pairingRequest(offer), NOW + 1);
     const approval = await manager.approve(offer.pairingId, NOW + 2);
     if (!approval.ok) throw new Error('Expected pairing approval');
@@ -238,7 +341,7 @@ describe('Desktop Bridge pairing core', () => {
   });
 
   it('rejects duplicate permission or session-scope updates', async () => {
-    const offer = manager.createOffer(NOW);
+    const offer = manager.createOffer(TRANSPORT, NOW);
     manager.submit(pairingRequest(offer), NOW + 1);
     const approval = await manager.approve(offer.pairingId, NOW + 2);
     if (!approval.ok) throw new Error('Expected pairing approval');
@@ -257,17 +360,20 @@ describe('Desktop Bridge pairing core', () => {
   });
 
   it('rejects mismatched bridge identity keys', () => {
-    const otherKey = generateKeyPairSync('ed25519').publicKey
-      .export({ format: 'der', type: 'spki' })
+    const otherKey = generateKeyPairSync('ed25519')
+      .publicKey.export({ format: 'der', type: 'spki' })
       .toString('base64url');
 
     expect(
       () =>
-        new PairingManager({
-          bridgeId: BRIDGE_ID,
-          privateKey: bridgeKeys.privateKey,
-          publicKeySpki: otherKey,
-        }, registry),
+        new PairingManager(
+          {
+            bridgeId: BRIDGE_ID,
+            privateKey: bridgeKeys.privateKey,
+            publicKeySpki: otherKey,
+          },
+          registry,
+        ),
     ).toThrow('keys do not match');
   });
 });
