@@ -63,6 +63,7 @@ interface DevinXDeviceCryptoNativeModule {
   sign(keyId: string, message: string): Promise<unknown>;
   verify(publicKeySpki: string, message: string, signature: string): Promise<unknown>;
   hmacSha256(secret: string, message: string): Promise<unknown>;
+  fingerprintPublicKeySpki?(publicKeySpki: string): Promise<unknown>;
   hasDeviceIdentity(keyId: string): Promise<unknown>;
   deleteDeviceIdentity(keyId: string): Promise<void>;
   deleteAllDeviceIdentities(): Promise<void>;
@@ -137,6 +138,16 @@ export async function hmacSha256(secret: string, message: string): Promise<strin
     );
 }
 
+export async function fingerprintPublicKeySpki(publicKeySpki: string): Promise<string> {
+  const nativeModule = getNativeModule();
+  if (!nativeModule.fingerprintPublicKeySpki) {
+    throw new Error('Computer pairing requires a current DevinX iOS build');
+  }
+  return certificateFingerprintSchema.parse(
+    await nativeModule.fingerprintPublicKeySpki(publicKeySpkiSchema.parse(publicKeySpki)),
+  );
+}
+
 export async function hasDeviceIdentity(keyId: string): Promise<boolean> {
   return z.boolean().parse(await getNativeModule().hasDeviceIdentity(keyIdSchema.parse(keyId)));
 }
@@ -155,7 +166,11 @@ export interface PinnedBridgeResponse {
 }
 
 export function isPinnedBridgeTransportAvailable(): boolean {
-  return typeof resolveNativeModule()?.postPinnedJson === 'function';
+  const nativeModule = resolveNativeModule();
+  return (
+    typeof nativeModule?.postPinnedJson === 'function' &&
+    typeof nativeModule.fingerprintPublicKeySpki === 'function'
+  );
 }
 
 export async function postPinnedBridgeJson(

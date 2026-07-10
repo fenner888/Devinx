@@ -2,6 +2,7 @@ export {
   createDeviceIdentity,
   deleteAllDeviceIdentities,
   deleteDeviceIdentity,
+  fingerprintPublicKeySpki,
   hasDeviceIdentity,
   hmacSha256,
   isDeviceCryptoAvailable,

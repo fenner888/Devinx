@@ -1,6 +1,6 @@
 # 013 — iOS pinned Desktop Bridge transport
 
-Status: native transport and credential gates implemented; pairing orchestration and real-device validation pending
+Status: native transport, credential gates, and pairing orchestration implemented; scanner UI and real-device validation pending
 
 ## Native-only trust boundary
 

@@ -57,6 +57,12 @@ public final class DevinXDeviceCryptoModule: Module {
       return Self.base64UrlEncode(Data(authenticationCode))
     }
 
+    AsyncFunction("fingerprintPublicKeySpki") { (publicKeySpki: String) throws -> String in
+      let spki = try Self.base64UrlDecode(publicKeySpki, expectedLength: 44)
+      _ = try Self.rawPublicKey(from: publicKeySpki)
+      return Self.base64UrlEncode(Data(SHA256.hash(data: spki)))
+    }
+
     AsyncFunction("hasDeviceIdentity") { (keyId: String) throws -> Bool in
       do {
         var privateKeyData = try Self.readPrivateKey(keyId: keyId)

@@ -2,6 +2,7 @@ import {
   createDeviceIdentity,
   deleteAllDeviceIdentities,
   deleteDeviceIdentity,
+  fingerprintPublicKeySpki,
   hasDeviceIdentity,
   hmacSha256,
   isDeviceCryptoAvailable,
@@ -24,6 +25,7 @@ function createNativeModule() {
     sign: jest.fn(async () => SIGNATURE),
     verify: jest.fn(async () => true),
     hmacSha256: jest.fn(async () => HMAC),
+    fingerprintPublicKeySpki: jest.fn(async () => 'F'.repeat(43)),
     hasDeviceIdentity: jest.fn(async () => true),
     deleteDeviceIdentity: jest.fn(async () => {}),
     deleteAllDeviceIdentities: jest.fn(async () => {}),
@@ -53,6 +55,7 @@ describe('iOS device signing boundary', () => {
     await expect(sign(KEY_ID, 'canonical request')).resolves.toBe(SIGNATURE);
     await expect(verify(PUBLIC_KEY, 'canonical receipt', SIGNATURE)).resolves.toBe(true);
     await expect(hmacSha256(PAIRING_SECRET, 'canonical proof')).resolves.toBe(HMAC);
+    await expect(fingerprintPublicKeySpki(PUBLIC_KEY)).resolves.toBe('F'.repeat(43));
     await expect(hasDeviceIdentity(KEY_ID)).resolves.toBe(true);
   });
 

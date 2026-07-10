@@ -1,6 +1,6 @@
 # 012 — TLS identity and pairing transport
 
-Status: bridge-side implementation complete; iOS pinning and real-device approval UI pending
+Status: bridge routes and native iOS pinning complete; scanner/desktop approval UI and real-device validation pending
 
 ## Explicit TLS provisioning
 

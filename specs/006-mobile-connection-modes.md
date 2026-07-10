@@ -1,6 +1,6 @@
 # Phase 3C — Mobile Connection Modes
 
-Status: mode model, onboarding choice, secure paired-computer registry, route guard, and settings status are implemented. QR transport and local-session data adapters remain pending.
+Status: mode model, onboarding choice, secure paired-computer registry, pinned iOS transport, and pairing protocol coordinator are implemented. Scanner/desktop approval UI and local-session data adapters remain pending.
 
 ## Supported modes
 
@@ -49,9 +49,7 @@ The onboarding choice and computer-setup explanation are visible in internal dev
 
 ## Remaining acceptance gates
 
-- Implement mobile Ed25519 key generation/import with a verified platform API and no unverified dependency.
-- Implement QR parsing with Zod, size bounds, expiry, bridge-key pinning, and user confirmation.
-- Complete pairing through the encrypted local transport and store the approved credential atomically.
+- Implement the native QR camera view and explicit user confirmation around the validated pairing coordinator.
 - Render Cloud and local session sources with collision-proof namespaced identifiers.
 - Add/remove/switch connection UX without trapping a configured user in onboarding.
 - Validate cold start, corrupt Secure Store, revoked device, offline computer, Cloud-only regression, and combined mode on real iPhone hardware.
