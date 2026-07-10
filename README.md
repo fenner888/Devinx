@@ -30,9 +30,21 @@ npm run ios                   # or npm run android / npm run web
 | `npm run lint` | ESLint, zero warnings |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test` | Jest (schemas, polling, sentry scrub, key-leak gate, tokens, branding) |
+| `npm run bridge:start -- --help` | Show safe Desktop Bridge setup and detected private Mac addresses |
 | `npm run build` | Typecheck gate (EAS build invoked separately) |
 | `npm run audit` | `npm audit --audit-level=high` |
 | `npm run ci` | lint → typecheck → test → build → audit (matches CI) |
+
+## Desktop Bridge development checkpoint
+
+The local Mac bridge is pairing-only by default and stores its identity in macOS Keychain. It requires an explicit active private address so it cannot silently select a VPN or public interface:
+
+```bash
+npm run bridge:start -- --help
+npm run bridge:start -- --host 192.168.1.141
+```
+
+After the QR code appears, open **Computer Connection** in DevinX on the iPhone, scan it, and type `yes` on the Mac only if the displayed device name is correct. Read-only Devin ACP discovery remains off unless an absolute CLI path is deliberately supplied. See `/specs/016-desktop-bridge-runner.md` for the security boundary and real-device checklist.
 
 ## Security gates (spec §10)
 

@@ -9,6 +9,12 @@ export { InMemoryReplayGuard, type ReplayGuard } from './replay';
 export { FixedWindowRateLimiter, type RateLimiter, type RateLimitRule } from './rate-limit';
 export { SessionHandleRegistry } from './session-handles';
 export {
+  discoverPrivateLanAddresses,
+  isPrivateLanIPv4,
+  validateAdvertisedLanHost,
+  type NetworkInterfaceMap,
+} from './network';
+export {
   MacOSKeychainSecretStore,
   type KeychainSecretStore,
   type MacOSKeychainOptions,
@@ -43,6 +49,17 @@ export {
   type BridgeServiceResponse,
   type SessionDiscoveryAdapter,
 } from './service';
+export {
+  DesktopBridgeRunner,
+  createProductionRunnerDependencies,
+  type AcpSessionLifecycle,
+  type BridgeListenerLifecycle,
+  type DesktopBridgeRunnerDependencies,
+  type DesktopBridgeRunnerOptions,
+  type PairingQrRenderer,
+  type StartedDesktopBridge,
+} from './runner';
+export { TerminalQrRenderer } from './terminal-qr';
 export {
   PairingManager,
   createPairingProof,
