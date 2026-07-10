@@ -8,7 +8,7 @@ export const opaqueIdSchema = z
   .max(128)
   .regex(/^[A-Za-z0-9_-]+$/);
 
-const sessionIdSchema = z.string().min(1).max(512);
+export const sessionIdSchema = z.string().min(1).max(512);
 const cursorSchema = z.string().min(1).max(4096);
 export const deviceNameSchema = z
   .string()

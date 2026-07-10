@@ -213,6 +213,10 @@ export class AcpSessionClient {
     };
   }
 
+  isSessionListSupported(): boolean {
+    return Boolean(this.child) && this.canListSessions;
+  }
+
   async stop(): Promise<void> {
     const child = this.child;
     this.child = null;

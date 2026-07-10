@@ -7,6 +7,19 @@ export {
 } from './acp';
 export { InMemoryReplayGuard, type ReplayGuard } from './replay';
 export {
+  FixedWindowRateLimiter,
+  type RateLimiter,
+  type RateLimitRule,
+} from './rate-limit';
+export { SessionHandleRegistry } from './session-handles';
+export {
+  BridgeService,
+  type BridgeRequestContext,
+  type BridgeServiceOptions,
+  type BridgeServiceResponse,
+  type SessionDiscoveryAdapter,
+} from './service';
+export {
   PairingManager,
   createPairingProof,
   devicePermissionUpdateSchema,
@@ -47,6 +60,7 @@ export {
   deviceNameSchema,
   deviceRecordSchema,
   opaqueIdSchema,
+  sessionIdSchema,
   signedRequestEnvelopeSchema,
   type BridgeBodyByMethod,
   type BridgeMethod,
