@@ -66,7 +66,16 @@ describe('API schema boundary validation (§8.3)', () => {
 
   it('tolerates optional nullable session fields being omitted entirely', () => {
     const minimal = { ...sessionFixture } as Record<string, unknown>;
-    for (const k of ['category', 'origin', 'child_session_ids', 'parent_session_id', 'playbook_id', 'service_user_id', 'status_detail', 'title']) {
+    for (const k of [
+      'category',
+      'origin',
+      'child_session_ids',
+      'parent_session_id',
+      'playbook_id',
+      'service_user_id',
+      'status_detail',
+      'title',
+    ]) {
       delete minimal[k];
     }
     expect(() => sessionResponseSchema.parse(minimal)).not.toThrow();
@@ -136,14 +145,31 @@ describe('API schema boundary validation (§8.3)', () => {
       updated_at: 2,
       url: 'https://app.devin.ai/sessions/devin-1',
       analysis: {
-        action: ['wrote tests'],
-        classification: 'feature',
-        issues: [{ description: 'd', severity: 'low', title: 't' }],
-        prompts: null,
-        timeline: [{ description: 'd', title: 't' }],
+        action_items: [
+          { action_item: 'Write focused tests', issue_id: 'issue-1', type: 'knowledge' },
+        ],
+        classification: {
+          category: 'feature_development',
+          confidence: 0.91,
+          programming_languages: ['TypeScript'],
+          tools_and_frameworks: ['React Native'],
+        },
+        issues: [
+          { id: 'issue-1', impact: 'Slow feedback', issue: 'Polling lag', label: 'Latency' },
+        ],
+        note_usage: null,
+        suggested_prompt: {
+          feedback_items: [],
+          original_prompt: 'Fix it',
+          suggested_prompt: 'Fix it and add focused tests',
+        },
+        timeline: [
+          { color: 'blue', description: 'Implemented fix', issue_id: null, title: 'Code' },
+        ],
       },
     });
-    expect(out.analysis?.issues[0]?.severity).toBe('low');
+    expect(out.analysis?.classification?.category).toBe('feature_development');
+    expect(out.analysis?.issues[0]?.issue).toBe('Polling lag');
   });
 
   it('parses insights without an analysis block (not generated yet)', () => {
@@ -227,10 +253,7 @@ describe('API schema boundary validation (§8.3)', () => {
     const page = sessionListResponseSchema.parse({
       end_cursor: null,
       has_next_page: false,
-      items: [
-        sessionFixture,
-        { session_id: 'broken', title: 'missing every required field' },
-      ],
+      items: [sessionFixture, { session_id: 'broken', title: 'missing every required field' }],
     });
     expect(page.items).toHaveLength(1);
     expect(page.items[0]?.session_id).toBe(sessionFixture.session_id);

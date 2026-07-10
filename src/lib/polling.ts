@@ -14,13 +14,17 @@ const MODE_FACTOR: Record<PollingMode, number> = {
 };
 
 /** Scale a polling interval by the user's polling-mode preference. */
-export function scalePolling(interval: number | false, mode: PollingMode = 'balanced'): number | false {
+export function scalePolling(
+  interval: number | false,
+  mode: PollingMode = 'balanced',
+): number | false {
   if (interval === false) return false;
   return Math.round(interval * MODE_FACTOR[mode]);
 }
 
 export function pollingPolicy(
-  sessionStatus: 'running' | 'suspended' | 'exit' | 'error' | 'new' | 'claimed' | 'resuming' | undefined,
+  sessionStatus:
+    'running' | 'suspended' | 'exit' | 'error' | 'new' | 'claimed' | 'resuming' | undefined,
   appState: 'active' | 'inactive' | 'background',
   screen: ScreenContext,
   mode: PollingMode = 'balanced',
@@ -40,6 +44,27 @@ export function pollingPolicy(
   }
   if (screen === 'board') return scalePolling(15_000, mode);
   return false;
+}
+
+export function messagePollingInterval({
+  appState,
+  followUpUntil,
+  now = Date.now(),
+  sessionStatus,
+  mode = 'balanced',
+}: {
+  appState: 'active' | 'inactive' | 'background';
+  followUpUntil?: number;
+  now?: number;
+  sessionStatus?: 'running' | 'suspended' | 'exit' | 'error' | 'new' | 'claimed' | 'resuming';
+  mode?: PollingMode;
+}): number | false {
+  if (appState !== 'active') return false;
+  if (followUpUntil && followUpUntil > now) return scalePolling(1_000, mode);
+  if (sessionStatus === 'exit' || sessionStatus === 'error' || sessionStatus === 'suspended') {
+    return false;
+  }
+  return scalePolling(2_500, mode);
 }
 
 /** 429 backoff with jitter (spec §8.4). Retry-After is capped at 60s. */
