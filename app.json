@@ -12,6 +12,7 @@
       "bundleIdentifier": "com.fenner888.devinx",
       "infoPlist": {
         "NSFileProtection": "NSFileProtectionComplete",
+        "NSCameraUsageDescription": "Allow DevinX to scan a pairing code shown by the Desktop Bridge.",
         "NSLocalNetworkUsageDescription": "Allow DevinX to connect securely to the DevinX Desktop Bridge on your Mac.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false
@@ -25,9 +26,7 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#141414"
       },
-      "permissions": [
-        "android.permission.MODIFY_AUDIO_SETTINGS"
-      ]
+      "permissions": ["android.permission.MODIFY_AUDIO_SETTINGS"]
     },
     "web": {
       "bundler": "metro",
@@ -79,7 +78,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow DevinX to attach photos and videos to Devin sessions.",
-          "cameraPermission": false,
+          "cameraPermission": "Allow DevinX to scan a pairing code shown by the Desktop Bridge.",
           "microphonePermission": false
         }
       ]

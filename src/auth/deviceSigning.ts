@@ -50,6 +50,7 @@ const nativePinnedResponseSchema = z
       .max(256 * 1024),
   })
   .strict();
+const qrScannerPermissionSchema = z.enum(['notDetermined', 'denied', 'restricted', 'authorized']);
 
 const deviceIdentitySchema = z
   .object({
@@ -64,6 +65,8 @@ interface DevinXDeviceCryptoNativeModule {
   verify(publicKeySpki: string, message: string, signature: string): Promise<unknown>;
   hmacSha256(secret: string, message: string): Promise<unknown>;
   fingerprintPublicKeySpki?(publicKeySpki: string): Promise<unknown>;
+  getQrScannerPermissionStatus?(): Promise<unknown>;
+  requestQrScannerPermission?(): Promise<unknown>;
   hasDeviceIdentity(keyId: string): Promise<unknown>;
   deleteDeviceIdentity(keyId: string): Promise<void>;
   deleteAllDeviceIdentities(): Promise<void>;
@@ -79,6 +82,8 @@ export interface DeviceIdentity {
   keyId: string;
   publicKeySpki: string;
 }
+
+export type QrScannerPermission = z.infer<typeof qrScannerPermissionSchema>;
 
 let nativeModuleOverride: DevinXDeviceCryptoNativeModule | undefined;
 
@@ -171,6 +176,30 @@ export function isPinnedBridgeTransportAvailable(): boolean {
     typeof nativeModule?.postPinnedJson === 'function' &&
     typeof nativeModule.fingerprintPublicKeySpki === 'function'
   );
+}
+
+export function isQrScannerAvailable(): boolean {
+  const nativeModule = resolveNativeModule();
+  return (
+    typeof nativeModule?.getQrScannerPermissionStatus === 'function' &&
+    typeof nativeModule.requestQrScannerPermission === 'function'
+  );
+}
+
+export async function getQrScannerPermissionStatus(): Promise<QrScannerPermission> {
+  const nativeModule = getNativeModule();
+  if (!nativeModule.getQrScannerPermissionStatus) {
+    throw new Error('QR scanning requires a current DevinX iOS build');
+  }
+  return qrScannerPermissionSchema.parse(await nativeModule.getQrScannerPermissionStatus());
+}
+
+export async function requestQrScannerPermission(): Promise<QrScannerPermission> {
+  const nativeModule = getNativeModule();
+  if (!nativeModule.requestQrScannerPermission) {
+    throw new Error('QR scanning requires a current DevinX iOS build');
+  }
+  return qrScannerPermissionSchema.parse(await nativeModule.requestQrScannerPermission());
 }
 
 export async function postPinnedBridgeJson(

@@ -1,6 +1,6 @@
 # Phase 3C — Mobile Connection Modes
 
-Status: mode model, onboarding choice, secure paired-computer registry, pinned iOS transport, and pairing protocol coordinator are implemented. Scanner/desktop approval UI and local-session data adapters remain pending.
+Status: mode model, onboarding choice, secure paired-computer registry, pinned iOS transport, pairing coordinator, and in-app scanner UI are implemented. Desktop approval UI and local-session data adapters remain pending.
 
 ## Supported modes
 
@@ -45,11 +45,10 @@ React context receives summaries only. Device private keys, bridge keys, endpoin
 
 ## Current UI boundary
 
-The onboarding choice and computer-setup explanation are visible in internal development builds. The QR scanner remains intentionally disabled until the encrypted transport, pinned bridge identity, pairing endpoint limits, and real-device security tests pass. This temporary state must not ship in the public build.
+Computer onboarding and Settings both reach the same in-app QR pairing flow. A Cloud-only user who adds a Mac moves to Cloud + Computer mode after the credential is securely stored. The camera starts only after an explicit Scan action and permission grant; cancel, background, scan completion, and view removal stop capture.
 
 ## Remaining acceptance gates
 
-- Implement the native QR camera view and explicit user confirmation around the validated pairing coordinator.
 - Render Cloud and local session sources with collision-proof namespaced identifiers.
-- Add/remove/switch connection UX without trapping a configured user in onboarding.
+- Add per-computer revocation/removal and complete mode switching without trapping a configured user.
 - Validate cold start, corrupt Secure Store, revoked device, offline computer, Cloud-only regression, and combined mode on real iPhone hardware.

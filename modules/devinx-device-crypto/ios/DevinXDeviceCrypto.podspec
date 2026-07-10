@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
-  s.frameworks = 'CryptoKit', 'Network', 'Security'
+  s.frameworks = 'AVFoundation', 'CryptoKit', 'Network', 'Security'
   s.source_files = '**/*.swift'
 
   s.pod_target_xcconfig = {

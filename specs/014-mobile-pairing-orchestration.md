@@ -1,6 +1,6 @@
 # 014 — Mobile pairing orchestration
 
-Status: protocol workflow implemented and unit validated; scanner UI and real Mac/iPhone approval pending
+Status: protocol workflow and scanner UI implemented and unit validated; desktop approval runner and real Mac/iPhone validation pending
 
 ## Workflow
 
@@ -25,7 +25,5 @@ Only one pairing workflow may run in-process at once. Cancellation, denial, expi
 
 ## Remaining gates
 
-- Add a native in-app QR scanner with explicit camera permission and bounded single-result delivery.
-- Connect the onboarding and settings UI to this coordinator without placing QR contents or credentials in global React state.
 - Add a desktop setup/approval runner so the Mac can display an offer and approve or deny locally.
 - Validate certificate mismatch, local-network prompt, camera denial, cancellation, approval, storage, cold start, and revocation on a real Mac and iPhone.

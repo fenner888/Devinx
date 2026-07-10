@@ -1,4 +1,5 @@
 import CryptoKit
+import AVFoundation
 import ExpoModulesCore
 import Foundation
 import Security
@@ -63,6 +64,21 @@ public final class DevinXDeviceCryptoModule: Module {
       return Self.base64UrlEncode(Data(SHA256.hash(data: spki)))
     }
 
+    AsyncFunction("getQrScannerPermissionStatus") { () -> String in
+      Self.cameraPermissionStatus()
+    }
+
+    AsyncFunction("requestQrScannerPermission") { (promise: Promise) in
+      let status = AVCaptureDevice.authorizationStatus(for: .video)
+      guard status == .notDetermined else {
+        promise.resolve(Self.cameraPermissionStatus(status))
+        return
+      }
+      AVCaptureDevice.requestAccess(for: .video) { granted in
+        promise.resolve(granted ? "authorized" : "denied")
+      }
+    }
+
     AsyncFunction("hasDeviceIdentity") { (keyId: String) throws -> Bool in
       do {
         var privateKeyData = try Self.readPrivateKey(keyId: keyId)
@@ -100,6 +116,30 @@ public final class DevinXDeviceCryptoModule: Module {
       } catch {
         promise.reject(error)
       }
+    }
+
+    View(DevinXQrScannerView.self) {
+      Events("onCode", "onError")
+      Prop("active") { (view: DevinXQrScannerView, active: Bool) in
+        view.setActive(active)
+      }
+    }
+  }
+
+  private static func cameraPermissionStatus(
+    _ status: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
+  ) -> String {
+    switch status {
+    case .authorized:
+      return "authorized"
+    case .denied:
+      return "denied"
+    case .restricted:
+      return "restricted"
+    case .notDetermined:
+      return "notDetermined"
+    @unknown default:
+      return "restricted"
     }
   }
 

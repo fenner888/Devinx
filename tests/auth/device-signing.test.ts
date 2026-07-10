@@ -3,11 +3,14 @@ import {
   deleteAllDeviceIdentities,
   deleteDeviceIdentity,
   fingerprintPublicKeySpki,
+  getQrScannerPermissionStatus,
   hasDeviceIdentity,
   hmacSha256,
   isDeviceCryptoAvailable,
   isPinnedBridgeTransportAvailable,
+  isQrScannerAvailable,
   postPinnedBridgeJson,
+  requestQrScannerPermission,
   setDeviceCryptoNativeModuleForTests,
   sign,
   verify,
@@ -26,6 +29,8 @@ function createNativeModule() {
     verify: jest.fn(async () => true),
     hmacSha256: jest.fn(async () => HMAC),
     fingerprintPublicKeySpki: jest.fn(async () => 'F'.repeat(43)),
+    getQrScannerPermissionStatus: jest.fn(async () => 'notDetermined'),
+    requestQrScannerPermission: jest.fn(async () => 'authorized'),
     hasDeviceIdentity: jest.fn(async () => true),
     deleteDeviceIdentity: jest.fn(async () => {}),
     deleteAllDeviceIdentities: jest.fn(async () => {}),
@@ -102,6 +107,18 @@ describe('iOS device signing boundary', () => {
         {},
       ),
     ).rejects.toThrow();
+  });
+
+  it('exposes a validated native QR camera permission boundary', async () => {
+    const nativeModule = createNativeModule();
+    setDeviceCryptoNativeModuleForTests(nativeModule);
+
+    expect(isQrScannerAvailable()).toBe(true);
+    await expect(getQrScannerPermissionStatus()).resolves.toBe('notDetermined');
+    await expect(requestQrScannerPermission()).resolves.toBe('authorized');
+
+    nativeModule.getQrScannerPermissionStatus.mockResolvedValueOnce('unknown');
+    await expect(getQrScannerPermissionStatus()).rejects.toThrow();
   });
 
   it('fails closed on malformed native bridge responses', async () => {

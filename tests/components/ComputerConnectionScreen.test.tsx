@@ -1,0 +1,128 @@
+import React from 'react';
+import { Pressable, Text } from 'react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+
+const mockReact = React;
+const mockPressable = Pressable;
+const mockText = Text;
+
+const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockRefreshComputers = jest.fn(async () => {});
+const mockPairComputer = jest.fn(
+  async (_payload: string, options: { onStatus?: (status: string) => void }) => {
+    options.onStatus?.('waiting_for_approval');
+    return {
+      bridgeId: 'bridge_1234567890',
+      computerName: 'My Mac',
+      pairedAt: 1_800_000_000_000,
+      permissions: ['bridge:health', 'session:metadata:read'],
+    };
+  },
+);
+const mockGetPermission = jest.fn(async () => 'authorized');
+const mockRequestPermission = jest.fn(async () => 'authorized');
+const mockSetConnectionMode = jest.fn();
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ replace: mockReplace, back: mockBack }),
+}));
+
+jest.mock('../../src/auth/ConnectionContext', () => ({
+  useConnections: () => ({ refreshComputers: mockRefreshComputers }),
+}));
+
+jest.mock('../../src/auth/computerPairing', () => ({
+  pairComputerFromQrPayload: (payload: string, options: { onStatus?: (status: string) => void }) =>
+    mockPairComputer(payload, options),
+}));
+
+jest.mock('../../src/auth/deviceSigning', () => ({
+  getQrScannerPermissionStatus: () => mockGetPermission(),
+  isQrScannerAvailable: () => true,
+  requestQrScannerPermission: () => mockRequestPermission(),
+}));
+
+jest.mock('../../src/components/connections/DevinXQrScanner', () => {
+  return {
+    DevinXQrScanner: ({ onCode }: { onCode: (payload: string) => void }) =>
+      mockReact.createElement(
+        mockPressable,
+        { testID: 'qr-scanner', onPress: () => onCode('{"pairing":"offer"}') },
+        mockReact.createElement(mockText, null, 'Camera preview'),
+      ),
+  };
+});
+
+jest.mock('../../src/store/preferences', () => ({
+  useAppPreferences: (selector: (state: unknown) => unknown) =>
+    selector({ connectionMode: 'computer', setConnectionMode: mockSetConnectionMode }),
+}));
+
+jest.mock('../../src/theme/index', () => ({
+  useTheme: () => ({
+    tokens: {
+      textMid: { hex: '#777777' },
+      brandText: { hex: '#0088ff' },
+      textLow: { hex: '#666666' },
+      brand: { hex: '#0088ff' },
+      finished: { hex: '#00aa66' },
+      textAlwaysWhite: { hex: '#ffffff' },
+    },
+  }),
+}));
+
+import ComputerConnectionScreen from '../../src/app/(onboarding)/computer';
+
+describe('Computer connection onboarding', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetPermission.mockResolvedValue('authorized');
+    mockRequestPermission.mockResolvedValue('authorized');
+  });
+
+  it('shows the real pairing instructions and starts the scanner after permission', async () => {
+    const screen = render(<ComputerConnectionScreen />);
+
+    expect(screen.getByText('Connect your Mac')).toBeTruthy();
+    expect(screen.getByText('Name this Mac')).toBeTruthy();
+    expect(screen.queryByText('Pairing transport pending')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Scan Desktop Bridge pairing code'));
+    await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
+    expect(mockGetPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests first-use permission and sends a scanned payload directly to pairing', async () => {
+    mockGetPermission.mockResolvedValueOnce('notDetermined');
+    const screen = render(<ComputerConnectionScreen />);
+
+    fireEvent.press(screen.getByLabelText('Scan Desktop Bridge pairing code'));
+    await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
+    expect(mockRequestPermission).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByTestId('qr-scanner'));
+    await waitFor(() => expect(mockPairComputer).toHaveBeenCalledTimes(1));
+    expect(mockPairComputer).toHaveBeenCalledWith(
+      '{"pairing":"offer"}',
+      expect.objectContaining({ computerName: 'My Mac', signal: expect.any(Object) }),
+    );
+    await waitFor(() => expect(mockRefreshComputers).toHaveBeenCalledTimes(1));
+    expect(mockReplace).toHaveBeenCalledWith('/(main)');
+  });
+
+  it('does not mount the camera when permission is denied', async () => {
+    mockGetPermission.mockResolvedValueOnce('denied');
+    const screen = render(<ComputerConnectionScreen />);
+
+    fireEvent.press(screen.getByLabelText('Scan Desktop Bridge pairing code'));
+    await waitFor(() =>
+      expect(
+        screen.getByText('Camera access is required to scan the Desktop Bridge pairing code.'),
+      ).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('qr-scanner')).toBeNull();
+    expect(screen.getByText('Open Settings')).toBeTruthy();
+    expect(mockPairComputer).not.toHaveBeenCalled();
+  });
+});

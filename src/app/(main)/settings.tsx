@@ -142,7 +142,12 @@ export default function SettingsScreen() {
               {hasCloudConnection ? 'Connected' : 'Not connected'}
             </Text>
           </View>
-          <View className="flex-row items-center px-4 py-3">
+          <Pressable
+            className="flex-row items-center px-4 py-3"
+            onPress={() => router.push('/(main)/computer')}
+            accessibilityRole="button"
+            accessibilityLabel="Add or pair a Mac"
+          >
             <Ionicons
               name="desktop-outline"
               size={17}
@@ -158,7 +163,8 @@ export default function SettingsScreen() {
                   : 'No paired computers'}
               </Text>
             </View>
-          </View>
+            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+          </Pressable>
           {connectionError && (
             <View className="bg-tint-red px-4 py-3 border-t border-border-subtle">
               <Text className="text-failed text-text12">{connectionError}</Text>
@@ -277,11 +283,11 @@ export default function SettingsScreen() {
                 {self?.service_user_name ||
                   self?.service_user_id ||
                   self?.user_id ||
-                (provider
-                  ? provider.kind === 'pat'
-                    ? 'Personal access token'
-                    : 'Service user key'
-                  : 'Devin Cloud not connected')}
+                  (provider
+                    ? provider.kind === 'pat'
+                      ? 'Personal access token'
+                      : 'Service user key'
+                    : 'Devin Cloud not connected')}
               </Text>
               <Text className="text-text-low text-text12 mt-0.5">
                 {self?.org_id ? `${self.org_id} · ` : ''}
@@ -294,18 +300,20 @@ export default function SettingsScreen() {
               </Text>
             </View>
           </View>
-          {provider && <Pressable
-            className="flex-row items-center px-4 py-3"
-            onPress={() => router.push('/(main)/usage')}
-            accessibilityRole="button"
-            accessibilityLabel="View ACU consumption"
-          >
-            <View className="w-8 h-8 rounded-button bg-tint-green items-center justify-center mr-3">
-              <Ionicons name="speedometer-outline" size={15} color={tokens.finished.hex} />
-            </View>
-            <Text className="text-text-hi text-text14 flex-1">Usage & limits</Text>
-            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
-          </Pressable>}
+          {provider && (
+            <Pressable
+              className="flex-row items-center px-4 py-3"
+              onPress={() => router.push('/(main)/usage')}
+              accessibilityRole="button"
+              accessibilityLabel="View ACU consumption"
+            >
+              <View className="w-8 h-8 rounded-button bg-tint-green items-center justify-center mr-3">
+                <Ionicons name="speedometer-outline" size={15} color={tokens.finished.hex} />
+              </View>
+              <Text className="text-text-hi text-text14 flex-1">Usage & limits</Text>
+              <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+            </Pressable>
+          )}
         </View>
 
         {/* Products */}
