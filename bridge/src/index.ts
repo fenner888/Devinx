@@ -79,6 +79,7 @@ export {
   type BridgePairingIdentity,
   type DevicePermissionUpdate,
   type PairingApprovalResult,
+  type PairingApprovalOptions,
   type PairingDeviceRegistry,
   type PairingManagerOptions,
   type PairingOffer,

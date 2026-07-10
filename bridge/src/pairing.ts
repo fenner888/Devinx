@@ -148,6 +148,12 @@ const pairingOptionsSchema = z
   })
   .strict();
 
+const pairingApprovalOptionsSchema = z
+  .object({
+    allowSessionContent: z.boolean().default(false),
+  })
+  .strict();
+
 export const devicePermissionUpdateSchema = z
   .object({
     permissions: z.array(bridgePermissionSchema).max(bridgePermissionSchema.options.length),
@@ -178,6 +184,10 @@ export interface PairingManagerOptions {
   maximumOffers?: number;
   maximumPending?: number;
   receiptLifetimeMs?: number;
+}
+
+export interface PairingApprovalOptions {
+  allowSessionContent?: boolean;
 }
 
 export interface PairingDeviceRegistry {
@@ -470,8 +480,13 @@ export class PairingManager {
     };
   }
 
-  async approve(pairingId: string, now = Date.now()): Promise<PairingApprovalResult> {
+  async approve(
+    pairingId: string,
+    now = Date.now(),
+    optionsInput: PairingApprovalOptions = {},
+  ): Promise<PairingApprovalResult> {
     validateNow(now);
+    const options = pairingApprovalOptionsSchema.parse(optionsInput);
     this.cleanup(now);
     const pairingIdResult = opaqueIdSchema.safeParse(pairingId);
     if (!pairingIdResult.success) {
@@ -482,6 +497,9 @@ export class PairingManager {
     this.pending.delete(pairingIdResult.data);
 
     try {
+      const permissions: BridgePermission[] = options.allowSessionContent
+        ? [...DEFAULT_PAIRING_PERMISSIONS, 'session:content:read']
+        : [...DEFAULT_PAIRING_PERMISSIONS];
       const device = deviceRecordSchema.parse({
         bridgeId: this.bridgeId,
         deviceId: state.request.deviceId,
@@ -489,7 +507,7 @@ export class PairingManager {
         publicKeySpki: state.request.devicePublicKeySpki,
         status: 'active',
         pairedAt: now,
-        permissions: DEFAULT_PAIRING_PERMISSIONS,
+        permissions,
       });
       const receipt = pairingReceiptSchema.parse({
         protocolVersion: BRIDGE_PROTOCOL_VERSION,

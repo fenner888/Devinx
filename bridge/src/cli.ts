@@ -152,9 +152,22 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         }
         if (stopping) break;
         if (answer.trim().toLowerCase() === 'yes') {
-          paired = await runner.approve(review.pairingId);
+          let contentAnswer = '';
+          try {
+            contentAnswer = await readline.question(
+              'Allow this iPhone to read local session titles and message history? Type yes to allow: ',
+              { signal: questionAbort.signal },
+            );
+          } catch {
+            if (!stopping) throw new Error('Desktop content-permission prompt failed');
+          }
+          if (stopping) break;
+          const allowSessionContent = contentAnswer.trim().toLowerCase() === 'yes';
+          paired = await runner.approve(review.pairingId, { allowSessionContent });
           process.stdout.write(
-            paired ? 'iPhone paired successfully. Press Control-C to stop the bridge.\n' : 'Pairing request expired.\n',
+            paired
+              ? `iPhone paired successfully with ${allowSessionContent ? 'read-only session content' : 'metadata-only'} access. Press Control-C to stop the bridge.\n`
+              : 'Pairing request expired.\n',
           );
         } else {
           runner.deny(review.pairingId);

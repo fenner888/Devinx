@@ -8,7 +8,11 @@ import { HttpsBridgeListener } from './listener';
 import type { KeychainSecretStore } from './macos-keychain';
 import { MacOSKeychainSecretStore } from './macos-keychain';
 import { isPrivateLanIPv4 } from './network';
-import { PairingManager, type PendingPairingReview } from './pairing';
+import {
+  PairingManager,
+  type PairingApprovalOptions,
+  type PendingPairingReview,
+} from './pairing';
 import { FixedWindowRateLimiter } from './rate-limit';
 import { InMemoryReplayGuard } from './replay';
 import { BridgeService, type SessionDiscoveryAdapter } from './service';
@@ -192,9 +196,13 @@ export class DesktopBridgeRunner {
     return this.pairing.pendingReviews(now);
   }
 
-  async approve(pairingId: string, now = Date.now()): Promise<boolean> {
+  async approve(
+    pairingId: string,
+    options: PairingApprovalOptions = {},
+    now = Date.now(),
+  ): Promise<boolean> {
     if (!this.pairing || this.stopped) return false;
-    return (await this.pairing.approve(pairingId, now)).ok;
+    return (await this.pairing.approve(pairingId, now, options)).ok;
   }
 
   deny(pairingId: string): boolean {

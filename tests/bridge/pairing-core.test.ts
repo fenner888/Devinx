@@ -186,6 +186,31 @@ describe('Desktop Bridge pairing core', () => {
     ).toMatchObject({ ok: false, status: 404 });
   });
 
+  it('adds session content only through the explicit read-only approval option', async () => {
+    const offer = manager.createOffer(TRANSPORT, NOW);
+    const submission = manager.submit(pairingRequest(offer), NOW + 1);
+    if (!submission.ok) throw new Error('Expected pending pairing');
+
+    const approval = await manager.approve(offer.pairingId, NOW + 2, {
+      allowSessionContent: true,
+    });
+
+    expect(approval).toMatchObject({
+      ok: true,
+      device: {
+        permissions: ['bridge:health', 'session:metadata:read', 'session:content:read'],
+      },
+      receipt: {
+        permissions: ['bridge:health', 'session:metadata:read', 'session:content:read'],
+      },
+    });
+    expect(registeredDevices.get(DEVICE_ID)).toMatchObject({
+      permissions: ['bridge:health', 'session:metadata:read', 'session:content:read'],
+    });
+    if (!approval.ok) throw new Error('Expected pairing approval');
+    expect(approval.device.permissions).not.toContain('session:prompt:send');
+  });
+
   it('invalidates an offer after repeated incorrect proofs', () => {
     const offer = manager.createOffer(TRANSPORT, NOW);
     const request = pairingRequest(offer);

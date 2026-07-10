@@ -28,7 +28,7 @@ import { useTheme } from '@theme/index';
 const STEPS = [
   'Open DevinX Desktop Bridge on your Mac.',
   'Choose Pair a phone to show a short-lived code.',
-  'Scan it here, then approve this iPhone on your Mac.',
+  'Scan it here, then approve this iPhone and its read access on your Mac.',
 ];
 
 const STATUS_COPY: Record<ComputerPairingStatus, string> = {
@@ -230,7 +230,8 @@ export default function ComputerConnectionScreen() {
             </Text>
             {pairingStatus === 'waiting_for_approval' && (
               <Text className="text-text-low text-text12 leading-4 text-center mt-2">
-                The request expires automatically if it is not approved.
+                Choose metadata-only or read-only session content on the Mac. The request expires
+                automatically if it is not approved.
               </Text>
             )}
             {phase === 'pairing' && (
