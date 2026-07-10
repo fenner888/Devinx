@@ -1,0 +1,8 @@
+{
+  "name": "devinx-device-crypto",
+  "version": "0.1.0",
+  "description": "DevinX iOS Keychain-backed device signing module",
+  "main": "src/index.ts",
+  "private": true,
+  "license": "UNLICENSED"
+}

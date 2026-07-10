@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { branding } from '@lib/branding';
 
 import { deleteSecret, getSecret, storeSecret } from './keychain';
+import { deleteAllDeviceIdentities, isDeviceCryptoAvailable } from './deviceSigning';
 
 const base64UrlSchema = z
   .string()
@@ -34,11 +35,11 @@ export const pairedComputerCredentialSchema = z
           return false;
         }
       }, 'Paired computer endpoint must use encrypted transport'),
-    bridgePublicKeySpki: base64UrlSchema,
+    bridgePublicKeySpki: base64UrlSchema.length(59),
     bridgeKeyFingerprint: base64UrlSchema.length(43),
     deviceId: z.string().min(16).max(128).regex(/^[A-Za-z0-9_-]+$/),
-    devicePrivateKeyPkcs8: base64UrlSchema,
-    devicePublicKeySpki: base64UrlSchema,
+    deviceKeyId: z.string().uuid(),
+    devicePublicKeySpki: base64UrlSchema.length(59),
     permissions: z.array(bridgePermissionSchema).max(bridgePermissionSchema.options.length),
     pairedAt: z.number().int().nonnegative(),
   })
@@ -102,5 +103,11 @@ export async function storePairedComputers(input: unknown): Promise<void> {
 }
 
 export async function clearPairedComputers(): Promise<void> {
+  const stored = await getSecret(branding.keychain.pairedComputers);
+  if (isDeviceCryptoAvailable()) {
+    await deleteAllDeviceIdentities();
+  } else if (stored) {
+    throw new Error('Native signing keys cannot be securely erased in this app build');
+  }
   await deleteSecret(branding.keychain.pairedComputers);
 }
