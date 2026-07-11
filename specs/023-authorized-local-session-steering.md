@@ -1,6 +1,6 @@
 # 023 — Authorized local session steering
 
-Status: implemented and synthetically validated; physical-iPhone prompt checkpoint pending
+Status: implemented and synthetically validated. Build 14 physically proved Tailscale discovery, authorized prompting, keyboard dismissal, and a returned Devin reply. A same-author replay-boundary defect was then fixed in Connector and response-aware mobile polling is pending the next TestFlight build/retest.
 
 ## Contract
 
@@ -16,4 +16,4 @@ Only one load or prompt may be active. Unexpected session association, malformed
 
 ## Mobile behavior
 
-The local session screen requests device-specific health, shows a composer only when steering is currently authorized, dismisses the keyboard on send, changes the Devin companion to working while submission is pending, and refreshes bounded text history after acceptance. It does not optimistically invent an agent response or expose raw transport errors.
+The local session screen requests device-specific health, shows a composer only when steering is currently authorized, dismisses the keyboard on send, and changes the Devin companion to working while submission is pending. After acceptance it polls bounded history within the read-rate budget until a changed Devin reply remains stable across two reads, tolerating temporary busy responses while ACP is still prompting. It does not optimistically invent an agent response or expose raw transport errors. Replay preserves private thought/tool events only as message boundaries, never as returned content, so separate no-ID user turns cannot collapse into one bubble.

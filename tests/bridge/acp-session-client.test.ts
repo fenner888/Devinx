@@ -184,6 +184,48 @@ if (request.method === 'initialize') {
     }
   });
 
+  it('keeps no-ID user turns separate across private replay boundaries', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-boundaries', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  const updates = [
+    { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'First ' } },
+    { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'turn.' } },
+    { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'private' } },
+    { sessionUpdate: 'tool_call', title: 'private tool' },
+    { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Second turn.' } },
+    { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Done.' } },
+  ];
+  for (const update of updates) process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', method: 'session/update',
+    params: { sessionId: 'session-boundaries', update }
+  }) + '\\n');
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    try {
+      await client.start();
+      await client.listSessions();
+      await expect(client.loadSession('session-boundaries')).resolves.toMatchObject({
+        messages: [
+          { source: 'user', text: 'First turn.' },
+          { source: 'user', text: 'Second turn.' },
+          { source: 'devin', text: 'Done.' },
+        ],
+      });
+    } finally {
+      await client.stop();
+    }
+  });
+
   it('does not invoke session/load when the capability is absent', async () => {
     const executablePath = fakeCli(`
 if (request.method === 'initialize') {

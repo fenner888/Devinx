@@ -28,6 +28,23 @@ import { useTheme } from '@theme/index';
 
 const BRIDGE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 const LOCAL_SESSION_ID_PATTERN = /^local_[A-Za-z0-9_-]{43}$/;
+const HISTORY_REFRESH_INTERVAL_MS = 3_000;
+const MAXIMUM_HISTORY_REFRESH_ATTEMPTS = 39;
+
+export function devinReplySignature(session: ComputerLoadedSession | undefined): string {
+  return JSON.stringify(
+    session?.messages.filter((message) => message.source === 'devin').map((message) => message.text) ??
+      [],
+  );
+}
+
+export function hasSettledNewDevinReply(
+  baseline: string,
+  previouslyObserved: string | null,
+  current: string,
+): boolean {
+  return current !== baseline && current === previouslyObserved;
+}
 
 function singleParameter(value: string | string[] | undefined): string {
   return typeof value === 'string' ? value : '';
@@ -106,6 +123,7 @@ export default function ComputerSessionDetailScreen() {
   const [draft, setDraft] = useState('');
   const [steeringActive, setSteeringActive] = useState(false);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshGeneration = useRef(0);
   const validParameters =
     BRIDGE_ID_PATTERN.test(bridgeId) && LOCAL_SESSION_ID_PATTERN.test(sessionId);
   const computer = computers.find((item) => item.bridgeId === bridgeId);
@@ -117,6 +135,7 @@ export default function ComputerSessionDetailScreen() {
 
   useEffect(
     () => () => {
+      refreshGeneration.current += 1;
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
     },
     [],
@@ -127,20 +146,41 @@ export default function ComputerSessionDetailScreen() {
     if (!text || !canPrompt || prompt.isPending || steeringActive) return;
     Keyboard.dismiss();
     setSteeringActive(true);
+    const generation = refreshGeneration.current + 1;
+    refreshGeneration.current = generation;
+    const baselineReply = devinReplySignature(query.data);
     prompt.mutate(text, {
       onSuccess: () => {
         setDraft('');
+        let observedReply: string | null = null;
         const refreshUntilComplete = async (attempt: number) => {
           const result = await query.refetch();
-          if (result.isSuccess || attempt >= 23) {
+          if (refreshGeneration.current !== generation) return;
+          if (result.isSuccess && result.data) {
+            const currentReply = devinReplySignature(result.data);
+            if (hasSettledNewDevinReply(baselineReply, observedReply, currentReply)) {
+              setSteeringActive(false);
+              return;
+            }
+            observedReply = currentReply === baselineReply ? null : currentReply;
+          }
+          if (attempt >= MAXIMUM_HISTORY_REFRESH_ATTEMPTS) {
             setSteeringActive(false);
             return;
           }
-          refreshTimer.current = setTimeout(() => refreshUntilComplete(attempt + 1), 5_000);
+          refreshTimer.current = setTimeout(
+            () => refreshUntilComplete(attempt + 1),
+            HISTORY_REFRESH_INTERVAL_MS,
+          );
         };
-        refreshTimer.current = setTimeout(() => refreshUntilComplete(0), 5_000);
+        refreshTimer.current = setTimeout(
+          () => refreshUntilComplete(0),
+          HISTORY_REFRESH_INTERVAL_MS,
+        );
       },
-      onError: () => setSteeringActive(false),
+      onError: () => {
+        if (refreshGeneration.current === generation) setSteeringActive(false);
+      },
     });
   }
 

@@ -76,7 +76,10 @@ jest.mock('../../src/theme/index', () => ({
   }),
 }));
 
-import ComputerSessionDetailScreen from '../../src/app/(main)/computer-session/[bridgeId]/[id]';
+import ComputerSessionDetailScreen, {
+  devinReplySignature,
+  hasSettledNewDevinReply,
+} from '../../src/app/(main)/computer-session/[bridgeId]/[id]';
 
 describe('Computer session detail', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -89,5 +92,21 @@ describe('Computer session detail', () => {
     fireEvent.press(screen.getByLabelText('Send computer session message'));
 
     expect(mockMutate).toHaveBeenCalledWith('Continue the task.', expect.any(Object));
+  });
+
+  it('waits for a changed Devin reply to remain stable before ending refresh', () => {
+    const baseline = devinReplySignature({
+      session: { id: `local_${'L'.repeat(43)}`, origin: 'computer', workspaceName: 'DevinX' },
+      messages: [
+        { sequence: 1, source: 'user', text: 'First' },
+        { sequence: 2, source: 'devin', text: 'Original' },
+      ],
+      truncated: false,
+    });
+    const changed = JSON.stringify(['Original', 'New reply']);
+
+    expect(hasSettledNewDevinReply(baseline, null, baseline)).toBe(false);
+    expect(hasSettledNewDevinReply(baseline, null, changed)).toBe(false);
+    expect(hasSettledNewDevinReply(baseline, changed, changed)).toBe(true);
   });
 });

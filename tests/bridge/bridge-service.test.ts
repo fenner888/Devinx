@@ -369,6 +369,24 @@ describe('authenticated Desktop Bridge service', () => {
     expect(JSON.stringify(failed)).not.toContain('/private/path');
   });
 
+  it('rate-limits session history reads independently from write operations', async () => {
+    const bridge = service({ sessionLoadLimit: 1, mutationLimit: 10, windowMs: 60_000 });
+    const permissions: BridgePermission[] = [
+      'bridge:health',
+      'session:metadata:read',
+      'session:content:read',
+    ];
+    const listed = await bridge.handle(envelope('session.list', {}, permissions), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+
+    await expect(
+      bridge.handle(envelope('session.load', { sessionId: handle }, permissions), context()),
+    ).resolves.toMatchObject({ status: 200 });
+    await expect(
+      bridge.handle(envelope('session.load', { sessionId: handle }, permissions), context()),
+    ).resolves.toEqual({ status: 429, body: { error: 'rate_limited' } });
+  });
+
   it('rate-limits malformed requests by transport peer before authentication', async () => {
     const bridge = service({ peerLimit: 2, windowMs: 60_000 });
 

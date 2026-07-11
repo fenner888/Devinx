@@ -191,6 +191,7 @@ interface ReplayCollector {
   truncated: boolean;
   accepting: boolean;
   failed: boolean;
+  mergeBarrier: boolean;
 }
 
 interface PendingRequest {
@@ -372,6 +373,7 @@ export class AcpSessionClient {
       truncated: false,
       accepting: true,
       failed: false,
+      mergeBarrier: false,
     };
     this.activeLoad = collector;
     try {
@@ -585,10 +587,19 @@ export class AcpSessionClient {
       return;
     }
     const updateType = notificationResult.data.update.sessionUpdate;
-    if (updateType !== 'user_message_chunk' && updateType !== 'agent_message_chunk') return;
+    if (updateType !== 'user_message_chunk' && updateType !== 'agent_message_chunk') {
+      // Devin ACP currently omits messageId on replay. Private thought/tool
+      // events still form a trustworthy boundary between otherwise adjacent
+      // same-author messages, even though their content must never be exposed.
+      collector.mergeBarrier = true;
+      return;
+    }
     const contentType = (notificationResult.data.update.content as { type?: unknown } | undefined)
       ?.type;
-    if (contentType !== 'text') return;
+    if (contentType !== 'text') {
+      collector.mergeBarrier = true;
+      return;
+    }
     const updateResult = textReplayUpdateSchema.safeParse(notificationResult.data.update);
     if (!updateResult.success) {
       collector.failed = true;
@@ -610,7 +621,9 @@ export class AcpSessionClient {
     const shouldMerge =
       last?.source === input.source &&
       ((last.messageId !== undefined && last.messageId === input.messageId) ||
-        (last.messageId === undefined && input.messageId === undefined));
+        (last.messageId === undefined &&
+          input.messageId === undefined &&
+          !collector.mergeBarrier));
     if (shouldMerge && last) {
       collector.textBytes -= messageBytes(last);
       const merged = utf8Tail(`${last.text}${clipped.text}`, MAX_MESSAGE_TEXT_BYTES);
@@ -626,6 +639,7 @@ export class AcpSessionClient {
       collector.messages.push(message);
       collector.textBytes += messageBytes(message);
     }
+    collector.mergeBarrier = false;
     while (
       collector.messages.length > MAX_REPLAY_MESSAGES ||
       collector.textBytes > MAX_REPLAY_TEXT_BYTES

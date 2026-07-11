@@ -34,6 +34,7 @@ const serviceOptionsSchema = z
     peerLimit: z.number().int().min(1).max(10_000).default(120),
     healthLimit: z.number().int().min(1).max(10_000).default(120),
     sessionListLimit: z.number().int().min(1).max(10_000).default(30),
+    sessionLoadLimit: z.number().int().min(1).max(10_000).default(30),
     mutationLimit: z.number().int().min(1).max(10_000).default(10),
     windowMs: z
       .number()
@@ -119,6 +120,7 @@ export interface BridgeServiceOptions {
   peerLimit?: number;
   healthLimit?: number;
   sessionListLimit?: number;
+  sessionLoadLimit?: number;
   mutationLimit?: number;
   windowMs?: number;
 }
@@ -209,6 +211,7 @@ export class BridgeService {
       peerLimit: dependencies.peerLimit,
       healthLimit: dependencies.healthLimit,
       sessionListLimit: dependencies.sessionListLimit,
+      sessionLoadLimit: dependencies.sessionLoadLimit,
       mutationLimit: dependencies.mutationLimit,
       windowMs: dependencies.windowMs,
     });
@@ -235,6 +238,8 @@ export class BridgeService {
     const deviceLimit =
       authorization.request.method === 'session.list'
         ? this.rates.sessionListLimit
+        : authorization.request.method === 'session.load'
+          ? this.rates.sessionLoadLimit
         : authorization.request.method === 'bridge.health'
           ? this.rates.healthLimit
           : this.rates.mutationLimit;
