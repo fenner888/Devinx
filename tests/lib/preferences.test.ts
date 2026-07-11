@@ -10,7 +10,7 @@ import {
   isConnectionModeConfigured,
   shouldEnableCloudRequests,
 } from '../../src/lib/connections';
-import { normalizeDefaultTags } from '../../src/store/preferences';
+import { normalizeDefaultTags, useAppPreferences } from '../../src/store/preferences';
 
 describe('preferences', () => {
   it('normalizes and deduplicates default tags', () => {
@@ -57,5 +57,25 @@ describe('preferences', () => {
     expect(connectionModeUsesComputer('cloud')).toBe(false);
     expect(connectionModeUsesComputer('computer')).toBe(true);
     expect(connectionModeUsesComputer('both')).toBe(true);
+  });
+
+  it('resets all persisted user-scoped preferences on disconnect', () => {
+    useAppPreferences.setState({
+      defaultTags: ['private'],
+      pinnedSessionIds: ['session-1'],
+      watchedSessionIds: ['session-2'],
+      composerTemplates: [{ id: 'template-1', name: 'Draft', prompt: 'private prompt' }],
+      connectionMode: 'both',
+    });
+
+    useAppPreferences.getState().resetUserScopedData();
+
+    expect(useAppPreferences.getState()).toMatchObject({
+      defaultTags: [],
+      pinnedSessionIds: [],
+      watchedSessionIds: [],
+      composerTemplates: [],
+      connectionMode: 'cloud',
+    });
   });
 });

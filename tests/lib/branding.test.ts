@@ -10,6 +10,8 @@ describe('branding (§1.4)', () => {
   });
 
   it('has the unofficial-client disclaimer', () => {
+    expect(branding.subtitle).toContain('Unofficial');
+    expect(branding.subtitle.length).toBeLessThanOrEqual(30);
     expect(branding.disclaimer).toContain('independent');
     expect(branding.disclaimer).toContain('Not affiliated with');
     expect(branding.disclaimer).toContain('Cognition AI');

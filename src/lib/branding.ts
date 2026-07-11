@@ -11,7 +11,7 @@ export const branding = {
   /** Product name. Fallbacks if Apple rejects the trademark: Cockpit | Dispatch | Overwatch. */
   name: 'DevinX',
   /** App Store subtitle (unofficial-client framing, spec §1.4). */
-  subtitle: 'Unofficial mission control for Devin sessions.',
+  subtitle: 'Unofficial client for Devin',
   /** Disclaimer shown on Welcome, Settings → About, and App Store listing. */
   disclaimer:
     'DevinX is an independent, unofficial client for the Devin API. Not affiliated with, endorsed by, or a product of Cognition AI.',

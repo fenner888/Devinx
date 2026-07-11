@@ -13,7 +13,7 @@ const rows = [
   {
     title: 'On-device storage',
     detail:
-      'Credentials stay in the system Keychain. Preferences and the read cache stay on this device and are wiped when you disconnect.',
+      'Credentials stay in the system Keychain. Compose drafts, prompt templates, session context, and the read cache stay on this device and are wiped when you disconnect. Your appearance choice may remain.',
   },
   {
     title: 'Crash reports',
@@ -38,12 +38,12 @@ const rows = [
   {
     title: 'App delivery',
     detail:
-      'The installed app may contact Expo over TLS to check for compatible DevinX updates. This release does not register your iPhone for remote push notifications.',
+      'The installed app may contact Expo over TLS to check for compatible DevinX updates. Expo may receive the device operating system, project ID, normal network metadata, and a randomized installation token. This release does not register your iPhone for remote push notifications.',
   },
   {
     title: 'Your controls and deletion',
     detail:
-      'Disconnecting removes DevinX credentials and cached data from this iPhone. Revoking the iPhone in DevinX Connector ends its Mac access. Cloud-session retention remains controlled by Cognition and your Devin account.',
+      'Disconnecting removes DevinX credentials, drafts, saved session context, and cached data from this iPhone. Revoking the iPhone in DevinX Connector ends its Mac access. Cloud-session retention remains controlled by Cognition and your Devin account.',
   },
 ] as const;
 

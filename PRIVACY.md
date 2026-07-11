@@ -11,11 +11,11 @@ When you use Devin Cloud, DevinX sends the credentials, prompts, attachments, an
 DevinX stores the following on your device:
 
 - Devin API credentials and organization identifiers in the operating-system Keychain or secure credential store
-- app preferences, selected repositories, and session display context in local app storage
+- app preferences, compose drafts, selected repositories, and session display context in local app storage
 - a read cache of cloud session metadata for offline access
 - per-device Connector credentials in the operating-system Keychain when you pair a computer
 
-Disconnecting and wiping connections removes stored credentials, cached cloud session data, and in-memory query data from the device.
+Disconnecting and wiping connections removes stored credentials, compose drafts, saved prompt templates, remembered session context, cached cloud session data, and in-memory query data from the device. The independent light/dark appearance preference may remain.
 
 ## Analytics, crash reports, and notifications
 
@@ -39,7 +39,7 @@ Tailscale provides private network reachability between your iPhone and computer
 
 ## App delivery
 
-The installed app may contact Expo over encrypted TLS to check for a compatible DevinX update. Update requests do not include Devin credentials, prompts, messages, repository names, attachments, local-session content, or Connector pairing secrets. Expo's handling of update-service transport data is governed by its privacy terms.
+The installed app may contact Expo over encrypted TLS to check for a compatible DevinX update. Expo states that EAS Update requests may include the device operating system, the Expo project ID, normal network metadata, and a randomized token used to determine whether an app installation requested an update. Update requests do not include Devin credentials, prompts, messages, repository names, attachments, local-session content, or Connector pairing secrets. Expo's handling of update-service transport data is governed by its privacy terms.
 
 ## Your controls and deletion
 

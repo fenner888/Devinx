@@ -18,6 +18,7 @@ import { purgeCache } from '@cache/index';
 import { branding } from '@lib/branding';
 import { connectionModeOptions } from '@lib/connections';
 import { confirmAction } from '@lib/confirm';
+import { purgeUserScopedStorage } from '@lib/localUserData';
 import { normalizeDefaultTags, useAppPreferences, type PollingMode } from '@store/preferences';
 import {
   setThemePreference,
@@ -48,6 +49,7 @@ export default function SettingsScreen() {
   const setHaptics = useAppPreferences((s) => s.setHaptics);
   const defaultTags = useAppPreferences((s) => s.defaultTags);
   const setDefaultTags = useAppPreferences((s) => s.setDefaultTags);
+  const resetUserScopedData = useAppPreferences((s) => s.resetUserScopedData);
   const [defaultTagsInput, setDefaultTagsInput] = useState(defaultTags.join(', '));
   const [credentialFingerprint, setCredentialFingerprint] = useState<string | null>(null);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
@@ -84,7 +86,8 @@ export default function SettingsScreen() {
         setDisconnectError(null);
         try {
           await disconnectAll();
-          await purgeCache();
+          await Promise.all([purgeCache(), purgeUserScopedStorage()]);
+          resetUserScopedData();
           queryClient.clear();
           router.replace('/(onboarding)');
         } catch {

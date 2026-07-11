@@ -37,9 +37,9 @@ import { AttachmentPickerSheet, type PickedAttachment } from '@components/Attach
 import type { DevinMode } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
+import { COMPOSE_DRAFT_KEY } from '@lib/localUserData';
 import { useAppPreferences } from '@store/preferences';
 
-const DRAFT_KEY = '@devinx/compose-draft';
 const MAX_PROMPT = 10000;
 const MAX_TITLE = 200;
 
@@ -99,7 +99,7 @@ export default function ComposeScreen() {
 
   // Load draft from AsyncStorage on mount.
   useEffect(() => {
-    AsyncStorage.getItem(DRAFT_KEY)
+    AsyncStorage.getItem(COMPOSE_DRAFT_KEY)
       .then((json) => {
         if (json) {
           try {
@@ -118,7 +118,7 @@ export default function ComposeScreen() {
   useEffect(() => {
     if (!loaded) return;
     const id = setTimeout(() => {
-      AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft)).catch(() => {
+      AsyncStorage.setItem(COMPOSE_DRAFT_KEY, JSON.stringify(draft)).catch(() => {
         // ignore storage errors
       });
     }, 500);
@@ -202,7 +202,7 @@ export default function ComposeScreen() {
         rememberSessionMode(session.session_id, draft.mode),
       ]);
       // Clear draft on success.
-      await AsyncStorage.removeItem(DRAFT_KEY);
+      await AsyncStorage.removeItem(COMPOSE_DRAFT_KEY);
       setDraft(emptyDraft);
       router.replace(`/(main)/session/${session.session_id}`);
     } catch (e) {

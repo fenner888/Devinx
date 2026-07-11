@@ -50,6 +50,7 @@ interface AppPreferencesState {
   removeTemplate: (id: string) => void;
   setConnectionMode: (mode: ConnectionMode) => void;
   setHasHydrated: (value: boolean) => void;
+  resetUserScopedData: () => void;
 }
 
 export const useAppPreferences = create<AppPreferencesState>()(
@@ -83,6 +84,14 @@ export const useAppPreferences = create<AppPreferencesState>()(
         set((s) => ({ composerTemplates: s.composerTemplates.filter((t) => t.id !== id) })),
       setConnectionMode: (connectionMode) => set({ connectionMode }),
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+      resetUserScopedData: () =>
+        set({
+          defaultTags: [],
+          pinnedSessionIds: [],
+          watchedSessionIds: [],
+          composerTemplates: [],
+          connectionMode: 'cloud',
+        }),
     }),
     {
       name: 'devinx-prefs',

@@ -22,9 +22,21 @@ describe('release privacy configuration', () => {
 
     expect(privacyScreen).toContain('directly from your Mac over Tailscale');
     expect(privacyScreen).toContain('contact Expo over TLS');
+    expect(privacyScreen).toContain('randomized installation token');
     expect(privacyScreen).toContain('does not register your iPhone for remote push notifications');
     expect(privacyScreen).toContain('Your controls and deletion');
     expect(privacyScreen).toContain('https://github.com/fenner888/Devinx/blob/main/PRIVACY.md');
     expect(privacyScreen).not.toContain('over pinned TLS');
+
+    const privacyPolicy = readFileSync(resolve(repositoryRoot, 'PRIVACY.md'), 'utf8');
+    expect(privacyPolicy).toContain('randomized token');
+
+    const privacyReview = readFileSync(
+      resolve(repositoryRoot, 'docs/app-privacy-review.md'),
+      'utf8',
+    );
+    expect(privacyReview).toContain(
+      '| Device ID | App Functionality (EAS Update randomized installation token) | No | No |',
+    );
   });
 });
