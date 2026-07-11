@@ -27,7 +27,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (24)` was built locally from clean commit `80c615c`, containing the complete local-data wipe, corrected EAS Update privacy disclosure, App Store-length subtitle, and public-release audit
 - [x] Build 24 IPA signature, bundle metadata, entitlements, update channel/runtime, file protection, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (24)`, `NSFileProtectionComplete`); no notification artifacts or APS entitlement remained; SHA-256 `825986a8909ff27b4e118175abc1084bb2556c9a87c0e138ece17d117439cbe5`
 - [x] Build 24 App Store Connect submission `355f66a7-e791-4cbb-96d2-8262ca689229` finished with no error as the superseding consolidated internal TestFlight candidate
-- [ ] Build and inspect a superseding candidate with the dormant Sentry SDK and diagnostic privacy manifest removed
+- [x] iOS `0.1.0 (25)` was built locally from clean commit `296e90a` after removing the dormant crash-reporting SDK, native plugin, build flags, and raw error-detail rendering
+- [x] Build 25 IPA signature, metadata, entitlements, production update channel/runtime, file protection, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (25)`, `NSFileProtectionComplete`); 10 privacy manifests contain no collected-data declarations, no reporting/notification artifacts or APS entitlement remain; SHA-256 `33dc35a39cb4943523ea70d00cdc7b285f3db7de7cf39822e629b197fc4dc713`
+- [x] Build 25 App Store Connect submission `edb84701-c0ff-4421-a70a-c3913dfd99b1` finished with no error as the definitive consolidated internal TestFlight candidate
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -54,7 +56,7 @@ The results below must be refreshed after release-document changes and before a 
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Current source removes both unused notifications and the dormant Sentry SDK; a superseding IPA must confirm no notification or diagnostic-reporting artifact remains and re-count the privacy manifests; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 25 contains 10 valid privacy manifests with no collected-data declarations or tracking; no notification, crash-reporting, or APS artifact remains; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -64,7 +66,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [x] Confirm the final TestFlight build contains the current self-disconnect, complete local-data wipe, session-boundary, local-history, companion-travel, privacy, and accessibility changes (Build 24 / `80c615c`)
+- [x] Confirm the final TestFlight build contains the current self-disconnect, complete local-data wipe, session-boundary, local-history, companion-travel, privacy, accessibility, and dormant-SDK removal changes (Build 25 / `296e90a`)
 - [x] Grant content read and message send to the iPhone in Connector
 - [x] Discover and load a real desktop session
 - [x] Send a harmless message and confirm it reaches that session
