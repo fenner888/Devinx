@@ -8,10 +8,14 @@ let mockConnection = {
   usesCloud: true,
   computers: [] as Array<{ bridgeId: string; computerName: string }>,
 };
-let mockComputerCreateOptions = {
-  workspaces: [] as Array<{ id: string; name: string }>,
-  models: [] as Array<{ id: string; name: string }>,
-};
+let mockComputerCreateOptions:
+  | {
+      workspaces: Array<{ id: string; name: string }>;
+      models: Array<{ id: string; name: string }>;
+    }
+  | undefined = { workspaces: [], models: [] };
+let mockComputerCreateOptionsError: Error | null = null;
+let mockComputerCreateOptionsLoading = false;
 let mockCloudSessions: Array<Record<string, unknown>> = [];
 let mockComputerBoard: {
   sessions: Array<Record<string, unknown>>;
@@ -64,8 +68,8 @@ jest.mock('@api/bridge/queries', () => ({
   useComputerSessions: () => ({ data: mockComputerBoard }),
   useComputerCreateOptions: () => ({
     data: mockComputerCreateOptions,
-    isLoading: false,
-    error: null,
+    isLoading: mockComputerCreateOptionsLoading,
+    error: mockComputerCreateOptionsError,
   }),
   useCreateComputerSession: () => ({
     isPending: false,
@@ -102,6 +106,7 @@ jest.mock('expo-document-picker', () => ({
 }));
 
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import HomeScreen from '../../src/app/(main)/index';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
@@ -116,6 +121,8 @@ describe('home attachment control', () => {
       computers: [],
     };
     mockComputerCreateOptions = { workspaces: [], models: [] };
+    mockComputerCreateOptionsError = null;
+    mockComputerCreateOptionsLoading = false;
     mockCloudSessions = [];
     mockComputerBoard = { sessions: [], computers: [] };
   });
@@ -272,6 +279,60 @@ describe('home attachment control', () => {
       },
       expect.any(Object),
     );
+  });
+
+  it('explains unavailable local options without opening an inescapable empty sheet', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = undefined;
+    mockComputerCreateOptionsError = new Error('not authorized');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Workspace: Unavailable'));
+    expect(alert).toHaveBeenCalledWith(
+      'Connector permission required',
+      expect.stringContaining('enable Create new sessions'),
+    );
+    expect(screen.queryByLabelText('Close workspace picker')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Model: Default'));
+    expect(alert).toHaveBeenCalledTimes(2);
+  });
+
+  it('always provides an explicit close control for local picker sheets', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      models: [],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Workspace: DevinX'));
+    expect(screen.getByLabelText('Close workspace picker')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Close workspace picker'));
+    expect(screen.queryByLabelText('Close workspace picker')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Model: Default'));
+    expect(screen.getByLabelText('Close model picker')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Close model picker'));
+    expect(screen.queryByLabelText('Close model picker')).toBeNull();
   });
 
   it('shows and selects the repository context', () => {

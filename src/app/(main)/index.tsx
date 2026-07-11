@@ -230,6 +230,32 @@ export default function HomeScreen() {
     }
   }
 
+  function openLocalPicker(kind: 'workspace' | 'model') {
+    if (localOptions.isLoading) {
+      Alert.alert('Loading Mac options', 'DevinX is checking the approved options on your Mac.');
+      return;
+    }
+    if (!localOptions.data) {
+      Alert.alert(
+        'Connector permission required',
+        'Open DevinX Connector on your Mac and enable Create new sessions for this iPhone.',
+      );
+      return;
+    }
+    if (kind === 'workspace') {
+      if (localOptions.data.workspaces.length === 0) {
+        Alert.alert(
+          'No local workspaces yet',
+          'Start or resume a Devin session in a workspace on your Mac, then try again.',
+        );
+        return;
+      }
+      setShowWorkspacePicker(true);
+      return;
+    }
+    setShowModelPicker(true);
+  }
+
   function handleSend() {
     if (isComputerDestination) {
       if (
@@ -472,8 +498,7 @@ export default function HomeScreen() {
                 {isComputerDestination ? (
                   <Pressable
                     className="flex-row items-center rounded-full px-3 py-2"
-                    onPress={() => setShowModelPicker(true)}
-                    disabled={!localOptions.data}
+                    onPress={() => openLocalPicker('model')}
                     accessibilityRole="button"
                     accessibilityLabel={`Model: ${selectedModel?.name ?? 'Default'}`}
                   >
@@ -569,7 +594,7 @@ export default function HomeScreen() {
               className="flex-row items-center flex-1 min-w-0"
               onPress={() => {
                 if (isComputerDestination) {
-                  setShowWorkspacePicker(true);
+                  openLocalPicker('workspace');
                 } else {
                   setRepoQuery('');
                   setShowRepoPicker(true);
@@ -936,7 +961,17 @@ export default function HomeScreen() {
             style={{ paddingBottom: Math.max(insets.bottom, 16) }}
             accessibilityViewIsModal
           >
-            <Text className="mb-1 text-text-hi text-text17 font-medium">Select workspace</Text>
+            <View className="mb-1 flex-row items-center justify-between">
+              <Text className="text-text-hi text-text17 font-medium">Select workspace</Text>
+              <Pressable
+                className="h-10 w-10 items-center justify-center rounded-full bg-tint-secondary"
+                onPress={() => setShowWorkspacePicker(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close workspace picker"
+              >
+                <Ionicons name="close" size={19} color={tokens.textMid.hex} />
+              </Pressable>
+            </View>
             <Text className="mb-4 text-text-low text-text12">
               Approved workspaces previously used by Devin on this Mac
             </Text>
@@ -982,7 +1017,17 @@ export default function HomeScreen() {
             style={{ paddingBottom: Math.max(insets.bottom, 16) }}
             accessibilityViewIsModal
           >
-            <Text className="mb-1 text-text-hi text-text17 font-medium">Select local model</Text>
+            <View className="mb-1 flex-row items-center justify-between">
+              <Text className="text-text-hi text-text17 font-medium">Select local model</Text>
+              <Pressable
+                className="h-10 w-10 items-center justify-center rounded-full bg-tint-secondary"
+                onPress={() => setShowModelPicker(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close model picker"
+              >
+                <Ionicons name="close" size={19} color={tokens.textMid.hex} />
+              </Pressable>
+            </View>
             <Text className="mb-4 text-text-low text-text12">
               Choose a Devin model, or keep Devin's recommended default
             </Text>
