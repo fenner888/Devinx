@@ -7,8 +7,8 @@ This is the source of truth for the current release checkpoint. A passing intern
 ## Verified
 
 - [x] Connector feature baseline `128269b` committed on `devin/phase-4a-connector-foundation`; release-audit changes follow it
-- [x] iOS `0.1.0 (13)` EAS build finished
-- [x] Build 13 App Store Connect upload finished as an internal TestFlight checkpoint
+- [x] iOS `0.1.0 (14)` EAS build `c6106cba-7fdb-455c-b3ef-d073bf9fda81` finished from commit `f5390b9`
+- [x] Build 14 App Store Connect submission `f4f2159a-e5b9-4052-ad17-90d13bec0973` finished with no error as an internal TestFlight checkpoint
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Same-Wi-Fi setup removed from the v1 product path
 - [x] Per-device read and send permissions enforced server-side
@@ -40,7 +40,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [ ] Confirm the intended TestFlight build contains the current self-disconnect source change
+- [x] Confirm the intended TestFlight build contains the current self-disconnect source change (Build 14 / `f5390b9`)
 - [ ] Grant content read and message send to the iPhone in Connector
 - [ ] Discover and load a real desktop session
 - [ ] Send a harmless message and confirm it reaches that session

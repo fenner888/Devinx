@@ -5,11 +5,11 @@ This document separates verified release evidence from work that still requires 
 ## Current checkpoint
 
 - Connector feature baseline: `128269b` (`feat: add secure DevinX Connector steering`); release-audit changes follow it on the same branch
-- iOS internal checkpoint: `0.1.0 (13)`
-- EAS build: `e0620751-6884-4e9a-867b-355f8e703a77` — finished
-- App Store Connect submission: `dcea8f15-013f-47f7-a0a7-92c3b3c05c1c` — finished
-- Build 13 is an internal TestFlight checkpoint, not an App Review submission.
-- The source checkpoint contains the newest per-computer self-disconnect behavior; confirm the App Store build number containing it before final release testing.
+- iOS internal checkpoint: `0.1.0 (14)`
+- EAS build: `c6106cba-7fdb-455c-b3ef-d073bf9fda81` — finished from commit `f5390b9`
+- App Store Connect submission: `f4f2159a-e5b9-4052-ad17-90d13bec0973` — finished with no error
+- Build 14 is an internal TestFlight checkpoint, not an App Review submission.
+- Build 14 contains the current per-computer self-disconnect, release-hardening, and accessibility changes.
 
 ## Release gates
 
