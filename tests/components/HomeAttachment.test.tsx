@@ -330,9 +330,9 @@ describe('home attachment control', () => {
     expect(screen.queryByLabelText('Close workspace picker')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Model: Default'));
-    expect(screen.getByLabelText('Close model picker')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Close model picker'));
-    expect(screen.queryByLabelText('Close model picker')).toBeNull();
+    expect(screen.getByLabelText('Close model menu')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Close model menu'));
+    expect(screen.queryByLabelText('Close model menu')).toBeNull();
   });
 
   it('shows and selects the repository context', () => {

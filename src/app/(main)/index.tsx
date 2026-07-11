@@ -1007,33 +1007,36 @@ export default function HomeScreen() {
       <Modal
         statusBarTranslucent
         visible={showModelPicker}
-        animationType="slide"
+        animationType="fade"
         transparent
         onRequestClose={() => setShowModelPicker(false)}
       >
-        <View className="flex-1 bg-scrim justify-end">
+        <View className="flex-1 items-center justify-center px-8">
+          <Pressable
+            className="absolute inset-0 bg-scrim"
+            onPress={() => setShowModelPicker(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close model picker"
+          />
           <View
-            className="bg-surface2 rounded-t-sheet px-5 pt-4 max-h-[65%]"
-            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+            className="w-full max-w-96 overflow-hidden rounded-sheet border border-border bg-surface2 px-5 py-4 shadow-2xl"
+            style={{ maxHeight: Math.min(height * 0.7, 540) }}
             accessibilityViewIsModal
           >
-            <View className="mb-1 flex-row items-center justify-between">
-              <Text className="text-text-hi text-text17 font-medium">Select local model</Text>
+            <View className="mb-3 flex-row items-center justify-between">
+              <Text className="text-text-low text-text14 font-medium">Model</Text>
               <Pressable
-                className="h-10 w-10 items-center justify-center rounded-full bg-tint-secondary"
+                className="h-9 w-9 items-center justify-center rounded-full"
                 onPress={() => setShowModelPicker(false)}
                 accessibilityRole="button"
-                accessibilityLabel="Close model picker"
+                accessibilityLabel="Close model menu"
               >
-                <Ionicons name="close" size={19} color={tokens.textMid.hex} />
+                <Ionicons name="close" size={18} color={tokens.textLow.hex} />
               </Pressable>
             </View>
-            <Text className="mb-4 text-text-low text-text12">
-              Choose a Devin model, or keep Devin's recommended default
-            </Text>
-            <ScrollView>
+            <ScrollView showsVerticalScrollIndicator={false}>
               <Pressable
-                className={`mb-2 flex-row items-center rounded-card border border-border-subtle px-4 py-3.5 ${selectedModelId === null ? 'bg-tint-blue' : 'bg-surface1'}`}
+                className="min-h-14 flex-row items-center px-2 py-3"
                 onPress={() => {
                   setSelectedModelId(null);
                   setShowModelPicker(false);
@@ -1041,23 +1044,27 @@ export default function HomeScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Use Devin default model"
               >
-                <Ionicons name="sparkles-outline" size={18} color={tokens.textMid.hex} />
-                <View className="ml-3 flex-1">
-                  <Text className="text-text-hi text-text14">Default model</Text>
-                  <Text className="mt-0.5 text-text-low text-text12">
-                    Let Devin choose the recommended model
-                  </Text>
+                <View className="w-8 items-start">
+                  {selectedModelId === null && (
+                    <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />
+                  )}
                 </View>
-                {selectedModelId === null && (
-                  <Ionicons name="checkmark-circle" size={20} color={tokens.brandText.hex} />
-                )}
+                <Text className="flex-1 text-text-hi text-text17">Default model</Text>
               </Pressable>
+              {Boolean(localOptions.data?.models.length) && (
+                <>
+                  <View className="my-2 h-px bg-border-subtle" />
+                  <Text className="px-10 pb-2 pt-2 text-text-low text-text13 font-medium">
+                    Recent
+                  </Text>
+                </>
+              )}
               {localOptions.data?.models.map((modelOption) => {
                 const selected = modelOption.id === selectedModelId;
                 return (
                   <Pressable
                     key={modelOption.id}
-                    className={`mb-2 flex-row items-center rounded-card border border-border-subtle px-4 py-3.5 ${selected ? 'bg-tint-blue' : 'bg-surface1'}`}
+                    className="min-h-14 flex-row items-center px-2 py-3"
                     onPress={() => {
                       setSelectedModelId(modelOption.id);
                       setShowModelPicker(false);
@@ -1065,13 +1072,14 @@ export default function HomeScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Use model ${modelOption.name}`}
                   >
-                    <Ionicons name="hardware-chip-outline" size={18} color={tokens.textMid.hex} />
-                    <Text className="ml-3 flex-1 text-text-hi text-text14" numberOfLines={1}>
+                    <View className="w-8 items-start">
+                      {selected && (
+                        <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />
+                      )}
+                    </View>
+                    <Text className="flex-1 text-text-hi text-text17" numberOfLines={1}>
                       {modelOption.name}
                     </Text>
-                    {selected && (
-                      <Ionicons name="checkmark-circle" size={20} color={tokens.brandText.hex} />
-                    )}
                   </Pressable>
                 );
               })}

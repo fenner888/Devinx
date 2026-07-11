@@ -174,14 +174,28 @@ function cleanDisplayText(value: string, maximumLength: number, fallback: string
 
 function modelDisplayName(modelId: string): string {
   const words = modelId.split(/[-_]+/).filter(Boolean);
-  const label = words
-    .map((word) => {
+  const labels: string[] = [];
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index] ?? '';
+    if (/^\d+$/.test(word)) {
+      const versionParts = [word];
+      while (/^\d+$/.test(words[index + 1] ?? '')) {
+        versionParts.push(words[index + 1] ?? '');
+        index += 1;
+      }
+      labels.push(versionParts.join('.'));
+      continue;
+    }
+    labels.push(
+      (() => {
       if (/^\d+(?:\.\d+)*$/.test(word)) return word;
       if (word.toLowerCase() === 'gpt') return 'GPT';
       if (word.toLowerCase() === 'glm') return 'GLM';
       return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
-    })
-    .join(' ');
+      })(),
+    );
+  }
+  const label = labels.join(' ');
   return cleanDisplayText(label, 160, 'Default');
 }
 

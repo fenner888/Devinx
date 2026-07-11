@@ -318,7 +318,7 @@ describe('authenticated Desktop Bridge service', () => {
             name: 'Secret Project',
           },
         ],
-        models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5 6 Sol Medium' }],
+        models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
       },
     });
     expect(JSON.stringify(result)).not.toContain('/Users/frank');
