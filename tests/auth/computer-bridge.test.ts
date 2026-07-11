@@ -26,10 +26,13 @@ import { FixedWindowRateLimiter } from '../../bridge/src/rate-limit';
 import { InMemoryReplayGuard } from '../../bridge/src/replay';
 import { BridgeService } from '../../bridge/src/service';
 import { SessionHandleRegistry } from '../../bridge/src/session-handles';
+import { WorkspaceHandleRegistry } from '../../bridge/src/workspace-handles';
 import {
   ComputerBridgeError,
+  createComputerSession,
   disconnectComputer,
   getComputerBridgeHealth,
+  getComputerCreateOptions,
   listComputerSessions,
   loadComputerSession,
   openComputerBridge,
@@ -141,6 +144,7 @@ describe('authenticated mobile Computer Bridge client', () => {
       replayGuard: new InMemoryReplayGuard(),
       rateLimiter: new FixedWindowRateLimiter(),
       sessionHandles,
+      workspaceHandles: new WorkspaceHandleRegistry(BRIDGE_ID, Buffer.alloc(32, 8)),
       sessions: {
         isSessionListSupported: () => true,
         listSessions: async () => ({ sessions: [] }),
@@ -250,6 +254,39 @@ describe('authenticated mobile Computer Bridge client', () => {
     await expect(
       promptComputerSession(BRIDGE_ID, sessionId, 'Continue the task.'),
     ).resolves.toEqual({ sessionId: continuedSessionId });
+  });
+
+  it('validates local creation options and lets the Mac authorize creation authoritatively', async () => {
+    const workspaceId = `workspace_${'W'.repeat(43)}`;
+    const sessionId = `local_${'C'.repeat(43)}`;
+    mockPostPinnedBridgeJson
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          workspaces: [{ id: workspaceId, name: 'DevinX' }],
+          models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
+        },
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: { accepted: true, sessionId },
+      });
+
+    await expect(getComputerCreateOptions(BRIDGE_ID)).resolves.toEqual({
+      workspaces: [{ id: workspaceId, name: 'DevinX' }],
+      models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
+    });
+    await expect(
+      createComputerSession(BRIDGE_ID, {
+        workspaceId,
+        modelId: 'gpt-5-6-sol-medium',
+        text: 'Build this.',
+      }),
+    ).resolves.toEqual({ sessionId });
+    expect(mockPostPinnedBridgeJson.mock.calls[1]?.[2]).toMatchObject({
+      method: 'session.create',
+      body: { workspaceId, modelId: 'gpt-5-6-sol-medium', text: 'Build this.' },
+    });
   });
 
   it('revokes on the Mac before removing the local computer credential', async () => {

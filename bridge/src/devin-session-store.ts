@@ -13,11 +13,15 @@ const MAXIMUM_CHAIN_NODES = 10_000;
 const MAXIMUM_MESSAGES = 200;
 const MAXIMUM_MESSAGE_BYTES = 100 * 1024;
 const MAXIMUM_HISTORY_BYTES = 160 * 1024;
+const MAXIMUM_CREATE_OPTIONS = 100;
+
+const modelIdSchema = z.string().min(1).max(160).regex(/^[A-Za-z0-9._:+-]+$/);
 
 const sessionRowSchema = z
   .object({
     workingDirectory: z.string().min(1).max(4_096).refine(isAbsolute),
     mainChainId: z.number().int().nonnegative(),
+    modelId: modelIdSchema,
   })
   .strict();
 
@@ -37,7 +41,15 @@ const chainBoundarySchema = z
   .strict();
 
 const requiredColumns = {
-  sessions: new Set(['id', 'working_directory', 'main_chain_id']),
+  sessions: new Set([
+    'id',
+    'working_directory',
+    'model',
+    'agent_mode',
+    'last_activity_at',
+    'main_chain_id',
+    'hidden',
+  ]),
   message_nodes: new Set([
     'session_id',
     'node_id',
@@ -54,6 +66,16 @@ interface DevinSessionStoreOptions {
 
 interface TableColumnRow {
   name: unknown;
+}
+
+export interface DevinSessionPresentation {
+  modelId: string;
+  agentMode: string;
+}
+
+export interface DevinCreateOptions {
+  workspaces: Array<{ path: string }>;
+  models: Array<{ id: string }>;
 }
 
 function utf8Tail(value: string, maximumBytes: number): { text: string; truncated: boolean } {
@@ -101,6 +123,84 @@ export class DevinSessionStore {
     this.supported = false;
   }
 
+  async getSessionPresentation(sessionIdInput: unknown): Promise<DevinSessionPresentation> {
+    if (!this.supported) throw new Error('Devin session metadata is unavailable');
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    await this.validateDatabaseFile();
+    const database = this.openDatabase();
+    try {
+      database.exec('PRAGMA query_only = ON; BEGIN;');
+      this.validateSchema(database);
+      const result = z
+        .object({ modelId: modelIdSchema, agentMode: z.string().min(1).max(160) })
+        .strict()
+        .parse(
+          database
+            .prepare(
+              `SELECT model AS modelId, agent_mode AS agentMode
+               FROM sessions WHERE id = ? AND hidden = 0`,
+            )
+            .get(sessionId),
+        );
+      database.exec('ROLLBACK;');
+      return result;
+    } catch {
+      try {
+        database.exec('ROLLBACK;');
+      } catch {
+        // The database may have rejected the transaction before it began.
+      }
+      throw new Error('Devin session metadata is unavailable');
+    } finally {
+      database.close();
+    }
+  }
+
+  async listCreateOptions(): Promise<DevinCreateOptions> {
+    if (!this.supported) throw new Error('Devin session metadata is unavailable');
+    await this.validateDatabaseFile();
+    const database = this.openDatabase();
+    try {
+      database.exec('PRAGMA query_only = ON; BEGIN;');
+      this.validateSchema(database);
+      const workspaces = database
+        .prepare(
+          `SELECT working_directory AS path
+           FROM sessions
+           WHERE hidden = 0
+           GROUP BY working_directory
+           ORDER BY MAX(last_activity_at) DESC
+           LIMIT ?`,
+        )
+        .all(MAXIMUM_CREATE_OPTIONS)
+        .map((row) =>
+          z.object({ path: z.string().min(1).max(4_096).refine(isAbsolute) }).strict().parse(row),
+        );
+      const models = database
+        .prepare(
+          `SELECT model AS id
+           FROM sessions
+           WHERE hidden = 0
+           GROUP BY model
+           ORDER BY MAX(last_activity_at) DESC
+           LIMIT ?`,
+        )
+        .all(MAXIMUM_CREATE_OPTIONS)
+        .map((row) => z.object({ id: modelIdSchema }).strict().parse(row));
+      database.exec('ROLLBACK;');
+      return { workspaces, models };
+    } catch {
+      try {
+        database.exec('ROLLBACK;');
+      } catch {
+        // The database may have rejected the transaction before it began.
+      }
+      throw new Error('Devin session metadata is unavailable');
+    } finally {
+      database.close();
+    }
+  }
+
   async loadSession(sessionIdInput: unknown): Promise<AcpLoadedSession> {
     if (!this.supported) throw new Error('Devin session history is unavailable');
     const sessionId = sessionIdSchema.parse(sessionIdInput);
@@ -112,7 +212,8 @@ export class DevinSessionStore {
       const session = sessionRowSchema.parse(
         database
           .prepare(
-            `SELECT working_directory AS workingDirectory, main_chain_id AS mainChainId
+            `SELECT working_directory AS workingDirectory, main_chain_id AS mainChainId,
+                    model AS modelId
              FROM sessions WHERE id = ?`,
           )
           .get(sessionId),
@@ -186,6 +287,7 @@ export class DevinSessionStore {
         cwd: session.workingDirectory,
         messages,
         truncated,
+        modelId: session.modelId,
       };
     } catch {
       try {

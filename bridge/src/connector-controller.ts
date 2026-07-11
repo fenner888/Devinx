@@ -231,6 +231,7 @@ export class ConnectorController {
           const updated = await runner.updateDevicePermissions(command.deviceId, {
             allowSessionContent: command.allowSessionContent,
             allowSessionPrompt: command.allowSessionPrompt,
+            allowSessionCreate: command.allowSessionCreate,
           });
           if (!updated) throw new Error('Paired device update was rejected');
           this.writeDevices();
@@ -276,6 +277,7 @@ export class ConnectorController {
         status: device.status,
         allowSessionContent: device.permissions.includes('session:content:read'),
         allowSessionPrompt: device.permissions.includes('session:prompt:send'),
+        allowSessionCreate: device.permissions.includes('session:create'),
       })),
     });
   }

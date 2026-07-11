@@ -12,6 +12,8 @@ export const opaqueIdSchema = z
   .regex(/^[A-Za-z0-9_-]+$/);
 
 export const sessionIdSchema = z.string().min(1).max(512);
+export const workspaceHandleSchema = z.string().regex(/^workspace_[A-Za-z0-9_-]{43}$/);
+export const modelIdSchema = z.string().min(1).max(160).regex(/^[A-Za-z0-9._:+-]+$/);
 const cursorSchema = z.string().min(1).max(4096);
 export const deviceNameSchema = z
   .string()
@@ -33,6 +35,8 @@ export const bridgeMethodSchema = z.enum([
   'session.list',
   'session.load',
   'session.prompt',
+  'session.create_options',
+  'session.create',
 ]);
 
 export const bridgePermissionSchema = z.enum([
@@ -40,6 +44,7 @@ export const bridgePermissionSchema = z.enum([
   'session:metadata:read',
   'session:content:read',
   'session:prompt:send',
+  'session:create',
 ]);
 
 export const signedRequestEnvelopeSchema = z
@@ -92,6 +97,16 @@ export const sessionPromptBodySchema = z
   })
   .strict();
 
+export const sessionCreateOptionsBodySchema = z.object({}).strict();
+
+export const sessionCreateBodySchema = z
+  .object({
+    workspaceId: workspaceHandleSchema,
+    modelId: modelIdSchema.nullable().optional(),
+    text: z.string().trim().min(1).max(10_000),
+  })
+  .strict();
+
 export const deviceRecordSchema = z
   .object({
     bridgeId: opaqueIdSchema,
@@ -126,6 +141,8 @@ export const bodySchemas = {
   'session.list': sessionListBodySchema,
   'session.load': sessionLoadBodySchema,
   'session.prompt': sessionPromptBodySchema,
+  'session.create_options': sessionCreateOptionsBodySchema,
+  'session.create': sessionCreateBodySchema,
 } as const;
 
 export const permissionByMethod = {
@@ -134,6 +151,8 @@ export const permissionByMethod = {
   'session.list': 'session:metadata:read',
   'session.load': 'session:content:read',
   'session.prompt': 'session:prompt:send',
+  'session.create_options': 'session:metadata:read',
+  'session.create': 'session:create',
 } as const satisfies Record<BridgeMethod, BridgePermission>;
 
 export type BridgeMethod = z.infer<typeof bridgeMethodSchema>;
@@ -145,6 +164,8 @@ export type DeviceRevokeBody = z.infer<typeof deviceRevokeBodySchema>;
 export type SessionListBody = z.infer<typeof sessionListBodySchema>;
 export type SessionLoadBody = z.infer<typeof sessionLoadBodySchema>;
 export type SessionPromptBody = z.infer<typeof sessionPromptBodySchema>;
+export type SessionCreateOptionsBody = z.infer<typeof sessionCreateOptionsBodySchema>;
+export type SessionCreateBody = z.infer<typeof sessionCreateBodySchema>;
 
 export type BridgeBodyByMethod = {
   'bridge.health': BridgeHealthBody;
@@ -152,4 +173,6 @@ export type BridgeBodyByMethod = {
   'session.list': SessionListBody;
   'session.load': SessionLoadBody;
   'session.prompt': SessionPromptBody;
+  'session.create_options': SessionCreateOptionsBody;
+  'session.create': SessionCreateBody;
 };

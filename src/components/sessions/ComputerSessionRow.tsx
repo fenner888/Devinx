@@ -30,8 +30,9 @@ export function ComputerSessionRow({
     : titleIsHidden
       ? 'Session title hidden'
       : 'Local session';
+  const modelText = session.model?.name;
 
-  const accessibilityLabel = `${primaryText}, on ${session.computerName}, ${detailText}${time ? `, ${time}` : ''}${onPress ? ', open read-only history' : ''}`;
+  const accessibilityLabel = `${primaryText}, on ${session.computerName}, ${detailText}${modelText ? `, ${modelText}` : ''}${time ? `, ${time}` : ''}${onPress ? ', open history' : ''}`;
   const content = (
     <>
       <View className="w-8 h-8 rounded-card bg-tint-blue items-center justify-center mr-3">
@@ -47,7 +48,7 @@ export function ComputerSessionRow({
           </Text>
           <Text className="text-text-low text-text12 mx-1.5">·</Text>
           <Text className="text-text-low text-text12 flex-1" numberOfLines={1}>
-            {detailText}
+            {detailText}{modelText ? ` · ${modelText}` : ''}
           </Text>
           {time && <Text className="text-text-low text-text12 ml-2">{time}</Text>}
         </View>

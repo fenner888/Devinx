@@ -122,9 +122,14 @@ describe('DevinX Connector platform and IPC boundary', () => {
           deviceId: 'device_1234567890abcdef',
           allowSessionContent: true,
           allowSessionPrompt: false,
+          allowSessionCreate: false,
         }),
       ),
-    ).toMatchObject({ type: 'update_device', allowSessionContent: true });
+    ).toMatchObject({
+      type: 'update_device',
+      allowSessionContent: true,
+      allowSessionCreate: false,
+    });
     expect(
       parseConnectorCommand(
         JSON.stringify({
@@ -156,6 +161,7 @@ describe('DevinX Connector platform and IPC boundary', () => {
             status: 'active',
             allowSessionContent: true,
             allowSessionPrompt: false,
+            allowSessionCreate: false,
           },
         ],
       }),

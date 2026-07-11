@@ -5,6 +5,8 @@ import { useConnections } from '@auth/ConnectionContext';
 import {
   ComputerBridgeError,
   getComputerBridgeHealth,
+  getComputerCreateOptions,
+  createComputerSession,
   loadComputerSession,
   promptComputerSession,
   openComputerBridges,
@@ -226,5 +228,22 @@ export function useComputerSessionAccess(bridgeId: string, enabled = true) {
 export function usePromptComputerSession(bridgeId: string, sessionId: string) {
   return useMutation({
     mutationFn: (text: string) => promptComputerSession(bridgeId, sessionId, text),
+  });
+}
+
+export function useComputerCreateOptions(bridgeId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['computerCreateOptions', bridgeId],
+    queryFn: () => getComputerCreateOptions(bridgeId),
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export function useCreateComputerSession(bridgeId: string) {
+  return useMutation({
+    mutationFn: (input: { workspaceId: string; modelId?: string | null; text: string }) =>
+      createComputerSession(bridgeId, input),
   });
 }

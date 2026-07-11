@@ -121,6 +121,30 @@ const newSessionResultSchema = z
   })
   .passthrough();
 
+const selectConfigOptionSchema = z
+  .object({
+    id: z.string().min(1).max(160),
+    name: z.string().min(1).max(160),
+    category: z.string().max(80).optional(),
+    type: z.literal('select'),
+    currentValue: z.string().max(160),
+    options: z
+      .array(
+        z
+          .object({
+            value: z.string().min(1).max(160),
+            name: z.string().min(1).max(160),
+          })
+          .passthrough(),
+      )
+      .max(200),
+  })
+  .passthrough();
+
+const setConfigOptionResultSchema = z
+  .object({ configOptions: z.array(z.unknown()).max(1_000) })
+  .passthrough();
+
 const promptResponseSchema = z
   .object({
     stopReason: z.enum(['end_turn', 'max_tokens', 'max_turn_requests', 'refusal', 'cancelled']),
@@ -165,6 +189,7 @@ export interface AcpSessionMetadata {
   additionalDirectories?: string[];
   title?: string;
   updatedAt?: string;
+  modelId?: string;
 }
 
 export interface AcpSessionPage {
@@ -182,6 +207,7 @@ export interface AcpLoadedSession {
   cwd: string;
   messages: AcpHistoryMessage[];
   truncated: boolean;
+  modelId?: string;
 }
 
 export type AcpOperationFailureKind = 'session_in_use' | 'request_failed';
@@ -395,6 +421,10 @@ export class AcpSessionClient {
     return Boolean(this.child);
   }
 
+  isSessionCreateSupported(): boolean {
+    return Boolean(this.child);
+  }
+
   async loadSession(input: unknown): Promise<AcpLoadedSession> {
     if (!this.child) throw new Error('ACP client is not started');
     if (!this.canLoadSessions) throw new Error('ACP agent does not support session loading');
@@ -483,6 +513,53 @@ export class AcpSessionClient {
         },
         { type: 'text', text },
       ]);
+      return created.sessionId;
+    } finally {
+      this.creatingContinuation = false;
+    }
+  }
+
+  async createSession(cwdInput: unknown, modelInput: unknown, textInput: unknown): Promise<string> {
+    if (!this.child) throw new Error('ACP client is not started');
+    const cwd = absolutePathSchema.parse(cwdInput);
+    const modelId = z.string().min(1).max(160).regex(/^[A-Za-z0-9._:+-]+$/).nullable().parse(
+      modelInput,
+    );
+    const text = z.string().trim().min(1).max(100_000).parse(textInput);
+    if (this.activeLoad || this.activePromptSessionId || this.creatingContinuation) {
+      throw new Error('ACP session creation is busy');
+    }
+    this.creatingContinuation = true;
+    try {
+      const created = await this.request(
+        'session/new',
+        { cwd, mcpServers: [] },
+        newSessionResultSchema,
+        'session creation',
+      );
+      if (modelId) {
+        const modelConfig = created.configOptions
+          ?.map((option) => selectConfigOptionSchema.safeParse(option))
+          .find(
+            (option) =>
+              option.success &&
+              (option.data.category === 'model' || option.data.id === 'model') &&
+              option.data.options.some((candidate) => candidate.value === modelId),
+          );
+        if (!modelConfig?.success) throw new Error('ACP model is not available');
+        await this.request(
+          'session/set_config_option',
+          { sessionId: created.sessionId, configId: modelConfig.data.id, value: modelId },
+          setConfigOptionResultSchema,
+          'model selection',
+        );
+      }
+      if (this.listedSessions.size >= MAX_CACHED_SESSIONS) {
+        throw new Error('ACP listed session cache capacity reached');
+      }
+      this.listedSessions.set(created.sessionId, { cwd });
+      this.loadedSessions.add(created.sessionId);
+      this.startPrompt(created.sessionId, [{ type: 'text', text }]);
       return created.sessionId;
     } finally {
       this.creatingContinuation = false;

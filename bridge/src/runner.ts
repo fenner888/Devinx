@@ -8,7 +8,11 @@ import {
   isAcpSessionInUseError,
   type AcpHistoryMessage,
 } from './acp';
-import { DevinSessionStore } from './devin-session-store';
+import {
+  DevinSessionStore,
+  type DevinCreateOptions,
+  type DevinSessionPresentation,
+} from './devin-session-store';
 import type { HttpsBridgeListenerAddress, HttpsBridgeListenerOptions } from './listener';
 import { HttpsBridgeListener } from './listener';
 import { MacOSKeychainSecretStore } from './macos-keychain';
@@ -22,6 +26,7 @@ import { FixedWindowRateLimiter } from './rate-limit';
 import { InMemoryReplayGuard } from './replay';
 import { BridgeService, type SessionDiscoveryAdapter } from './service';
 import { SessionHandleRegistry } from './session-handles';
+import { WorkspaceHandleRegistry } from './workspace-handles';
 import type { SecretStore } from './secret-store';
 import {
   DesktopBridgeStateRepository,
@@ -88,6 +93,8 @@ export interface AcpSessionLifecycle extends SessionDiscoveryAdapter {
   start(): Promise<void>;
   stop(): Promise<void>;
   createContinuation?(cwd: string, context: string, text: string): Promise<string>;
+  isSessionCreateSupported?(): boolean;
+  createSession?(cwd: string, modelId: string | null, text: string): Promise<string>;
 }
 
 export interface SessionHistoryLifecycle {
@@ -95,6 +102,8 @@ export interface SessionHistoryLifecycle {
   stop(): Promise<void>;
   isSessionLoadSupported(): boolean;
   loadSession(sessionId: string): ReturnType<SessionDiscoveryAdapter['loadSession']>;
+  getSessionPresentation?(sessionId: string): Promise<DevinSessionPresentation>;
+  listCreateOptions?(): Promise<DevinCreateOptions>;
 }
 
 export interface DesktopBridgeRunnerDependencies {
@@ -121,6 +130,9 @@ const unavailableSessions: SessionDiscoveryAdapter = {
   loadSession: () => Promise.reject(new Error('Session loading is not enabled')),
   isSessionPromptSupported: () => false,
   promptSession: () => Promise.reject(new Error('Session prompting is not enabled')),
+  isSessionCreateSupported: () => false,
+  listCreateOptions: () => Promise.reject(new Error('Session creation is not enabled')),
+  createSession: () => Promise.reject(new Error('Session creation is not enabled')),
 };
 
 const MAXIMUM_REHYDRATION_PAGES = 100;
@@ -177,6 +189,15 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   async listSessions(input?: unknown): ReturnType<SessionDiscoveryAdapter['listSessions']> {
     const page = await this.current.listSessions(input);
     for (const session of page.sessions) this.listedSessionIds.add(session.sessionId);
+    if (this.history?.getSessionPresentation) {
+      for (const session of page.sessions.slice(0, 200)) {
+        try {
+          session.modelId = (await this.history.getSessionPresentation(session.sessionId)).modelId;
+        } catch {
+          // Model display is optional; never fail session discovery for it.
+        }
+      }
+    }
     return page;
   }
 
@@ -201,6 +222,31 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
 
   isSessionPromptSupported(): boolean {
     return this.current.isSessionPromptSupported();
+  }
+
+  isSessionCreateSupported(): boolean {
+    return Boolean(
+      this.current.isSessionCreateSupported?.() &&
+        this.current.createSession &&
+        this.history?.listCreateOptions,
+    );
+  }
+
+  async listCreateOptions(): Promise<DevinCreateOptions> {
+    if (!this.isSessionCreateSupported() || !this.history?.listCreateOptions) {
+      throw new Error('Session creation is not enabled');
+    }
+    return this.history.listCreateOptions();
+  }
+
+  async createSession(cwd: string, modelId: string | null, text: string): Promise<string> {
+    if (!this.isSessionCreateSupported() || !this.current.createSession) {
+      throw new Error('Session creation is not enabled');
+    }
+    const sessionId = await this.current.createSession(cwd, modelId, text);
+    this.listedSessionIds.add(sessionId);
+    this.acpLoadedSessionIds.add(sessionId);
+    return sessionId;
   }
 
   async promptSession(
@@ -274,6 +320,7 @@ export class DesktopBridgeRunner {
   private devinCliPath: string | null = null;
   private pairing: PairingManager | null = null;
   private sessionHandles: SessionHandleRegistry | null = null;
+  private workspaceHandles: WorkspaceHandleRegistry | null = null;
   private devices: PersistentDeviceRegistry | null = null;
   private transport: {
     transportSecurity: 'tailscale_wireguard' | 'pinned_tls';
@@ -303,6 +350,10 @@ export class DesktopBridgeRunner {
           this.dependencies.tlsIdentityGenerator,
         );
         sessionHandles = new SessionHandleRegistry(runtime.bridgeId, runtime.sessionHandleKey);
+        this.workspaceHandles = new WorkspaceHandleRegistry(
+          runtime.bridgeId,
+          runtime.sessionHandleKey,
+        );
       } finally {
         runtime.sessionHandleKey.fill(0);
       }
@@ -337,6 +388,7 @@ export class DesktopBridgeRunner {
         replayGuard: new InMemoryReplayGuard(),
         rateLimiter: new FixedWindowRateLimiter(),
         sessionHandles,
+        workspaceHandles: this.workspaceHandles,
         sessions,
       });
       const listener = this.dependencies.createListener({
@@ -420,7 +472,11 @@ export class DesktopBridgeRunner {
 
   async updateDevicePermissions(
     deviceId: string,
-    options: { allowSessionContent: boolean; allowSessionPrompt: boolean },
+    options: {
+      allowSessionContent: boolean;
+      allowSessionPrompt: boolean;
+      allowSessionCreate: boolean;
+    },
   ): Promise<boolean> {
     const devices = this.devices;
     if (!devices || this.stopped) return false;
@@ -432,6 +488,7 @@ export class DesktopBridgeRunner {
         'session:metadata:read',
         ...(options.allowSessionContent ? (['session:content:read'] as const) : []),
         ...(options.allowSessionPrompt ? (['session:prompt:send'] as const) : []),
+        ...(options.allowSessionCreate ? (['session:create'] as const) : []),
       ],
     });
   }
@@ -493,6 +550,7 @@ export class DesktopBridgeRunner {
     const acp = this.acp;
     const history = this.history;
     const sessionHandles = this.sessionHandles;
+    const workspaceHandles = this.workspaceHandles;
     this.listener = null;
     this.acp = null;
     this.history = null;
@@ -501,6 +559,7 @@ export class DesktopBridgeRunner {
     this.devinCliPath = null;
     this.pairing = null;
     this.sessionHandles = null;
+    this.workspaceHandles = null;
     this.devices = null;
     this.transport = null;
 
@@ -510,6 +569,7 @@ export class DesktopBridgeRunner {
       history?.stop() ?? Promise.resolve(),
     ]);
     sessionHandles?.destroy();
+    workspaceHandles?.destroy();
     if (results.some((result) => result.status === 'rejected')) {
       throw new Error('Desktop Bridge did not shut down cleanly');
     }

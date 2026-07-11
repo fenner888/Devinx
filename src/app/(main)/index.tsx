@@ -3,7 +3,7 @@
  * Top-left menu (slide-over) for navigation, a friendly prompt, a large
  * rounded composer, and a compact recent-sessions list.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
-import { useComputerSessions, type ComputerSessionListItem } from '@api/bridge/queries';
+import {
+  useComputerSessions,
+  useComputerCreateOptions,
+  useCreateComputerSession,
+  type ComputerSessionListItem,
+} from '@api/bridge/queries';
 import {
   useSessions,
   useCreateSession,
@@ -72,9 +77,27 @@ export default function HomeScreen() {
   const defaultTags = useAppPreferences((state) => state.defaultTags);
   const { data: sessions } = useSessions('board');
   const computerSessions = useComputerSessions();
-  const { mode: connectionMode, hasCloudConnection, usesCloud } = useConnections();
+  const {
+    mode: connectionMode,
+    hasCloudConnection,
+    usesCloud,
+    computers = [],
+  } = useConnections();
   const usesComputer = connectionModeUsesComputer(connectionMode);
   const canCreateCloudSession = usesCloud && hasCloudConnection;
+  const [selectedComputerBridgeId, setSelectedComputerBridgeId] = useState<string | null>(
+    computers[0]?.bridgeId ?? null,
+  );
+  const computer =
+    computers.find((candidate) => candidate.bridgeId === selectedComputerBridgeId) ?? computers[0];
+  const [destination, setDestination] = useState<'cloud' | 'computer'>(
+    connectionMode === 'computer' ? 'computer' : 'cloud',
+  );
+  const localOptions = useComputerCreateOptions(
+    computer?.bridgeId ?? '',
+    destination === 'computer' && Boolean(computer),
+  );
+  const createComputerSession = useCreateComputerSession(computer?.bridgeId ?? '');
   const createSession = useCreateSession();
   const uploadAttachment = useUploadAttachment();
   const { data: playbooks } = usePlaybooks();
@@ -90,6 +113,11 @@ export default function HomeScreen() {
   const [repoQuery, setRepoQuery] = useState('');
   const [showModePicker, setShowModePicker] = useState(false);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
+  const [showDestinationPicker, setShowDestinationPicker] = useState(false);
+  const [showWorkspacePicker, setShowWorkspacePicker] = useState(false);
+  const [showModelPicker, setShowModelPicker] = useState(false);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [attachments, setAttachments] = useState<
     { name: string; url: string; previewUri?: string }[]
@@ -97,6 +125,31 @@ export default function HomeScreen() {
   const [uploadingAttachmentName, setUploadingAttachmentName] = useState<string | null>(null);
   const [composerError, setComposerError] = useState<string | null>(null);
   const [companionActive, setCompanionActive] = useState(false);
+
+  useEffect(() => {
+    if (connectionMode === 'computer') setDestination('computer');
+    if (connectionMode === 'cloud') setDestination('cloud');
+  }, [connectionMode]);
+
+  useEffect(() => {
+    if (!computers.some((candidate) => candidate.bridgeId === selectedComputerBridgeId)) {
+      setSelectedComputerBridgeId(computers[0]?.bridgeId ?? null);
+    }
+  }, [computers, selectedComputerBridgeId]);
+
+  useEffect(() => {
+    const options = localOptions.data;
+    if (!options) return;
+    if (!options.workspaces.some((workspace) => workspace.id === selectedWorkspaceId)) {
+      setSelectedWorkspaceId(options.workspaces[0]?.id ?? null);
+    }
+    if (
+      selectedModelId !== null &&
+      !options.models.some((model) => model.id === selectedModelId)
+    ) {
+      setSelectedModelId(null);
+    }
+  }, [localOptions.data, selectedModelId, selectedWorkspaceId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -126,7 +179,25 @@ export default function HomeScreen() {
     ? (playbooks?.find((p) => p.playbook_id === selectedPlaybook)?.title ?? 'Playbook')
     : null;
   const selectedRepoName = selectedRepo?.split('/').filter(Boolean).pop() ?? 'Any repository';
-  const companionState = composerError ? 'error' : createSession.isPending ? 'working' : 'idle';
+  const localCreationPending = createComputerSession.isPending;
+  const companionState = composerError
+    ? 'error'
+    : createSession.isPending || localCreationPending
+      ? 'working'
+      : 'idle';
+  const isComputerDestination = destination === 'computer';
+  const canChooseDestination = connectionMode === 'both' || computers.length > 1;
+  const selectedWorkspace = localOptions.data?.workspaces.find(
+    (workspace) => workspace.id === selectedWorkspaceId,
+  );
+  const selectedModel = localOptions.data?.models.find((model) => model.id === selectedModelId);
+  const canCreateComputerSession = Boolean(
+    computer && selectedWorkspaceId && !localOptions.isLoading && !localOptions.error,
+  );
+  const canUseComposer = isComputerDestination
+    ? canCreateComputerSession
+    : canCreateCloudSession;
+  const composerPending = createSession.isPending || createComputerSession.isPending;
   const normalizedRepoQuery = repoQuery.trim().toLowerCase();
   const filteredRepositories = (repositories ?? []).filter(
     (repository) =>
@@ -160,6 +231,41 @@ export default function HomeScreen() {
   }
 
   function handleSend() {
+    if (isComputerDestination) {
+      if (
+        !computer ||
+        !selectedWorkspaceId ||
+        !prompt.trim() ||
+        createComputerSession.isPending
+      ) {
+        return;
+      }
+      hapticLight();
+      setComposerError(null);
+      createComputerSession.mutate(
+        {
+          workspaceId: selectedWorkspaceId,
+          modelId: selectedModelId,
+          text: prompt.trim().slice(0, MAX_PROMPT),
+        },
+        {
+          onSuccess: ({ sessionId }) => {
+            hapticSuccess();
+            setPrompt('');
+            router.push(`/computer-session/${computer.bridgeId}/${sessionId}?continuing=1`);
+          },
+          onError: (error) => {
+            hapticError();
+            setComposerError(
+              error instanceof Error
+                ? error.message
+                : 'The local session could not be created.',
+            );
+          },
+        },
+      );
+      return;
+    }
     if (
       !canCreateCloudSession ||
       !prompt.trim() ||
@@ -286,18 +392,18 @@ export default function HomeScreen() {
 
           {/* One clean composer surface; no additional card around it. */}
           <Text className="mb-3 text-text-hi text-text17 font-medium">
-            {canCreateCloudSession ? 'What should Devin build?' : 'Computer connection'}
+            What should Devin build?
           </Text>
           <View className="rounded-cardLg border border-border bg-surface1">
             <TextInput
               className="text-text-hi text-text16 px-5 pt-5 pb-3 min-h-[112px]"
               value={prompt}
               onChangeText={(v) => setPrompt(v.slice(0, MAX_PROMPT))}
-              editable={canCreateCloudSession}
+              editable={canUseComposer}
               placeholder={
-                canCreateCloudSession
-                  ? 'Ask Devin to build features, fix bugs, or work on your code…'
-                  : 'Start a task from Devin CLI or desktop, then monitor it here.'
+                isComputerDestination
+                  ? 'Ask Devin on your Mac to build, fix, or investigate…'
+                  : 'Ask Devin to build features, fix bugs, or work on your code…'
               }
               placeholderTextColor={tokens.textLow.hex}
               multiline
@@ -307,7 +413,7 @@ export default function HomeScreen() {
               textAlignVertical="top"
               accessibilityLabel="Session prompt"
             />
-            {(attachments.length > 0 || uploadingAttachmentName) && (
+            {!isComputerDestination && (attachments.length > 0 || uploadingAttachmentName) && (
               <View className="flex-row flex-wrap px-4 pb-2">
                 {uploadingAttachmentName && (
                   <View className="flex-row items-center bg-tint-blue rounded-chip px-pillX py-pillY mr-2 mb-1">
@@ -353,7 +459,7 @@ export default function HomeScreen() {
                 <Pressable
                   className="w-9 h-9 rounded-full items-center justify-center"
                   onPress={() => setShowAttachmentPicker(true)}
-                  disabled={!canCreateCloudSession || uploadAttachment.isPending}
+                  disabled={isComputerDestination || !canCreateCloudSession || uploadAttachment.isPending}
                   accessibilityRole="button"
                   accessibilityLabel="Add attachment"
                 >
@@ -363,56 +469,74 @@ export default function HomeScreen() {
                     <Ionicons name="add" size={22} color={tokens.textMid.hex} />
                   )}
                 </Pressable>
-                <Pressable
-                  className="flex-row items-center rounded-full px-3 py-2"
-                  onPress={() => setShowModePicker(true)}
-                  disabled={!canCreateCloudSession}
-                  accessibilityRole="button"
-                  accessibilityLabel="Execution mode"
-                >
-                  <Ionicons name="options-outline" size={15} color={tokens.textMid.hex} />
-                  <Text className="text-text-mid text-text13 ml-1.5">{modeLabel(mode)}</Text>
-                </Pressable>
-                <Pressable
-                  className="flex-row items-center rounded-full px-3 py-2"
-                  onPress={() => setShowPlaybookPicker(true)}
-                  disabled={!canCreateCloudSession}
-                  accessibilityRole="button"
-                  accessibilityLabel="Select playbook"
-                >
-                  <Ionicons
-                    name="book-outline"
-                    size={14}
-                    color={selectedPlaybook ? tokens.brandText.hex : tokens.textMid.hex}
-                  />
-                  <Text
-                    className={`text-text13 ml-1.5 max-w-28 ${selectedPlaybook ? 'text-brand-text' : 'text-text-mid'}`}
-                    numberOfLines={1}
+                {isComputerDestination ? (
+                  <Pressable
+                    className="flex-row items-center rounded-full px-3 py-2"
+                    onPress={() => setShowModelPicker(true)}
+                    disabled={!localOptions.data}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Model: ${selectedModel?.name ?? 'Default'}`}
                   >
-                    {selectedPlaybookTitle ?? 'Playbook'}
-                  </Text>
-                </Pressable>
+                    <Ionicons name="hardware-chip-outline" size={15} color={tokens.textMid.hex} />
+                    <Text className="text-text-mid text-text13 ml-1.5 max-w-36" numberOfLines={1}>
+                      {selectedModel?.name ?? 'Default model'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
+                  </Pressable>
+                ) : (
+                  <>
+                    <Pressable
+                      className="flex-row items-center rounded-full px-3 py-2"
+                      onPress={() => setShowModePicker(true)}
+                      disabled={!canCreateCloudSession}
+                      accessibilityRole="button"
+                      accessibilityLabel="Execution mode"
+                    >
+                      <Ionicons name="options-outline" size={15} color={tokens.textMid.hex} />
+                      <Text className="text-text-mid text-text13 ml-1.5">{modeLabel(mode)}</Text>
+                    </Pressable>
+                    <Pressable
+                      className="flex-row items-center rounded-full px-3 py-2"
+                      onPress={() => setShowPlaybookPicker(true)}
+                      disabled={!canCreateCloudSession}
+                      accessibilityRole="button"
+                      accessibilityLabel="Select playbook"
+                    >
+                      <Ionicons
+                        name="book-outline"
+                        size={14}
+                        color={selectedPlaybook ? tokens.brandText.hex : tokens.textMid.hex}
+                      />
+                      <Text
+                        className={`text-text13 ml-1.5 max-w-28 ${selectedPlaybook ? 'text-brand-text' : 'text-text-mid'}`}
+                        numberOfLines={1}
+                      >
+                        {selectedPlaybookTitle ?? 'Playbook'}
+                      </Text>
+                    </Pressable>
+                  </>
+                )}
               </View>
               <Pressable
-                className={`w-10 h-10 rounded-full items-center justify-center ${canCreateCloudSession && prompt.trim() && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
+                className={`w-10 h-10 rounded-full items-center justify-center ${canUseComposer && prompt.trim() && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
                 onPress={handleSend}
                 disabled={
-                  !canCreateCloudSession ||
+                  !canUseComposer ||
                   !prompt.trim() ||
-                  createSession.isPending ||
+                  composerPending ||
                   uploadAttachment.isPending
                 }
                 accessibilityRole="button"
                 accessibilityLabel="Start session"
               >
-                {createSession.isPending ? (
+                {composerPending ? (
                   <ActivityIndicator color={tokens.textAlwaysWhite.hex} size="small" />
                 ) : (
                   <Ionicons
                     name="arrow-up"
                     size={20}
                     color={
-                      canCreateCloudSession && prompt.trim() && !uploadAttachment.isPending
+                      canUseComposer && prompt.trim() && !uploadAttachment.isPending
                         ? tokens.textAlwaysWhite.hex
                         : tokens.textLow.hex
                     }
@@ -421,35 +545,56 @@ export default function HomeScreen() {
               </Pressable>
             </View>
           </View>
-          {canCreateCloudSession ? (
-            <View className="flex-row items-center px-2 pt-2">
-              <View className="flex-row items-center mr-4">
-                <Ionicons name="cloud-outline" size={14} color={tokens.textLow.hex} />
-                <Text className="text-text-low text-text12 ml-1.5">Devin Cloud</Text>
-              </View>
-              <Pressable
-                className="flex-row items-center flex-1"
-                onPress={() => {
+          <View className="flex-row items-center px-2 pt-2 gap-4">
+            <Pressable
+              className="flex-row items-center"
+              onPress={() => canChooseDestination && setShowDestinationPicker(true)}
+              disabled={!canChooseDestination}
+              accessibilityRole="button"
+              accessibilityLabel={`Session destination: ${isComputerDestination ? computer?.computerName ?? 'Computer' : 'Devin Cloud'}`}
+            >
+              <Ionicons
+                name={isComputerDestination ? 'desktop-outline' : 'cloud-outline'}
+                size={14}
+                color={tokens.textLow.hex}
+              />
+              <Text className="text-text-mid text-text12 ml-1.5" numberOfLines={1}>
+                {isComputerDestination ? computer?.computerName ?? 'Computer' : 'Devin Cloud'}
+              </Text>
+              {canChooseDestination && (
+                <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
+              )}
+            </Pressable>
+            <Pressable
+              className="flex-row items-center flex-1 min-w-0"
+              onPress={() => {
+                if (isComputerDestination) {
+                  setShowWorkspacePicker(true);
+                } else {
                   setRepoQuery('');
                   setShowRepoPicker(true);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Repository: ${selectedRepo ?? 'Any repository'}`}
-              >
-                <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
-                <Text className="text-text-mid text-text12 ml-1.5 flex-1" numberOfLines={1}>
-                  {selectedRepoName}
-                </Text>
-                <Ionicons name="chevron-down" size={13} color={tokens.textLow.hex} />
-              </Pressable>
-            </View>
-          ) : (
-            <View className="flex-row items-center px-2 pt-2">
-              <Ionicons name="desktop-outline" size={14} color={tokens.textLow.hex} />
-              <Text className="text-text-low text-text12 ml-1.5">
-                New local tasks start from Devin CLI or desktop
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isComputerDestination
+                  ? `Workspace: ${selectedWorkspace?.name ?? 'Unavailable'}`
+                  : `Repository: ${selectedRepo ?? 'Any repository'}`
+              }
+            >
+              <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
+              <Text className="text-text-mid text-text12 ml-1.5 flex-1" numberOfLines={1}>
+                {isComputerDestination
+                  ? selectedWorkspace?.name ?? 'Select workspace'
+                  : selectedRepoName}
               </Text>
-            </View>
+              <Ionicons name="chevron-down" size={13} color={tokens.textLow.hex} />
+            </Pressable>
+          </View>
+          {isComputerDestination && localOptions.error && (
+            <Text className="px-2 pt-2 text-failed text-text12">
+              Open DevinX Connector and allow this iPhone to create sessions.
+            </Text>
           )}
           {composerError && (
             <View className="flex-row items-center bg-tint-red rounded-card px-3 py-2 mt-3">
@@ -704,6 +849,187 @@ export default function HomeScreen() {
                   </View>
                 )}
               </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        statusBarTranslucent
+        visible={showDestinationPicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowDestinationPicker(false)}
+      >
+        <View className="flex-1 bg-scrim justify-end">
+          <View
+            className="bg-surface2 rounded-t-sheet px-5 pt-4"
+            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+            accessibilityViewIsModal
+          >
+            <Text className="mb-4 text-text-hi text-text17 font-medium">Run this session on</Text>
+            {canCreateCloudSession && (
+              <Pressable
+                className={`mb-2 flex-row items-center rounded-card border border-border-subtle px-4 py-4 ${destination === 'cloud' ? 'bg-tint-blue' : 'bg-surface1'}`}
+                onPress={() => {
+                  setDestination('cloud');
+                  setShowDestinationPicker(false);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Use Devin Cloud"
+              >
+                <Ionicons name="cloud-outline" size={19} color={tokens.brandText.hex} />
+                <View className="ml-3 flex-1">
+                  <Text className="text-text-hi text-text14 font-medium">Devin Cloud</Text>
+                  <Text className="mt-0.5 text-text-low text-text12">
+                    Cloud repositories, playbooks, attachments, and Devin modes
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+            {computers.map((computerOption, index) => {
+              const selected =
+                destination === 'computer' && computerOption.bridgeId === computer?.bridgeId;
+              return (
+                <Pressable
+                  key={computerOption.bridgeId}
+                  className={`flex-row items-center rounded-card border border-border-subtle px-4 py-4 ${index > 0 || canCreateCloudSession ? 'mt-2' : ''} ${selected ? 'bg-tint-blue' : 'bg-surface1'}`}
+                  onPress={() => {
+                    setSelectedComputerBridgeId(computerOption.bridgeId);
+                    setSelectedWorkspaceId(null);
+                    setSelectedModelId(null);
+                    setDestination('computer');
+                    setShowDestinationPicker(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Use ${computerOption.computerName}`}
+                >
+                  <Ionicons name="desktop-outline" size={19} color={tokens.brandText.hex} />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-text-hi text-text14 font-medium">
+                      {computerOption.computerName}
+                    </Text>
+                    <Text className="mt-0.5 text-text-low text-text12">
+                      Local workspaces and models supplied by Devin on this computer
+                    </Text>
+                  </View>
+                  {selected && (
+                    <Ionicons name="checkmark-circle" size={20} color={tokens.brandText.hex} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        statusBarTranslucent
+        visible={showWorkspacePicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowWorkspacePicker(false)}
+      >
+        <View className="flex-1 bg-scrim justify-end">
+          <View
+            className="bg-surface2 rounded-t-sheet px-5 pt-4 max-h-[65%]"
+            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+            accessibilityViewIsModal
+          >
+            <Text className="mb-1 text-text-hi text-text17 font-medium">Select workspace</Text>
+            <Text className="mb-4 text-text-low text-text12">
+              Approved workspaces previously used by Devin on this Mac
+            </Text>
+            <ScrollView>
+              {localOptions.data?.workspaces.map((workspace) => {
+                const selected = workspace.id === selectedWorkspaceId;
+                return (
+                  <Pressable
+                    key={workspace.id}
+                    className={`mb-2 flex-row items-center rounded-card border border-border-subtle px-4 py-3.5 ${selected ? 'bg-tint-blue' : 'bg-surface1'}`}
+                    onPress={() => {
+                      setSelectedWorkspaceId(workspace.id);
+                      setShowWorkspacePicker(false);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Use workspace ${workspace.name}`}
+                  >
+                    <Ionicons name="folder-outline" size={18} color={tokens.textMid.hex} />
+                    <Text className="ml-3 flex-1 text-text-hi text-text14" numberOfLines={1}>
+                      {workspace.name}
+                    </Text>
+                    {selected && (
+                      <Ionicons name="checkmark-circle" size={20} color={tokens.brandText.hex} />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        statusBarTranslucent
+        visible={showModelPicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowModelPicker(false)}
+      >
+        <View className="flex-1 bg-scrim justify-end">
+          <View
+            className="bg-surface2 rounded-t-sheet px-5 pt-4 max-h-[65%]"
+            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+            accessibilityViewIsModal
+          >
+            <Text className="mb-1 text-text-hi text-text17 font-medium">Select local model</Text>
+            <Text className="mb-4 text-text-low text-text12">
+              Choose a Devin model, or keep Devin's recommended default
+            </Text>
+            <ScrollView>
+              <Pressable
+                className={`mb-2 flex-row items-center rounded-card border border-border-subtle px-4 py-3.5 ${selectedModelId === null ? 'bg-tint-blue' : 'bg-surface1'}`}
+                onPress={() => {
+                  setSelectedModelId(null);
+                  setShowModelPicker(false);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Use Devin default model"
+              >
+                <Ionicons name="sparkles-outline" size={18} color={tokens.textMid.hex} />
+                <View className="ml-3 flex-1">
+                  <Text className="text-text-hi text-text14">Default model</Text>
+                  <Text className="mt-0.5 text-text-low text-text12">
+                    Let Devin choose the recommended model
+                  </Text>
+                </View>
+                {selectedModelId === null && (
+                  <Ionicons name="checkmark-circle" size={20} color={tokens.brandText.hex} />
+                )}
+              </Pressable>
+              {localOptions.data?.models.map((modelOption) => {
+                const selected = modelOption.id === selectedModelId;
+                return (
+                  <Pressable
+                    key={modelOption.id}
+                    className={`mb-2 flex-row items-center rounded-card border border-border-subtle px-4 py-3.5 ${selected ? 'bg-tint-blue' : 'bg-surface1'}`}
+                    onPress={() => {
+                      setSelectedModelId(modelOption.id);
+                      setShowModelPicker(false);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Use model ${modelOption.name}`}
+                  >
+                    <Ionicons name="hardware-chip-outline" size={18} color={tokens.textMid.hex} />
+                    <Text className="ml-3 flex-1 text-text-hi text-text14" numberOfLines={1}>
+                      {modelOption.name}
+                    </Text>
+                    {selected && (
+                      <Ionicons name="checkmark-circle" size={20} color={tokens.brandText.hex} />
+                    )}
+                  </Pressable>
+                );
+              })}
             </ScrollView>
           </View>
         </View>

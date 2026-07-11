@@ -22,6 +22,7 @@ export const connectorCommandSchema = z.discriminatedUnion('type', [
       deviceId: opaqueIdSchema,
       allowSessionContent: z.boolean(),
       allowSessionPrompt: z.boolean(),
+      allowSessionCreate: z.boolean(),
     })
     .strict(),
   z
@@ -116,6 +117,7 @@ export const connectorEventSchema = z.discriminatedUnion('type', [
               status: z.enum(['active', 'revoked']),
               allowSessionContent: z.boolean(),
               allowSessionPrompt: z.boolean(),
+              allowSessionCreate: z.boolean(),
             })
             .strict(),
         )

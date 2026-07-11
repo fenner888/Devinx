@@ -13,6 +13,7 @@ private struct ConnectorDevice: Decodable, Identifiable {
     let status: String
     let allowSessionContent: Bool
     let allowSessionPrompt: Bool
+    let allowSessionCreate: Bool
     var id: String { deviceId }
 }
 
@@ -179,13 +180,19 @@ private final class ConnectorModel: ObservableObject {
         allowSessionContent = false
     }
 
-    func updateDevice(_ device: ConnectorDevice, content: Bool? = nil, prompt: Bool? = nil) {
+    func updateDevice(
+        _ device: ConnectorDevice,
+        content: Bool? = nil,
+        prompt: Bool? = nil,
+        create: Bool? = nil
+    ) {
         send([
             "version": ipcVersion,
             "type": "update_device",
             "deviceId": device.deviceId,
             "allowSessionContent": content ?? device.allowSessionContent,
             "allowSessionPrompt": prompt ?? device.allowSessionPrompt,
+            "allowSessionCreate": create ?? device.allowSessionCreate,
         ])
     }
 
@@ -463,6 +470,11 @@ private struct ConnectorView: View {
                                     Toggle("Send messages to sessions", isOn: Binding(
                                         get: { device.allowSessionPrompt },
                                         set: { model.updateDevice(device, prompt: $0) }
+                                    ))
+                                    .disabled(device.status != "active")
+                                    Toggle("Create new sessions", isOn: Binding(
+                                        get: { device.allowSessionCreate },
+                                        set: { model.updateDevice(device, create: $0) }
                                     ))
                                     .disabled(device.status != "active")
                                     if device.status == "active" {

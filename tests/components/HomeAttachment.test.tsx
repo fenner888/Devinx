@@ -1,7 +1,17 @@
 const mockUploadAttachment = jest.fn();
 const mockCreateSession = jest.fn();
+const mockCreateComputerSession = jest.fn();
 const mockDevinCompanion = jest.fn((_props: unknown) => null);
-let mockConnection = { mode: 'cloud', hasCloudConnection: true, usesCloud: true };
+let mockConnection = {
+  mode: 'cloud',
+  hasCloudConnection: true,
+  usesCloud: true,
+  computers: [] as Array<{ bridgeId: string; computerName: string }>,
+};
+let mockComputerCreateOptions = {
+  workspaces: [] as Array<{ id: string; name: string }>,
+  models: [] as Array<{ id: string; name: string }>,
+};
 let mockCloudSessions: Array<Record<string, unknown>> = [];
 let mockComputerBoard: {
   sessions: Array<Record<string, unknown>>;
@@ -52,6 +62,15 @@ jest.mock('@api/devin/queries', () => ({
 
 jest.mock('@api/bridge/queries', () => ({
   useComputerSessions: () => ({ data: mockComputerBoard }),
+  useComputerCreateOptions: () => ({
+    data: mockComputerCreateOptions,
+    isLoading: false,
+    error: null,
+  }),
+  useCreateComputerSession: () => ({
+    isPending: false,
+    mutate: mockCreateComputerSession,
+  }),
 }));
 
 jest.mock('@auth/ConnectionContext', () => ({
@@ -90,7 +109,13 @@ import { ThemeProvider } from '../../src/theme/ThemeProvider';
 describe('home attachment control', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnection = { mode: 'cloud', hasCloudConnection: true, usesCloud: true };
+    mockConnection = {
+      mode: 'cloud',
+      hasCloudConnection: true,
+      usesCloud: true,
+      computers: [],
+    };
+    mockComputerCreateOptions = { workspaces: [], models: [] };
     mockCloudSessions = [];
     mockComputerBoard = { sessions: [], computers: [] };
   });
@@ -114,7 +139,16 @@ describe('home attachment control', () => {
   });
 
   it('shows paired-Mac sessions without presenting the Cloud composer as active', () => {
-    mockConnection = { mode: 'computer', hasCloudConnection: false, usesCloud: false };
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
+    };
     mockComputerBoard = {
       sessions: [
         {
@@ -134,11 +168,11 @@ describe('home attachment control', () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByText('Computer connection')).toBeTruthy();
-    expect(screen.getByPlaceholderText(/Start a task from Devin CLI/)).toBeTruthy();
-    expect(screen.getByText('Studio Mac')).toBeTruthy();
-    expect(screen.getByText('DevinX')).toBeTruthy();
-    expect(screen.queryByText('What should Devin build?')).toBeNull();
+    expect(screen.getByText('What should Devin build?')).toBeTruthy();
+    expect(screen.getByPlaceholderText(/Ask Devin on your Mac/)).toBeTruthy();
+    expect(screen.getAllByText('Studio Mac').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DevinX').length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('Execution mode')).toBeNull();
   });
 
   it('does not render cached sessions from a connection source excluded by the mode', () => {
@@ -163,7 +197,12 @@ describe('home attachment control', () => {
     expect(cloudScreen.queryByText('Hidden Mac')).toBeNull();
     cloudScreen.unmount();
 
-    mockConnection = { mode: 'computer', hasCloudConnection: true, usesCloud: false };
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: true,
+      usesCloud: false,
+      computers: [],
+    };
     mockCloudSessions = [
       {
         session_id: 'devin-hidden',
@@ -196,6 +235,43 @@ describe('home attachment control', () => {
     expect(getByLabelText('Choose photo or video')).toBeTruthy();
     expect(getByLabelText('Choose file')).toBeTruthy();
     expect(queryByText('Session settings')).toBeNull();
+  });
+
+  it('keeps Computer workspace and model controls separate from Cloud controls', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByLabelText('Workspace: DevinX')).toBeTruthy();
+    expect(screen.getByLabelText('Model: Default')).toBeTruthy();
+    expect(screen.queryByLabelText('Execution mode')).toBeNull();
+    expect(screen.queryByLabelText('Select playbook')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Model: Default'));
+    fireEvent.press(screen.getByLabelText('Use model GPT 5.6 Sol Medium'));
+    fireEvent.changeText(screen.getByLabelText('Session prompt'), 'Build the local feature');
+    fireEvent.press(screen.getByLabelText('Start session'));
+
+    expect(mockCreateComputerSession).toHaveBeenCalledWith(
+      {
+        workspaceId: `workspace_${'W'.repeat(43)}`,
+        modelId: 'gpt-5-6-sol-medium',
+        text: 'Build the local feature',
+      },
+      expect.any(Object),
+    );
   });
 
   it('shows and selects the repository context', () => {

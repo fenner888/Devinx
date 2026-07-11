@@ -14,11 +14,15 @@ import {
 import {
   BRIDGE_PROTOCOL_VERSION,
   opaqueIdSchema,
+  modelIdSchema,
+  sessionCreateBodySchema,
+  sessionCreateOptionsBodySchema,
   sessionListBodySchema,
   sessionLoadBodySchema,
   sessionPromptBodySchema,
 } from './schemas';
 import type { SessionHandleRegistry } from './session-handles';
+import type { WorkspaceHandleRegistry } from './workspace-handles';
 
 const MAX_LOCAL_SESSION_RESPONSE_BYTES = 192 * 1024;
 
@@ -53,6 +57,10 @@ const localSessionSchema = z
     hasTitle: z.boolean(),
     title: z.string().max(10_000).optional(),
     updatedAt: z.string().datetime({ offset: true }).optional(),
+    model: z
+      .object({ id: modelIdSchema, name: z.string().min(1).max(160) })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -92,6 +100,10 @@ const localLoadedSessionSchema = z
         id: z.string().regex(/^local_[A-Za-z0-9_-]{43}$/),
         origin: z.literal('computer'),
         workspaceName: z.string().min(1).max(160),
+        model: z
+          .object({ id: modelIdSchema, name: z.string().min(1).max(160) })
+          .strict()
+          .optional(),
       })
       .strict(),
     messages: z.array(localHistoryMessageSchema).max(200),
@@ -112,6 +124,12 @@ export interface SessionDiscoveryAdapter {
     text: string,
   ): Promise<void | { continuedSessionId: string }>;
   createContinuation?(cwd: string, context: string, text: string): Promise<string>;
+  isSessionCreateSupported?(): boolean;
+  listCreateOptions?(): Promise<{
+    workspaces: Array<{ path: string }>;
+    models: Array<{ id: string }>;
+  }>;
+  createSession?(cwd: string, modelId: string | null, text: string): Promise<string>;
 }
 
 export interface BridgeServiceOptions {
@@ -120,6 +138,7 @@ export interface BridgeServiceOptions {
   replayGuard: ReplayGuard;
   rateLimiter: RateLimiter;
   sessionHandles: SessionHandleRegistry;
+  workspaceHandles: WorkspaceHandleRegistry;
   sessions: SessionDiscoveryAdapter;
   peerLimit?: number;
   healthLimit?: number;
@@ -151,6 +170,34 @@ function cleanDisplayText(value: string, maximumLength: number, fallback: string
   const collapsed = characters.join('').replace(/\s+/g, ' ').trim();
   const clean = [...collapsed].slice(0, maximumLength).join('');
   return clean || fallback;
+}
+
+function modelDisplayName(modelId: string): string {
+  const words = modelId.split(/[-_]+/).filter(Boolean);
+  const label = words
+    .map((word) => {
+      if (/^\d+(?:\.\d+)*$/.test(word)) return word;
+      if (word.toLowerCase() === 'gpt') return 'GPT';
+      if (word.toLowerCase() === 'glm') return 'GLM';
+      return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
+    })
+    .join(' ');
+  return cleanDisplayText(label, 160, 'Default');
+}
+
+function workspaceDisplayNames(workspaces: Array<{ path: string }>): string[] {
+  const bases = workspaces.map((workspace) =>
+    cleanDisplayText(basename(workspace.path), 150, 'Workspace'),
+  );
+  const totals = new Map<string, number>();
+  for (const base of bases) totals.set(base, (totals.get(base) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  return bases.map((base) => {
+    if ((totals.get(base) ?? 0) === 1) return base;
+    const occurrence = (seen.get(base) ?? 0) + 1;
+    seen.set(base, occurrence);
+    return `${base} (${occurrence})`;
+  });
 }
 
 function serializedBytes(value: unknown): number {
@@ -296,6 +343,12 @@ export class BridgeService {
     if (authorization.request.method === 'session.prompt') {
       return this.promptSession(authorization, context.now);
     }
+    if (authorization.request.method === 'session.create_options') {
+      return this.createOptions(authorization, context.now);
+    }
+    if (authorization.request.method === 'session.create') {
+      return this.createSession(authorization, context.now);
+    }
     return { status: 404, body: { error: 'not_found' } };
   }
 
@@ -329,6 +382,9 @@ export class BridgeService {
               ? cleanDisplayText(session.title, 10_000, 'Untitled session')
               : undefined,
           updatedAt: session.updatedAt,
+          model: session.modelId
+            ? { id: session.modelId, name: modelDisplayName(session.modelId) }
+            : undefined,
         })),
         nextCursor: page.nextCursor,
       });
@@ -363,6 +419,9 @@ export class BridgeService {
           id: body.sessionId,
           origin: 'computer',
           workspaceName: cleanDisplayText(basename(loaded.cwd), 160, 'Workspace'),
+          model: loaded.modelId
+            ? { id: loaded.modelId, name: modelDisplayName(loaded.modelId) }
+            : undefined,
         },
         messages: loaded.messages.map((message, index) => ({
           sequence: index + 1,
@@ -400,6 +459,88 @@ export class BridgeService {
             ? { sessionId: this.dependencies.sessionHandles.register(continuedSessionId, now) }
             : {}),
         },
+      };
+    } catch {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+  }
+
+  private async createOptions(
+    authorization: RequestAuthorization,
+    now: number,
+  ): Promise<BridgeServiceResponse> {
+    sessionCreateOptionsBodySchema.parse(authorization.request.body);
+    if (
+      !this.dependencies.sessions.isSessionCreateSupported?.() ||
+      !this.dependencies.sessions.listCreateOptions
+    ) {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+    try {
+      const options = await this.dependencies.sessions.listCreateOptions();
+      const workspaceNames = workspaceDisplayNames(options.workspaces);
+      return {
+        status: 200,
+        body: z
+          .object({
+            workspaces: z
+              .array(
+                z
+                  .object({
+                    id: z.string().regex(/^workspace_[A-Za-z0-9_-]{43}$/),
+                    name: z.string().min(1).max(160),
+                  })
+                  .strict(),
+              )
+              .max(100),
+            models: z
+              .array(z.object({ id: modelIdSchema, name: z.string().min(1).max(160) }).strict())
+              .max(100),
+          })
+          .strict()
+          .parse({
+            workspaces: options.workspaces.map((workspace, index) => ({
+              id: this.dependencies.workspaceHandles.register(workspace.path, now),
+              name: workspaceNames[index] ?? 'Workspace',
+            })),
+            models: options.models.map((model) => ({
+              id: model.id,
+              name: modelDisplayName(model.id),
+            })),
+          }),
+      };
+    } catch {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+  }
+
+  private async createSession(
+    authorization: RequestAuthorization,
+    now: number,
+  ): Promise<BridgeServiceResponse> {
+    const body = sessionCreateBodySchema.parse(authorization.request.body);
+    const cwd = this.dependencies.workspaceHandles.resolve(body.workspaceId, now);
+    if (!cwd) return { status: 404, body: { error: 'not_found' } };
+    if (
+      !this.dependencies.sessions.isSessionCreateSupported?.() ||
+      !this.dependencies.sessions.listCreateOptions ||
+      !this.dependencies.sessions.createSession
+    ) {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+    try {
+      const options = await this.dependencies.sessions.listCreateOptions();
+      if (!options.workspaces.some((workspace) => workspace.path === cwd)) {
+        return { status: 404, body: { error: 'not_found' } };
+      }
+      const modelId = body.modelId ?? null;
+      if (modelId && !options.models.some((model) => model.id === modelId)) {
+        return { status: 404, body: { error: 'not_found' } };
+      }
+      const sessionId = await this.dependencies.sessions.createSession(cwd, modelId, body.text);
+      return {
+        status: 200,
+        body: { accepted: true, sessionId: this.dependencies.sessionHandles.register(sessionId, now) },
       };
     } catch {
       return { status: 503, body: { error: 'temporarily_unavailable' } };

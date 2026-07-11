@@ -290,6 +290,14 @@ export default function ComputerSessionDetailScreen() {
             <Text className="text-text-low text-text12">
               {canPrompt ? 'Steering enabled' : 'Read only'}
             </Text>
+            {query.data?.session.model && (
+              <>
+                <Text className="mx-1.5 text-text-low text-text12">·</Text>
+                <Text className="text-text-low text-text12" numberOfLines={1}>
+                  {query.data.session.model.name}
+                </Text>
+              </>
+            )}
             {computer && (
               <>
                 <Text className="mx-1.5 text-text-low text-text12">·</Text>

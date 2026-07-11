@@ -13,7 +13,11 @@ function createFixture(path: string, schemaVersion = 16): DatabaseSync {
     CREATE TABLE sessions (
       id TEXT PRIMARY KEY,
       working_directory TEXT NOT NULL,
-      main_chain_id INTEGER NOT NULL
+      main_chain_id INTEGER NOT NULL,
+      model TEXT NOT NULL DEFAULT 'adaptive',
+      agent_mode TEXT NOT NULL DEFAULT 'agent',
+      last_activity_at TEXT NOT NULL DEFAULT '2026-07-11T00:00:00.000Z',
+      hidden INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE message_nodes (
       row_id INTEGER PRIMARY KEY,
@@ -130,6 +134,7 @@ describe('read-only Devin session store', () => {
       expect(loaded).toEqual({
         sessionId,
         cwd: '/Users/example/project',
+        modelId: 'adaptive',
         messages: [
           { source: 'user', text: 'Build this.' },
           { source: 'devin', text: 'Working.' },
@@ -154,6 +159,58 @@ describe('read-only Devin session store', () => {
     await expect(new DevinSessionStore({ databasePath }).start()).rejects.toThrow(
       'schema is not supported',
     );
+  });
+
+  it('lists only visible, recently observed local workspaces and models', async () => {
+    const databasePath = join(directory, 'sessions.db');
+    const database = createFixture(databasePath);
+    database
+      .prepare(
+        `INSERT INTO sessions(
+          id, working_directory, main_chain_id, model, agent_mode, last_activity_at, hidden
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'session-visible',
+        '/Users/example/current-project',
+        0,
+        'gpt-5-6-sol-medium',
+        'agent',
+        '2026-07-11T12:00:00.000Z',
+        0,
+      );
+    database
+      .prepare(
+        `INSERT INTO sessions(
+          id, working_directory, main_chain_id, model, agent_mode, last_activity_at, hidden
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'session-hidden',
+        '/Users/example/private-project',
+        0,
+        'private-model',
+        'agent',
+        '2026-07-11T13:00:00.000Z',
+        1,
+      );
+    database.close();
+    await chmod(databasePath, 0o600);
+
+    const store = new DevinSessionStore({ databasePath });
+    await store.start();
+    await expect(store.listCreateOptions()).resolves.toEqual({
+      workspaces: [{ path: '/Users/example/current-project' }],
+      models: [{ id: 'gpt-5-6-sol-medium' }],
+    });
+    await expect(store.getSessionPresentation('session-visible')).resolves.toEqual({
+      modelId: 'gpt-5-6-sol-medium',
+      agentMode: 'agent',
+    });
+    await expect(store.getSessionPresentation('session-hidden')).rejects.toThrow(
+      'metadata is unavailable',
+    );
+    await store.stop();
   });
 
   it('rejects a symbolic-link database path before opening SQLite', async () => {

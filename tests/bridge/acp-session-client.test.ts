@@ -332,6 +332,87 @@ if (request.method === 'initialize') {
     }
   });
 
+  it('creates a local session, applies an offered model, then starts the prompt', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: {}
+  } }) + '\\n');
+} else if (request.method === 'session/new') {
+  if (request.params.cwd !== '/tmp/project' ||
+      JSON.stringify(request.params.mcpServers) !== '[]') process.exit(21);
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessionId: 'session-created',
+    configOptions: [{
+      id: 'model', name: 'Model', category: 'model', type: 'select',
+      currentValue: 'adaptive',
+      options: [
+        { value: 'adaptive', name: 'Adaptive' },
+        { value: 'gpt-5-6-sol-medium', name: 'GPT 5.6' }
+      ]
+    }]
+  } }) + '\\n');
+} else if (request.method === 'session/set_config_option') {
+  if (request.params.sessionId !== 'session-created' ||
+      request.params.configId !== 'model' ||
+      request.params.value !== 'gpt-5-6-sol-medium') process.exit(22);
+  globalThis.modelConfigured = true;
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    configOptions: []
+  } }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  if (!globalThis.modelConfigured ||
+      request.params.sessionId !== 'session-created' ||
+      JSON.stringify(request.params.prompt) !== JSON.stringify([
+        { type: 'text', text: 'Build it.' }
+      ])) process.exit(23);
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    stopReason: 'end_turn'
+  } }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    try {
+      await client.start();
+      await expect(
+        client.createSession('/tmp/project', 'gpt-5-6-sol-medium', 'Build it.'),
+      ).resolves.toBe('session-created');
+    } finally {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await client.stop();
+    }
+  });
+
+  it('fails closed before prompting when a requested model is not offered', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: {}
+  } }) + '\\n');
+} else if (request.method === 'session/new') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessionId: 'session-created',
+    configOptions: [{
+      id: 'model', name: 'Model', category: 'model', type: 'select',
+      currentValue: 'adaptive', options: [{ value: 'adaptive', name: 'Adaptive' }]
+    }]
+  } }) + '\\n');
+} else if (request.method === 'session/prompt' ||
+           request.method === 'session/set_config_option') {
+  process.exit(24);
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    try {
+      await client.start();
+      await expect(
+        client.createSession('/tmp/project', 'gpt-5-6-sol-medium', 'Do not send.'),
+      ).rejects.toThrow('model is not available');
+    } finally {
+      await client.stop();
+    }
+  });
+
   it('classifies an exclusively owned session without exposing its error text', async () => {
     const executablePath = fakeCli(`
 if (request.method === 'initialize') {

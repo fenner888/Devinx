@@ -6,6 +6,7 @@ import { InMemoryReplayGuard } from '../../bridge/src/replay';
 import { BridgeService, type SessionDiscoveryAdapter } from '../../bridge/src/service';
 import { signingPayload, type DeviceStore } from '../../bridge/src/security';
 import { SessionHandleRegistry } from '../../bridge/src/session-handles';
+import { WorkspaceHandleRegistry } from '../../bridge/src/workspace-handles';
 import {
   BRIDGE_PROTOCOL_VERSION,
   type BridgeMethod,
@@ -51,6 +52,12 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   loadFailure: Error | null = null;
   prompts: Array<{ sessionId: string; text: string }> = [];
   continuedSessionId: string | null = null;
+  createSupported = true;
+  createOptions = {
+    workspaces: [{ path: '/Users/frank/Secret Project' }],
+    models: [{ id: 'gpt-5-6-sol-medium' }],
+  };
+  creations: Array<{ cwd: string; modelId: string | null; text: string }> = [];
 
   isSessionListSupported(): boolean {
     return this.supported;
@@ -86,6 +93,19 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     return this.continuedSessionId
       ? { continuedSessionId: this.continuedSessionId }
       : undefined;
+  }
+
+  isSessionCreateSupported(): boolean {
+    return this.createSupported;
+  }
+
+  async listCreateOptions() {
+    return this.createOptions;
+  }
+
+  async createSession(cwd: string, modelId: string | null, text: string): Promise<string> {
+    this.creations.push({ cwd, modelId, text });
+    return 'raw-private-created-session-id';
   }
 }
 
@@ -145,6 +165,7 @@ describe('authenticated Desktop Bridge service', () => {
       replayGuard: new InMemoryReplayGuard(),
       rateLimiter: new FixedWindowRateLimiter(),
       sessionHandles: new SessionHandleRegistry(BRIDGE_ID, randomBytes(32)),
+      workspaceHandles: new WorkspaceHandleRegistry(BRIDGE_ID, randomBytes(32)),
       sessions: adapter,
       ...overrides,
     });
@@ -280,6 +301,94 @@ describe('authenticated Desktop Bridge service', () => {
 
     expect(result).toEqual({ status: 404, body: { error: 'not_found' } });
     expect(adapter.calls).toBe(0);
+  });
+
+  it('returns only opaque workspace handles and sanitized local model metadata', async () => {
+    const result = await service().handle(
+      envelope('session.create_options', {}, ['session:metadata:read']),
+      context(),
+    );
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        workspaces: [
+          {
+            id: expect.stringMatching(/^workspace_[A-Za-z0-9_-]{43}$/),
+            name: 'Secret Project',
+          },
+        ],
+        models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5 6 Sol Medium' }],
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('/Users/frank');
+  });
+
+  it('creates a local session only with the separate create grant and validated options', async () => {
+    const bridge = service();
+    const options = await bridge.handle(
+      envelope('session.create_options', {}, ['session:metadata:read']),
+      context(),
+    );
+    const workspaceId = (options.body as { workspaces: Array<{ id: string }> }).workspaces[0]?.id;
+    const body = { workspaceId, modelId: 'gpt-5-6-sol-medium', text: 'Build this safely.' };
+
+    await expect(
+      bridge.handle(envelope('session.create', body, ['session:metadata:read']), context()),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
+    const created = await bridge.handle(
+      envelope('session.create', body, ['session:create']),
+      context(),
+    );
+
+    expect(created).toMatchObject({
+      status: 200,
+      body: { accepted: true, sessionId: expect.stringMatching(/^local_[A-Za-z0-9_-]{43}$/) },
+    });
+    expect(adapter.creations).toEqual([
+      {
+        cwd: '/Users/frank/Secret Project',
+        modelId: 'gpt-5-6-sol-medium',
+        text: 'Build this safely.',
+      },
+    ]);
+    expect(JSON.stringify(created)).not.toContain('raw-private-created-session-id');
+  });
+
+  it('conceals stale workspace and model selections with 404 before ACP creation', async () => {
+    const bridge = service();
+    const options = await bridge.handle(
+      envelope('session.create_options', {}, ['session:metadata:read']),
+      context(),
+    );
+    const workspaceId = (options.body as { workspaces: Array<{ id: string }> }).workspaces[0]?.id;
+    adapter.createOptions.models = [];
+
+    await expect(
+      bridge.handle(
+        envelope(
+          'session.create',
+          { workspaceId, modelId: 'gpt-5-6-sol-medium', text: 'Do not dispatch.' },
+          ['session:create'],
+        ),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
+    await expect(
+      bridge.handle(
+        envelope(
+          'session.create',
+          {
+            workspaceId: `workspace_${'A'.repeat(43)}`,
+            modelId: null,
+            text: 'Do not dispatch.',
+          },
+          ['session:create'],
+        ),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
+    expect(adapter.creations).toEqual([]);
   });
 
   it('loads only a previously listed opaque handle and minimizes replay content', async () => {
@@ -494,5 +603,18 @@ describe('bridge rate limits and session handles', () => {
     registry.destroy();
     expect(registry.resolve(handle, NOW)).toBeNull();
     expect(() => registry.register('another-session', NOW)).toThrow('destroyed');
+  });
+
+  it('resolves only registered, unexpired opaque workspace handles', () => {
+    const registry = new WorkspaceHandleRegistry(BRIDGE_ID, randomBytes(32), 60_000, 2);
+    const handle = registry.register('/Users/frank/Secret Project', NOW);
+
+    expect(handle).toMatch(/^workspace_[A-Za-z0-9_-]{43}$/);
+    expect(registry.register('/Users/frank/Secret Project', NOW + 1)).toBe(handle);
+    expect(registry.resolve(handle, NOW + 2)).toBe('/Users/frank/Secret Project');
+    expect(registry.resolve(`workspace_${'A'.repeat(43)}`, NOW + 2)).toBeNull();
+    expect(registry.resolve(handle, NOW + 60_001)).toBeNull();
+    registry.destroy();
+    expect(registry.resolve(handle, NOW)).toBeNull();
   });
 });

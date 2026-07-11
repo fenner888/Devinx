@@ -87,6 +87,7 @@ const bridgePermissionSchema = z.enum([
   'session:metadata:read',
   'session:content:read',
   'session:prompt:send',
+  'session:create',
 ]);
 
 export const computerPairingOfferSchema = z
