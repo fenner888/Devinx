@@ -207,7 +207,12 @@ export default function PlaybooksScreen() {
                 <Text className="text-text-hi text-text17">
                   {editor?.playbookId ? 'Edit playbook' : 'Create playbook'}
                 </Text>
-                <Pressable onPress={() => setEditor(null)}>
+                <Pressable
+                  onPress={() => setEditor(null)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close playbook editor"
+                >
                   <Ionicons name="close" size={18} color={tokens.textMid.hex} />
                 </Pressable>
               </View>

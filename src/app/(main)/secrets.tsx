@@ -200,7 +200,12 @@ export default function SecretsScreen() {
             <View className="bg-surface2 rounded-t-sheet px-5 pt-4 max-h-[85%]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-text-hi text-text17">Add secret</Text>
-                <Pressable onPress={() => setShowCreate(false)}>
+                <Pressable
+                  onPress={() => setShowCreate(false)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close add secret"
+                >
                   <Ionicons name="close" size={18} color={tokens.textMid.hex} />
                 </Pressable>
               </View>

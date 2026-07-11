@@ -238,6 +238,9 @@ export default function AutomationsScreen() {
                     setShowCreate(false);
                     setCreateError(null);
                   }}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close new automation"
                 >
                   <Ionicons name="close" size={18} color={tokens.textMid.hex} />
                 </Pressable>
