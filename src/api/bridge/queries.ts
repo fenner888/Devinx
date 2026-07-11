@@ -1,10 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppState } from 'react-native';
 
 import { useConnections } from '@auth/ConnectionContext';
 import {
   ComputerBridgeError,
+  getComputerBridgeHealth,
   loadComputerSession,
+  promptComputerSession,
   openComputerBridges,
   type ComputerLoadedSession,
   type ComputerBridgeConnection,
@@ -84,9 +86,7 @@ async function discoverComputer(
           ...session,
           bridgeId: computer.bridgeId,
           computerName: computer.computerName,
-          canLoad:
-            health.capabilities.sessionLoad &&
-            computer.permissions.includes('session:content:read'),
+          canLoad: health.capabilities.sessionLoad,
         });
       }
       if (!page.nextCursor) break;
@@ -133,6 +133,7 @@ function updatedAtMilliseconds(session: ComputerSessionListItem): number {
 
 export async function loadComputerSessionBoard(
   computers: PairedComputerSummary[],
+  previousBoard?: ComputerSessionBoard,
 ): Promise<ComputerSessionBoard> {
   if (computers.length === 0) return { sessions: [], computers: [] };
   let bridges: Map<string, ComputerBridgeConnection>;
@@ -164,22 +165,31 @@ export async function loadComputerSessionBoard(
       return discoverComputer(computer, bridge);
     }),
   );
+  const sessions = results.flatMap((result) => {
+    if (result.status.state !== 'unavailable') return result.sessions;
+    return (
+      previousBoard?.sessions.filter((session) => session.bridgeId === result.status.bridgeId) ?? []
+    );
+  });
   return {
-    sessions: results
-      .flatMap((result) => result.sessions)
-      .sort((left, right) => updatedAtMilliseconds(right) - updatedAtMilliseconds(left)),
+    sessions: sessions.sort(
+      (left, right) => updatedAtMilliseconds(right) - updatedAtMilliseconds(left),
+    ),
     computers: results.map((result) => result.status),
   };
 }
 
 export function useComputerSessions() {
+  const queryClient = useQueryClient();
   const { mode, computers } = useConnections();
   const enabled = connectionModeUsesComputer(mode) && computers.length > 0;
   const bridgeIds = computers.map((computer) => computer.bridgeId).sort();
+  const queryKey = ['computerSessions', ...bridgeIds] as const;
 
   return useQuery({
-    queryKey: ['computerSessions', ...bridgeIds],
-    queryFn: () => loadComputerSessionBoard(computers),
+    queryKey,
+    queryFn: () =>
+      loadComputerSessionBoard(computers, queryClient.getQueryData<ComputerSessionBoard>(queryKey)),
     enabled,
     staleTime: 15_000,
     gcTime: 5 * 60_000,
@@ -190,11 +200,7 @@ export function useComputerSessions() {
   });
 }
 
-export function useComputerSessionDetail(
-  bridgeId: string,
-  sessionId: string,
-  enabled = true,
-) {
+export function useComputerSessionDetail(bridgeId: string, sessionId: string, enabled = true) {
   return useQuery<ComputerLoadedSession, Error>({
     queryKey: ['computerSession', bridgeId, sessionId],
     queryFn: () => loadComputerSession(bridgeId, sessionId),
@@ -204,5 +210,21 @@ export function useComputerSessionDetail(
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: false,
+  });
+}
+
+export function useComputerSessionAccess(bridgeId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['computerSessionAccess', bridgeId],
+    queryFn: () => getComputerBridgeHealth(bridgeId),
+    enabled,
+    staleTime: 5_000,
+    retry: false,
+  });
+}
+
+export function usePromptComputerSession(bridgeId: string, sessionId: string) {
+  return useMutation({
+    mutationFn: (text: string) => promptComputerSession(bridgeId, sessionId, text),
   });
 }

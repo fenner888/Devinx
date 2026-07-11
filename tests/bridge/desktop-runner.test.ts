@@ -62,12 +62,10 @@ function interfaces(): NetworkInterfaceMap {
 
 describe('Desktop Bridge development runner', () => {
   it('discovers only active private IPv4 addresses and requires an exact interface match', () => {
-    expect(discoverPrivateLanAddresses(interfaces())).toEqual([
-      '100.127.166.87',
-      '192.168.1.141',
-    ]);
+    expect(discoverPrivateLanAddresses(interfaces())).toEqual(['100.127.166.87', '192.168.1.141']);
     expect(validateAdvertisedLanHost('192.168.1.141', interfaces())).toBe('192.168.1.141');
     expect(privateTransportKind('100.127.166.87')).toBe('tailscale_vpn');
+    expect(privateTransportKind('fd7a:115c:a1e0::f501:a690')).toBe('tailscale_vpn');
     expect(privateTransportLabel('100.127.166.87')).toBe('Tailscale/VPN');
     expect(privateTransportKind('192.168.1.141')).toBe('local_network');
     expect(privateTransportLabel('192.168.1.141')).toBe('Same Wi-Fi');
@@ -135,10 +133,7 @@ describe('Desktop Bridge development runner', () => {
         throw new Error('ACP should not be created without an explicit CLI path');
       },
     };
-    const runner = new DesktopBridgeRunner(
-      { advertisedHost: '192.168.1.141' },
-      dependencies,
-    );
+    const runner = new DesktopBridgeRunner({ advertisedHost: '192.168.1.141' }, dependencies);
 
     const started = await runner.start();
     const offer = JSON.parse(renderedPayloads[0] ?? '{}') as Record<string, unknown>;
@@ -151,10 +146,8 @@ describe('Desktop Bridge development runner', () => {
     expect(offer).toMatchObject({
       bridgeEndpoint: started.endpoint,
       tlsCertificateFingerprint: listenerOptions
-        ? tlsIdentityFromPem(
-            listenerOptions.tlsCertificatePem,
-            listenerOptions.tlsPrivateKeyPem,
-          ).certificateFingerprint
+        ? tlsIdentityFromPem(listenerOptions.tlsCertificatePem, listenerOptions.tlsPrivateKeyPem)
+            .certificateFingerprint
         : '',
     });
     expect(typeof offer.pairingSecret).toBe('string');
@@ -178,6 +171,52 @@ describe('Desktop Bridge development runner', () => {
     expect(listenerStop).toHaveBeenCalledTimes(1);
   });
 
+  it('binds a proxied bridge to loopback while advertising its Tailscale address', async () => {
+    let listenerOptions: HttpsBridgeListenerOptions | undefined;
+    const dependencies: DesktopBridgeRunnerDependencies = {
+      secretStore: new MemorySecretStore(),
+      tlsIdentityGenerator: new OpenSslTlsIdentityGenerator({ validityDays: 1 }),
+      qrRenderer: { render: jest.fn() },
+      createListener: (options) => {
+        listenerOptions = options;
+        const identity = tlsIdentityFromPem(options.tlsCertificatePem, options.tlsPrivateKeyPem);
+        return {
+          start: async () => ({
+            host: '127.0.0.1',
+            port: 45_832,
+            certificateFingerprint: identity.certificateFingerprint,
+          }),
+          stop: async () => {},
+        };
+      },
+      createAcpClient: () => {
+        throw new Error('ACP should not be created');
+      },
+    };
+    const runner = new DesktopBridgeRunner(
+      {
+        advertisedHost: '100.127.166.87',
+        bindHost: '127.0.0.1',
+        port: 45_831,
+        bindPort: 45_832,
+      },
+      dependencies,
+    );
+
+    await expect(runner.start()).resolves.toMatchObject({
+      endpoint: 'http://100.127.166.87:45831/',
+      transportKind: 'tailscale_vpn',
+    });
+    expect(listenerOptions).toMatchObject({
+      host: '127.0.0.1',
+      port: 45_832,
+      advertisedPort: 45_831,
+      allowLan: false,
+      allowedHosts: ['100.127.166.87'],
+    });
+    await runner.stop();
+  });
+
   it('starts ACP only when explicitly configured and cleans it up after listener failure', async () => {
     const secretStore = new MemorySecretStore();
     const acpStart = jest.fn<Promise<void>, []>().mockResolvedValue();
@@ -192,18 +231,18 @@ describe('Desktop Bridge development runner', () => {
       loadSession: async () => {
         throw new Error('Session loading is disabled');
       },
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
     };
     const createAcpClient = jest.fn<AcpSessionLifecycle, [string]>(() => acp);
-    const createListener = jest.fn<BridgeListenerLifecycle, [HttpsBridgeListenerOptions]>(
-      () => ({
-        start: async () => ({
-          host: '0.0.0.0',
-          port: 45_831,
-          certificateFingerprint: 'A'.repeat(43),
-        }),
-        stop: listenerStop,
+    const createListener = jest.fn<BridgeListenerLifecycle, [HttpsBridgeListenerOptions]>(() => ({
+      start: async () => ({
+        host: '0.0.0.0',
+        port: 45_831,
+        certificateFingerprint: 'A'.repeat(43),
       }),
-    );
+      stop: listenerStop,
+    }));
     const runner = new DesktopBridgeRunner(
       { advertisedHost: '192.168.1.141', devinCliPath: '/usr/local/bin/devin' },
       {

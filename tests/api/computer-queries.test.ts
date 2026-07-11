@@ -65,7 +65,7 @@ describe('Computer session board query', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetComputerBridgeHealth.mockResolvedValue({
-      protocolVersion: 1,
+      protocolVersion: 2,
       status: 'ready',
       capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
     });
@@ -111,9 +111,9 @@ describe('Computer session board query', () => {
     ]);
   });
 
-  it('marks rows loadable only when both the Mac and device grant allow history', async () => {
+  it('uses the authenticated Mac capability instead of a stale cached grant', async () => {
     mockGetComputerBridgeHealth.mockResolvedValue({
-      protocolVersion: 1,
+      protocolVersion: 2,
       status: 'ready',
       capabilities: { sessionList: true, sessionLoad: true, sessionPrompt: false },
     });
@@ -129,13 +129,13 @@ describe('Computer session board query', () => {
       sessions: [{ canLoad: true }],
     });
     await expect(loadComputerSessionBoard([FIRST])).resolves.toMatchObject({
-      sessions: [{ canLoad: false }],
+      sessions: [{ canLoad: true }],
     });
   });
 
   it('reports pairing-only bridges without requesting a session list', async () => {
     mockGetComputerBridgeHealth.mockResolvedValue({
-      protocolVersion: 1,
+      protocolVersion: 2,
       status: 'ready',
       capabilities: { sessionList: false, sessionLoad: false, sessionPrompt: false },
     });
@@ -159,7 +159,7 @@ describe('Computer session board query', () => {
         throw new ComputerBridgeError('private transport detail', 'unavailable');
       }
       return {
-        protocolVersion: 1,
+        protocolVersion: 2,
         status: 'ready',
         capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
       };
@@ -178,13 +178,43 @@ describe('Computer session board query', () => {
     });
   });
 
+  it('retains the last verified sessions during a transient bridge outage', async () => {
+    mockListComputerSessions.mockResolvedValue({
+      sessions: [session('A', '2027-01-15T10:00:00.000Z')],
+    });
+    const previous = await loadComputerSessionBoard([FIRST]);
+    mockGetComputerBridgeHealth.mockRejectedValueOnce(
+      new ComputerBridgeError('private transport detail', 'unavailable'),
+    );
+
+    const result = await loadComputerSessionBoard([FIRST], previous);
+
+    expect(result.sessions).toEqual(previous.sessions);
+    expect(result.computers).toEqual([
+      { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'unavailable' },
+    ]);
+  });
+
   it('fails a computer closed on repeated cursors or duplicate session handles', async () => {
     mockListComputerSessions.mockResolvedValue({
       sessions: [session('A', '2027-01-15T10:00:00.000Z')],
       nextCursor: 'repeat',
     });
 
-    const result = await loadComputerSessionBoard([FIRST]);
+    const previous = {
+      sessions: [
+        {
+          ...session('B', '2027-01-15T09:00:00.000Z'),
+          bridgeId: FIRST.bridgeId,
+          computerName: FIRST.computerName,
+          canLoad: false,
+        },
+      ],
+      computers: [
+        { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'ready' as const },
+      ],
+    };
+    const result = await loadComputerSessionBoard([FIRST], previous);
 
     expect(result.sessions).toEqual([]);
     expect(result.computers[0]).toMatchObject({ state: 'invalid_response' });

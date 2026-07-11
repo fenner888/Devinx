@@ -1,6 +1,6 @@
 # 017 — Mobile Computer session discovery
 
-Status: implemented and automated-test validated; real Mac/iPhone transport validation pending
+Status: implemented and automated-test validated; Tailscale HTTP was exercised from an iOS Simulator against the real macOS Connector, while physical-iPhone validation remains pending. Spec 020 supersedes this document's HTTPS-only transport wording for Tailscale.
 
 ## Scope
 

@@ -3,6 +3,8 @@ import { isAbsolute, join } from 'node:path';
 
 import { z } from 'zod';
 
+import type { SecretStore } from './secret-store';
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_SECRET_BYTES = 1024 * 1024;
 const ITEM_NOT_FOUND_EXIT_CODE = 44;
@@ -22,11 +24,8 @@ const optionsSchema = z
   })
   .strict();
 
-export interface KeychainSecretStore {
-  get(): Promise<string | null>;
-  set(value: string): Promise<void>;
-  delete(): Promise<void>;
-}
+/** @deprecated Import SecretStore from ./secret-store in platform-neutral code. */
+export type KeychainSecretStore = SecretStore;
 
 export interface MacOSKeychainOptions {
   executablePath?: string;
@@ -52,7 +51,7 @@ function safeEnvironment(): NodeJS.ProcessEnv {
   return environment;
 }
 
-export class MacOSKeychainSecretStore implements KeychainSecretStore {
+export class MacOSKeychainSecretStore implements SecretStore {
   private readonly options: z.infer<typeof optionsSchema>;
 
   constructor(options: MacOSKeychainOptions = {}) {

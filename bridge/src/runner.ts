@@ -1,23 +1,29 @@
 import { isAbsolute } from 'node:path';
+import { isIP } from 'node:net';
 
 import { z } from 'zod';
 
 import { AcpSessionClient } from './acp';
 import type { HttpsBridgeListenerAddress, HttpsBridgeListenerOptions } from './listener';
 import { HttpsBridgeListener } from './listener';
-import type { KeychainSecretStore } from './macos-keychain';
 import { MacOSKeychainSecretStore } from './macos-keychain';
-import { isPrivateLanIPv4, privateTransportKind, type PrivateTransportKind } from './network';
 import {
-  PairingManager,
-  type PairingApprovalOptions,
-  type PendingPairingReview,
-} from './pairing';
+  isAdvertisablePrivateAddress,
+  privateTransportKind,
+  type PrivateTransportKind,
+} from './network';
+import { PairingManager, type PairingApprovalOptions, type PendingPairingReview } from './pairing';
 import { FixedWindowRateLimiter } from './rate-limit';
 import { InMemoryReplayGuard } from './replay';
 import { BridgeService, type SessionDiscoveryAdapter } from './service';
 import { SessionHandleRegistry } from './session-handles';
-import { DesktopBridgeStateRepository, loadDesktopBridgeRuntime } from './state';
+import type { SecretStore } from './secret-store';
+import {
+  DesktopBridgeStateRepository,
+  loadDesktopBridgeRuntime,
+  type DeviceSummary,
+  type PersistentDeviceRegistry,
+} from './state';
 import {
   OpenSslTlsIdentityGenerator,
   type TlsIdentity,
@@ -28,10 +34,18 @@ const runnerOptionsSchema = z
   .object({
     advertisedHost: z
       .string()
-      .min(7)
-      .max(15)
-      .refine(isPrivateLanIPv4, 'Advertised host must be a private LAN IPv4 address'),
+      .min(2)
+      .max(64)
+      .refine(
+        isAdvertisablePrivateAddress,
+        'Advertised host must be an advertisable private IP address',
+      ),
+    bindHost: z
+      .string()
+      .refine((value) => isIP(value) !== 0, 'Bind host must be an IP literal')
+      .optional(),
     port: z.number().int().min(1_024).max(65_535).default(45_831),
+    bindPort: z.number().int().min(1_024).max(65_535).optional(),
     devinCliPath: z
       .string()
       .min(1)
@@ -43,7 +57,9 @@ const runnerOptionsSchema = z
 
 export interface DesktopBridgeRunnerOptions {
   advertisedHost: string;
+  bindHost?: string;
   port?: number;
+  bindPort?: number;
   devinCliPath?: string;
 }
 
@@ -62,11 +78,12 @@ export interface AcpSessionLifecycle extends SessionDiscoveryAdapter {
 }
 
 export interface DesktopBridgeRunnerDependencies {
-  secretStore: KeychainSecretStore;
+  secretStore: SecretStore;
   tlsIdentityGenerator: TlsIdentityGenerator;
   qrRenderer: PairingQrRenderer;
   createListener(options: HttpsBridgeListenerOptions): BridgeListenerLifecycle;
   createAcpClient(executablePath: string): AcpSessionLifecycle;
+  onPairingDiagnostic?: HttpsBridgeListenerOptions['onPairingDiagnostic'];
 }
 
 export interface StartedDesktopBridge {
@@ -81,6 +98,8 @@ const unavailableSessions: SessionDiscoveryAdapter = {
   listSessions: () => Promise.reject(new Error('Session discovery is not enabled')),
   isSessionLoadSupported: () => false,
   loadSession: () => Promise.reject(new Error('Session loading is not enabled')),
+  isSessionPromptSupported: () => false,
+  promptSession: () => Promise.reject(new Error('Session prompting is not enabled')),
 };
 
 export function createProductionRunnerDependencies(
@@ -100,7 +119,12 @@ export class DesktopBridgeRunner {
   private acp: AcpSessionLifecycle | null = null;
   private pairing: PairingManager | null = null;
   private sessionHandles: SessionHandleRegistry | null = null;
-  private transport: { bridgeEndpoint: string; tlsCertificateFingerprint: string } | null = null;
+  private devices: PersistentDeviceRegistry | null = null;
+  private transport: {
+    transportSecurity: 'tailscale_wireguard' | 'pinned_tls';
+    bridgeEndpoint: string;
+    tlsCertificateFingerprint: string;
+  } | null = null;
   private started = false;
   private stopped = false;
 
@@ -123,14 +147,12 @@ export class DesktopBridgeRunner {
         tlsIdentity = await runtime.devices.ensureTlsIdentity(
           this.dependencies.tlsIdentityGenerator,
         );
-        sessionHandles = new SessionHandleRegistry(
-          runtime.bridgeId,
-          runtime.sessionHandleKey,
-        );
+        sessionHandles = new SessionHandleRegistry(runtime.bridgeId, runtime.sessionHandleKey);
       } finally {
         runtime.sessionHandleKey.fill(0);
       }
       this.sessionHandles = sessionHandles;
+      this.devices = runtime.devices;
 
       let sessions: SessionDiscoveryAdapter = unavailableSessions;
       if (options.devinCliPath) {
@@ -155,18 +177,31 @@ export class DesktopBridgeRunner {
         pairing,
         tlsCertificatePem: tlsIdentity.certificatePem,
         tlsPrivateKeyPem: tlsIdentity.privateKeyPem,
-        host: options.advertisedHost,
-        port: options.port,
-        allowLan: true,
+        host: options.bindHost ?? options.advertisedHost,
+        port: options.bindPort ?? options.port,
+        advertisedPort: options.port,
+        allowLan: options.bindHost === undefined,
         allowedHosts: [options.advertisedHost],
+        transportSecurity:
+          privateTransportKind(options.advertisedHost) === 'tailscale_vpn'
+            ? 'tailscale_wireguard'
+            : 'pinned_tls',
+        onPairingDiagnostic: this.dependencies.onPairingDiagnostic,
       });
       this.listener = listener;
       const address = await listener.start();
       if (address.certificateFingerprint !== tlsIdentity.certificateFingerprint) {
         throw new Error('Desktop Bridge listener TLS identity changed unexpectedly');
       }
-      const endpoint = `https://${options.advertisedHost}:${address.port}/`;
+      const endpointHost =
+        isIP(options.advertisedHost) === 6 ? `[${options.advertisedHost}]` : options.advertisedHost;
+      const transportSecurity =
+        privateTransportKind(options.advertisedHost) === 'tailscale_vpn'
+          ? 'tailscale_wireguard'
+          : 'pinned_tls';
+      const endpoint = `${transportSecurity === 'tailscale_wireguard' ? 'http' : 'https'}://${endpointHost}:${options.port}/`;
       this.transport = {
+        transportSecurity,
         bridgeEndpoint: endpoint,
         tlsCertificateFingerprint: address.certificateFingerprint,
       };
@@ -212,6 +247,33 @@ export class DesktopBridgeRunner {
     return this.pairing.deny(pairingId);
   }
 
+  pairedDevices(): DeviceSummary[] {
+    return this.devices?.list() ?? [];
+  }
+
+  async updateDevicePermissions(
+    deviceId: string,
+    options: { allowSessionContent: boolean; allowSessionPrompt: boolean },
+  ): Promise<boolean> {
+    const devices = this.devices;
+    if (!devices || this.stopped) return false;
+    const current = devices.get(deviceId) as DeviceSummary | undefined;
+    if (!current || current.status !== 'active') return false;
+    return devices.updatePermissions(deviceId, {
+      permissions: [
+        'bridge:health',
+        'session:metadata:read',
+        ...(options.allowSessionContent ? (['session:content:read'] as const) : []),
+        ...(options.allowSessionPrompt ? (['session:prompt:send'] as const) : []),
+      ],
+    });
+  }
+
+  async revokeDevice(deviceId: string): Promise<boolean> {
+    if (!this.devices || this.stopped) return false;
+    return this.devices.revoke(deviceId);
+  }
+
   async stop(): Promise<void> {
     if (this.stopped) return;
     this.stopped = true;
@@ -222,6 +284,7 @@ export class DesktopBridgeRunner {
     this.acp = null;
     this.pairing = null;
     this.sessionHandles = null;
+    this.devices = null;
     this.transport = null;
 
     const results = await Promise.allSettled([

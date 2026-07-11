@@ -16,6 +16,7 @@ import { OpenSslTlsIdentityGenerator } from '../../bridge/src/tls-identity';
 
 const NOW = 1_800_000_000_000;
 const TRANSPORT = {
+  transportSecurity: 'pinned_tls' as const,
   bridgeEndpoint: 'https://192.168.1.20:45831/',
   tlsCertificateFingerprint: 'T'.repeat(43),
 };
@@ -192,6 +193,7 @@ describe('Desktop Bridge Keychain state', () => {
       bridgeId: offer.bridgeId,
       pairingId: offer.pairingId,
       bridgeKeyFingerprint: offer.bridgeKeyFingerprint,
+      transportSecurity: offer.transportSecurity,
       bridgeEndpoint: offer.bridgeEndpoint,
       tlsCertificateFingerprint: offer.tlsCertificateFingerprint,
       deviceId: 'device_1234567890',

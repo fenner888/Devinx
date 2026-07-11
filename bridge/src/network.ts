@@ -1,5 +1,5 @@
 import { isIP } from 'node:net';
-import type { NetworkInterfaceInfo, NetworkInterfaceInfoIPv4 } from 'node:os';
+import type { NetworkInterfaceInfo } from 'node:os';
 
 import { z } from 'zod';
 
@@ -8,6 +8,22 @@ const ipv4AddressSchema = z
   .min(7)
   .max(15)
   .refine((value) => isIP(value) === 4, 'LAN host must be an IPv4 address');
+
+const privateAddressSchema = z
+  .string()
+  .min(2)
+  .max(64)
+  .refine(isAdvertisablePrivateAddress, 'Host must be an advertisable private IP address');
+
+export function isTailscaleIPv4(address: string): boolean {
+  if (isIP(address) !== 4) return false;
+  const [first, second] = address.split('.').map(Number);
+  return first === 100 && second !== undefined && second >= 64 && second <= 127;
+}
+
+export function isTailscaleIPv6(address: string): boolean {
+  return isIP(address) === 6 && address.toLowerCase().startsWith('fd7a:115c:a1e0:');
+}
 
 export function isPrivateLanIPv4(address: string): boolean {
   if (isIP(address) !== 4) return false;
@@ -24,14 +40,17 @@ export function isPrivateLanIPv4(address: string): boolean {
   );
 }
 
+export function isAdvertisablePrivateAddress(address: string): boolean {
+  return isPrivateLanIPv4(address) || isTailscaleIPv6(address);
+}
+
 export type PrivateTransportKind = 'local_network' | 'tailscale_vpn';
 
 export function privateTransportKind(address: string): PrivateTransportKind {
-  if (!isPrivateLanIPv4(address)) {
-    throw new Error('Transport classification requires a private IPv4 address');
+  if (!isAdvertisablePrivateAddress(address)) {
+    throw new Error('Transport classification requires an advertisable private IP address');
   }
-  const [first, second] = address.split('.').map(Number);
-  return first === 100 && second !== undefined && second >= 64 && second <= 127
+  return isTailscaleIPv4(address) || isTailscaleIPv6(address)
     ? 'tailscale_vpn'
     : 'local_network';
 }
@@ -42,12 +61,6 @@ export function privateTransportLabel(address: string): string {
     : 'Same Wi-Fi';
 }
 
-function isIPv4Record(
-  record: NetworkInterfaceInfo,
-): record is NetworkInterfaceInfoIPv4 {
-  return record.family === 'IPv4';
-}
-
 export type NetworkInterfaceMap = NodeJS.Dict<NetworkInterfaceInfo[]>;
 
 export function discoverPrivateLanAddresses(interfaces: NetworkInterfaceMap): string[] {
@@ -55,9 +68,8 @@ export function discoverPrivateLanAddresses(interfaces: NetworkInterfaceMap): st
   for (const records of Object.values(interfaces)) {
     for (const record of records ?? []) {
       if (
-        isIPv4Record(record) &&
         !record.internal &&
-        isPrivateLanIPv4(record.address)
+        isAdvertisablePrivateAddress(record.address)
       ) {
         discovered.add(record.address);
       }
@@ -76,6 +88,17 @@ export function validateAdvertisedLanHost(
   }
   if (!discoverPrivateLanAddresses(interfaces).includes(host)) {
     throw new Error('Desktop Bridge host is not active on this Mac');
+  }
+  return host;
+}
+
+export function validateAdvertisedPrivateHost(
+  input: unknown,
+  interfaces: NetworkInterfaceMap,
+): string {
+  const host = privateAddressSchema.parse(input);
+  if (!discoverPrivateLanAddresses(interfaces).includes(host)) {
+    throw new Error('Desktop Bridge host is not active on this computer');
   }
   return host;
 }

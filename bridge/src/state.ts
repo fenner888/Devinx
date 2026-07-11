@@ -10,7 +10,7 @@ import {
 
 import { z } from 'zod';
 
-import type { KeychainSecretStore } from './macos-keychain';
+import type { SecretStore } from './secret-store';
 import {
   devicePermissionUpdateSchema,
   revokeDeviceRecord,
@@ -169,7 +169,7 @@ function createState(): DesktopBridgeState {
 }
 
 export class DesktopBridgeStateRepository {
-  constructor(private readonly secrets: KeychainSecretStore) {}
+  constructor(private readonly secrets: SecretStore) {}
 
   async loadOrCreate(): Promise<DesktopBridgeState> {
     const stored = await this.secrets.get();

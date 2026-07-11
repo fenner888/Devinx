@@ -25,7 +25,7 @@ const bridgePermissionSchema = z.enum([
 
 export const pairedComputerCredentialSchema = z
   .object({
-    version: z.literal(2),
+    version: z.union([z.literal(2), z.literal(3)]),
     bridgeId: z
       .string()
       .min(16)
@@ -40,7 +40,7 @@ export const pairedComputerCredentialSchema = z
         try {
           const url = new URL(value);
           return (
-            url.protocol === 'https:' &&
+            (url.protocol === 'https:' || url.protocol === 'http:') &&
             url.username === '' &&
             url.password === '' &&
             url.pathname === '/' &&
@@ -52,7 +52,8 @@ export const pairedComputerCredentialSchema = z
         } catch {
           return false;
         }
-      }, 'Paired computer endpoint must be a canonical HTTPS origin with an explicit port'),
+      }, 'Paired computer endpoint must be a canonical HTTP or HTTPS origin with an explicit port'),
+    transportSecurity: z.enum(['tailscale_wireguard', 'pinned_tls']).optional(),
     tlsCertificateFingerprint: base64UrlSchema.length(43),
     bridgePublicKeySpki: base64UrlSchema.length(59),
     bridgeKeyFingerprint: base64UrlSchema.length(43),
@@ -71,7 +72,20 @@ export const pairedComputerCredentialSchema = z
     if (new Set(value.permissions).size !== value.permissions.length) {
       context.addIssue({ code: z.ZodIssueCode.custom, message: 'Permissions must be unique' });
     }
-  });
+    const scheme = new URL(value.endpoint).protocol;
+    const transportSecurity = value.transportSecurity ?? 'pinned_tls';
+    if (
+      (transportSecurity === 'tailscale_wireguard' && scheme !== 'http:') ||
+      (transportSecurity === 'pinned_tls' && scheme !== 'https:')
+    ) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Transport security mismatch' });
+    }
+  })
+  .transform((value) => ({
+    ...value,
+    version: 3 as const,
+    transportSecurity: value.transportSecurity ?? ('pinned_tls' as const),
+  }));
 
 const pairedComputerListSchema = z
   .array(pairedComputerCredentialSchema)
@@ -92,8 +106,9 @@ export type PairedComputerCredential = z.infer<typeof pairedComputerCredentialSc
 export type ComputerTransportKind = 'local_network' | 'tailscale_vpn';
 
 export function computerTransportKind(endpoint: string): ComputerTransportKind {
-  const hostname = new URL(endpoint).hostname.toLowerCase();
+  const hostname = new URL(endpoint).hostname.toLowerCase().replace(/^\[|\]$/g, '');
   if (hostname.endsWith('.ts.net')) return 'tailscale_vpn';
+  if (hostname.startsWith('fd7a:115c:a1e0:')) return 'tailscale_vpn';
   const [first, second] = hostname.split('.').map(Number);
   return first === 100 && second !== undefined && second >= 64 && second <= 127
     ? 'tailscale_vpn'
@@ -101,7 +116,7 @@ export function computerTransportKind(endpoint: string): ComputerTransportKind {
 }
 
 export function computerTransportLabel(kind: ComputerTransportKind): string {
-  return kind === 'tailscale_vpn' ? 'Tailscale/VPN' : 'Same Wi-Fi';
+  return kind === 'tailscale_vpn' ? 'Tailscale' : 'Unavailable';
 }
 
 export interface PairedComputerSummary {
@@ -123,8 +138,17 @@ export async function loadPairedComputers(): Promise<PairedComputerCredential[]>
   }
   const result = pairedComputerListSchema.safeParse(parsed);
   if (!result.success) throw new Error('Paired computer credentials failed validation');
-  if (result.data.length > 0 && !isPinnedBridgeTransportAvailable()) {
-    throw new Error('Paired computer credentials require a current secure transport');
+  if (
+    result.data.some((computer) => computer.transportSecurity === 'tailscale_wireguard') &&
+    !isDeviceCryptoAvailable()
+  ) {
+    throw new Error('Tailnet computer credentials require a current secure transport');
+  }
+  if (
+    result.data.some((computer) => computer.transportSecurity === 'pinned_tls') &&
+    !isPinnedBridgeTransportAvailable()
+  ) {
+    throw new Error('Pinned computer credentials require a current secure transport');
   }
   const keyAvailability = await Promise.all(
     result.data.map((computer) => hasDeviceIdentity(computer.deviceKeyId)),
@@ -137,19 +161,30 @@ export async function loadPairedComputers(): Promise<PairedComputerCredential[]>
 
 export async function loadPairedComputerSummaries(): Promise<PairedComputerSummary[]> {
   const computers = await loadPairedComputers();
-  return computers.map(({ bridgeId, computerName, pairedAt, permissions, endpoint }) => ({
-    bridgeId,
-    computerName,
-    pairedAt,
-    permissions: [...permissions],
-    transportKind: computerTransportKind(endpoint),
-  }));
+  return computers
+    .filter((computer) => computer.transportSecurity === 'tailscale_wireguard')
+    .map(({ bridgeId, computerName, pairedAt, permissions, endpoint }) => ({
+      bridgeId,
+      computerName,
+      pairedAt,
+      permissions: [...permissions],
+      transportKind: computerTransportKind(endpoint),
+    }));
 }
 
 export async function storePairedComputers(input: unknown): Promise<void> {
   const computers = pairedComputerListSchema.parse(input);
-  if (computers.length > 0 && !isPinnedBridgeTransportAvailable()) {
-    throw new Error('Paired computer credentials require a current secure transport');
+  if (
+    computers.some((computer) => computer.transportSecurity === 'tailscale_wireguard') &&
+    !isDeviceCryptoAvailable()
+  ) {
+    throw new Error('Tailnet computer credentials require a current secure transport');
+  }
+  if (
+    computers.some((computer) => computer.transportSecurity === 'pinned_tls') &&
+    !isPinnedBridgeTransportAvailable()
+  ) {
+    throw new Error('Pinned computer credentials require a current secure transport');
   }
   const keyAvailability = await Promise.all(
     computers.map((computer) => hasDeviceIdentity(computer.deviceKeyId)),

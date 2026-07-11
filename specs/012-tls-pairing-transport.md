@@ -1,5 +1,7 @@
 # 012 — TLS identity and pairing transport
 
+The TLS rules in this spec remain authoritative for same-WiFi. Spec 020 defines the protocol-v2 `tailscale_wireguard` mode: its endpoint is canonical HTTP in `100.64.0.0/10`, while the transport mode and endpoint remain bound into the QR proof, request, and signed receipt.
+
 Status: bridge routes and native iOS pinning complete; scanner/desktop approval UI and real-device validation pending
 
 ## Explicit TLS provisioning

@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-export const BRIDGE_PROTOCOL_VERSION = 1 as const;
+export const BRIDGE_PROTOCOL_VERSION = 2 as const;
+
+export const transportSecuritySchema = z.enum(['tailscale_wireguard', 'pinned_tls']);
+export type TransportSecurity = z.infer<typeof transportSecuritySchema>;
 
 export const opaqueIdSchema = z
   .string()
@@ -16,15 +19,17 @@ export const deviceNameSchema = z
   .min(1)
   .max(80)
   .refine(
-    (value) => [...value].every((character) => {
-      const codePoint = character.codePointAt(0) ?? 0;
-      return codePoint >= 32 && codePoint !== 127;
-    }),
+    (value) =>
+      [...value].every((character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return codePoint >= 32 && codePoint !== 127;
+      }),
     'Device name contains control characters',
   );
 
 export const bridgeMethodSchema = z.enum([
   'bridge.health',
+  'device.revoke',
   'session.list',
   'session.load',
   'session.prompt',
@@ -66,6 +71,7 @@ export const signedRequestEnvelopeSchema = z
   });
 
 export const bridgeHealthBodySchema = z.object({}).strict();
+export const deviceRevokeBodySchema = z.object({}).strict();
 
 export const sessionListBodySchema = z
   .object({
@@ -116,6 +122,7 @@ export const deviceRecordSchema = z
 
 export const bodySchemas = {
   'bridge.health': bridgeHealthBodySchema,
+  'device.revoke': deviceRevokeBodySchema,
   'session.list': sessionListBodySchema,
   'session.load': sessionLoadBodySchema,
   'session.prompt': sessionPromptBodySchema,
@@ -123,6 +130,7 @@ export const bodySchemas = {
 
 export const permissionByMethod = {
   'bridge.health': 'bridge:health',
+  'device.revoke': 'bridge:health',
   'session.list': 'session:metadata:read',
   'session.load': 'session:content:read',
   'session.prompt': 'session:prompt:send',
@@ -133,12 +141,14 @@ export type BridgePermission = z.infer<typeof bridgePermissionSchema>;
 export type SignedRequestEnvelope = z.infer<typeof signedRequestEnvelopeSchema>;
 export type DeviceRecord = z.infer<typeof deviceRecordSchema>;
 export type BridgeHealthBody = z.infer<typeof bridgeHealthBodySchema>;
+export type DeviceRevokeBody = z.infer<typeof deviceRevokeBodySchema>;
 export type SessionListBody = z.infer<typeof sessionListBodySchema>;
 export type SessionLoadBody = z.infer<typeof sessionLoadBodySchema>;
 export type SessionPromptBody = z.infer<typeof sessionPromptBodySchema>;
 
 export type BridgeBodyByMethod = {
   'bridge.health': BridgeHealthBody;
+  'device.revoke': DeviceRevokeBody;
   'session.list': SessionListBody;
   'session.load': SessionLoadBody;
   'session.prompt': SessionPromptBody;

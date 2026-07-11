@@ -87,7 +87,7 @@ function discoveryMessage(status: ComputerDiscoveryStatus): string | null {
   if (status.state === 'invalid_response') {
     return `${status.computerName} returned an incompatible session response.`;
   }
-  return `${status.computerName} is offline or its Desktop Bridge is not running.`;
+  return `${status.computerName} is offline or DevinX Connector is not running.`;
 }
 
 export function ComputerDiscoveryNotices({ computers }: { computers: ComputerDiscoveryStatus[] }) {

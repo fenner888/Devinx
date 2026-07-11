@@ -1,17 +1,22 @@
 import { generateKeyPairSync, sign as nodeSign } from 'node:crypto';
 
 const mockLoadPairedComputers = jest.fn();
+const mockStorePairedComputers = jest.fn(async (_input: unknown) => {});
 const mockCreateRequestIdentity = jest.fn();
 const mockSign = jest.fn();
 const mockPostPinnedBridgeJson = jest.fn();
 
 jest.mock('../../src/auth/pairedComputers', () => ({
   loadPairedComputers: () => mockLoadPairedComputers(),
+  storePairedComputers: (input: unknown) => mockStorePairedComputers(input),
 }));
 
 jest.mock('../../src/auth/deviceSigning', () => ({
   createRequestIdentity: () => mockCreateRequestIdentity(),
+  deleteDeviceIdentity: jest.fn(async () => {}),
   sign: (keyId: string, message: string) => mockSign(keyId, message),
+  postTailnetBridgeJson: (endpoint: string, path: string, body: unknown) =>
+    mockPostPinnedBridgeJson(endpoint, path, body),
   postPinnedBridgeJson: (endpoint: string, path: string, fingerprint: string, body: unknown) =>
     mockPostPinnedBridgeJson(endpoint, path, fingerprint, body),
 }));
@@ -23,11 +28,13 @@ import { BridgeService } from '../../bridge/src/service';
 import { SessionHandleRegistry } from '../../bridge/src/session-handles';
 import {
   ComputerBridgeError,
+  disconnectComputer,
   getComputerBridgeHealth,
   listComputerSessions,
   loadComputerSession,
   openComputerBridge,
   openComputerBridges,
+  promptComputerSession,
 } from '../../src/auth/computerBridge';
 
 const NOW = 1_800_000_000_000;
@@ -39,10 +46,11 @@ const NONCE = 'N'.repeat(32);
 const SIGNATURE = 'S'.repeat(86);
 
 const COMPUTER = {
-  version: 2,
+  version: 3,
   bridgeId: BRIDGE_ID,
   computerName: 'Frank’s MacBook',
-  endpoint: 'https://192.168.1.20:45831/',
+  endpoint: 'http://100.127.166.87:45831/',
+  transportSecurity: 'tailscale_wireguard',
   tlsCertificateFingerprint: 'T'.repeat(43),
   bridgePublicKeySpki: 'B'.repeat(59),
   bridgeKeyFingerprint: 'F'.repeat(43),
@@ -66,18 +74,18 @@ describe('authenticated mobile Computer Bridge client', () => {
     jest.restoreAllMocks();
   });
 
-  it('signs a short-lived health envelope and sends it only through the pinned route', async () => {
+  it('signs a short-lived health envelope and sends it only through the Tailscale route', async () => {
     mockPostPinnedBridgeJson.mockResolvedValue({
       status: 200,
       body: {
-        protocolVersion: 1,
+        protocolVersion: 2,
         status: 'ready',
         capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
       },
     });
 
     await expect(getComputerBridgeHealth(BRIDGE_ID)).resolves.toEqual({
-      protocolVersion: 1,
+      protocolVersion: 2,
       status: 'ready',
       capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
     });
@@ -93,15 +101,13 @@ describe('authenticated mobile Computer Bridge client', () => {
       issuedAt: NOW,
       method: 'bridge.health',
       nonce: NONCE,
-      protocolVersion: 1,
+      protocolVersion: 2,
       requestId: REQUEST_ID,
     });
-    expect(mockPostPinnedBridgeJson).toHaveBeenCalledWith(
-      COMPUTER.endpoint,
-      '/v1/request',
-      COMPUTER.tlsCertificateFingerprint,
-      { ...unsigned, signature: SIGNATURE },
-    );
+    expect(mockPostPinnedBridgeJson).toHaveBeenCalledWith(COMPUTER.endpoint, '/v1/request', {
+      ...unsigned,
+      signature: SIGNATURE,
+    });
   });
 
   it('interoperates with the real server authorization and canonicalization path', async () => {
@@ -142,10 +148,12 @@ describe('authenticated mobile Computer Bridge client', () => {
         loadSession: async () => {
           throw new Error('Session loading is disabled');
         },
+        isSessionPromptSupported: () => true,
+        promptSession: async () => {},
       },
     });
     mockPostPinnedBridgeJson.mockImplementation(
-      async (_endpoint: string, _path: string, _fingerprint: string, envelope: unknown) => {
+      async (_endpoint: string, _path: string, envelope: unknown) => {
         const response = await service.handle(envelope, { peerKey: 'phone', now: NOW });
         return { status: response.status, body: response.body };
       },
@@ -187,7 +195,7 @@ describe('authenticated mobile Computer Bridge client', () => {
       ],
       nextCursor: 'next-page',
     });
-    const envelope = mockPostPinnedBridgeJson.mock.calls[0]?.[3] as Record<string, unknown>;
+    const envelope = mockPostPinnedBridgeJson.mock.calls[0]?.[2] as Record<string, unknown>;
     expect(envelope).toMatchObject({ method: 'session.list', body: { cursor: 'current-page' } });
   });
 
@@ -212,10 +220,34 @@ describe('authenticated mobile Computer Bridge client', () => {
       session: { id: sessionId, workspaceName: 'DevinX' },
       messages: [{ source: 'user' }, { source: 'devin' }],
     });
-    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[3]).toMatchObject({
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
       method: 'session.load',
       body: { sessionId },
     });
+  });
+
+  it('sends steering to the authoritative Mac even when the cached pairing grant is stale', async () => {
+    const sessionId = `local_${'P'.repeat(43)}`;
+    mockPostPinnedBridgeJson.mockResolvedValue({ status: 200, body: { accepted: true } });
+
+    await expect(
+      promptComputerSession(BRIDGE_ID, sessionId, 'Continue the task.'),
+    ).resolves.toBeUndefined();
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
+      method: 'session.prompt',
+      body: { sessionId, text: 'Continue the task.' },
+    });
+  });
+
+  it('revokes on the Mac before removing the local computer credential', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({ status: 200, body: { revoked: true } });
+
+    await expect(disconnectComputer(BRIDGE_ID)).resolves.toBeUndefined();
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
+      method: 'device.revoke',
+      body: {},
+    });
+    expect(mockStorePairedComputers).toHaveBeenCalledWith([]);
   });
 
   it('fails local history closed for absent grants, handle mismatch, or invalid sequence', async () => {
@@ -262,7 +294,7 @@ describe('authenticated mobile Computer Bridge client', () => {
       .mockResolvedValueOnce({
         status: 200,
         body: {
-          protocolVersion: 1,
+          protocolVersion: 2,
           status: 'ready',
           capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
         },

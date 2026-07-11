@@ -34,10 +34,11 @@ import {
 import { storeSecret } from '../../src/auth/keychain';
 
 const COMPUTER = {
-  version: 2 as const,
+  version: 3 as const,
   bridgeId: 'bridge_1234567890',
   computerName: 'Frank’s MacBook',
   endpoint: 'https://192.168.1.20:45831/',
+  transportSecurity: 'pinned_tls' as const,
   tlsCertificateFingerprint: 'T'.repeat(43),
   bridgePublicKeySpki: 'A'.repeat(59),
   bridgeKeyFingerprint: 'B'.repeat(43),
@@ -46,6 +47,16 @@ const COMPUTER = {
   devicePublicKeySpki: 'D'.repeat(59),
   permissions: ['bridge:health', 'session:metadata:read'] as const,
   pairedAt: 1_800_000_000_000,
+};
+
+const TAILSCALE_COMPUTER = {
+  ...COMPUTER,
+  bridgeId: 'bridge_tailscale1234',
+  computerName: 'Frank’s Mac mini',
+  endpoint: 'http://100.127.166.87:45831/',
+  transportSecurity: 'tailscale_wireguard' as const,
+  deviceId: 'device_tailscale1234',
+  deviceKeyId: '5bd905d0-c390-45f9-a2b3-a07678db6093',
 };
 
 describe('paired computer credential storage', () => {
@@ -65,29 +76,30 @@ describe('paired computer credential storage', () => {
 
   it('labels Tailscale addresses without changing the stored credential', () => {
     expect(computerTransportKind('https://100.127.166.87:45831/')).toBe('tailscale_vpn');
-    expect(computerTransportKind('https://studio.tail1234.ts.net:45831/')).toBe(
+    expect(computerTransportKind('https://[fd7a:115c:a1e0::f501:a690]:45831/')).toBe(
       'tailscale_vpn',
     );
-    expect(computerTransportLabel('tailscale_vpn')).toBe('Tailscale/VPN');
+    expect(computerTransportKind('https://studio.tail1234.ts.net:45831/')).toBe('tailscale_vpn');
+    expect(computerTransportLabel('tailscale_vpn')).toBe('Tailscale');
     expect(computerTransportKind(COMPUTER.endpoint)).toBe('local_network');
-    expect(computerTransportLabel('local_network')).toBe('Same Wi-Fi');
+    expect(computerTransportLabel('local_network')).toBe('Unavailable');
   });
 
-  it('exposes only non-secret computer summaries to React state', async () => {
-    await storePairedComputers([COMPUTER]);
+  it('exposes only non-secret Tailscale computer summaries to React state', async () => {
+    await storePairedComputers([COMPUTER, TAILSCALE_COMPUTER]);
 
     const summaries = await loadPairedComputerSummaries();
     expect(summaries).toEqual([
       {
-        bridgeId: COMPUTER.bridgeId,
-        computerName: COMPUTER.computerName,
-        pairedAt: COMPUTER.pairedAt,
-        permissions: COMPUTER.permissions,
-        transportKind: 'local_network',
+        bridgeId: TAILSCALE_COMPUTER.bridgeId,
+        computerName: TAILSCALE_COMPUTER.computerName,
+        pairedAt: TAILSCALE_COMPUTER.pairedAt,
+        permissions: TAILSCALE_COMPUTER.permissions,
+        transportKind: 'tailscale_vpn',
       },
     ]);
-    expect(JSON.stringify(summaries)).not.toContain(COMPUTER.deviceKeyId);
-    expect(JSON.stringify(summaries)).not.toContain(COMPUTER.bridgePublicKeySpki);
+    expect(JSON.stringify(summaries)).not.toContain(TAILSCALE_COMPUTER.deviceKeyId);
+    expect(JSON.stringify(summaries)).not.toContain(TAILSCALE_COMPUTER.bridgePublicKeySpki);
   });
 
   it('fails closed on malformed or duplicate secure records', async () => {

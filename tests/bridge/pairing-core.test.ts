@@ -17,6 +17,7 @@ const NOW = 1_800_000_000_000;
 const BRIDGE_ID = 'bridge_1234567890';
 const DEVICE_ID = 'device_1234567890';
 const TRANSPORT = {
+  transportSecurity: 'pinned_tls' as const,
   bridgeEndpoint: 'https://192.168.1.20:45831/',
   tlsCertificateFingerprint: 'T'.repeat(43),
 };
@@ -65,6 +66,7 @@ describe('Desktop Bridge pairing core', () => {
       bridgeId: offer.bridgeId,
       pairingId: offer.pairingId,
       bridgeKeyFingerprint: offer.bridgeKeyFingerprint,
+      transportSecurity: offer.transportSecurity,
       bridgeEndpoint: offer.bridgeEndpoint,
       tlsCertificateFingerprint: offer.tlsCertificateFingerprint,
       deviceId: DEVICE_ID,
@@ -85,7 +87,7 @@ describe('Desktop Bridge pairing core', () => {
       .digest('base64url');
 
     expect(offer).toMatchObject({
-      protocolVersion: 1,
+      protocolVersion: 2,
       bridgeId: BRIDGE_ID,
       bridgePublicKeySpki,
       bridgeKeyFingerprint: fingerprint,
@@ -121,7 +123,7 @@ describe('Desktop Bridge pairing core', () => {
     expect(
       manager.poll(
         {
-          protocolVersion: 1,
+          protocolVersion: 2,
           bridgeId: BRIDGE_ID,
           pairingId: offer.pairingId,
           pollToken: submission.pollToken,
@@ -161,7 +163,7 @@ describe('Desktop Bridge pairing core', () => {
     );
     const approvedPoll = manager.poll(
       {
-        protocolVersion: 1,
+        protocolVersion: 2,
         bridgeId: BRIDGE_ID,
         pairingId: offer.pairingId,
         pollToken: submission.pollToken,
@@ -176,7 +178,7 @@ describe('Desktop Bridge pairing core', () => {
     expect(
       manager.poll(
         {
-          protocolVersion: 1,
+          protocolVersion: 2,
           bridgeId: BRIDGE_ID,
           pairingId: offer.pairingId,
           pollToken: submission.pollToken,
@@ -303,7 +305,7 @@ describe('Desktop Bridge pairing core', () => {
     expect(
       manager.poll(
         {
-          protocolVersion: 1,
+          protocolVersion: 2,
           bridgeId: BRIDGE_ID,
           pairingId: offer.pairingId,
           pollToken: submission.pollToken,

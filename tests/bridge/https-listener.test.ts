@@ -199,6 +199,36 @@ describe('encrypted Desktop Bridge listener', () => {
     expect(bridgeService.handle).not.toHaveBeenCalled();
   });
 
+  it('accepts an explicitly advertised proxy port without weakening Host validation', async () => {
+    const bridgeService = service();
+    const diagnostics = jest.fn();
+    const address = await createListener(bridgeService, {
+      allowedHosts: ['100.127.166.87'],
+      advertisedPort: 45_831,
+      onPairingDiagnostic: diagnostics,
+    }).start();
+    const json = JSON.stringify({ signed: 'request' });
+
+    await expect(post(address, json, { Host: '100.127.166.87:45831' })).resolves.toMatchObject({
+      status: 200,
+      body: { ok: true },
+    });
+    await expect(
+      post(address, json, { Host: `100.127.166.87:${address.port}` }),
+    ).resolves.toMatchObject({ status: 404, body: { error: 'not_found' } });
+    expect(bridgeService.handle).toHaveBeenCalledTimes(1);
+    expect(diagnostics).toHaveBeenNthCalledWith(1, {
+      route: 'request',
+      phase: 'handler',
+      status: 200,
+    });
+    expect(diagnostics).toHaveBeenNthCalledWith(2, {
+      route: 'request',
+      phase: 'metadata',
+      status: 404,
+    });
+  });
+
   it('rejects invalid JSON, unsupported media, and oversized declarations before dispatch', async () => {
     const bridgeService = service();
     const address = await createListener(bridgeService, { maximumBodyBytes: 1_024 }).start();
@@ -311,16 +341,18 @@ describe('encrypted Desktop Bridge listener', () => {
       pairingStatusLimitPerMinute: 3,
     }).start();
     const transport = {
+      transportSecurity: 'pinned_tls' as const,
       bridgeEndpoint: `https://127.0.0.1:${address.port}/`,
       tlsCertificateFingerprint: address.certificateFingerprint,
     };
     const offer = pairing.createOffer(transport);
     const phoneKeys = generateKeyPairSync('ed25519');
     const unsigned: UnsignedPairingRequest = {
-      protocolVersion: 1,
+      protocolVersion: 2,
       bridgeId,
       pairingId: offer.pairingId,
       bridgeKeyFingerprint: offer.bridgeKeyFingerprint,
+      transportSecurity: offer.transportSecurity,
       bridgeEndpoint: offer.bridgeEndpoint,
       tlsCertificateFingerprint: offer.tlsCertificateFingerprint,
       deviceId: 'device_1234567890',
@@ -340,7 +372,7 @@ describe('encrypted Desktop Bridge listener', () => {
     );
     expect(submission).toMatchObject({ status: 202, body: { status: 'pending' } });
     const pollToken = (submission.body as { pollToken: string }).pollToken;
-    const pollBody = { protocolVersion: 1, bridgeId, pairingId: offer.pairingId, pollToken };
+    const pollBody = { protocolVersion: 2, bridgeId, pairingId: offer.pairingId, pollToken };
 
     await expect(
       post(address, JSON.stringify(pollBody), {}, '/v1/pair/status'),

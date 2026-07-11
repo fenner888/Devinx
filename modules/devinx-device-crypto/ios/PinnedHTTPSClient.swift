@@ -120,9 +120,9 @@ enum PinnedHTTPSClient {
     configuration.httpShouldSetCookies = false
     configuration.httpShouldUsePipelining = false
     configuration.httpMaximumConnectionsPerHost = 1
-    configuration.timeoutIntervalForRequest = 10
-    configuration.timeoutIntervalForResource = 15
-    configuration.waitsForConnectivity = false
+    configuration.timeoutIntervalForRequest = 20
+    configuration.timeoutIntervalForResource = 30
+    configuration.waitsForConnectivity = true
 
     let queue = OperationQueue()
     queue.name = "com.fenner888.devinx.pinned-https"
@@ -136,7 +136,7 @@ enum PinnedHTTPSClient {
     var urlRequest = URLRequest(url: request.url)
     urlRequest.httpMethod = "POST"
     urlRequest.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-    urlRequest.timeoutInterval = 10
+    urlRequest.timeoutInterval = 20
     urlRequest.httpBody = request.body
     urlRequest.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
     urlRequest.setValue(String(request.body.count), forHTTPHeaderField: "Content-Length")
@@ -182,6 +182,15 @@ private final class PinnedHTTPSDelegate: NSObject, URLSessionDataDelegate, URLSe
     let certificateData = SecCertificateCopyData(certificate) as Data
     let fingerprint = Data(SHA256.hash(data: certificateData))
     guard Self.constantTimeEqual(fingerprint, expectedFingerprint) else {
+      completionHandler(.cancelAuthenticationChallenge, nil)
+      finish(error: .certificateMismatch)
+      return
+    }
+    let pinnedPolicy = SecPolicyCreateBasicX509()
+    guard SecTrustSetPolicies(trust, pinnedPolicy) == errSecSuccess,
+          SecTrustSetAnchorCertificates(trust, [certificate] as CFArray) == errSecSuccess,
+          SecTrustSetAnchorCertificatesOnly(trust, true) == errSecSuccess,
+          SecTrustEvaluateWithError(trust, nil) else {
       completionHandler(.cancelAuthenticationChallenge, nil)
       finish(error: .certificateMismatch)
       return

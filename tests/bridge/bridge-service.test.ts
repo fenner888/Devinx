@@ -21,6 +21,7 @@ const DEVICE_ID = 'device_1234567890';
 class FakeSessionAdapter implements SessionDiscoveryAdapter {
   supported = true;
   loadSupported = true;
+  promptSupported = true;
   calls = 0;
   loadCalls = 0;
   page: AcpSessionPage = {
@@ -48,6 +49,7 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   };
   loadPending: Promise<AcpLoadedSession> | null = null;
   loadFailure: Error | null = null;
+  prompts: Array<{ sessionId: string; text: string }> = [];
 
   isSessionListSupported(): boolean {
     return this.supported;
@@ -69,6 +71,14 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     if (this.loadFailure) throw this.loadFailure;
     if (this.loadPending) return this.loadPending;
     return this.loaded;
+  }
+
+  isSessionPromptSupported(): boolean {
+    return this.promptSupported;
+  }
+
+  async promptSession(sessionId: string, text: string): Promise<void> {
+    this.prompts.push({ sessionId, text });
   }
 }
 
@@ -141,11 +151,51 @@ describe('authenticated Desktop Bridge service', () => {
     expect(result).toEqual({
       status: 200,
       body: {
-        protocolVersion: 1,
+        protocolVersion: 2,
         status: 'ready',
-        capabilities: { sessionList: true, sessionLoad: true, sessionPrompt: false },
+        capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
       },
     });
+  });
+
+  it('revokes the authenticated device through the server-authoritative registry', async () => {
+    const revoke = jest.fn(async () => true);
+    const bridge = service({ devices: { get: devices.get, revoke } });
+
+    await expect(bridge.handle(envelope('device.revoke', {}), context())).resolves.toEqual({
+      status: 200,
+      body: { revoked: true },
+    });
+    expect(revoke).toHaveBeenCalledWith(DEVICE_ID);
+  });
+
+  it('advertises and accepts prompting only for the authorized device and opaque handle', async () => {
+    const bridge = service();
+    const permissions: BridgePermission[] = [
+      'bridge:health',
+      'session:metadata:read',
+      'session:content:read',
+      'session:prompt:send',
+    ];
+    const health = await bridge.handle(envelope('bridge.health', {}, permissions), context());
+    expect(health).toMatchObject({
+      body: { capabilities: { sessionLoad: true, sessionPrompt: true } },
+    });
+    const listed = await bridge.handle(envelope('session.list', {}, permissions), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+    await expect(
+      bridge.handle(
+        envelope(
+          'session.prompt',
+          { sessionId: handle, text: 'Continue the review.' },
+          permissions,
+        ),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 200, body: { accepted: true } });
+    expect(adapter.prompts).toEqual([
+      { sessionId: 'raw-private-session-id', text: 'Continue the review.' },
+    ]);
   });
 
   it('returns opaque, namespaced, minimized session metadata by default', async () => {
@@ -339,9 +389,9 @@ describe('authenticated Desktop Bridge service', () => {
     const first = bridge.handle(envelope('session.list', {}), context('peer-one'));
     await Promise.resolve();
 
-    await expect(
-      bridge.handle(envelope('session.list', {}), context('peer-two')),
-    ).resolves.toEqual({ status: 429, body: { error: 'busy' } });
+    await expect(bridge.handle(envelope('session.list', {}), context('peer-two'))).resolves.toEqual(
+      { status: 429, body: { error: 'busy' } },
+    );
     resolvePage?.(adapter.page);
     await expect(first).resolves.toMatchObject({ status: 200 });
   });

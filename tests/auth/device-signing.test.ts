@@ -11,6 +11,7 @@ import {
   isPinnedBridgeTransportAvailable,
   isQrScannerAvailable,
   postPinnedBridgeJson,
+  postTailnetBridgeJson,
   requestQrScannerPermission,
   setDeviceCryptoNativeModuleForTests,
   sign,
@@ -118,6 +119,33 @@ describe('iOS device signing boundary', () => {
         {},
       ),
     ).rejects.toThrow();
+  });
+
+  it('allows bounded HTTP only on the Tailscale CGNAT range and rejects redirects', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response('{"status":"pending"}', {
+        status: 202,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      }),
+    );
+
+    await expect(
+      postTailnetBridgeJson('http://100.127.166.87:45831/', '/v1/pair/submit', {
+        pairing: 'request',
+      }),
+    ).resolves.toEqual({ status: 202, body: { status: 'pending' } });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://100.127.166.87:45831/v1/pair/submit',
+      expect.objectContaining({ method: 'POST', redirect: 'error', credentials: 'omit' }),
+    );
+
+    await expect(
+      postTailnetBridgeJson('http://192.168.1.20:45831/', '/v1/pair/submit', {}),
+    ).rejects.toThrow('100.64.0.0/10');
+    await expect(
+      postTailnetBridgeJson('https://100.127.166.87:45831/', '/v1/pair/submit', {}),
+    ).rejects.toThrow('100.64.0.0/10');
+    fetchMock.mockRestore();
   });
 
   it('exposes a validated native QR camera permission boundary', async () => {

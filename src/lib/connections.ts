@@ -13,7 +13,7 @@ export const connectionModeOptions: ReadonlyArray<{
   {
     key: 'computer',
     label: 'Computer',
-    description: 'Pair with a Desktop Bridge running on your Mac.',
+    description: 'Pair securely with DevinX Connector running on your computer.',
   },
   {
     key: 'both',

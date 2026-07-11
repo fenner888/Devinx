@@ -28,6 +28,14 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, back: mockBack }),
 }));
 
+jest.mock('react-native-safe-area-context', () => {
+  const actual = jest.requireActual('react-native-safe-area-context');
+  return {
+    ...actual,
+    useSafeAreaInsets: () => ({ top: 47, right: 0, bottom: 34, left: 0 }),
+  };
+});
+
 jest.mock('../../src/auth/ConnectionContext', () => ({
   useConnections: () => ({ refreshComputers: mockRefreshComputers }),
 }));
@@ -87,29 +95,32 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByText('Connect your Mac')).toBeTruthy();
     expect(screen.getByText('Name this Mac')).toBeTruthy();
     expect(screen.getByText('Open Tailscale setup guide')).toBeTruthy();
-    expect(screen.getByText(/100.x Tailscale address/)).toBeTruthy();
+    expect(screen.getByText('Open DevinX Connector on your Mac.')).toBeTruthy();
     expect(screen.queryByText('Pairing transport pending')).toBeNull();
 
-    fireEvent.press(screen.getByLabelText('Scan Desktop Bridge pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
+    expect(
+      screen.getByText('Point your camera at the code shown in DevinX Connector.'),
+    ).toBeTruthy();
+    expect(screen.getByText('Hold the code inside the frame.')).toBeTruthy();
+    expect(screen.getByLabelText('Cancel QR scanning')).toBeTruthy();
     expect(mockGetPermission).toHaveBeenCalledTimes(1);
   });
 
-  it('offers same-Wi-Fi instructions without weakening QR pairing', () => {
+  it('offers one Tailscale path without a same-Wi-Fi fallback', () => {
     const screen = render(<ComputerConnectionScreen />);
 
-    fireEvent.press(screen.getByLabelText('Same Wi-Fi computer connection'));
-    expect(screen.getByText(/same private Wi-Fi/)).toBeTruthy();
-    expect(screen.getByText(/local-network address/)).toBeTruthy();
-    expect(screen.queryByText('Open Tailscale setup guide')).toBeNull();
-    expect(screen.getByLabelText('Scan Desktop Bridge pairing code')).toBeTruthy();
+    expect(screen.getByText(/Tailscale supplies the private network/)).toBeTruthy();
+    expect(screen.queryByText('Same Wi-Fi')).toBeNull();
+    expect(screen.getByLabelText('Scan DevinX Connector pairing code')).toBeTruthy();
   });
 
   it('requests first-use permission and sends a scanned payload directly to pairing', async () => {
     mockGetPermission.mockResolvedValueOnce('notDetermined');
     const screen = render(<ComputerConnectionScreen />);
 
-    fireEvent.press(screen.getByLabelText('Scan Desktop Bridge pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
     expect(mockRequestPermission).toHaveBeenCalledTimes(1);
 
@@ -127,14 +138,29 @@ describe('Computer connection onboarding', () => {
     mockGetPermission.mockResolvedValueOnce('denied');
     const screen = render(<ComputerConnectionScreen />);
 
-    fireEvent.press(screen.getByLabelText('Scan Desktop Bridge pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
     await waitFor(() =>
       expect(
-        screen.getByText('Camera access is required to scan the Desktop Bridge pairing code.'),
+        screen.getByText('Camera access is required to scan the DevinX Connector pairing code.'),
       ).toBeTruthy(),
     );
     expect(screen.queryByTestId('qr-scanner')).toBeNull();
     expect(screen.getByText('Open Settings')).toBeTruthy();
     expect(mockPairComputer).not.toHaveBeenCalled();
+  });
+
+  it('shows a useful private-network recovery message when the connector is unreachable', async () => {
+    mockPairComputer.mockRejectedValueOnce({ code: 'ERR_PINNED_HTTPS_NETWORK' });
+    const screen = render(<ComputerConnectionScreen />);
+
+    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('qr-scanner'));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Confirm Tailscale is connected on this iPhone and Mac/),
+      ).toBeTruthy(),
+    );
   });
 });

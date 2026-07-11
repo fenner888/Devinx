@@ -65,6 +65,22 @@ export {
   type StartedDesktopBridge,
 } from './runner';
 export { TerminalQrRenderer } from './terminal-qr';
+export { ConnectorController } from './connector-controller';
+export {
+  CONNECTOR_IPC_VERSION,
+  connectorCommandSchema,
+  connectorEventSchema,
+  encodeConnectorEvent,
+  parseConnectorCommand,
+} from './connector-ipc';
+export {
+  createConnectorPlatformAdapter,
+  discoverDevinCliFromPath,
+  executableCandidates,
+  MacOSConnectorPlatformAdapter,
+  selectPreferredConnectorAddress,
+} from './connector-platform';
+export type { SecretStore } from './secret-store';
 export {
   PairingManager,
   createPairingProof,

@@ -1,6 +1,11 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { createServer, type Server as HttpsServer } from 'node:https';
+import {
+  createServer as createHttpServer,
+  type IncomingMessage,
+  type Server as HttpServer,
+  type ServerResponse,
+} from 'node:http';
+import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https';
 import { isIP } from 'node:net';
 import type { Socket } from 'node:net';
 import { TextDecoder } from 'node:util';
@@ -11,6 +16,7 @@ import { FixedWindowRateLimiter, type RateLimiter } from './rate-limit';
 import type { BridgeServiceResponse } from './service';
 import { tlsIdentityFromPem, type TlsIdentity } from './tls-identity';
 import type { PairingPollResult, PairingSubmissionResult } from './pairing';
+import { transportSecuritySchema } from './schemas';
 
 const DEFAULT_PORT = 45_831;
 const DEFAULT_MAXIMUM_BODY_BYTES = 256 * 1024;
@@ -35,8 +41,10 @@ const listenerOptionsSchema = z
   .object({
     host: z.string().refine((value) => isIP(value) !== 0, 'Bind host must be an IP literal'),
     port: z.number().int().min(0).max(65_535),
+    advertisedPort: z.number().int().min(1_024).max(65_535).optional(),
     allowLan: z.boolean(),
     allowedHosts: z.array(hostNameSchema).min(1).max(32),
+    transportSecurity: transportSecuritySchema,
     tlsCertificatePem: z
       .string()
       .min(1)
@@ -65,6 +73,13 @@ const listenerOptionsSchema = z
         code: z.ZodIssueCode.custom,
         path: ['host'],
         message: 'Non-loopback binding requires explicit LAN enablement',
+      });
+    }
+    if (value.transportSecurity === 'tailscale_wireguard' && !isTailscaleAddress(value.host)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['host'],
+        message: 'WireGuard transport must bind directly to a Tailscale address',
       });
     }
     if (value.allowLan && !isUnspecifiedAddress(value.host) && !isPrivatePeerAddress(value.host)) {
@@ -113,8 +128,10 @@ export interface HttpsBridgeListenerOptions {
   tlsPrivateKeyPem: string;
   host?: string;
   port?: number;
+  advertisedPort?: number;
   allowLan?: boolean;
   allowedHosts?: string[];
+  transportSecurity?: 'tailscale_wireguard' | 'pinned_tls';
   maximumBodyBytes?: number;
   maximumConnections?: number;
   maximumConcurrentRequests?: number;
@@ -124,6 +141,7 @@ export interface HttpsBridgeListenerOptions {
   pairingStatusLimitPerMinute?: number;
   bodyTimeoutMs?: number;
   rateLimiter?: RateLimiter;
+  onPairingDiagnostic?: (diagnostic: PairingTransportDiagnostic) => void;
 }
 
 export interface HttpsBridgeListenerAddress {
@@ -134,6 +152,12 @@ export interface HttpsBridgeListenerAddress {
 
 type TransportStatus = 400 | 404 | 413 | 415 | 429 | 503;
 type TransportRoute = 'request' | 'pairing.submit' | 'pairing.status';
+
+export interface PairingTransportDiagnostic {
+  route: 'request' | 'pairing.submit' | 'pairing.status';
+  phase: 'metadata' | 'body' | 'handler';
+  status: 202 | 200 | 400 | 404 | 413 | 415 | 429 | 503;
+}
 
 interface TransportHandlerResponse {
   status: 200 | 202 | 400 | 404 | 429 | 503;
@@ -187,6 +211,15 @@ function isPrivatePeerAddress(address: string): boolean {
   return false;
 }
 
+function isTailscaleAddress(address: string): boolean {
+  const value = normalizedAddress(address);
+  if (isIP(value) === 4) {
+    const [first, second] = value.split('.').map(Number);
+    return first === 100 && second !== undefined && second >= 64 && second <= 127;
+  }
+  return isIP(value) === 6 && value.startsWith('fd7a:115c:a1e0:');
+}
+
 function countRawHeader(requestHeaders: string[], name: string): number {
   let count = 0;
   for (let index = 0; index < requestHeaders.length; index += 2) {
@@ -233,7 +266,8 @@ export class HttpsBridgeListener {
     'tlsCertificatePem' | 'tlsPrivateKeyPem'
   >;
   private readonly rateLimiter: RateLimiter;
-  private readonly server: HttpsServer;
+  private readonly onPairingDiagnostic: HttpsBridgeListenerOptions['onPairingDiagnostic'];
+  private readonly server: HttpServer | HttpsServer;
   private readonly sockets = new Set<Socket>();
   private readonly activeByPeer = new Map<string, number>();
   private readonly fingerprint: string;
@@ -245,13 +279,16 @@ export class HttpsBridgeListener {
   constructor(input: HttpsBridgeListenerOptions) {
     this.service = input.service;
     this.pairing = input.pairing;
+    this.onPairingDiagnostic = input.onPairingDiagnostic;
     const host = input.host ?? '127.0.0.1';
     const allowedHosts = input.allowedHosts ?? (isUnspecifiedAddress(host) ? [] : [host]);
     const parsedOptions = listenerOptionsSchema.parse({
       host,
       port: input.port ?? DEFAULT_PORT,
+      advertisedPort: input.advertisedPort,
       allowLan: input.allowLan ?? false,
       allowedHosts,
+      transportSecurity: input.transportSecurity ?? 'pinned_tls',
       tlsCertificatePem: input.tlsCertificatePem,
       tlsPrivateKeyPem: input.tlsPrivateKeyPem,
       maximumBodyBytes: input.maximumBodyBytes ?? DEFAULT_MAXIMUM_BODY_BYTES,
@@ -276,19 +313,23 @@ export class HttpsBridgeListener {
     this.certificateValidTo = tlsIdentity.validTo;
     this.fingerprint = tlsIdentity.certificateFingerprint;
 
-    this.server = createServer(
-      {
-        cert: tlsCertificatePem,
-        key: tlsPrivateKeyPem,
-        minVersion: 'TLSv1.3',
-        maxHeaderSize: 16 * 1024,
-        insecureHTTPParser: false,
-        handshakeTimeout: 10_000,
-      },
-      (request, response) => {
-        this.handleRequest(request, response).catch(() => response.destroy());
-      },
-    );
+    const handler = (request: IncomingMessage, response: ServerResponse) => {
+      this.handleRequest(request, response).catch(() => response.destroy());
+    };
+    this.server =
+      this.options.transportSecurity === 'tailscale_wireguard'
+        ? createHttpServer({ maxHeaderSize: 16 * 1024, insecureHTTPParser: false }, handler)
+        : createHttpsServer(
+            {
+              cert: tlsCertificatePem,
+              key: tlsPrivateKeyPem,
+              minVersion: 'TLSv1.3',
+              maxHeaderSize: 16 * 1024,
+              insecureHTTPParser: false,
+              handshakeTimeout: 10_000,
+            },
+            handler,
+          );
     this.server.maxConnections = this.options.maximumConnections;
     this.server.maxHeadersCount = 32;
     this.server.headersTimeout = 5_000;
@@ -305,7 +346,9 @@ export class HttpsBridgeListener {
       for (const socket of this.sockets) socket.destroy();
     });
     this.server.on('clientError', (_error, socket) => socket.destroy());
-    this.server.on('tlsClientError', (_error, socket) => socket.destroy());
+    if (this.options.transportSecurity === 'pinned_tls') {
+      this.server.on('tlsClientError', (_error, socket) => socket.destroy());
+    }
     this.server.on('upgrade', (_request, socket) => socket.destroy());
     this.server.on('checkContinue', (_request, response) => this.send(response, 400));
     this.server.on('checkExpectation', (_request, response) => this.send(response, 400));
@@ -357,13 +400,15 @@ export class HttpsBridgeListener {
   private async handleRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
     let peerKey: string | null = null;
     let counted = false;
+    let route: TransportRoute | null = null;
+    let phase: PairingTransportDiagnostic['phase'] = 'metadata';
     try {
       const peerAddress = request.socket.remoteAddress;
       if (!peerAddress || !this.peerIsAllowed(peerAddress)) throw new TransportError(404);
       peerKey = createHmac('sha256', this.peerHashKey)
         .update(normalizedAddress(peerAddress))
         .digest('base64url');
-      const route = this.validateRequestMetadata(request, this.boundPort());
+      route = this.validateRequestMetadata(request, this.boundPort());
       const now = Date.now();
       if (now >= this.certificateValidTo) throw new TransportError(503);
       if (
@@ -393,13 +438,19 @@ export class HttpsBridgeListener {
       }
       this.beginRequest(peerKey);
       counted = true;
+      phase = 'body';
       const input = await this.readJsonBody(request);
+      phase = 'handler';
       const result = await this.dispatch(route, input, peerKey, now);
+      this.reportPairingDiagnostic(route, phase, result.status);
       this.sendServiceResponse(response, result);
     } catch (error) {
+      const status = error instanceof TransportError ? error.status : 503;
+      const routeHint = route ?? this.pairingRouteHint(request.url);
+      if (routeHint) this.reportPairingDiagnostic(routeHint, phase, status);
       if (!response.headersSent && !response.destroyed) {
         const closeConnection = !request.complete;
-        this.send(response, error instanceof TransportError ? error.status : 503, closeConnection);
+        this.send(response, status, closeConnection);
         if (closeConnection) response.once('finish', () => request.socket.destroy());
       } else if (!response.destroyed) {
         response.destroy();
@@ -409,7 +460,32 @@ export class HttpsBridgeListener {
     }
   }
 
+  private pairingRouteHint(
+    url: string | undefined,
+  ): 'request' | 'pairing.submit' | 'pairing.status' | null {
+    if (url === '/v1/request') return 'request';
+    if (url === '/v1/pair/submit') return 'pairing.submit';
+    if (url === '/v1/pair/status') return 'pairing.status';
+    return null;
+  }
+
+  private reportPairingDiagnostic(
+    route: TransportRoute,
+    phase: PairingTransportDiagnostic['phase'],
+    status: PairingTransportDiagnostic['status'],
+  ): void {
+    if (!this.onPairingDiagnostic) return;
+    try {
+      this.onPairingDiagnostic({ route, phase, status });
+    } catch {
+      // Diagnostics cannot affect the protected transport response.
+    }
+  }
+
   private peerIsAllowed(address: string): boolean {
+    if (this.options.transportSecurity === 'tailscale_wireguard') {
+      return isTailscaleAddress(address);
+    }
     return this.options.allowLan ? isPrivatePeerAddress(address) : isLoopbackAddress(address);
   }
 
@@ -438,7 +514,7 @@ export class HttpsBridgeListener {
     if (
       !parsedHost ||
       !this.options.allowedHosts.includes(parsedHost.host) ||
-      (parsedHost.port ?? 443) !== port
+      (parsedHost.port ?? 443) !== (this.options.advertisedPort ?? port)
     ) {
       throw new TransportError(404);
     }

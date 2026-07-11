@@ -1,6 +1,6 @@
 # 011 — Encrypted Desktop Bridge listener
 
-Status: implemented transport and bridge-side pairing routes; mobile pinning pending
+Status: implemented transport and bridge-side pairing routes. The TLS-only contract below remains authoritative for same-WiFi; Spec 020 supersedes it for protocol-v2 Tailscale transport, which uses HTTP only on an exact active `100.64.0.0/10` interface over WireGuard.
 
 ## Gate decisions
 
@@ -17,7 +17,7 @@ These decisions close the listener prerequisites in `002-local-bridge-threat-mod
 
 ## Listener contract
 
-- HTTPS with TLS 1.3 is the only listener. There is no HTTP downgrade path.
+- HTTPS with TLS 1.3 is the only same-WiFi listener. The separate `tailscale_wireguard` mode permits HTTP only on an exact active `100.64.0.0/10` bind; it is not a downgrade or fallback path.
 - Construction does not open a socket. `start()` is an explicit lifecycle action.
 - Default bind is `127.0.0.1`. A non-loopback bind requires `allowLan: true`, TLS material, and explicit allowed Host values.
 - LAN mode accepts only loopback, RFC 1918, link-local, IPv6 ULA/link-local, and carrier-grade NAT peers. Public source addresses are rejected before parsing.

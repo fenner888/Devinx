@@ -32,6 +32,34 @@ const bridgeEndpointSchema = z
       return false;
     }
   }, 'Bridge endpoint must be a canonical HTTPS origin with an explicit port');
+const tailnetEndpointSchema = z
+  .string()
+  .url()
+  .max(2048)
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      const octets = url.hostname.split('.').map(Number);
+      return (
+        url.protocol === 'http:' &&
+        url.username === '' &&
+        url.password === '' &&
+        url.pathname === '/' &&
+        url.search === '' &&
+        url.hash === '' &&
+        url.port !== '' &&
+        url.toString() === value &&
+        octets.length === 4 &&
+        octets.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255) &&
+        octets[0] === 100 &&
+        octets[1] !== undefined &&
+        octets[1] >= 64 &&
+        octets[1] <= 127
+      );
+    } catch {
+      return false;
+    }
+  }, 'Tailnet endpoint must be a canonical HTTP origin in 100.64.0.0/10');
 const bridgePathSchema = z.enum(['/v1/pair/submit', '/v1/pair/status', '/v1/request']);
 const certificateFingerprintSchema = base64UrlSchema.length(43);
 const nativePinnedResponseSchema = z
@@ -253,6 +281,62 @@ export async function postPinnedBridgeJson(
     throw new Error('Bridge response was not valid JSON');
   }
   return { status: result.status, body: z.record(z.unknown()).parse(body) };
+}
+
+export async function postTailnetBridgeJson(
+  endpoint: string,
+  path: '/v1/pair/submit' | '/v1/pair/status' | '/v1/request',
+  input: unknown,
+): Promise<PinnedBridgeResponse> {
+  const origin = tailnetEndpointSchema.parse(endpoint);
+  const parsedPath = bridgePathSchema.parse(path);
+  const parsedInput = z.record(z.unknown()).parse(input);
+  const serialized = JSON.stringify(parsedInput);
+  if (new TextEncoder().encode(serialized).length > 256 * 1024) {
+    throw new Error('Bridge request exceeds the secure transport limit');
+  }
+  const requestUrl = `${origin.slice(0, -1)}${parsedPath}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: serialized,
+      cache: 'no-store',
+      credentials: 'omit',
+      redirect: 'error',
+      signal: controller.signal,
+    });
+    if (
+      (response.url !== '' && response.url !== requestUrl) ||
+      ![200, 202, 400, 404, 429, 503].includes(response.status)
+    ) {
+      throw new Error('Bridge returned an invalid response');
+    }
+    if (
+      !/^application\/json(?:;\s*charset=utf-8)?$/i.test(response.headers.get('content-type') ?? '')
+    ) {
+      throw new Error('Bridge returned an invalid content type');
+    }
+    if (response.headers.get('content-encoding') !== null) {
+      throw new Error('Bridge returned an unsupported encoded response');
+    }
+    const text = await response.text();
+    if (text.length === 0 || new TextEncoder().encode(text).length > 256 * 1024) {
+      throw new Error('Bridge response exceeded the secure transport limit');
+    }
+    const body: unknown = JSON.parse(text);
+    return {
+      status: nativePinnedResponseSchema.shape.status.parse(response.status),
+      body: z.record(z.unknown()).parse(body),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function setDeviceCryptoNativeModuleForTests(

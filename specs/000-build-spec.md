@@ -397,7 +397,7 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 
 1. **Secrets:** API key/PAT only ever in Keychain with `WHEN_UNLOCKED_THIS_DEVICE_ONLY` accessibility; excluded from iCloud/device backups. Grep-gate in CI: no `cog_` pattern, no key variable names outside `/src/auth`.
 2. **No secret leakage:** Sentry `beforeSend` scrubs Authorization headers, key-shaped strings, and message bodies; network breadcrumbs disabled for `api.devin.ai` request headers. PostHog receives event names + counts ONLY — never prompts, messages, titles, or IDs.
-3. **Transport:** TLS only; block cleartext (ATS default, no exceptions in Info.plist). Optional certificate pinning evaluated in Phase 2 (tradeoff: Cognition cert rotation breaks the app — document decision either way).
+3. **Transport:** Devin Cloud remains TLS-only. The v1 Connector uses Tailscale only and may use HTTP solely to a canonical explicit-port `100.64.0.0/10` address because Tailscale WireGuard encrypts that path; the sole ATS exception is scoped to that range, and signed device requests, replay protection, rate limits, and server-side authorization remain mandatory. The Connector never falls back to LAN or public transport.
 4. **Least privilege by design:** onboarding actively instructs users to create a scoped service user (session-use + read perms only). The app must function gracefully when permissions are missing (feature-gated UI, not crashes).
 5. **Session content is code:** treat every fetched message as potentially containing the user's proprietary source. Never in analytics, never in logs, cache encrypted / OS file-protected, cache purged on disconnect and verifiably so (test asserts empty DB + empty Keychain after logout).
 6. **Screen privacy:** mark credential fields `secureTextEntry`; add app-switcher snapshot blur on screens showing session content (privacy overlay on background).
@@ -454,6 +454,8 @@ One session per phase. Each session: reads `/specs/000-build-spec.md` + its phas
 **Session 7 (Phase 3A, required before public release)** — ACP discovery and threat model: negotiate `devin acp` capabilities, verify read-only session discovery on pinned CLI versions, specify pairing/auth/permissions, and build a localhost-only probe. No network listener or session mutation until the threat-model gate passes.
 
 **Session 8 (Phase 3B, required before public release)** — macOS Computer Connection: a user-controlled bridge wrapping the supported ACP subprocess, QR pairing, per-device credentials and permissions, read-only session browsing first, then explicitly authorized message steering. LAN/Tailscale follows localhost validation; public tunnels and relays remain deferred.
+
+**Session 9 (Phase 4A, required before public local-computer release)** — DevinX Connector: replace the terminal-only development runner with a signed, notarized macOS companion that detects Devin for Terminal and Tailscale, renders QR pairing locally, handles explicit device permissions, and provides visible per-user background lifecycle controls. Keep the bridge core platform-neutral and define secure-storage/service adapters for required Windows and Linux follow-up releases. No manual server URL or shared-password flow.
 
 ---
 

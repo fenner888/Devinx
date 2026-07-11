@@ -18,6 +18,7 @@ import {
   deviceNameSchema,
   deviceRecordSchema,
   opaqueIdSchema,
+  transportSecuritySchema,
   type BridgePermission,
   type DeviceRecord,
 } from './schemas';
@@ -38,6 +39,18 @@ const base64UrlSchema = z
 const pairingSecretSchema = base64UrlSchema.length(43);
 const pollTokenSchema = base64UrlSchema.length(43);
 
+function isTailscaleHttpEndpoint(endpoint: string): boolean {
+  const url = new URL(endpoint);
+  const [first, second] = url.hostname.split('.').map(Number);
+  return (
+    url.protocol === 'http:' &&
+    first === 100 &&
+    second !== undefined &&
+    second >= 64 &&
+    second <= 127
+  );
+}
+
 const bridgeEndpointSchema = z
   .string()
   .url()
@@ -46,7 +59,7 @@ const bridgeEndpointSchema = z
     try {
       const url = new URL(value);
       return (
-        url.protocol === 'https:' &&
+        (url.protocol === 'https:' || url.protocol === 'http:') &&
         url.username === '' &&
         url.password === '' &&
         url.pathname === '/' &&
@@ -57,14 +70,24 @@ const bridgeEndpointSchema = z
     } catch {
       return false;
     }
-  }, 'Bridge endpoint must be an HTTPS origin');
+  }, 'Bridge endpoint must be an HTTP or HTTPS origin');
 
 export const pairingTransportSchema = z
   .object({
+    transportSecurity: transportSecuritySchema,
     bridgeEndpoint: bridgeEndpointSchema,
     tlsCertificateFingerprint: base64UrlSchema.length(43),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const valid =
+      value.transportSecurity === 'tailscale_wireguard'
+        ? isTailscaleHttpEndpoint(value.bridgeEndpoint)
+        : new URL(value.bridgeEndpoint).protocol === 'https:';
+    if (!valid) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Transport security mismatch' });
+    }
+  });
 
 export const pairingOfferSchema = z
   .object({
@@ -72,6 +95,7 @@ export const pairingOfferSchema = z
     bridgeId: opaqueIdSchema,
     bridgePublicKeySpki: base64UrlSchema,
     bridgeKeyFingerprint: base64UrlSchema.length(43),
+    transportSecurity: transportSecuritySchema,
     bridgeEndpoint: bridgeEndpointSchema,
     tlsCertificateFingerprint: base64UrlSchema.length(43),
     pairingId: opaqueIdSchema,
@@ -86,6 +110,7 @@ export const unsignedPairingRequestSchema = z
     bridgeId: opaqueIdSchema,
     pairingId: opaqueIdSchema,
     bridgeKeyFingerprint: base64UrlSchema.length(43),
+    transportSecurity: transportSecuritySchema,
     bridgeEndpoint: bridgeEndpointSchema,
     tlsCertificateFingerprint: base64UrlSchema.length(43),
     deviceId: opaqueIdSchema,
@@ -105,6 +130,7 @@ export const pairingReceiptSchema = z
     protocolVersion: z.literal(BRIDGE_PROTOCOL_VERSION),
     bridgeId: opaqueIdSchema,
     bridgeKeyFingerprint: base64UrlSchema.length(43),
+    transportSecurity: transportSecuritySchema,
     bridgeEndpoint: bridgeEndpointSchema,
     tlsCertificateFingerprint: base64UrlSchema.length(43),
     deviceId: opaqueIdSchema,
@@ -263,6 +289,7 @@ function withoutProof(request: PairingRequest): UnsignedPairingRequest {
     bridgeId: request.bridgeId,
     pairingId: request.pairingId,
     bridgeKeyFingerprint: request.bridgeKeyFingerprint,
+    transportSecurity: request.transportSecurity,
     bridgeEndpoint: request.bridgeEndpoint,
     tlsCertificateFingerprint: request.tlsCertificateFingerprint,
     deviceId: request.deviceId,
@@ -334,6 +361,7 @@ export function verifyPairingReceipt(
   if (
     result.data.bridgeId !== bridgeIdResult.data ||
     result.data.bridgeKeyFingerprint !== expectedFingerprint ||
+    result.data.transportSecurity !== transportResult.data.transportSecurity ||
     result.data.bridgeEndpoint !== transportResult.data.bridgeEndpoint ||
     result.data.tlsCertificateFingerprint !== transportResult.data.tlsCertificateFingerprint
   ) {
@@ -446,6 +474,7 @@ export class PairingManager {
     }
     if (
       request.bridgeKeyFingerprint !== state.offer.bridgeKeyFingerprint ||
+      request.transportSecurity !== state.offer.transportSecurity ||
       request.bridgeEndpoint !== state.offer.bridgeEndpoint ||
       request.tlsCertificateFingerprint !== state.offer.tlsCertificateFingerprint
     ) {
@@ -513,6 +542,7 @@ export class PairingManager {
         protocolVersion: BRIDGE_PROTOCOL_VERSION,
         bridgeId: this.bridgeId,
         bridgeKeyFingerprint: this.bridgeKeyFingerprint,
+        transportSecurity: state.request.transportSecurity,
         bridgeEndpoint: state.request.bridgeEndpoint,
         tlsCertificateFingerprint: state.request.tlsCertificateFingerprint,
         deviceId: device.deviceId,

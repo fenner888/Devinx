@@ -1,10 +1,20 @@
 import { z } from 'zod';
 
 import { canonicalJson } from './canonicalJson';
-import { createRequestIdentity, postPinnedBridgeJson, sign } from './deviceSigning';
-import { loadPairedComputers, type PairedComputerCredential } from './pairedComputers';
+import {
+  createRequestIdentity,
+  deleteDeviceIdentity,
+  postPinnedBridgeJson,
+  postTailnetBridgeJson,
+  sign,
+} from './deviceSigning';
+import {
+  loadPairedComputers,
+  storePairedComputers,
+  type PairedComputerCredential,
+} from './pairedComputers';
 
-const BRIDGE_PROTOCOL_VERSION = 1 as const;
+const BRIDGE_PROTOCOL_VERSION = 2 as const;
 const REQUEST_LIFETIME_MS = 15_000;
 
 const opaqueIdSchema = z
@@ -23,10 +33,22 @@ const bridgeIdListSchema = z
     }
   });
 const localSessionIdSchema = z.string().regex(/^local_[A-Za-z0-9_-]{43}$/);
-const bridgeMethodSchema = z.enum(['bridge.health', 'session.list', 'session.load']);
+const bridgeMethodSchema = z.enum([
+  'bridge.health',
+  'device.revoke',
+  'session.list',
+  'session.load',
+  'session.prompt',
+]);
 const bridgeHealthBodySchema = z.object({}).strict();
+const deviceRevokeBodySchema = z.object({}).strict();
+const deviceRevokeResponseSchema = z.object({ revoked: z.literal(true) }).strict();
 const sessionListBodySchema = z.object({ cursor: cursorSchema.optional() }).strict();
 const sessionLoadBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
+const sessionPromptBodySchema = z
+  .object({ sessionId: localSessionIdSchema, text: z.string().trim().min(1).max(100_000) })
+  .strict();
+const sessionPromptResponseSchema = z.object({ accepted: z.literal(true) }).strict();
 
 const unsignedRequestSchema = z
   .object({
@@ -163,14 +185,18 @@ type SupportedMethod = z.infer<typeof bridgeMethodSchema>;
 
 const permissionByMethod = {
   'bridge.health': 'bridge:health',
+  'device.revoke': 'bridge:health',
   'session.list': 'session:metadata:read',
   'session.load': 'session:content:read',
+  'session.prompt': 'session:prompt:send',
 } as const satisfies Record<SupportedMethod, PairedComputerCredential['permissions'][number]>;
 
 function bodyForMethod(method: SupportedMethod, input: unknown): object {
   if (method === 'bridge.health') return bridgeHealthBodySchema.parse(input);
+  if (method === 'device.revoke') return deviceRevokeBodySchema.parse(input);
   if (method === 'session.list') return sessionListBodySchema.parse(input);
-  return sessionLoadBodySchema.parse(input);
+  if (method === 'session.load') return sessionLoadBodySchema.parse(input);
+  return sessionPromptBodySchema.parse(input);
 }
 
 function publicResponseError(status: number): ComputerBridgeError {
@@ -208,7 +234,7 @@ async function requestComputer(
   input: unknown,
 ): Promise<{ body: Record<string, unknown>; credential: PairedComputerCredential }> {
   const requiredPermission = permissionByMethod[method];
-  if (!credential.permissions.includes(requiredPermission)) {
+  if (method !== 'session.prompt' && !credential.permissions.includes(requiredPermission)) {
     throw new ComputerBridgeError(
       'This iPhone does not have permission for that Mac request.',
       'permission_denied',
@@ -232,12 +258,15 @@ async function requestComputer(
   const envelope = signedRequestSchema.parse({ ...unsigned, signature });
 
   try {
-    const response = await postPinnedBridgeJson(
-      credential.endpoint,
-      '/v1/request',
-      credential.tlsCertificateFingerprint,
-      envelope,
-    );
+    const response =
+      credential.transportSecurity === 'tailscale_wireguard'
+        ? await postTailnetBridgeJson(credential.endpoint, '/v1/request', envelope)
+        : await postPinnedBridgeJson(
+            credential.endpoint,
+            '/v1/request',
+            credential.tlsCertificateFingerprint,
+            envelope,
+          );
     if (response.status !== 200) throw publicResponseError(response.status);
     return { body: response.body, credential };
   } catch (error) {
@@ -256,6 +285,16 @@ async function requestHealth(credential: PairedComputerCredential): Promise<Comp
     );
   }
   return result.data;
+}
+
+async function requestDeviceRevocation(credential: PairedComputerCredential): Promise<void> {
+  const response = await requestComputer(credential, 'device.revoke', {});
+  if (!deviceRevokeResponseSchema.safeParse(response.body).success) {
+    throw new ComputerBridgeError(
+      'The paired Mac returned an invalid revocation response.',
+      'invalid_response',
+    );
+  }
 }
 
 async function requestSessionList(
@@ -299,11 +338,26 @@ async function requestSessionLoad(
   return result.data;
 }
 
+async function requestSessionPrompt(
+  credential: PairedComputerCredential,
+  input: { sessionId: string; text: string },
+): Promise<void> {
+  const body = sessionPromptBodySchema.parse(input);
+  const response = await requestComputer(credential, 'session.prompt', body);
+  if (!sessionPromptResponseSchema.safeParse(response.body).success) {
+    throw new ComputerBridgeError(
+      'The paired Mac returned an invalid steering response.',
+      'invalid_response',
+    );
+  }
+}
+
 export interface ComputerBridgeConnection {
   bridgeId: string;
   getHealth(): Promise<ComputerBridgeHealth>;
   listSessions(input?: { cursor?: string }): Promise<ComputerSessionPage>;
   loadSession(sessionId: string): Promise<ComputerLoadedSession>;
+  promptSession(sessionId: string, text: string): Promise<void>;
 }
 
 function connectionForCredential(credential: PairedComputerCredential): ComputerBridgeConnection {
@@ -312,7 +366,14 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
     getHealth: () => requestHealth(credential),
     listSessions: (input = {}) => requestSessionList(credential, input),
     loadSession: (sessionId) => requestSessionLoad(credential, { sessionId }),
+    promptSession: (sessionId, text) => requestSessionPrompt(credential, { sessionId, text }),
   };
+}
+
+export async function verifyComputerBridgeCredential(
+  credentialInput: PairedComputerCredential,
+): Promise<ComputerBridgeHealth> {
+  return requestHealth(credentialInput);
 }
 
 export async function openComputerBridges(
@@ -324,7 +385,9 @@ export async function openComputerBridges(
   const connections = new Map<string, ComputerBridgeConnection>();
   for (const bridgeId of bridgeIds) {
     const credential = credentials.get(bridgeId);
-    if (!credential) throw new ComputerBridgeError('This Mac is not paired.', 'not_paired');
+    if (!credential || credential.transportSecurity !== 'tailscale_wireguard') {
+      throw new ComputerBridgeError('This Mac is not paired through Tailscale.', 'not_paired');
+    }
     connections.set(bridgeId, connectionForCredential(credential));
   }
   return connections;
@@ -353,4 +416,24 @@ export async function loadComputerSession(
   sessionId: string,
 ): Promise<ComputerLoadedSession> {
   return (await openComputerBridge(bridgeId)).loadSession(sessionId);
+}
+
+export async function promptComputerSession(
+  bridgeId: string,
+  sessionId: string,
+  text: string,
+): Promise<void> {
+  return (await openComputerBridge(bridgeId)).promptSession(sessionId, text);
+}
+
+export async function disconnectComputer(bridgeIdInput: string): Promise<void> {
+  const bridgeId = opaqueIdSchema.parse(bridgeIdInput);
+  const computers = await validatedComputerRegistry();
+  const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
+  if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {
+    throw new ComputerBridgeError('This Mac is not paired through Tailscale.', 'not_paired');
+  }
+  await requestDeviceRevocation(computer);
+  await storePairedComputers(computers.filter((candidate) => candidate.bridgeId !== bridgeId));
+  await deleteDeviceIdentity(computer.deviceKeyId);
 }

@@ -1,6 +1,6 @@
 # Phase 3C — Mobile Connection Modes
 
-Status: mode model, onboarding choice, secure paired-computer registry, pinned iOS transport, pairing and desktop approval, and privacy-minimized local session discovery are implemented. Local session loading, steering, and per-computer removal remain pending.
+Status: mode model, onboarding choice, secure paired-computer registry, Tailscale-only iOS networking, pairing and desktop approval, privacy-minimized local session discovery, and authorized read-only session loading are implemented. Steering and per-computer removal remain pending. Spec 020 supersedes this document's earlier multi-transport language.
 
 ## Supported modes
 
@@ -52,5 +52,5 @@ Computer and Cloud + Computer modes issue signed, pinned health requests and lis
 ## Remaining acceptance gates
 
 - Add per-computer revocation/removal and complete mode switching without trapping a configured user.
-- Add separately authorized local session loading and steering; keep local discovery rows non-interactive until then.
+- Add separately authorized local steering and per-device permission management.
 - Validate cold start, corrupt Secure Store, revoked device, offline computer, Cloud-only regression, and combined mode on real iPhone hardware.

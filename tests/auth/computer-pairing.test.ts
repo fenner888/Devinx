@@ -9,6 +9,10 @@ const mockPostPinnedBridgeJson = jest.fn(async (..._arguments: unknown[]): Promi
   status: 202,
   body: { status: 'pending', pollToken: 'P'.repeat(43), expiresAt: 1_800_000_300_000 },
 }));
+const mockPostTailnetBridgeJson = jest.fn(async (..._arguments: unknown[]): Promise<unknown> => ({
+  status: 202,
+  body: { status: 'pending', pollToken: 'P'.repeat(43), expiresAt: 1_800_000_300_000 },
+}));
 const mockVerify = jest.fn(
   async (_publicKeySpki: string, _message: string, _signature: string) => true,
 );
@@ -19,12 +23,22 @@ jest.mock('../../src/auth/deviceSigning', () => ({
   fingerprintPublicKeySpki: (publicKeySpki: string) => mockFingerprintPublicKeySpki(publicKeySpki),
   hmacSha256: (secret: string, message: string) => mockHmacSha256(secret, message),
   postPinnedBridgeJson: (...arguments_: unknown[]) => mockPostPinnedBridgeJson(...arguments_),
+  postTailnetBridgeJson: (...arguments_: unknown[]) => mockPostTailnetBridgeJson(...arguments_),
   verify: (publicKeySpki: string, message: string, signature: string) =>
     mockVerify(publicKeySpki, message, signature),
 }));
 
 const mockLoadPairedComputers = jest.fn(async (): Promise<unknown[]> => []);
 const mockStorePairedComputers = jest.fn(async (_input: unknown) => {});
+const mockVerifyComputerBridgeCredential = jest.fn(async (_input: unknown) => ({
+  protocolVersion: 2,
+  status: 'ready',
+  capabilities: { sessionList: true, sessionLoad: true, sessionPrompt: false },
+}));
+
+jest.mock('../../src/auth/computerBridge', () => ({
+  verifyComputerBridgeCredential: (input: unknown) => mockVerifyComputerBridgeCredential(input),
+}));
 
 jest.mock('../../src/auth/pairedComputers', () => {
   const actual = jest.requireActual('../../src/auth/pairedComputers');
@@ -44,7 +58,8 @@ import {
 
 const NOW = 1_800_000_000_000;
 const OFFER = {
-  protocolVersion: 1 as const,
+  protocolVersion: 2 as const,
+  transportSecurity: 'pinned_tls' as const,
   bridgeId: 'bridge_1234567890',
   bridgePublicKeySpki: 'A'.repeat(59),
   bridgeKeyFingerprint: 'B'.repeat(43),
@@ -56,9 +71,10 @@ const OFFER = {
 };
 const DEVICE_ID = 'device_3e399a5d79c44a238aa7a418565d974d';
 const RECEIPT = {
-  protocolVersion: 1 as const,
+  protocolVersion: 2 as const,
   bridgeId: OFFER.bridgeId,
   bridgeKeyFingerprint: OFFER.bridgeKeyFingerprint,
+  transportSecurity: OFFER.transportSecurity,
   bridgeEndpoint: OFFER.bridgeEndpoint,
   tlsCertificateFingerprint: OFFER.tlsCertificateFingerprint,
   deviceId: DEVICE_ID,
@@ -122,6 +138,10 @@ describe('mobile computer pairing orchestration', () => {
 
     expect(statuses).toEqual([
       'validating',
+      'checking_bridge_identity',
+      'loading_existing_pairing',
+      'creating_device_identity',
+      'preparing_secure_request',
       'submitting',
       'waiting_for_approval',
       'saving',
@@ -147,7 +167,8 @@ describe('mobile computer pairing orchestration', () => {
     );
     expect(mockStorePairedComputers).toHaveBeenCalledWith([
       expect.objectContaining({
-        version: 2,
+        version: 3,
+        transportSecurity: 'pinned_tls',
         bridgeId: OFFER.bridgeId,
         endpoint: OFFER.bridgeEndpoint,
         tlsCertificateFingerprint: OFFER.tlsCertificateFingerprint,
@@ -170,6 +191,60 @@ describe('mobile computer pairing orchestration', () => {
       pairComputerFromQrPayload(JSON.stringify(OFFER), { computerName: 'My Mac' }),
     ).rejects.toThrow('invalid bridge identity');
     expect(mockCreateDeviceIdentity).not.toHaveBeenCalled();
+  });
+
+  it('securely migrates an existing pairing to its Tailscale endpoint', async () => {
+    const existing = {
+      version: 2 as const,
+      bridgeId: OFFER.bridgeId,
+      computerName: 'Frank’s MacBook',
+      endpoint: OFFER.bridgeEndpoint,
+      tlsCertificateFingerprint: OFFER.tlsCertificateFingerprint,
+      bridgePublicKeySpki: OFFER.bridgePublicKeySpki,
+      bridgeKeyFingerprint: OFFER.bridgeKeyFingerprint,
+      deviceId: DEVICE_ID,
+      deviceKeyId: '3e399a5d-79c4-4a23-8aa7-a418565d974d',
+      devicePublicKeySpki: 'D'.repeat(59),
+      permissions: ['bridge:health', 'session:metadata:read'] as const,
+      pairedAt: NOW - 60_000,
+    };
+    const tailscaleOffer = {
+      ...OFFER,
+      transportSecurity: 'tailscale_wireguard' as const,
+      bridgeEndpoint: 'http://100.127.166.87:45831/',
+    };
+    mockLoadPairedComputers.mockResolvedValue([existing]);
+    const statuses: string[] = [];
+
+    await expect(
+      pairComputerFromQrPayload(JSON.stringify(tailscaleOffer), {
+        computerName: 'Ignored during migration',
+        onStatus: (status) => statuses.push(status),
+      }),
+    ).resolves.toMatchObject({
+      bridgeId: OFFER.bridgeId,
+      transportKind: 'tailscale_vpn',
+      pairedAt: existing.pairedAt,
+    });
+
+    expect(mockVerifyComputerBridgeCredential).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint: tailscaleOffer.bridgeEndpoint }),
+    );
+    expect(mockStorePairedComputers).toHaveBeenCalledWith([
+      expect.objectContaining({
+        endpoint: tailscaleOffer.bridgeEndpoint,
+        deviceKeyId: existing.deviceKeyId,
+      }),
+    ]);
+    expect(mockCreateDeviceIdentity).not.toHaveBeenCalled();
+    expect(statuses).toEqual([
+      'validating',
+      'checking_bridge_identity',
+      'loading_existing_pairing',
+      'submitting',
+      'saving',
+      'complete',
+    ]);
   });
 
   it('erases the temporary device key when approval is denied or forged', async () => {

@@ -213,6 +213,44 @@ if (request.method === 'initialize') {
     }
   });
 
+  it('starts a text-only prompt asynchronously after an authorized session load', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-prompt', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  if (request.params.sessionId !== 'session-prompt' ||
+      JSON.stringify(request.params.prompt) !== JSON.stringify([{ type: 'text', text: 'Continue.' }])) process.exit(18);
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: {
+    sessionId: 'session-prompt', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Working.' } }
+  } }) + '\\n');
+  setTimeout(() => process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' }
+  }) + '\\n'), 25);
+}`);
+    const client = new AcpSessionClient({
+      executablePath,
+      requestTimeoutMs: 1_000,
+      promptTimeoutMs: 1_000,
+    });
+    try {
+      await client.start();
+      await client.listSessions();
+      await client.loadSession('session-prompt');
+      await expect(client.promptSession('session-prompt', 'Continue.')).resolves.toBeUndefined();
+    } finally {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      await client.stop();
+    }
+  });
+
   it('bounds replayed text history to the newest 200 messages', async () => {
     const executablePath = fakeCli(`
 if (request.method === 'initialize') {
@@ -320,14 +358,8 @@ if (request.method === 'initialize') {
   });
 
   it.each([
-    [
-      'relative workspace paths',
-      [{ sessionId: 'session-relative', cwd: 'relative/path' }],
-    ],
-    [
-      'invalid metadata shapes',
-      [{ sessionId: 'session-meta', cwd: '/tmp', _meta: 'invalid' }],
-    ],
+    ['relative workspace paths', [{ sessionId: 'session-relative', cwd: 'relative/path' }]],
+    ['invalid metadata shapes', [{ sessionId: 'session-meta', cwd: '/tmp', _meta: 'invalid' }]],
     [
       'duplicate session IDs',
       [

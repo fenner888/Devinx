@@ -4,9 +4,12 @@ import { StringDecoder } from 'node:string_decoder';
 
 import { z, type ZodType } from 'zod';
 
-import { BRIDGE_PROTOCOL_VERSION, sessionIdSchema, sessionListBodySchema } from './schemas';
+import { sessionIdSchema, sessionListBodySchema } from './schemas';
+
+const ACP_PROTOCOL_VERSION = 1 as const;
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 5_000;
+const DEFAULT_PROMPT_TIMEOUT_MS = 30 * 60_000;
 const MAX_JSON_RPC_BYTES = 1024 * 1024;
 const MAX_UNMATCHED_MESSAGES = 100;
 const MAX_CACHED_SESSIONS = 10_000;
@@ -32,6 +35,12 @@ const acpClientOptionsSchema = z
   .object({
     executablePath: z.string().min(1).max(4096).refine(isAbsolute, 'CLI path must be absolute'),
     requestTimeoutMs: z.number().int().min(50).max(30_000).default(DEFAULT_REQUEST_TIMEOUT_MS),
+    promptTimeoutMs: z
+      .number()
+      .int()
+      .min(1_000)
+      .max(60 * 60_000)
+      .default(DEFAULT_PROMPT_TIMEOUT_MS),
   })
   .strict();
 
@@ -54,7 +63,7 @@ const jsonRpcMessageSchema = z
 
 const initializeResultSchema = z
   .object({
-    protocolVersion: z.literal(BRIDGE_PROTOCOL_VERSION),
+    protocolVersion: z.literal(ACP_PROTOCOL_VERSION),
     agentCapabilities: z.record(z.unknown()),
     agentInfo: z
       .object({
@@ -103,6 +112,12 @@ const loadSessionResultSchema = z.union([
     .passthrough(),
 ]);
 
+const promptResponseSchema = z
+  .object({
+    stopReason: z.enum(['end_turn', 'max_tokens', 'max_turn_requests', 'refusal', 'cancelled']),
+  })
+  .passthrough();
+
 const sessionUpdateNotificationSchema = z
   .object({
     sessionId: sessionIdSchema,
@@ -132,6 +147,7 @@ const textReplayUpdateSchema = z
 export interface AcpClientOptions {
   executablePath: string;
   requestTimeoutMs?: number;
+  promptTimeoutMs?: number;
 }
 
 export interface AcpSessionMetadata {
@@ -199,7 +215,11 @@ function safeChildEnvironment(): NodeJS.ProcessEnv {
 
 function supportsSessionList(agentCapabilities: Record<string, unknown>): boolean {
   const sessionCapabilities = agentCapabilities.sessionCapabilities;
-  if (!sessionCapabilities || typeof sessionCapabilities !== 'object' || Array.isArray(sessionCapabilities)) {
+  if (
+    !sessionCapabilities ||
+    typeof sessionCapabilities !== 'object' ||
+    Array.isArray(sessionCapabilities)
+  ) {
     return false;
   }
   const list = (sessionCapabilities as Record<string, unknown>).list;
@@ -237,7 +257,9 @@ export class AcpSessionClient {
   private canListSessions = false;
   private canLoadSessions = false;
   private readonly listedSessions = new Map<string, CachedSessionMetadata>();
+  private readonly loadedSessions = new Set<string>();
   private activeLoad: ReplayCollector | null = null;
+  private activePromptSessionId: string | null = null;
 
   constructor(options: AcpClientOptions) {
     this.options = acpClientOptionsSchema.parse(options);
@@ -254,6 +276,7 @@ export class AcpSessionClient {
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;
     this.listedSessions.clear();
+    this.loadedSessions.clear();
     this.activeLoad = null;
     const child = spawn(this.options.executablePath, ['acp'], {
       cwd: workingDirectory,
@@ -272,7 +295,7 @@ export class AcpSessionClient {
       const initialization = await this.request(
         'initialize',
         {
-          protocolVersion: BRIDGE_PROTOCOL_VERSION,
+          protocolVersion: ACP_PROTOCOL_VERSION,
           clientCapabilities: {},
           clientInfo: { name: 'devinx-desktop-bridge', version: '1' },
         },
@@ -328,10 +351,15 @@ export class AcpSessionClient {
     return Boolean(this.child) && this.canLoadSessions;
   }
 
+  isSessionPromptSupported(): boolean {
+    return Boolean(this.child);
+  }
+
   async loadSession(input: unknown): Promise<AcpLoadedSession> {
     if (!this.child) throw new Error('ACP client is not started');
     if (!this.canLoadSessions) throw new Error('ACP agent does not support session loading');
     if (this.activeLoad) throw new Error('ACP session loading is busy');
+    if (this.activePromptSessionId) throw new Error('ACP session prompting is busy');
     const sessionId = sessionIdSchema.parse(input);
     const metadata = this.listedSessions.get(sessionId);
     if (!metadata) throw new Error('ACP session must be listed before loading');
@@ -355,6 +383,7 @@ export class AcpSessionClient {
       );
       collector.accepting = false;
       if (collector.failed) throw new Error('ACP session replay failed validation');
+      this.loadedSessions.add(sessionId);
       return {
         sessionId,
         cwd: metadata.cwd,
@@ -366,13 +395,41 @@ export class AcpSessionClient {
     }
   }
 
+  async promptSession(sessionIdInput: unknown, textInput: unknown): Promise<void> {
+    if (!this.child) throw new Error('ACP client is not started');
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    const text = z.string().trim().min(1).max(100_000).parse(textInput);
+    if (!this.loadedSessions.has(sessionId)) {
+      throw new Error('ACP session must be loaded before prompting');
+    }
+    if (this.activeLoad || this.activePromptSessionId)
+      throw new Error('ACP session prompting is busy');
+    this.activePromptSessionId = sessionId;
+    this.request(
+      'session/prompt',
+      { sessionId, prompt: [{ type: 'text', text }] },
+      promptResponseSchema,
+      'session prompt',
+      this.options.promptTimeoutMs,
+    ).then(
+      () => {
+        if (this.activePromptSessionId === sessionId) this.activePromptSessionId = null;
+      },
+      () => {
+        if (this.activePromptSessionId === sessionId) this.activePromptSessionId = null;
+      },
+    );
+  }
+
   async stop(): Promise<void> {
     const child = this.child;
     this.child = null;
     this.canListSessions = false;
     this.canLoadSessions = false;
     this.listedSessions.clear();
+    this.loadedSessions.clear();
     this.activeLoad = null;
+    this.activePromptSessionId = null;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;
@@ -400,6 +457,7 @@ export class AcpSessionClient {
     params: unknown,
     schema: ZodType<T>,
     operation: string,
+    timeoutMs = this.options.requestTimeoutMs,
   ): Promise<T> {
     const child = this.child;
     if (!child) return Promise.reject(new Error('ACP client is not started'));
@@ -412,7 +470,7 @@ export class AcpSessionClient {
         const error = new Error(`ACP ${operation} timed out`);
         reject(error);
         this.abort(child, error);
-      }, this.options.requestTimeoutMs);
+      }, timeoutMs);
       timer.unref();
       this.pending.set(id, {
         operation,
@@ -428,7 +486,10 @@ export class AcpSessionClient {
   private handleData(child: ChildProcessWithoutNullStreams, chunk: Buffer): void {
     if (child !== this.child) return;
     this.buffer += this.decoder.write(chunk);
-    if (Buffer.byteLength(this.buffer, 'utf8') > MAX_JSON_RPC_BYTES && !this.buffer.includes('\n')) {
+    if (
+      Buffer.byteLength(this.buffer, 'utf8') > MAX_JSON_RPC_BYTES &&
+      !this.buffer.includes('\n')
+    ) {
       this.abort(child, new Error('ACP message exceeded the size limit'));
       return;
     }
@@ -497,6 +558,13 @@ export class AcpSessionClient {
 
   private handleSessionUpdate(child: ChildProcessWithoutNullStreams, input: unknown): void {
     const collector = this.activeLoad;
+    if (!collector && this.activePromptSessionId) {
+      const result = sessionUpdateNotificationSchema.safeParse(input);
+      if (!result.success || result.data.sessionId !== this.activePromptSessionId) {
+        this.abort(child, new Error('ACP prompt update failed validation'));
+      }
+      return;
+    }
     if (!collector || !collector.accepting) {
       this.unmatchedMessages += 1;
       if (this.unmatchedMessages > MAX_UNMATCHED_MESSAGES) {
@@ -583,8 +651,10 @@ export class AcpSessionClient {
     this.canListSessions = false;
     this.canLoadSessions = false;
     this.listedSessions.clear();
+    this.loadedSessions.clear();
     if (this.activeLoad) this.activeLoad.failed = true;
     this.activeLoad = null;
+    this.activePromptSessionId = null;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;
@@ -604,8 +674,10 @@ export class AcpSessionClient {
     this.canListSessions = false;
     this.canLoadSessions = false;
     this.listedSessions.clear();
+    this.loadedSessions.clear();
     if (this.activeLoad) this.activeLoad.failed = true;
     this.activeLoad = null;
+    this.activePromptSessionId = null;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;

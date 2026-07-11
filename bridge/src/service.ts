@@ -16,6 +16,7 @@ import {
   opaqueIdSchema,
   sessionListBodySchema,
   sessionLoadBodySchema,
+  sessionPromptBodySchema,
 } from './schemas';
 import type { SessionHandleRegistry } from './session-handles';
 
@@ -34,7 +35,12 @@ const serviceOptionsSchema = z
     healthLimit: z.number().int().min(1).max(10_000).default(120),
     sessionListLimit: z.number().int().min(1).max(10_000).default(30),
     mutationLimit: z.number().int().min(1).max(10_000).default(10),
-    windowMs: z.number().int().min(1_000).max(60 * 60 * 1_000).default(60_000),
+    windowMs: z
+      .number()
+      .int()
+      .min(1_000)
+      .max(60 * 60 * 1_000)
+      .default(60_000),
   })
   .strict();
 
@@ -99,11 +105,13 @@ export interface SessionDiscoveryAdapter {
   listSessions(input?: unknown): Promise<AcpSessionPage>;
   isSessionLoadSupported(): boolean;
   loadSession(sessionId: string): Promise<AcpLoadedSession>;
+  isSessionPromptSupported(): boolean;
+  promptSession(sessionId: string, text: string): Promise<void>;
 }
 
 export interface BridgeServiceOptions {
   bridgeId: string;
-  devices: DeviceStore;
+  devices: DeviceStore & { revoke?(deviceId: string): Promise<boolean> };
   replayGuard: ReplayGuard;
   rateLimiter: RateLimiter;
   sessionHandles: SessionHandleRegistry;
@@ -248,17 +256,36 @@ export class BridgeService {
           status: 'ready',
           capabilities: {
             sessionList: this.dependencies.sessions.isSessionListSupported(),
-            sessionLoad: this.dependencies.sessions.isSessionLoadSupported(),
-            sessionPrompt: false,
+            sessionLoad:
+              this.dependencies.sessions.isSessionLoadSupported() &&
+              authorization.request.device.permissions.includes('session:content:read'),
+            sessionPrompt:
+              this.dependencies.sessions.isSessionPromptSupported() &&
+              authorization.request.device.permissions.includes('session:prompt:send'),
           },
         }),
       };
+    }
+    if (authorization.request.method === 'device.revoke') {
+      try {
+        const revoked = await this.dependencies.devices.revoke?.(
+          authorization.request.device.deviceId,
+        );
+        return revoked
+          ? { status: 200, body: { revoked: true } }
+          : { status: 503, body: { error: 'temporarily_unavailable' } };
+      } catch {
+        return { status: 503, body: { error: 'temporarily_unavailable' } };
+      }
     }
     if (authorization.request.method === 'session.list') {
       return this.listSessions(authorization, context.now);
     }
     if (authorization.request.method === 'session.load') {
       return this.loadSession(authorization, context.now);
+    }
+    if (authorization.request.method === 'session.prompt') {
+      return this.promptSession(authorization, context.now);
     }
     return { status: 404, body: { error: 'not_found' } };
   }
@@ -280,9 +307,8 @@ export class BridgeService {
     try {
       const body = sessionListBodySchema.parse(authorization.request.body);
       const page = await this.dependencies.sessions.listSessions(body);
-      const mayReadTitles = authorization.request.device.permissions.includes(
-        'session:content:read',
-      );
+      const mayReadTitles =
+        authorization.request.device.permissions.includes('session:content:read');
       const response = localSessionPageSchema.parse({
         sessions: page.sessions.map((session) => ({
           id: this.dependencies.sessionHandles.register(session.sessionId, now),
@@ -341,6 +367,24 @@ export class BridgeService {
       return { status: 503, body: { error: 'temporarily_unavailable' } };
     } finally {
       this.loading = false;
+    }
+  }
+
+  private async promptSession(
+    authorization: RequestAuthorization,
+    now: number,
+  ): Promise<BridgeServiceResponse> {
+    if (!this.dependencies.sessions.isSessionPromptSupported()) {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+    const body = sessionPromptBodySchema.parse(authorization.request.body);
+    const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
+    if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
+    try {
+      await this.dependencies.sessions.promptSession(rawSessionId, body.text);
+      return { status: 200, body: { accepted: true } };
+    } catch {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
     }
   }
 }

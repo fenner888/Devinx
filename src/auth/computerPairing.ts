@@ -1,12 +1,14 @@
 import { z } from 'zod';
 
 import { canonicalJson } from './canonicalJson';
+import { verifyComputerBridgeCredential } from './computerBridge';
 import {
   createDeviceIdentity,
   deleteDeviceIdentity,
   fingerprintPublicKeySpki,
   hmacSha256,
   postPinnedBridgeJson,
+  postTailnetBridgeJson,
   verify,
 } from './deviceSigning';
 import {
@@ -18,7 +20,7 @@ import {
   type PairedComputerSummary,
 } from './pairedComputers';
 
-const PROTOCOL_VERSION = 1 as const;
+const PROTOCOL_VERSION = 2 as const;
 const MAXIMUM_QR_BYTES = 4_096;
 const MAXIMUM_PAIRING_WINDOW_MS = 15 * 60 * 1_000;
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
@@ -54,7 +56,7 @@ const bridgeEndpointSchema = z
     try {
       const url = new URL(value);
       return (
-        url.protocol === 'https:' &&
+        (url.protocol === 'https:' || url.protocol === 'http:') &&
         url.username === '' &&
         url.password === '' &&
         url.pathname === '/' &&
@@ -66,7 +68,20 @@ const bridgeEndpointSchema = z
     } catch {
       return false;
     }
-  }, 'Bridge endpoint must be a canonical HTTPS origin with an explicit port');
+  }, 'Bridge endpoint must be a canonical HTTP or HTTPS origin with an explicit port');
+const transportSecuritySchema = z.enum(['tailscale_wireguard', 'pinned_tls']);
+
+function isTailscaleHttpEndpoint(endpoint: string): boolean {
+  const url = new URL(endpoint);
+  const [first, second] = url.hostname.split('.').map(Number);
+  return (
+    url.protocol === 'http:' &&
+    first === 100 &&
+    second !== undefined &&
+    second >= 64 &&
+    second <= 127
+  );
+}
 const bridgePermissionSchema = z.enum([
   'bridge:health',
   'session:metadata:read',
@@ -80,13 +95,23 @@ export const computerPairingOfferSchema = z
     bridgeId: opaqueIdSchema,
     bridgePublicKeySpki: base64UrlSchema.length(59),
     bridgeKeyFingerprint: base64UrlSchema.length(43),
+    transportSecurity: transportSecuritySchema,
     bridgeEndpoint: bridgeEndpointSchema,
     tlsCertificateFingerprint: base64UrlSchema.length(43),
     pairingId: opaqueIdSchema,
     pairingSecret: base64UrlSchema.length(43),
     expiresAt: z.number().int().positive(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const valid =
+      value.transportSecurity === 'tailscale_wireguard'
+        ? isTailscaleHttpEndpoint(value.bridgeEndpoint)
+        : new URL(value.bridgeEndpoint).protocol === 'https:';
+    if (!valid) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Transport security mismatch' });
+    }
+  });
 
 const unsignedPairingRequestSchema = z
   .object({
@@ -94,6 +119,7 @@ const unsignedPairingRequestSchema = z
     bridgeId: opaqueIdSchema,
     pairingId: opaqueIdSchema,
     bridgeKeyFingerprint: base64UrlSchema.length(43),
+    transportSecurity: transportSecuritySchema,
     bridgeEndpoint: bridgeEndpointSchema,
     tlsCertificateFingerprint: base64UrlSchema.length(43),
     deviceId: opaqueIdSchema,
@@ -122,6 +148,7 @@ const pairingReceiptSchema = z
     protocolVersion: z.literal(PROTOCOL_VERSION),
     bridgeId: opaqueIdSchema,
     bridgeKeyFingerprint: base64UrlSchema.length(43),
+    transportSecurity: transportSecuritySchema,
     bridgeEndpoint: bridgeEndpointSchema,
     tlsCertificateFingerprint: base64UrlSchema.length(43),
     deviceId: opaqueIdSchema,
@@ -145,7 +172,15 @@ const approvedStatusSchema = z
 
 export type ComputerPairingOffer = z.infer<typeof computerPairingOfferSchema>;
 export type ComputerPairingStatus =
-  'validating' | 'submitting' | 'waiting_for_approval' | 'saving' | 'complete';
+  | 'validating'
+  | 'checking_bridge_identity'
+  | 'loading_existing_pairing'
+  | 'creating_device_identity'
+  | 'preparing_secure_request'
+  | 'submitting'
+  | 'waiting_for_approval'
+  | 'saving'
+  | 'complete';
 
 export interface PairComputerOptions {
   computerName: string;
@@ -232,6 +267,7 @@ async function verifyReceipt(
   if (
     receipt.bridgeId !== offer.bridgeId ||
     receipt.bridgeKeyFingerprint !== offer.bridgeKeyFingerprint ||
+    receipt.transportSecurity !== offer.transportSecurity ||
     receipt.bridgeEndpoint !== offer.bridgeEndpoint ||
     receipt.tlsCertificateFingerprint !== offer.tlsCertificateFingerprint ||
     receipt.deviceId !== deviceId
@@ -255,6 +291,66 @@ function summary(credential: PairedComputerCredential): PairedComputerSummary {
   };
 }
 
+function bridgeIdentityMatches(
+  credential: PairedComputerCredential,
+  offer: ComputerPairingOffer,
+): boolean {
+  return (
+    credential.bridgeId === offer.bridgeId &&
+    credential.bridgePublicKeySpki === offer.bridgePublicKeySpki &&
+    credential.bridgeKeyFingerprint === offer.bridgeKeyFingerprint &&
+    credential.tlsCertificateFingerprint === offer.tlsCertificateFingerprint
+  );
+}
+
+async function migratePairedComputerEndpoint(
+  current: PairedComputerCredential,
+  offer: ComputerPairingOffer,
+  options: PairComputerOptions,
+): Promise<PairedComputerSummary> {
+  if (!bridgeIdentityMatches(current, offer)) {
+    throw new Error('The pairing code does not match the paired Mac identity');
+  }
+  const candidate = pairedComputerCredentialSchema.parse({
+    ...current,
+    endpoint: offer.bridgeEndpoint,
+    transportSecurity: offer.transportSecurity,
+  });
+  ensureActive(options.signal);
+  notify(options, 'submitting');
+  await verifyComputerBridgeCredential(candidate);
+  ensureActive(options.signal);
+  notify(options, 'saving');
+  const latestComputers = await loadPairedComputers();
+  const latestIndex = latestComputers.findIndex((computer) => computer.bridgeId === offer.bridgeId);
+  const latest = latestComputers[latestIndex];
+  if (!latest || !bridgeIdentityMatches(latest, offer)) {
+    throw new Error('The paired Mac changed while its connection was being updated');
+  }
+  const updated = pairedComputerCredentialSchema.parse({
+    ...latest,
+    endpoint: offer.bridgeEndpoint,
+    transportSecurity: offer.transportSecurity,
+  });
+  await storePairedComputers([
+    ...latestComputers.slice(0, latestIndex),
+    updated,
+    ...latestComputers.slice(latestIndex + 1),
+  ]);
+  notify(options, 'complete');
+  return summary(updated);
+}
+
+function postPairingJson(
+  offer: ComputerPairingOffer,
+  path: '/v1/pair/submit' | '/v1/pair/status',
+  input: unknown,
+) {
+  return offer.transportSecurity === 'tailscale_wireguard'
+    ? postTailnetBridgeJson(offer.bridgeEndpoint, path, input)
+    : postPinnedBridgeJson(offer.bridgeEndpoint, path, offer.tlsCertificateFingerprint, input);
+}
+
 async function performComputerPairing(
   payload: string,
   options: PairComputerOptions,
@@ -266,25 +362,33 @@ async function performComputerPairing(
   const offer = parseOffer(payload, now);
   const computerName = deviceNameSchema.parse(options.computerName);
   const deviceName = deviceNameSchema.parse(options.deviceName ?? 'DevinX iPhone');
+  notify(options, 'checking_bridge_identity');
   if ((await fingerprintPublicKeySpki(offer.bridgePublicKeySpki)) !== offer.bridgeKeyFingerprint) {
     throw new Error('The pairing code has an invalid bridge identity');
   }
+  notify(options, 'loading_existing_pairing');
   const initialComputers = await loadPairedComputers();
-  if (initialComputers.some((computer) => computer.bridgeId === offer.bridgeId)) {
-    throw new Error('This Mac is already paired');
+  const existingComputer = initialComputers.find(
+    (computer) => computer.bridgeId === offer.bridgeId,
+  );
+  if (existingComputer) {
+    return migratePairedComputerEndpoint(existingComputer, offer, options);
   }
   if (initialComputers.length >= 8) throw new Error('Remove a paired Mac before adding another');
 
+  notify(options, 'creating_device_identity');
   const identity = await createDeviceIdentity();
   const deviceId = `device_${identity.keyId.replaceAll('-', '')}`;
   let stored = false;
   try {
     ensureActive(options.signal);
+    notify(options, 'preparing_secure_request');
     const unsignedRequest = unsignedPairingRequestSchema.parse({
       protocolVersion: PROTOCOL_VERSION,
       bridgeId: offer.bridgeId,
       pairingId: offer.pairingId,
       bridgeKeyFingerprint: offer.bridgeKeyFingerprint,
+      transportSecurity: offer.transportSecurity,
       bridgeEndpoint: offer.bridgeEndpoint,
       tlsCertificateFingerprint: offer.tlsCertificateFingerprint,
       deviceId,
@@ -293,12 +397,10 @@ async function performComputerPairing(
     });
     const proof = await hmacSha256(offer.pairingSecret, canonicalJson(unsignedRequest));
     notify(options, 'submitting');
-    const submission = await postPinnedBridgeJson(
-      offer.bridgeEndpoint,
-      '/v1/pair/submit',
-      offer.tlsCertificateFingerprint,
-      { ...unsignedRequest, proof },
-    );
+    const submission = await postPairingJson(offer, '/v1/pair/submit', {
+      ...unsignedRequest,
+      proof,
+    });
     ensureActive(options.signal);
     if (submission.status !== 202) throw new Error('The Mac did not accept the pairing request');
     const pending = pendingSubmissionSchema.parse(submission.body);
@@ -311,17 +413,12 @@ async function performComputerPairing(
       const remaining = pending.expiresAt - pairingRuntime.now();
       await pairingRuntime.wait(Math.min(DEFAULT_POLL_INTERVAL_MS, remaining), options.signal);
       ensureActive(options.signal);
-      const poll = await postPinnedBridgeJson(
-        offer.bridgeEndpoint,
-        '/v1/pair/status',
-        offer.tlsCertificateFingerprint,
-        {
-          protocolVersion: PROTOCOL_VERSION,
-          bridgeId: offer.bridgeId,
-          pairingId: offer.pairingId,
-          pollToken: pending.pollToken,
-        },
-      );
+      const poll = await postPairingJson(offer, '/v1/pair/status', {
+        protocolVersion: PROTOCOL_VERSION,
+        bridgeId: offer.bridgeId,
+        pairingId: offer.pairingId,
+        pollToken: pending.pollToken,
+      });
       ensureActive(options.signal);
       if (poll.status === 202) {
         const status = pendingStatusSchema.parse(poll.body);
@@ -346,10 +443,11 @@ async function performComputerPairing(
       throw new Error('Remove a paired Mac before adding another');
     }
     const credential = pairedComputerCredentialSchema.parse({
-      version: 2,
+      version: 3,
       bridgeId: offer.bridgeId,
       computerName,
       endpoint: offer.bridgeEndpoint,
+      transportSecurity: offer.transportSecurity,
       tlsCertificateFingerprint: offer.tlsCertificateFingerprint,
       bridgePublicKeySpki: offer.bridgePublicKeySpki,
       bridgeKeyFingerprint: offer.bridgeKeyFingerprint,
