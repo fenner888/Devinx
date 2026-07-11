@@ -4,6 +4,7 @@ import { isIP } from 'node:net';
 import { z } from 'zod';
 
 import { AcpSessionClient } from './acp';
+import { DevinSessionStore } from './devin-session-store';
 import type { HttpsBridgeListenerAddress, HttpsBridgeListenerOptions } from './listener';
 import { HttpsBridgeListener } from './listener';
 import { MacOSKeychainSecretStore } from './macos-keychain';
@@ -52,6 +53,12 @@ const runnerOptionsSchema = z
       .max(4_096)
       .refine(isAbsolute, 'Devin CLI path must be absolute')
       .optional(),
+    devinSessionDbPath: z
+      .string()
+      .min(1)
+      .max(4_096)
+      .refine(isAbsolute, 'Devin session database path must be absolute')
+      .optional(),
   })
   .strict();
 
@@ -61,6 +68,7 @@ export interface DesktopBridgeRunnerOptions {
   port?: number;
   bindPort?: number;
   devinCliPath?: string;
+  devinSessionDbPath?: string;
 }
 
 export interface PairingQrRenderer {
@@ -77,12 +85,20 @@ export interface AcpSessionLifecycle extends SessionDiscoveryAdapter {
   stop(): Promise<void>;
 }
 
+export interface SessionHistoryLifecycle {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  isSessionLoadSupported(): boolean;
+  loadSession(sessionId: string): ReturnType<SessionDiscoveryAdapter['loadSession']>;
+}
+
 export interface DesktopBridgeRunnerDependencies {
   secretStore: SecretStore;
   tlsIdentityGenerator: TlsIdentityGenerator;
   qrRenderer: PairingQrRenderer;
   createListener(options: HttpsBridgeListenerOptions): BridgeListenerLifecycle;
   createAcpClient(executablePath: string): AcpSessionLifecycle;
+  createSessionStore?(databasePath: string): SessionHistoryLifecycle;
   onPairingDiagnostic?: HttpsBridgeListenerOptions['onPairingDiagnostic'];
 }
 
@@ -106,13 +122,18 @@ const MAXIMUM_REHYDRATION_PAGES = 100;
 
 export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapter {
   private current: SessionDiscoveryAdapter = unavailableSessions;
+  private history: SessionHistoryLifecycle | null = null;
   private readonly listedSessionIds = new Set<string>();
-  private readonly loadedSessionIds = new Set<string>();
+  private readonly acpLoadedSessionIds = new Set<string>();
 
   replace(adapter: SessionDiscoveryAdapter | null): void {
     this.current = adapter ?? unavailableSessions;
     this.listedSessionIds.clear();
-    this.loadedSessionIds.clear();
+    this.acpLoadedSessionIds.clear();
+  }
+
+  setHistory(adapter: SessionHistoryLifecycle | null): void {
+    this.history = adapter;
   }
 
   isSessionListSupported(): boolean {
@@ -126,13 +147,21 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   }
 
   isSessionLoadSupported(): boolean {
-    return this.current.isSessionLoadSupported();
+    return Boolean(this.history?.isSessionLoadSupported()) || this.current.isSessionLoadSupported();
   }
 
   async loadSession(input: string): ReturnType<SessionDiscoveryAdapter['loadSession']> {
     await this.ensureSessionListed(input);
+    if (this.history?.isSessionLoadSupported()) {
+      try {
+        return await this.history.loadSession(input);
+      } catch {
+        // Fall back to negotiated ACP loading when the reviewed store cannot
+        // provide this specific session without exposing its private error.
+      }
+    }
     const loaded = await this.current.loadSession(input);
-    this.loadedSessionIds.add(input);
+    this.acpLoadedSessionIds.add(input);
     return loaded;
   }
 
@@ -144,7 +173,11 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     sessionId: string,
     text: string,
   ): ReturnType<SessionDiscoveryAdapter['promptSession']> {
-    if (!this.loadedSessionIds.has(sessionId)) await this.loadSession(sessionId);
+    await this.ensureSessionListed(sessionId);
+    if (!this.acpLoadedSessionIds.has(sessionId)) {
+      await this.current.loadSession(sessionId);
+      this.acpLoadedSessionIds.add(sessionId);
+    }
     return this.current.promptSession(sessionId, text);
   }
 
@@ -172,12 +205,14 @@ export function createProductionRunnerDependencies(
     qrRenderer,
     createListener: (options) => new HttpsBridgeListener(options),
     createAcpClient: (executablePath) => new AcpSessionClient({ executablePath }),
+    createSessionStore: (databasePath) => new DevinSessionStore({ databasePath }),
   };
 }
 
 export class DesktopBridgeRunner {
   private listener: BridgeListenerLifecycle | null = null;
   private acp: AcpSessionLifecycle | null = null;
+  private history: SessionHistoryLifecycle | null = null;
   private readonly sessions = new RecoverableSessionDiscoveryAdapter();
   private acpRecovery: Promise<boolean> | null = null;
   private devinCliPath: string | null = null;
@@ -226,6 +261,16 @@ export class DesktopBridgeRunner {
         await acp.start();
         this.sessions.replace(acp);
         sessions = this.sessions;
+        if (options.devinSessionDbPath && this.dependencies.createSessionStore) {
+          const history = this.dependencies.createSessionStore(options.devinSessionDbPath);
+          try {
+            await history.start();
+            this.history = history;
+            this.sessions.setHistory(history);
+          } catch {
+            await history.stop().catch(() => {});
+          }
+        }
       }
 
       const pairing = new PairingManager(runtime.identity, runtime.devices);
@@ -390,10 +435,13 @@ export class DesktopBridgeRunner {
     if (recovery) await recovery.catch(() => false);
     const listener = this.listener;
     const acp = this.acp;
+    const history = this.history;
     const sessionHandles = this.sessionHandles;
     this.listener = null;
     this.acp = null;
+    this.history = null;
     this.sessions.replace(null);
+    this.sessions.setHistory(null);
     this.devinCliPath = null;
     this.pairing = null;
     this.sessionHandles = null;
@@ -403,6 +451,7 @@ export class DesktopBridgeRunner {
     const results = await Promise.allSettled([
       listener?.stop() ?? Promise.resolve(),
       acp?.stop() ?? Promise.resolve(),
+      history?.stop() ?? Promise.resolve(),
     ]);
     sessionHandles?.destroy();
     if (results.some((result) => result.status === 'rejected')) {

@@ -38,6 +38,7 @@ export interface ConnectorControllerOptions {
       port?: number;
       bindPort?: number;
       devinCliPath?: string;
+      devinSessionDbPath?: string;
     },
     dependencies: DesktopBridgeRunnerDependencies,
   ) => DesktopBridgeRunner;
@@ -81,6 +82,7 @@ export class ConnectorController {
     const addresses = this.platform.discoverPrivateAddresses(this.interfaces);
     const host = selectPreferredConnectorAddress(addresses);
     const devinCliPath = await this.platform.discoverDevinCli(this.environment);
+    const devinSessionDbPath = await this.platform.discoverDevinSessionDb(this.environment);
     const qrRenderer = {
       render: (payload: string) => {
         const offer = pairingOfferSchema.parse(JSON.parse(payload));
@@ -114,6 +116,7 @@ export class ConnectorController {
         advertisedHost: host,
         port: CONNECTOR_EXTERNAL_PORT,
         ...(devinCliPath ? { devinCliPath } : {}),
+        ...(devinSessionDbPath ? { devinSessionDbPath } : {}),
       },
       dependencies,
     );

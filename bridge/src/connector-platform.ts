@@ -20,6 +20,7 @@ export interface ConnectorPlatformAdapter {
   createSecretStore(): SecretStore;
   discoverPrivateAddresses(interfaces: NetworkInterfaceMap): string[];
   discoverDevinCli(environment: NodeJS.ProcessEnv): Promise<string | null>;
+  discoverDevinSessionDb(environment: NodeJS.ProcessEnv): Promise<string | null>;
 }
 
 const pathEntrySchema = z.string().min(1).max(4_096);
@@ -109,6 +110,20 @@ export async function discoverMacOSDevinCli(
   return firstExecutable(macOSDevinCliCandidates(environment));
 }
 
+export async function discoverMacOSDevinSessionDb(
+  environment: NodeJS.ProcessEnv,
+): Promise<string | null> {
+  const home = environment.HOME;
+  if (!home || !isAbsolute(home)) return null;
+  const candidate = join(home, '.local', 'share', 'devin', 'cli', 'sessions.db');
+  try {
+    await access(candidate, constants.R_OK);
+    return candidate;
+  } catch {
+    return null;
+  }
+}
+
 export class MacOSConnectorPlatformAdapter implements ConnectorPlatformAdapter {
   readonly id = 'macos' as const;
 
@@ -122,6 +137,10 @@ export class MacOSConnectorPlatformAdapter implements ConnectorPlatformAdapter {
 
   discoverDevinCli(environment: NodeJS.ProcessEnv): Promise<string | null> {
     return discoverMacOSDevinCli(environment);
+  }
+
+  discoverDevinSessionDb(environment: NodeJS.ProcessEnv): Promise<string | null> {
+    return discoverMacOSDevinSessionDb(environment);
   }
 }
 

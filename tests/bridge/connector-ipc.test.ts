@@ -11,6 +11,7 @@ import {
 import {
   createConnectorPlatformAdapter,
   discoverDevinCliFromPath,
+  discoverMacOSDevinSessionDb,
   executableCandidates,
   macOSDevinCliCandidates,
   selectPreferredConnectorAddress,
@@ -73,6 +74,15 @@ describe('DevinX Connector platform and IPC boundary', () => {
       '/Users/tester/Applications/Devin.app/Contents/Resources/app/extensions/windsurf/devin/bin/devin',
     );
     expect(candidates.every((candidate) => candidate.startsWith('/'))).toBe(true);
+  });
+
+  it('derives the read-only Devin session store only from an absolute home', async () => {
+    await expect(
+      discoverMacOSDevinSessionDb({ NODE_ENV: 'test', HOME: 'relative' }),
+    ).resolves.toBeNull();
+    await expect(
+      discoverMacOSDevinSessionDb({ NODE_ENV: 'test', HOME: '/missing-home' }),
+    ).resolves.toBeNull();
   });
 
   it('strictly validates bounded local connector commands and events', () => {
