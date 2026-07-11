@@ -6,7 +6,7 @@
  * Key retrieval is lazy + memoized per app foreground; zeroized on disconnect.
  */
 
-import * as Sentry from '@sentry/react-native';
+import { captureDiagnostic } from '@lib/diagnostics';
 import { branding } from '@lib/branding';
 import { loadCredentials, storeSecret, wipeCloudSecrets, type StoredCredentials } from './keychain';
 import type { AuthProvider, ValidationResult } from './AuthProvider';
@@ -135,7 +135,7 @@ export class ServiceUserAuth implements AuthProvider {
           detail: 'Could not reach api.devin.ai. Check your connection.',
         };
       }
-      Sentry.captureException(e);
+      captureDiagnostic(e);
       return { ok: false, code: 'network', detail: msg };
     }
   }

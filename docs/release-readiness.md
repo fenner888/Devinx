@@ -27,6 +27,7 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (24)` was built locally from clean commit `80c615c`, containing the complete local-data wipe, corrected EAS Update privacy disclosure, App Store-length subtitle, and public-release audit
 - [x] Build 24 IPA signature, bundle metadata, entitlements, update channel/runtime, file protection, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (24)`, `NSFileProtectionComplete`); no notification artifacts or APS entitlement remained; SHA-256 `825986a8909ff27b4e118175abc1084bb2556c9a87c0e138ece17d117439cbe5`
 - [x] Build 24 App Store Connect submission `355f66a7-e791-4cbb-96d2-8262ca689229` finished with no error as the superseding consolidated internal TestFlight candidate
+- [ ] Build and inspect a superseding candidate with the dormant Sentry SDK and diagnostic privacy manifest removed
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -47,13 +48,13 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed; release environment is pinned to Node 20.19.4 (the local Node 23 shell emitted expected unsupported-engine warnings) |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 50 suites / 376 tests with handle detection enabled; Sentry's import-time timers are isolated by the test setup |
-| Production iOS export | passed; 13 MB total, 6.77 MB Hermes bundle, 101 assets |
+| Jest | passed 51 suites / 379 tests with handle detection enabled; no analytics or crash-reporting SDK runtime is loaded by the test environment |
+| Production iOS export | passed after dormant SDK removal; 12 MB total, 5.38 MB Hermes bundle, 101 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 23 contains 11 valid privacy manifests; the app manifest declares no collected data or tracking, Sentry's bundled SDK manifest declares diagnostic categories although Sentry is disabled in this release, and no notification artifact or APS entitlement remains; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Current source removes both unused notifications and the dormant Sentry SDK; a superseding IPA must confirm no notification or diagnostic-reporting artifact remains and re-count the privacy manifests; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -80,7 +81,7 @@ The results below must be refreshed after release-document changes and before a 
 - [ ] Obtain an Apple Developer ID Application certificate
 - [ ] Sign, notarize, staple, and Gatekeeper-verify the macOS Connector and DMG
 - [ ] Provide a non-production review credential and Connector review instructions privately in App Store Connect
-- [x] Confirm App Privacy answers against the exact production Sentry/push configuration
+- [x] Confirm App Privacy answers against the exact production crash-reporting/push configuration
 - [x] Review current official Cognition, Expo, and Tailscale privacy/retention materials and record the EAS Update randomized installation token in `docs/app-privacy-review.md`
 - [ ] Confirm the selected Devin account/agreement's exact retention treatment and publish the final App Store Connect privacy answers from `docs/app-privacy-review.md`
 - [ ] Capture final iPhone screenshots without credentials or private session content

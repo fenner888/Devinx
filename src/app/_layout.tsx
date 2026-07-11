@@ -1,5 +1,5 @@
 /**
- * Root layout — wires ThemeProvider, TanStack Query, Sentry, and the
+ * Root layout — wires ThemeProvider, TanStack Query, and the
  * SafeAreaProvider. Expo Router file-based routing lives under /src/app.
  */
 
@@ -16,14 +16,12 @@ import {
 } from '@tanstack/react-query';
 import NetInfo from '@react-native-community/netinfo';
 import { ThemeProvider, useTheme, loadThemePreference } from '@theme/index';
-import { initSentry } from '@lib/sentry';
 import { shouldRetryQuery } from '@api/devin/client';
 import { AuthProvider } from '@auth/AuthContext';
 import { ConnectionProvider, useConnections } from '@auth/ConnectionContext';
 import { ErrorBoundary } from '@components/ErrorBoundary';
 import { PrivacyShield } from '@components/PrivacyShield';
 
-initSentry();
 loadThemePreference();
 
 // TanStack Query has no built-in focus/online detection on React Native —

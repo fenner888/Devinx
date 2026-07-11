@@ -56,15 +56,6 @@
         }
       ],
       [
-        "@sentry/react-native",
-        {
-          "organization": "devinx",
-          "project": "devinx-mobile",
-          "setCommits": false,
-          "uploadNativeSymbols": false
-        }
-      ],
-      [
         "expo-build-properties",
         {
           "ios": {

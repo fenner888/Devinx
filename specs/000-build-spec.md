@@ -52,8 +52,8 @@ Devin Teams/Enterprise users (engineers, EMs, solo builders) who run multiple as
 - Payments: none (free app / pitch artifact)
 - Email: none
 - Storage: iOS Keychain via expo-secure-store; SQLite for read cache
-- Errors: Sentry (React Native SDK)
-- Analytics: PostHog (opt-in only, no session content ever)
+- Errors: local-only safe diagnostic boundary; no crash-reporting SDK in v1
+- Analytics: none in v1; any future opt-in analytics requires a separate privacy/security review
 - Phase 2: APNs via Expo Push + thin Vercel notifier
 
 **DATA CLASSIFICATION:**
@@ -79,7 +79,7 @@ Devin Teams/Enterprise users (engineers, EMs, solo builders) who run multiple as
 - Storage: expo-secure-store (secrets) + expo-sqlite (read cache)
 - Hosting: none for v1; Vercel for Phase 2 notifier
 - CI/CD: GitHub + GitHub Actions + EAS Build/Submit
-- Errors: Sentry; Analytics: PostHog (opt-in)
+- Errors: local-only diagnostics; Analytics: none in v1
 
 **CONSTRAINTS / DEADLINES:**
 - MVP TestFlight before CLTivate Devin meetup
@@ -169,8 +169,8 @@ Hermex = native iOS thin client → self-hosted bridge server (hermes-webui) →
 | Styling | NativeWind (Tailwind for RN) + tokens file | Matches Mark's Tailwind muscle memory; tokens in §5 |
 | Animation/haptics | Reanimated 3 + expo-haptics | Native feel — the Hermex bar |
 | Validation | zod | Every API response parsed at the boundary (§8.3) |
-| Errors | Sentry RN (`beforeSend` scrubber, §10) | Day-1 requirement |
-| Analytics | PostHog (opt-in, events only, never content) | Usage learning without custody risk |
+| Errors | Local-only diagnostic boundary + tested scrubber (§10) | Avoids crash-data custody and package-level privacy ambiguity in v1 |
+| Analytics | None in v1 | Any future opt-in provider requires a new spec, consent flow, and privacy review |
 | CI/CD | GitHub Actions + EAS Build + EAS Submit | PR checks + TestFlight automation |
 | Backend (v1) | **None** | ADR-001 |
 | Backend (Phase 2) | Vercel serverless + Vercel KV + Expo Push/APNs | Notifier only |
@@ -361,7 +361,7 @@ interface AuthProvider {
 `PatAuth` behind `EXPO_PUBLIC_ENABLE_PAT` until GA. Key retrieval is lazy + memoized per app foreground; never held in module-level state longer than needed; zeroized on disconnect.
 
 ### 8.3 Boundary Validation
-Every response parses through zod schemas in `/src/api/devin/schemas.ts`. Unknown fields pass through (API evolves monthly); missing REQUIRED fields fail closed with a typed `ApiSchemaError` logged to Sentry (scrubbed). Devin: generate schemas from live docs (§2.3 note), then hand-tighten.
+Every response parses through zod schemas in `/src/api/devin/schemas.ts`. Unknown fields pass through (API evolves monthly); missing REQUIRED fields fail closed with a typed `ApiSchemaError` passed to a local no-op diagnostic boundary without logging content. Devin: generate schemas from live docs (§2.3 note), then hand-tighten.
 
 ### 8.4 Polling Policy & Resilience
 - `pollingPolicy(sessionStatus, appState, screen)` → interval or `false`. Defaults: watched-session messages 5s, board 15s, background OS-scheduled, terminal statuses never.
@@ -396,7 +396,7 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 ## 10. Security Requirements (Gates — every one blocks ship)
 
 1. **Secrets:** API key/PAT only ever in Keychain with `WHEN_UNLOCKED_THIS_DEVICE_ONLY` accessibility; excluded from iCloud/device backups. Grep-gate in CI: no `cog_` pattern, no key variable names outside `/src/auth`.
-2. **No secret leakage:** Sentry `beforeSend` scrubs Authorization headers, key-shaped strings, and message bodies; network breadcrumbs disabled for `api.devin.ai` request headers. PostHog receives event names + counts ONLY — never prompts, messages, titles, or IDs.
+2. **No secret leakage:** v1 bundles no crash-reporting or analytics SDK. The local diagnostic boundary never logs or transmits errors. Its tested scrubber removes Authorization headers, key-shaped strings, identifiers, and message content and is mandatory before any future reporting provider can be proposed.
 3. **Transport:** Devin Cloud remains TLS-only. The v1 Connector uses Tailscale only and may use HTTP solely to a canonical explicit-port `100.64.0.0/10` address because Tailscale WireGuard encrypts that path; the sole ATS exception is scoped to that range, and signed device requests, replay protection, rate limits, and server-side authorization remain mandatory. The Connector never falls back to LAN or public transport.
 4. **Least privilege by design:** onboarding actively instructs users to create a scoped service user (session-use + read perms only). The app must function gracefully when permissions are missing (feature-gated UI, not crashes).
 5. **Session content is code:** treat every fetched message as potentially containing the user's proprietary source. Never in analytics, never in logs, cache encrypted / OS file-protected, cache purged on disconnect and verifiably so (test asserts empty DB + empty Keychain after logout).
@@ -416,7 +416,7 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 | Unit | zod schemas, polling policy, backoff math, auth strategies, cache purge | All schemas + all policy branches |
 | Integration | endpoint functions vs MSW mock of Devin API (fixtures from real doc examples) | Every endpoint in §8.5, incl. 401/403/429/5xx paths |
 | E2E (Maestro) | onboard → validate → board → open session → send message → archive → disconnect-wipes-everything | The golden path + the wipe test |
-| Security | key-leak grep gate, Sentry scrub test, logout wipe assertion, deep-link fuzz | All pass in CI |
+| Security | key-leak grep gate, diagnostic scrub/no-transmission test, logout wipe assertion, deep-link fuzz | All pass in CI |
 | Performance | cold start <2s to cached board; 60fps list scroll with 200 sessions; battery: Balanced polling <2%/hr foreground | Measured on a real mid-tier device |
 
 ### 11.2 Release Checklist (App Store additions to standard gates)
@@ -436,7 +436,7 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 One session per phase. Each session: reads `/specs/000-build-spec.md` + its phase spec + the `/specs/reference-ui/` screenshots, works on a branch `devin/phase-N-*`, ends in ONE PR with passing CI **and side-by-side parity screenshots per §5.4.6**. Create a Playbook from Phase 1's session prompt once it succeeds. Add a Knowledge note: "DevinX repo: TypeScript strict, no raw hex outside tokens.ts, secrets only in /src/auth, every API boundary zod-parsed, follow /specs."
 
 **Session 0 — Foundation & Ground Truth** (small, do first)
-> Read /specs/000-build-spec.md. Tasks: (1) Execute the full §5.0 UI audit of app.devin.ai and cognition.com — tokens, component anatomy, status vocabulary, and reference screenshots to /specs/reference-ui/; write /specs/design-tokens.md and /src/theme/tokens.ts. This audit is the design spec for the entire build (§5.4). (2) Fetch docs.devin.ai/llms.txt, crawl v3 API reference, generate /src/api/devin/types.ts + zod schemas per §8.3; note any deltas from §2.3/§8.5 in /specs/api-deltas.md. (3) Scaffold the Expo project per §6 with CI workflow, branch protection config note, .env.example, ESLint/Prettier/strict tsconfig, NativeWind + tokens wired, Sentry initialized with the §10.2 scrubber. PR with all three.
+> Read /specs/000-build-spec.md. Tasks: (1) Execute the full §5.0 UI audit of app.devin.ai and cognition.com — tokens, component anatomy, status vocabulary, and reference screenshots to /specs/reference-ui/; write /specs/design-tokens.md and /src/theme/tokens.ts. This audit is the design spec for the entire build (§5.4). (2) Fetch docs.devin.ai/llms.txt, crawl v3 API reference, generate /src/api/devin/types.ts + zod schemas per §8.3; note any deltas from §2.3/§8.5 in /specs/api-deltas.md. (3) Scaffold the Expo project per §6 with CI workflow, branch protection config note, .env.example, ESLint/Prettier/strict tsconfig, NativeWind + tokens wired, and the local §10.2 diagnostic boundary. PR with all three.
 
 **Session 1 — Auth + Golden Path** (proves the architecture)
 > Build §7.1 onboarding, §8.2 auth strategies (ServiceUserAuth live, PatAuth flag-gated), the client layer (§8.1, §8.4), and a minimal Session Board reading the real list endpoint. Golden path: connect → validate → see real sessions → disconnect wipes everything (write the wipe test). Every §10 gate that applies must have a test. One PR.

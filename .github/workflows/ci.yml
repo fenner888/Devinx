@@ -55,18 +55,18 @@ jobs:
           }
 
           # No real cog_ keys (cog_ followed by 8+ alphanumerics) in ANY tracked
-          # file (src, tests, specs, config). Allowlisted: sentry.ts (scrubber
+          # file (src, tests, specs, config). Allowlisted: diagnostics.ts (scrubber
           # regex) and two test files with deliberately fake cog_test fixtures.
           scan "Potential real API key found in tracked files" \
             'cog_[A-Za-z0-9]{8,}' -- '.' \
-            ':!src/lib/sentry.ts' \
+            ':!src/lib/diagnostics.ts' \
             ':!tests/auth/wipe.test.ts' \
             ':!tests/lib/sentry-scrub.test.ts'
 
           # No key variable names outside /src/auth (with documented allowlist).
           scan "Secret-adjacent variable outside /src/auth" \
             '\b(apiKey|api_key|apiSecret|api_secret|password|passwd)\b\s*[=:(]' -- 'src' \
-            ':!src/auth' ':!src/lib/branding.ts' ':!src/lib/sentry.ts' \
+            ':!src/auth' ':!src/lib/branding.ts' ':!src/lib/diagnostics.ts' \
             ':!src/api/devin/schemas.ts' ':!src/api/devin/types.ts' \
             ':!src/store/preferences.ts' ':!src/app/(onboarding)'
 

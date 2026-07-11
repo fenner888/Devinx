@@ -13,12 +13,12 @@ The cloud mobile client and macOS-first Connector foundation are implemented. Se
 - NativeWind (Tailwind for RN) wired to extracted Devin design tokens
 - TanStack Query (polling, cache, retry) + Zustand (UI state)
 - expo-secure-store (Keychain) + expo-sqlite (read cache)
-- Sentry (secret-scrubbing beforeSend)
+- Local-only diagnostic boundary (no crash-reporting or analytics SDK in v1)
 
 ## Getting started
 
 ```bash
-npm install --legacy-peer-deps
+npm ci
 cp .env.example .env          # fill in EXPO_PUBLIC_* (never secrets)
 npm run ios                   # or npm run android / npm run web
 ```
@@ -29,7 +29,7 @@ npm run ios                   # or npm run android / npm run web
 |---|---|
 | `npm run lint` | ESLint, zero warnings |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run test` | Jest (schemas, polling, sentry scrub, key-leak gate, tokens, branding) |
+| `npm run test` | Jest (schemas, polling, diagnostic scrub, key-leak gate, tokens, branding) |
 | `npm run bridge:start -- --help` | Show safe Desktop Bridge setup and detected private Mac addresses |
 | `npm run build` | Typecheck gate (EAS build invoked separately) |
 | `npm run audit` | `npm audit --audit-level=high` |
@@ -49,8 +49,8 @@ After the QR code appears, open **Computer Connection** in DevinX on the iPhone 
 ## Security gates (spec §10)
 
 - **§10.1** API key/PAT only in Keychain; CI grep gate blocks `cog_*` keys and key variable names outside `/src/auth`.
-- **§10.2** Sentry `beforeSend` scrubs Authorization headers, key-shaped strings, and message bodies; network breadcrumbs disabled for `api.devin.ai`.
-- **§10.5** Disconnect wipes Keychain + SQLite cache + query cache (test asserts empty).
+- **§10.2** No crash-reporting or analytics SDK ships in v1; the tested diagnostic boundary never logs or transmits errors, and its scrubber is required before any future provider integration.
+- **§10.5** Disconnect wipes Keychain, SQLite/query caches, drafts, templates, and remembered session context.
 - All API responses parsed through zod at the boundary (§8.3).
 
 ## Repo layout (spec §6)
@@ -63,7 +63,7 @@ src/
   auth/                     AuthProvider strategies, Keychain (ONLY secrets touch)
   theme/                    tokens.ts (extracted), ThemeProvider
   store/                    Zustand slices (UI prefs, pins, watch list)
-  lib/                      branding, sentry, polling policy, utils
+  lib/                      branding, diagnostics, polling policy, utils
   cache/                    sqlite cache layer
 tests/                      mirrors src/
 .github/workflows/ci.yml    lint → typecheck → test → build → npm audit + key-leak gate

@@ -21,7 +21,7 @@ Disconnecting and wiping connections removes stored credentials, compose drafts,
 
 DevinX does not currently enable a product analytics SDK. Session titles, prompts, messages, repository names, source code, and attachments are not sent to an analytics provider.
 
-The current production configuration does not provide a Sentry DSN, so crash reports are not transmitted. If crash reporting is enabled in a future release, DevinX will update this policy and its App Store privacy disclosures before release; its existing scrubber removes authorization headers, API-key-like strings, organization identifiers, credential-bearing URLs, and session message content.
+The current release does not bundle or configure a crash-reporting SDK, so crash reports are not transmitted. If crash reporting is enabled in a future release, DevinX will update this policy and its App Store privacy disclosures before release; its tested diagnostic scrubber removes authorization headers, API-key-like strings, organization identifiers, credential-bearing URLs, and session message content.
 
 The current release does not register the iPhone for remote push notifications and does not transmit an Expo push token.
 

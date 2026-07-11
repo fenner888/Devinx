@@ -30,7 +30,7 @@ Computer Connection requests must be signed by a per-install device identity wit
 
 ## Security boundaries
 
-- No key material is written to AsyncStorage, SecureStore JSON, analytics, Sentry, or logs.
+- No key material is written to AsyncStorage, SecureStore JSON, analytics, any reporting provider, or logs.
 - There is no silent key regeneration. A missing key invalidates that computer credential and requires pairing again.
 - This design does not claim Secure Enclave storage. Apple documents Keychain generic-password storage for CryptoKit keys without a `SecKey` counterpart.
 - Android support requires a separate native-keystore phase before Computer Connection can be enabled there.

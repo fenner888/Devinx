@@ -4,7 +4,8 @@
  *
  * Boundary validation rule (spec §8.3): every API response parses through
  * these schemas. Unknown fields PASS THROUGH (API evolves monthly); missing
- * REQUIRED fields fail closed with a typed `ApiSchemaError` logged to Sentry.
+ * REQUIRED fields fail closed with a typed `ApiSchemaError` passed through the
+ * local diagnostic boundary without logging user data.
  *
  * The `.passthrough()` on object schemas enforces the "unknown fields ok"
  * rule. Required fields are non-optional; optional fields use `.nullish()`.

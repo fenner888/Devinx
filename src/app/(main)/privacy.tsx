@@ -18,7 +18,7 @@ const rows = [
   {
     title: 'Crash reports',
     detail:
-      'This release does not configure a Sentry destination, so crash reports are not transmitted. If reporting is enabled in a future release, this disclosure and the App Store privacy answers must be updated first.',
+      'This release does not bundle or configure a crash-reporting SDK, so crash reports are not transmitted. If reporting is enabled in a future release, this disclosure and the App Store privacy answers must be updated first.',
   },
   {
     title: 'Product analytics',

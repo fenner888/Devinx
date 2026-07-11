@@ -14,6 +14,16 @@ describe('release privacy configuration', () => {
     expect(rootLayout).not.toMatch(/expo-notifications|getPushToken|requestNotificationPermissions/);
   });
 
+  it('does not bundle a dormant crash-reporting SDK', () => {
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repositoryRoot, 'package.json'), 'utf8'),
+    ) as { dependencies?: Record<string, string> };
+    const appJson = readFileSync(resolve(repositoryRoot, 'app.json'), 'utf8');
+
+    expect(packageJson.dependencies).not.toHaveProperty('@sentry/react-native');
+    expect(appJson).not.toContain('@sentry/react-native');
+  });
+
   it('describes the current Tailscale and app-delivery paths', () => {
     const privacyScreen = readFileSync(
       resolve(repositoryRoot, 'src/app/(main)/privacy.tsx'),
