@@ -1,13 +1,13 @@
 # Authorization matrix
 
-Reviewed against source checkpoint `128269b` on July 10, 2026. This matrix covers the user-controlled Connector HTTP boundary. Devin Cloud authorization remains enforced by the Devin API and the user's credential scopes.
+Reviewed against source checkpoint `5643f30` on July 11, 2026. This matrix covers the user-controlled Connector HTTP boundary. Devin Cloud authorization remains enforced by the Devin API and the user's credential scopes.
 
 | Method | Required device grant | Input validation | Resource binding | Unauthorized result | Rate limit class |
 |---|---|---|---|---|---|
 | `bridge.health` | `bridge:health` | strict empty Zod object | paired device from signed envelope | indistinguishable `404` | health |
 | `device.revoke` | `bridge:health` | strict empty Zod object | requesting device revokes itself | indistinguishable `404` | mutation |
 | `session.list` | `session:metadata:read` | strict optional bounded cursor | opaque handles minted for this bridge | indistinguishable `404` | session list |
-| `session.load` | `session:content:read` | strict local-handle schema | handle must have been listed for this device/session scope | indistinguishable `404` | mutation |
+| `session.load` | `session:content:read` | strict local-handle schema | handle must have been listed for this device/session scope | indistinguishable `404` | session history read |
 | `session.prompt` | `session:prompt:send` | strict handle plus bounded non-empty text | handle must have been listed for this device/session scope | indistinguishable `404` | mutation |
 
 ## Request gates

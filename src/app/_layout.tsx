@@ -4,9 +4,8 @@
  */
 
 import '../../global.css';
-import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
-import { Stack, Redirect, useSegments, useRouter } from 'expo-router';
+import { Stack, Redirect, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -21,7 +20,6 @@ import { initSentry } from '@lib/sentry';
 import { shouldRetryQuery } from '@api/devin/client';
 import { AuthProvider } from '@auth/AuthContext';
 import { ConnectionProvider, useConnections } from '@auth/ConnectionContext';
-import { getPushToken, setupNotificationListener } from '@lib/notifications';
 import { ErrorBoundary } from '@components/ErrorBoundary';
 import { PrivacyShield } from '@components/PrivacyShield';
 
@@ -58,28 +56,8 @@ const queryClient = new QueryClient({
 
 /** Initial route — declarative redirect based on auth state. */
 function InitialRoute() {
-  const { isConfigured, isLoading, hasCloudConnection, usesCloud } = useConnections();
+  const { isConfigured, isLoading } = useConnections();
   const segments = useSegments();
-  const router = useRouter();
-
-  // Register for push notifications when authenticated.
-  useEffect(() => {
-    if (hasCloudConnection && usesCloud) {
-      getPushToken().catch(() => {
-        /* ignore */
-      });
-    }
-  }, [hasCloudConnection, usesCloud]);
-
-  // Listen for notification taps → navigate to session detail.
-  useEffect(() => {
-    const unsubscribe = setupNotificationListener((sessionId) => {
-      if (hasCloudConnection && usesCloud) {
-        router.push(`/(main)/session/${sessionId}`);
-      }
-    });
-    return unsubscribe;
-  }, [hasCloudConnection, router, usesCloud]);
 
   const inOnboarding = segments[0] === '(onboarding)';
 

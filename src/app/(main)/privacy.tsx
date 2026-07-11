@@ -18,7 +18,7 @@ const rows = [
   {
     title: 'Crash reports',
     detail:
-      'Sentry is disabled unless a production DSN is configured. Secret-like values and authorization data are scrubbed before any report leaves the device.',
+      'This release does not configure a Sentry destination, so crash reports are not transmitted. If reporting is enabled in a future release, this disclosure and the App Store privacy answers must be updated first.',
   },
   {
     title: 'Product analytics',
@@ -28,12 +28,17 @@ const rows = [
   {
     title: 'Local Desktop sessions',
     detail:
-      'Only after you pair and approve an iPhone, DevinX can request minimized Devin CLI session data directly from your Mac over pinned TLS. Metadata is the default; message text requires a separate read grant. Local files, tool payloads, thoughts, and credentials are not returned.',
+      'Only after you pair and approve an iPhone, DevinX can request minimized Devin CLI session data directly from your Mac over Tailscale. Metadata is the default; message text requires a separate read grant. Local files, tool payloads, thoughts, and credentials are not returned.',
   },
   {
     title: 'Tailscale and private networks',
     detail:
       'If you choose Tailscale, it supplies private network reachability between your devices. DevinX still authenticates every bridge request, and no DevinX-operated relay receives the session.',
+  },
+  {
+    title: 'App delivery',
+    detail:
+      'The installed app may contact Expo over TLS to check for compatible DevinX updates. This release does not register your iPhone for remote push notifications.',
   },
 ] as const;
 
@@ -58,8 +63,8 @@ export default function PrivacyScreen() {
           What data leaves your device?
         </Text>
         <Text className="text-text-mid text-text14 leading-5 mb-5">
-          DevinX has no intermediary backend. Cloud actions go directly to Cognition's Devin API;
-          approved local-session requests go directly to your paired Mac.
+          DevinX does not relay session content through its own backend. Cloud actions go directly
+          to Cognition's Devin API; approved local-session requests go directly to your paired Mac.
         </Text>
         <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-5">
           {rows.map((row, index) => (
