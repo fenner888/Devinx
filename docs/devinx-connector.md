@@ -29,6 +29,28 @@ Generated artifacts are ignored under `artifacts/connector/` so Expo OTA exports
 
 The local development build is ad-hoc signed. It is suitable for development and real-device validation on the build Mac, but it is not a public release. Public artifacts require a Developer ID signature, hardened runtime verification, notarization, stapling, provenance, and clean-machine Gatekeeper validation.
 
+## Developer ID release workflow
+
+Store notarization credentials interactively in Keychain; never put an Apple password, private key, or API key in the repository or command history:
+
+```bash
+xcrun notarytool store-credentials devinx-notary
+```
+
+Then select the exact Developer ID Application identity and the Keychain profile for the release commands:
+
+```bash
+export DEVINX_CODESIGN_IDENTITY='Developer ID Application: Your Name (TEAMID)'
+export DEVINX_NOTARYTOOL_PROFILE='devinx-notary'
+npm run connector:notarize:check
+npm run connector:build:macos
+npm run connector:notarize:macos
+```
+
+The builder checksum-verifies the pinned Node.js Foundation archive, then re-signs its runtime with the DevinX identity and only the JIT entitlement required by this fixed workload. It explicitly rejects `get-task-allow`, dynamic-loader, executable-page-protection, and library-validation exceptions. It then signs the remaining DevinX-owned executables from the inside out, seals the app with hardened runtime and a secure timestamp, and signs the DMG. The notarization command fails closed unless the selected identity is a valid Developer ID Application certificate and the named `notarytool` profile works.
+
+The release workflow submits the app ZIP first, requires an accepted response with an issue-free notary log, staples and Gatekeeper-checks the app, rebuilds the DMG around that stapled app, signs and verifies the DMG, submits it separately, staples it, and writes a final checksum plus `notarization-audit.json`. It does not use deprecated `altool` or accept ad-hoc/Apple Development identities.
+
 ## Runtime behavior
 
 - The app bundles a pinned Node LTS runtime rather than depending on the user's Node or shell configuration.
@@ -46,13 +68,11 @@ The local development build is ad-hoc signed. It is suitable for development and
 
 Before publishing a macOS connector release:
 
-- merge and retest the authorized steering branch;
-- add paired-device listing, permission editing, and revocation to the native UI;
+- retest authorized steering from the final mobile/Connector commits;
 - validate QR pairing, denial, expiry, reconnect, and revocation on a physical Mac and iPhone;
 - run the authentication and authorization matrices for every protected bridge operation;
 - run dependency, secret, dead-code, and packaged-artifact scans;
-- sign with the DevinX Developer ID identity;
-- notarize and staple both the application and disk image;
+- run the fail-closed Developer ID signing and two-stage notarization workflow above;
 - verify installation, login start, update, repair, and uninstall on a clean macOS account; and
 - publish the checksum and compatibility matrix with the artifact.
 

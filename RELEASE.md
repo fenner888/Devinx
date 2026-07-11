@@ -44,11 +44,11 @@ Do not use production credentials or a destructive prompt for this checkpoint.
 
 Local development artifacts can be ad-hoc signed, but public distribution requires an Apple **Developer ID Application** certificate and notarization credentials. After those credentials are available:
 
-1. Sign the app and nested executable with hardened runtime.
-2. Build the DMG, sign it, and submit it with `notarytool`.
-3. Staple the accepted ticket to the app and DMG.
-4. Verify with `codesign --verify --deep --strict`, `spctl --assess`, and `stapler validate`.
-5. Publish the SHA-256 checksum beside the artifact.
+1. Store notarization credentials in Keychain with `xcrun notarytool store-credentials devinx-notary`.
+2. Set `DEVINX_CODESIGN_IDENTITY` to the exact Developer ID Application identity and `DEVINX_NOTARYTOOL_PROFILE` to the Keychain profile name.
+3. Run `npm run connector:notarize:check`, then `npm run connector:build:macos`.
+4. Run `npm run connector:notarize:macos` to notarize/staple the app first, rebuild and sign the DMG, notarize/staple the DMG, run Gatekeeper checks, and write the checksum/audit record.
+5. Test the resulting artifact on a clean macOS account before publication.
 
 The existing Apple Development certificate is not a substitute for Developer ID distribution signing.
 

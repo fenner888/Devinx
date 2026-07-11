@@ -42,6 +42,56 @@ function run(executable, args, options = {}) {
   }
 }
 
+function capture(executable, args) {
+  const result = spawnSync(executable, args, {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    shell: false,
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(`${basename(executable)} failed while validating DevinX Connector signing`);
+  }
+  return `${result.stdout ?? ''}${result.stderr ?? ''}`;
+}
+
+function validatedSigningIdentity() {
+  const identity = process.env.DEVINX_CODESIGN_IDENTITY?.trim() || '-';
+  if (identity === '-') return identity;
+  if (!identity.startsWith('Developer ID Application: ')) {
+    throw new Error('Public Connector builds require a Developer ID Application identity');
+  }
+  const identities = capture('/usr/bin/security', ['find-identity', '-v', '-p', 'codesigning']);
+  if (!identities.includes(`\"${identity}\"`)) {
+    throw new Error('The requested Developer ID Application identity is not available in Keychain');
+  }
+  return identity;
+}
+
+function signOwnedCode(path, identity, entitlements) {
+  const args = ['--force', '--options', 'runtime'];
+  if (identity !== '-') args.push('--timestamp');
+  if (entitlements) args.push('--entitlements', entitlements);
+  args.push('--sign', identity, path);
+  run('/usr/bin/codesign', args);
+}
+
+function validateRuntimeEntitlements(path) {
+  const entitlements = capture('/usr/bin/codesign', ['-d', '--entitlements', ':-', path]);
+  if (!entitlements.includes('<key>com.apple.security.cs.allow-jit</key>')) {
+    throw new Error('The bundled Node runtime is missing its required JIT entitlement');
+  }
+  for (const forbidden of [
+    'com.apple.security.get-task-allow',
+    'com.apple.security.cs.allow-dyld-environment-variables',
+    'com.apple.security.cs.disable-executable-page-protection',
+    'com.apple.security.cs.disable-library-validation',
+  ]) {
+    if (entitlements.includes(`<key>${forbidden}</key>`)) {
+      throw new Error(`The bundled Node runtime contains forbidden entitlement ${forbidden}`);
+    }
+  }
+}
+
 function nodePlatformArchive() {
   if (architecture === 'arm64') return `node-${NODE_VERSION}-darwin-arm64.tar.gz`;
   if (architecture === 'x64') return `node-${NODE_VERSION}-darwin-x64.tar.gz`;
@@ -193,16 +243,22 @@ run('/usr/bin/xcrun', [
   resolve(macOSRoot, 'DevinXConnector'),
 ]);
 
-const identity = process.env.DEVINX_CODESIGN_IDENTITY?.trim() || '-';
-run('/usr/bin/codesign', [
-  '--force',
-  '--deep',
-  '--options',
-  'runtime',
-  '--sign',
+// The checksum-verified upstream Node runtime ships with debugging and dynamic
+// loader entitlements that are broader than this fixed Connector runtime
+// needs. Re-sign it with only JIT permission, then sign DevinX-owned
+// executables bottom-up and seal the bundle. `--deep` signing is deliberately
+// avoided for release correctness.
+const identity = validatedSigningIdentity();
+const nodeRuntimePath = resolve(runtimeRoot, 'node');
+signOwnedCode(
+  nodeRuntimePath,
   identity,
-  appRoot,
-]);
+  resolve(repositoryRoot, 'connector', 'macos', 'NodeRuntime.entitlements'),
+);
+validateRuntimeEntitlements(nodeRuntimePath);
+signOwnedCode(resolve(resourcesRoot, 'macos-keychain-helper'), identity);
+signOwnedCode(resolve(macOSRoot, 'DevinXConnector'), identity);
+signOwnedCode(appRoot, identity);
 run('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', appRoot]);
 
 const stagingRoot = resolve(outputRoot, 'dmg-staging');
@@ -224,6 +280,10 @@ run('/usr/bin/hdiutil', [
   dmgPath,
 ]);
 rmSync(stagingRoot, { recursive: true, force: true });
+if (identity !== '-') {
+  run('/usr/bin/codesign', ['--force', '--timestamp', '--sign', identity, dmgPath]);
+  run('/usr/bin/codesign', ['--verify', '--verbose=2', dmgPath]);
+}
 const digest = sha256(dmgPath);
 writeFileSync(`${dmgPath}.sha256`, `${digest}  ${basename(dmgPath)}\n`, {
   encoding: 'utf8',
