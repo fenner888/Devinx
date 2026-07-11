@@ -32,7 +32,7 @@ History remains bounded to the newest 200 text messages, 100 KiB per message, 16
 
 An unlocked session continues through the existing authorized `session/prompt` path. A locked session must not cause DevinX to kill Devin Desktop, delete a lock, write to `sessions.db`, inject UI events, or parse private process memory.
 
-The supported fallback is a new Connector-owned ACP session created with `session/new` after capability and synthetic-contract validation. The Connector supplies a minimized, bounded context derived from the authorized read-only history using ACP embedded context, then sends the user's new text. The original session remains untouched. DevinX must label and persist the continuation relationship so subsequent history and steering use the new owner without pretending the original session was mutated.
+The supported fallback is a new Connector-owned ACP session created with `session/new` after capability and synthetic-contract validation. The Connector supplies a minimized, bounded context derived from the authorized read-only history using ACP embedded context, then sends the user's new text. The original session remains untouched. The bridge returns a new opaque handle, and DevinX explicitly navigates to that new Devin-persisted session so subsequent history and steering use the new owner without pretending the original session was mutated.
 
 Until that continuation path passes synthetic and physical validation, locked sessions are readable but steering remains unavailable with an explicit `session_in_use` state.
 

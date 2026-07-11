@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { AcpSessionClient } from '../../bridge/src/acp';
+import { AcpSessionClient, isAcpSessionInUseError } from '../../bridge/src/acp';
 
 describe('ACP session client', () => {
   const temporaryDirectories: string[] = [];
@@ -289,6 +289,74 @@ if (request.method === 'initialize') {
       await expect(client.promptSession('session-prompt', 'Continue.')).resolves.toBeUndefined();
     } finally {
       await new Promise((resolve) => setTimeout(resolve, 40));
+      await client.stop();
+    }
+  });
+
+  it('creates a new session with bounded embedded history before prompting it', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1,
+    agentCapabilities: { promptCapabilities: { embeddedContext: true } }
+  } }) + '\\n');
+} else if (request.method === 'session/new') {
+  if (request.params.cwd !== '/tmp/project' ||
+      JSON.stringify(request.params.mcpServers) !== '[]') process.exit(19);
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessionId: 'session-continuation'
+  } }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  const prompt = request.params.prompt;
+  if (request.params.sessionId !== 'session-continuation' ||
+      prompt.length !== 2 ||
+      prompt[0].type !== 'resource' ||
+      prompt[0].resource.uri !== 'devinx://continuation/history.md' ||
+      prompt[0].resource.mimeType !== 'text/markdown' ||
+      prompt[0].resource.text !== '# Prior history' ||
+      JSON.stringify(prompt[1]) !== JSON.stringify({ type: 'text', text: 'Continue.' })) process.exit(20);
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    stopReason: 'end_turn'
+  } }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    try {
+      await client.start();
+      await expect(
+        client.createContinuation('/tmp/project', '# Prior history', 'Continue.'),
+      ).resolves.toBe('session-continuation');
+    } finally {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await client.stop();
+    }
+  });
+
+  it('classifies an exclusively owned session without exposing its error text', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1,
+    agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-locked', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, error: {
+    code: -32600, message: "Session 'private-id' is already open in another process"
+  } }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    try {
+      await client.start();
+      await client.listSessions();
+      const error = await client.loadSession('session-locked').catch((failure: unknown) => failure);
+      expect(isAcpSessionInUseError(error)).toBe(true);
+      expect(String(error)).not.toContain('private-id');
+    } finally {
       await client.stop();
     }
   });

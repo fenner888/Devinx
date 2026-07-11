@@ -48,7 +48,9 @@ const sessionLoadBodySchema = z.object({ sessionId: localSessionIdSchema }).stri
 const sessionPromptBodySchema = z
   .object({ sessionId: localSessionIdSchema, text: z.string().trim().min(1).max(100_000) })
   .strict();
-const sessionPromptResponseSchema = z.object({ accepted: z.literal(true) }).strict();
+const sessionPromptResponseSchema = z
+  .object({ accepted: z.literal(true), sessionId: localSessionIdSchema.optional() })
+  .strict();
 
 const unsignedRequestSchema = z
   .object({
@@ -341,15 +343,17 @@ async function requestSessionLoad(
 async function requestSessionPrompt(
   credential: PairedComputerCredential,
   input: { sessionId: string; text: string },
-): Promise<void> {
+): Promise<void | { sessionId: string }> {
   const body = sessionPromptBodySchema.parse(input);
   const response = await requestComputer(credential, 'session.prompt', body);
-  if (!sessionPromptResponseSchema.safeParse(response.body).success) {
+  const result = sessionPromptResponseSchema.safeParse(response.body);
+  if (!result.success) {
     throw new ComputerBridgeError(
       'The paired Mac returned an invalid steering response.',
       'invalid_response',
     );
   }
+  return result.data.sessionId ? { sessionId: result.data.sessionId } : undefined;
 }
 
 export interface ComputerBridgeConnection {
@@ -357,7 +361,7 @@ export interface ComputerBridgeConnection {
   getHealth(): Promise<ComputerBridgeHealth>;
   listSessions(input?: { cursor?: string }): Promise<ComputerSessionPage>;
   loadSession(sessionId: string): Promise<ComputerLoadedSession>;
-  promptSession(sessionId: string, text: string): Promise<void>;
+  promptSession(sessionId: string, text: string): Promise<void | { sessionId: string }>;
 }
 
 function connectionForCredential(credential: PairedComputerCredential): ComputerBridgeConnection {
@@ -422,7 +426,7 @@ export async function promptComputerSession(
   bridgeId: string,
   sessionId: string,
   text: string,
-): Promise<void> {
+): Promise<void | { sessionId: string }> {
   return (await openComputerBridge(bridgeId)).promptSession(sessionId, text);
 }
 

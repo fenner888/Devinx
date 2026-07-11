@@ -112,6 +112,15 @@ const loadSessionResultSchema = z.union([
     .passthrough(),
 ]);
 
+const newSessionResultSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    modes: z.unknown().nullable().optional(),
+    configOptions: z.array(z.unknown()).max(1_000).nullable().optional(),
+    _meta: z.record(z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
 const promptResponseSchema = z
   .object({
     stopReason: z.enum(['end_turn', 'max_tokens', 'max_turn_requests', 'refusal', 'cancelled']),
@@ -173,6 +182,23 @@ export interface AcpLoadedSession {
   cwd: string;
   messages: AcpHistoryMessage[];
   truncated: boolean;
+}
+
+export type AcpOperationFailureKind = 'session_in_use' | 'request_failed';
+
+export class AcpOperationError extends Error {
+  constructor(
+    readonly kind: AcpOperationFailureKind,
+    operation: string,
+    readonly code: number,
+  ) {
+    super(`ACP ${operation} failed`);
+    this.name = 'AcpOperationError';
+  }
+}
+
+export function isAcpSessionInUseError(error: unknown): boolean {
+  return error instanceof AcpOperationError && error.kind === 'session_in_use';
 }
 
 interface CachedSessionMetadata {
@@ -257,10 +283,12 @@ export class AcpSessionClient {
   private readonly pending = new Map<string | number, PendingRequest>();
   private canListSessions = false;
   private canLoadSessions = false;
+  private canEmbedContext = false;
   private readonly listedSessions = new Map<string, CachedSessionMetadata>();
   private readonly loadedSessions = new Set<string>();
   private activeLoad: ReplayCollector | null = null;
   private activePromptSessionId: string | null = null;
+  private creatingContinuation = false;
 
   constructor(options: AcpClientOptions) {
     this.options = acpClientOptionsSchema.parse(options);
@@ -279,6 +307,11 @@ export class AcpSessionClient {
     this.listedSessions.clear();
     this.loadedSessions.clear();
     this.activeLoad = null;
+    this.activePromptSessionId = null;
+    this.creatingContinuation = false;
+    this.canListSessions = false;
+    this.canLoadSessions = false;
+    this.canEmbedContext = false;
     const child = spawn(this.options.executablePath, ['acp'], {
       cwd: workingDirectory,
       env: environment,
@@ -305,6 +338,12 @@ export class AcpSessionClient {
       );
       this.canListSessions = supportsSessionList(initialization.agentCapabilities);
       this.canLoadSessions = supportsSessionLoad(initialization.agentCapabilities);
+      this.canEmbedContext =
+        (
+          initialization.agentCapabilities.promptCapabilities as
+            | Record<string, unknown>
+            | undefined
+        )?.embeddedContext === true;
     } catch (error) {
       await this.stop();
       throw error;
@@ -404,12 +443,60 @@ export class AcpSessionClient {
     if (!this.loadedSessions.has(sessionId)) {
       throw new Error('ACP session must be loaded before prompting');
     }
-    if (this.activeLoad || this.activePromptSessionId)
+    this.startPrompt(sessionId, [{ type: 'text', text }]);
+  }
+
+  async createContinuation(
+    cwdInput: unknown,
+    contextInput: unknown,
+    textInput: unknown,
+  ): Promise<string> {
+    if (!this.child) throw new Error('ACP client is not started');
+    if (!this.canEmbedContext) throw new Error('ACP agent does not support embedded context');
+    const cwd = absolutePathSchema.parse(cwdInput);
+    const context = z.string().min(1).max(160 * 1024).parse(contextInput);
+    const text = z.string().trim().min(1).max(100_000).parse(textInput);
+    if (this.activeLoad || this.activePromptSessionId || this.creatingContinuation) {
+      throw new Error('ACP session continuation is busy');
+    }
+    this.creatingContinuation = true;
+    try {
+      const created = await this.request(
+        'session/new',
+        { cwd, mcpServers: [] },
+        newSessionResultSchema,
+        'session creation',
+      );
+      if (this.listedSessions.size >= MAX_CACHED_SESSIONS) {
+        throw new Error('ACP listed session cache capacity reached');
+      }
+      this.listedSessions.set(created.sessionId, { cwd });
+      this.loadedSessions.add(created.sessionId);
+      this.startPrompt(created.sessionId, [
+        {
+          type: 'resource',
+          resource: {
+            uri: 'devinx://continuation/history.md',
+            mimeType: 'text/markdown',
+            text: context,
+          },
+        },
+        { type: 'text', text },
+      ]);
+      return created.sessionId;
+    } finally {
+      this.creatingContinuation = false;
+    }
+  }
+
+  private startPrompt(sessionId: string, prompt: unknown[]): void {
+    if (this.activeLoad || this.activePromptSessionId) {
       throw new Error('ACP session prompting is busy');
+    }
     this.activePromptSessionId = sessionId;
     this.request(
       'session/prompt',
-      { sessionId, prompt: [{ type: 'text', text }] },
+      { sessionId, prompt },
       promptResponseSchema,
       'session prompt',
       this.options.promptTimeoutMs,
@@ -428,10 +515,12 @@ export class AcpSessionClient {
     this.child = null;
     this.canListSessions = false;
     this.canLoadSessions = false;
+    this.canEmbedContext = false;
     this.listedSessions.clear();
     this.loadedSessions.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;
@@ -545,7 +634,12 @@ export class AcpSessionClient {
     this.pending.delete(message.id);
     clearTimeout(pending.timer);
     if (message.error) {
-      pending.reject(new Error(`ACP ${pending.operation} failed with code ${message.error.code}`));
+      const kind: AcpOperationFailureKind =
+        message.error.code === -32600 &&
+        /already open in another process/i.test(message.error.message ?? '')
+          ? 'session_in_use'
+          : 'request_failed';
+      pending.reject(new AcpOperationError(kind, pending.operation, message.error.code));
       return;
     }
     const result = pending.schema.safeParse(message.result);
@@ -666,11 +760,13 @@ export class AcpSessionClient {
     this.child = null;
     this.canListSessions = false;
     this.canLoadSessions = false;
+    this.canEmbedContext = false;
     this.listedSessions.clear();
     this.loadedSessions.clear();
     if (this.activeLoad) this.activeLoad.failed = true;
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;
@@ -689,11 +785,13 @@ export class AcpSessionClient {
     this.child = null;
     this.canListSessions = false;
     this.canLoadSessions = false;
+    this.canEmbedContext = false;
     this.listedSessions.clear();
     this.loadedSessions.clear();
     if (this.activeLoad) this.activeLoad.failed = true;
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;

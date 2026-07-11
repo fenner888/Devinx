@@ -239,6 +239,19 @@ describe('authenticated mobile Computer Bridge client', () => {
     });
   });
 
+  it('returns a validated continuation handle from the authoritative Mac', async () => {
+    const sessionId = `local_${'P'.repeat(43)}`;
+    const continuedSessionId = `local_${'C'.repeat(43)}`;
+    mockPostPinnedBridgeJson.mockResolvedValue({
+      status: 200,
+      body: { accepted: true, sessionId: continuedSessionId },
+    });
+
+    await expect(
+      promptComputerSession(BRIDGE_ID, sessionId, 'Continue the task.'),
+    ).resolves.toEqual({ sessionId: continuedSessionId });
+  });
+
   it('revokes on the Mac before removing the local computer credential', async () => {
     mockPostPinnedBridgeJson.mockResolvedValue({ status: 200, body: { revoked: true } });
 

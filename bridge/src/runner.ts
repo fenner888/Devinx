@@ -3,7 +3,11 @@ import { isIP } from 'node:net';
 
 import { z } from 'zod';
 
-import { AcpSessionClient } from './acp';
+import {
+  AcpSessionClient,
+  isAcpSessionInUseError,
+  type AcpHistoryMessage,
+} from './acp';
 import { DevinSessionStore } from './devin-session-store';
 import type { HttpsBridgeListenerAddress, HttpsBridgeListenerOptions } from './listener';
 import { HttpsBridgeListener } from './listener';
@@ -83,6 +87,7 @@ export interface BridgeListenerLifecycle {
 export interface AcpSessionLifecycle extends SessionDiscoveryAdapter {
   start(): Promise<void>;
   stop(): Promise<void>;
+  createContinuation?(cwd: string, context: string, text: string): Promise<string>;
 }
 
 export interface SessionHistoryLifecycle {
@@ -119,6 +124,35 @@ const unavailableSessions: SessionDiscoveryAdapter = {
 };
 
 const MAXIMUM_REHYDRATION_PAGES = 100;
+// Reserve one KiB for the omission marker and framing before ACP's 160 KiB limit.
+const MAXIMUM_CONTINUATION_CONTEXT_BYTES = 149 * 1024;
+
+function continuationContext(messages: AcpHistoryMessage[], truncated: boolean): string {
+  const blocks: string[] = [];
+  let omitted = truncated;
+  const base = [
+    '# Prior Devin conversation',
+    '',
+    'This is a read-only transcript supplied to continue the conversation in a new session.',
+  ]
+    .join('\n');
+  let bytes = Buffer.byteLength(base, 'utf8');
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message) continue;
+    const speaker = message.source === 'user' ? 'User' : 'Devin';
+    const block = `## ${speaker}\n\n${message.text}`;
+    const blockBytes = Buffer.byteLength(`\n\n${block}`, 'utf8');
+    if (bytes + blockBytes > MAXIMUM_CONTINUATION_CONTEXT_BYTES) {
+      omitted = true;
+      break;
+    }
+    blocks.unshift(block);
+    bytes += blockBytes;
+  }
+  const omission = omitted ? '\n\nThe oldest transcript content was omitted.' : '';
+  return `${base}${omission}\n\n${blocks.join('\n\n')}`;
+}
 
 export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapter {
   private current: SessionDiscoveryAdapter = unavailableSessions;
@@ -175,8 +209,30 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   ): ReturnType<SessionDiscoveryAdapter['promptSession']> {
     await this.ensureSessionListed(sessionId);
     if (!this.acpLoadedSessionIds.has(sessionId)) {
-      await this.current.loadSession(sessionId);
-      this.acpLoadedSessionIds.add(sessionId);
+      try {
+        await this.current.loadSession(sessionId);
+        this.acpLoadedSessionIds.add(sessionId);
+      } catch (error) {
+        const createContinuation = this.current.createContinuation;
+        if (
+          !isAcpSessionInUseError(error) ||
+          !createContinuation ||
+          !this.history?.isSessionLoadSupported()
+        ) {
+          throw error;
+        }
+        const history = await this.history.loadSession(sessionId);
+        if (history.messages.length === 0) throw new Error('Session continuation has no context');
+        const continuedSessionId = await createContinuation.call(
+          this.current,
+          history.cwd,
+          continuationContext(history.messages, history.truncated),
+          text,
+        );
+        this.listedSessionIds.add(continuedSessionId);
+        this.acpLoadedSessionIds.add(continuedSessionId);
+        return { continuedSessionId };
+      }
     }
     return this.current.promptSession(sessionId, text);
   }

@@ -50,6 +50,7 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   loadPending: Promise<AcpLoadedSession> | null = null;
   loadFailure: Error | null = null;
   prompts: Array<{ sessionId: string; text: string }> = [];
+  continuedSessionId: string | null = null;
 
   isSessionListSupported(): boolean {
     return this.supported;
@@ -77,8 +78,14 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     return this.promptSupported;
   }
 
-  async promptSession(sessionId: string, text: string): Promise<void> {
+  async promptSession(
+    sessionId: string,
+    text: string,
+  ): Promise<void | { continuedSessionId: string }> {
     this.prompts.push({ sessionId, text });
+    return this.continuedSessionId
+      ? { continuedSessionId: this.continuedSessionId }
+      : undefined;
   }
 }
 
@@ -196,6 +203,29 @@ describe('authenticated Desktop Bridge service', () => {
     expect(adapter.prompts).toEqual([
       { sessionId: 'raw-private-session-id', text: 'Continue the review.' },
     ]);
+  });
+
+  it('returns only an opaque handle when a locked session is continued', async () => {
+    adapter.continuedSessionId = 'raw-private-continuation-id';
+    const bridge = service();
+    const permissions: BridgePermission[] = [
+      'bridge:health',
+      'session:metadata:read',
+      'session:content:read',
+      'session:prompt:send',
+    ];
+    const listed = await bridge.handle(envelope('session.list', {}, permissions), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+    const result = await bridge.handle(
+      envelope('session.prompt', { sessionId: handle, text: 'Continue.' }, permissions),
+      context(),
+    );
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: { accepted: true, sessionId: expect.stringMatching(/^local_[A-Za-z0-9_-]{43}$/) },
+    });
+    expect(JSON.stringify(result)).not.toContain('raw-private-continuation-id');
   });
 
   it('returns opaque, namespaced, minimized session metadata by default', async () => {

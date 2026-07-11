@@ -2,6 +2,7 @@ import type { NetworkInterfaceInfo } from 'node:os';
 
 import { parseDesktopBridgeArguments, safeTerminalText } from '../../bridge/src/cli';
 import type { HttpsBridgeListenerOptions } from '../../bridge/src/listener';
+import { AcpOperationError } from '../../bridge/src/acp';
 import type { KeychainSecretStore } from '../../bridge/src/macos-keychain';
 import {
   discoverPrivateLanAddresses,
@@ -101,6 +102,53 @@ describe('Desktop Bridge development runner', () => {
       'not available in the current ACP process',
     );
     expect(replacementLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it('continues a Desktop-owned session without mutating the locked original', async () => {
+    const createContinuation = jest.fn(async () => 'session-continuation');
+    const locked: AcpSessionLifecycle = {
+      start: async () => {},
+      stop: async () => {},
+      isSessionListSupported: () => true,
+      listSessions: async () => ({
+        sessions: [{ sessionId: 'session-locked', cwd: '/tmp/project' }],
+      }),
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new AcpOperationError('session_in_use', 'session load', -32600);
+      },
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {
+        throw new Error('Locked original must not be prompted');
+      },
+      createContinuation,
+    };
+    const history = {
+      start: async () => {},
+      stop: async () => {},
+      isSessionLoadSupported: () => true,
+      loadSession: async () => ({
+        sessionId: 'session-locked',
+        cwd: '/tmp/project',
+        messages: [
+          { source: 'user' as const, text: 'Original question' },
+          { source: 'devin' as const, text: 'Original answer' },
+        ],
+        truncated: false,
+      }),
+    };
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace(locked);
+    adapter.setHistory(history);
+
+    await expect(adapter.promptSession('session-locked', 'Continue.')).resolves.toEqual({
+      continuedSessionId: 'session-continuation',
+    });
+    expect(createContinuation).toHaveBeenCalledWith(
+      '/tmp/project',
+      expect.stringContaining('## User\n\nOriginal question'),
+      'Continue.',
+    );
   });
 
   it('discovers only active private IPv4 addresses and requires an exact interface match', () => {

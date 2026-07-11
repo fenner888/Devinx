@@ -107,7 +107,11 @@ export interface SessionDiscoveryAdapter {
   isSessionLoadSupported(): boolean;
   loadSession(sessionId: string): Promise<AcpLoadedSession>;
   isSessionPromptSupported(): boolean;
-  promptSession(sessionId: string, text: string): Promise<void>;
+  promptSession(
+    sessionId: string,
+    text: string,
+  ): Promise<void | { continuedSessionId: string }>;
+  createContinuation?(cwd: string, context: string, text: string): Promise<string>;
 }
 
 export interface BridgeServiceOptions {
@@ -386,8 +390,17 @@ export class BridgeService {
     const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
     if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
     try {
-      await this.dependencies.sessions.promptSession(rawSessionId, body.text);
-      return { status: 200, body: { accepted: true } };
+      const result = await this.dependencies.sessions.promptSession(rawSessionId, body.text);
+      const continuedSessionId = result?.continuedSessionId;
+      return {
+        status: 200,
+        body: {
+          accepted: true,
+          ...(continuedSessionId
+            ? { sessionId: this.dependencies.sessionHandles.register(continuedSessionId, now) }
+            : {}),
+        },
+      };
     } catch {
       return { status: 503, body: { error: 'temporarily_unavailable' } };
     }

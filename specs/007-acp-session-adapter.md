@@ -1,5 +1,9 @@
 # Phase 3D — ACP Session Discovery Adapter
 
+> Historical phase note: the read-only limitation in this document is superseded by
+> `024-concurrent-local-continuation.md`, which specifies the reviewed SQLite history
+> adapter and explicit `session/new` continuation path.
+
 Status: synthetic-fixture implementation. Real-account invocation remains an explicit user checkpoint.
 
 ## Purpose

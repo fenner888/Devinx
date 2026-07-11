@@ -124,20 +124,23 @@ export default function ComputerSessionDetailScreen() {
   const parameters = useLocalSearchParams<{
     bridgeId?: string | string[];
     id?: string | string[];
+    continuing?: string | string[];
   }>();
   const bridgeId = singleParameter(parameters.bridgeId);
   const sessionId = singleParameter(parameters.id);
+  const continuationPending = singleParameter(parameters.continuing) === '1';
   const router = useRouter();
   const { tokens } = useTheme();
   const { computers } = useConnections();
   const [companionActive, setCompanionActive] = useState(false);
   const [draft, setDraft] = useState('');
   const [pendingText, setPendingText] = useState<string | null>(null);
-  const [steeringActive, setSteeringActive] = useState(false);
+  const [steeringActive, setSteeringActive] = useState(continuationPending);
   const historyRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshGeneration = useRef(0);
+  const continuationRefreshStarted = useRef(false);
   const validParameters =
     BRIDGE_ID_PATTERN.test(bridgeId) && LOCAL_SESSION_ID_PATTERN.test(sessionId);
   const computer = computers.find((item) => item.bridgeId === bridgeId);
@@ -146,6 +149,38 @@ export default function ComputerSessionDetailScreen() {
   const query = useComputerSessionDetail(bridgeId, sessionId, mayReadContent);
   const prompt = usePromptComputerSession(bridgeId, sessionId);
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
+
+  useEffect(() => {
+    if (!continuationPending || !mayReadContent || continuationRefreshStarted.current) return;
+    continuationRefreshStarted.current = true;
+    const generation = refreshGeneration.current + 1;
+    refreshGeneration.current = generation;
+    let previouslyObserved: string | null = null;
+    const refreshUntilComplete = async (attempt: number) => {
+      const refreshResult = await query.refetch();
+      if (refreshGeneration.current !== generation) return;
+      const currentReply = refreshResult.data
+        ? devinReplySignature(refreshResult.data)
+        : '[]';
+      if (currentReply !== '[]' && currentReply === previouslyObserved) {
+        setSteeringActive(false);
+        return;
+      }
+      previouslyObserved = currentReply === '[]' ? null : currentReply;
+      if (attempt >= MAXIMUM_HISTORY_REFRESH_ATTEMPTS) {
+        setSteeringActive(false);
+        return;
+      }
+      refreshTimer.current = setTimeout(
+        () => refreshUntilComplete(attempt + 1),
+        HISTORY_REFRESH_INTERVAL_MS,
+      );
+    };
+    refreshTimer.current = setTimeout(
+      () => refreshUntilComplete(0),
+      HISTORY_REFRESH_INTERVAL_MS,
+    );
+  }, [continuationPending, mayReadContent, query]);
 
   useEffect(
     () => () => {
@@ -171,15 +206,21 @@ export default function ComputerSessionDetailScreen() {
         .map((message) => message.text) ?? [],
     );
     prompt.mutate(text, {
-      onSuccess: () => {
+      onSuccess: (result) => {
+        if (result?.sessionId && result.sessionId !== sessionId) {
+          setPendingText(null);
+          setSteeringActive(false);
+          router.replace(`/computer-session/${bridgeId}/${result.sessionId}?continuing=1`);
+          return;
+        }
         let observedReply: string | null = null;
         const refreshUntilComplete = async (attempt: number) => {
-          const result = await query.refetch();
+          const refreshResult = await query.refetch();
           if (refreshGeneration.current !== generation) return;
-          if (result.isSuccess && result.data) {
-            const currentReply = devinReplySignature(result.data);
+          if (refreshResult.isSuccess && refreshResult.data) {
+            const currentReply = devinReplySignature(refreshResult.data);
             const currentUser = JSON.stringify(
-              result.data.messages
+              refreshResult.data.messages
                 .filter((message) => message.source === 'user')
                 .map((message) => message.text),
             );
@@ -321,6 +362,15 @@ export default function ComputerSessionDetailScreen() {
                 <Ionicons name="information-circle-outline" size={16} color={tokens.textMid.hex} />
                 <Text className="ml-2 flex-1 text-text-mid text-text12 leading-4">
                   Older content was omitted to keep this private-device transfer small.
+                </Text>
+              </View>
+            )}
+            {continuationPending && (
+              <View className="mb-5 flex-row items-start rounded-card border border-border-subtle bg-surface1 px-3 py-3">
+                <Ionicons name="git-branch-outline" size={16} color={tokens.brandText.hex} />
+                <Text className="ml-2 flex-1 text-text-mid text-text12 leading-4">
+                  {steeringActive ? 'Continuing' : 'Continued'} in a new computer session while the
+                  original remains open in Devin Desktop.
                 </Text>
               </View>
             )}
