@@ -1,6 +1,6 @@
 # 023 — Authorized local session steering
 
-Status: implemented and synthetically validated. Build 14 physically proved Tailscale discovery, authorized prompting, keyboard dismissal, and a returned Devin reply. A same-author replay-boundary defect was then fixed in Connector and response-aware mobile polling is pending the next TestFlight build/retest.
+Status: implemented and synthetically validated. Build 14 physically proved Tailscale discovery, authorized prompting, keyboard dismissal, and a returned Devin reply. A same-author replay-boundary defect was then fixed in Connector, and response-aware mobile polling shipped to internal TestFlight processing in Build 17. Physical Build 17 presentation and companion-behavior retesting remains pending.
 
 ## Contract
 
