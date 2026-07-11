@@ -336,7 +336,7 @@ if (request.method === 'initialize') {
     }
   });
 
-  it('fails closed when replay is associated with a different session', async () => {
+  it('drops differently-associated replay records without exposing or aborting history', async () => {
     const executablePath = fakeCli(`
 if (request.method === 'initialize') {
   process.stdout.write(JSON.stringify({
@@ -356,13 +356,24 @@ if (request.method === 'initialize') {
       update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'wrong' } }
     }
   }) + '\\n');
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', method: 'session/update',
+    params: {
+      sessionId: 'session-right',
+      update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'safe' } }
+    }
+  }) + '\\n');
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
 }`);
     const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
 
     await client.start();
     await client.listSessions();
-    await expect(client.loadSession('session-right')).rejects.toThrow('replay failed validation');
-    expect(client.isSessionLoadSupported()).toBe(false);
+    await expect(client.loadSession('session-right')).resolves.toMatchObject({
+      messages: [{ source: 'devin', text: 'safe' }],
+      truncated: true,
+    });
+    expect(client.isSessionLoadSupported()).toBe(true);
     await client.stop();
   });
 

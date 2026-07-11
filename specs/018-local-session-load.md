@@ -10,6 +10,8 @@ The request must contain the raw ACP session ID, the session's exact absolute `c
 
 During load, the agent replays history as `session/update` notifications and sends the load response only after replay completes. The adapter must therefore scope notifications to one active load, validate them before collection, and never treat an agent-to-client request as approval.
 
+An invalid, excessive, or differently-associated replay notification is discarded without collection and marks the minimized history as truncated. Valid text records from the requested session may still be returned after the validated load response completes. This fails closed for the incompatible record without making one legacy or private update terminate session discovery for every session.
+
 ## Privacy and authorization
 
 The mobile request continues to use the opaque `local_` session handle. The server resolves that handle in its bounded, expiring in-memory registry and returns 404 when it is missing, expired, outside a device session scope, or unauthorized.

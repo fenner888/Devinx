@@ -576,14 +576,16 @@ export class AcpSessionClient {
     }
     collector.notifications += 1;
     if (collector.notifications > MAX_REPLAY_NOTIFICATIONS) {
-      collector.failed = true;
-      this.abort(child, new Error('ACP session replay exceeded the notification limit'));
+      collector.truncated = true;
+      collector.mergeBarrier = true;
       return;
     }
     const notificationResult = sessionUpdateNotificationSchema.safeParse(input);
     if (!notificationResult.success || notificationResult.data.sessionId !== collector.sessionId) {
-      collector.failed = true;
-      this.abort(child, new Error('ACP session replay failed validation'));
+      // Drop invalid or differently-associated records without collecting any
+      // of their content or terminating otherwise valid replay history.
+      collector.truncated = true;
+      collector.mergeBarrier = true;
       return;
     }
     const updateType = notificationResult.data.update.sessionUpdate;
@@ -602,8 +604,8 @@ export class AcpSessionClient {
     }
     const updateResult = textReplayUpdateSchema.safeParse(notificationResult.data.update);
     if (!updateResult.success) {
-      collector.failed = true;
-      this.abort(child, new Error('ACP session replay failed validation'));
+      collector.truncated = true;
+      collector.mergeBarrier = true;
       return;
     }
     this.collectReplayText(collector, {
