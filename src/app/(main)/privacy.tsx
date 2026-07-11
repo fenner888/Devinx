@@ -40,6 +40,11 @@ const rows = [
     detail:
       'The installed app may contact Expo over TLS to check for compatible DevinX updates. This release does not register your iPhone for remote push notifications.',
   },
+  {
+    title: 'Your controls and deletion',
+    detail:
+      'Disconnecting removes DevinX credentials and cached data from this iPhone. Revoking the iPhone in DevinX Connector ends its Mac access. Cloud-session retention remains controlled by Cognition and your Devin account.',
+  },
 ] as const;
 
 export default function PrivacyScreen() {
@@ -79,6 +84,17 @@ export default function PrivacyScreen() {
         </View>
         <Pressable
           className="flex-row items-center justify-center rounded-button bg-tint-secondary py-3"
+          onPress={() =>
+            Linking.openURL('https://github.com/fenner888/Devinx/blob/main/PRIVACY.md')
+          }
+          accessibilityRole="link"
+          accessibilityLabel="Open the full DevinX privacy policy"
+        >
+          <Text className="text-brand-text text-text14 font-medium">Full privacy policy</Text>
+          <Ionicons name="open-outline" size={14} color={tokens.brandText.hex} />
+        </Pressable>
+        <Pressable
+          className="mt-3 flex-row items-center justify-center rounded-button bg-tint-secondary py-3"
           onPress={() => Linking.openURL('https://docs.devin.ai/api-reference/v3/overview')}
           accessibilityRole="link"
           accessibilityLabel="Open Devin API privacy documentation"

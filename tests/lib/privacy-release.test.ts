@@ -23,6 +23,8 @@ describe('release privacy configuration', () => {
     expect(privacyScreen).toContain('directly from your Mac over Tailscale');
     expect(privacyScreen).toContain('contact Expo over TLS');
     expect(privacyScreen).toContain('does not register your iPhone for remote push notifications');
+    expect(privacyScreen).toContain('Your controls and deletion');
+    expect(privacyScreen).toContain('https://github.com/fenner888/Devinx/blob/main/PRIVACY.md');
     expect(privacyScreen).not.toContain('over pinned TLS');
   });
 });

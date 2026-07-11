@@ -1,6 +1,6 @@
 # DevinX Privacy Policy
 
-Effective: July 10, 2026
+Effective: July 11, 2026
 
 DevinX is an independent, unofficial client for the Devin API. It is not affiliated with, endorsed by, or a product of Cognition AI.
 
@@ -17,11 +17,13 @@ DevinX stores the following on your device:
 
 Disconnecting and wiping connections removes stored credentials, cached cloud session data, and in-memory query data from the device.
 
-## Analytics and crash reports
+## Analytics, crash reports, and notifications
 
 DevinX does not currently enable a product analytics SDK. Session titles, prompts, messages, repository names, source code, and attachments are not sent to an analytics provider.
 
-Production builds may use Sentry for crash diagnostics. Before a report is sent, DevinX removes authorization headers, API-key-like strings, organization identifiers, credential-bearing URLs, and session message content. Crash reporting is disabled when no Sentry DSN is configured.
+The current production configuration does not provide a Sentry DSN, so crash reports are not transmitted. If crash reporting is enabled in a future release, DevinX will update this policy and its App Store privacy disclosures before release; its existing scrubber removes authorization headers, API-key-like strings, organization identifiers, credential-bearing URLs, and session message content.
+
+The current release does not register the iPhone for remote push notifications and does not transmit an Expo push token.
 
 ## Paired-computer access
 
@@ -35,9 +37,19 @@ Local-session responses remain only in the app's in-memory query cache and are r
 
 Tailscale provides private network reachability between your iPhone and computer; DevinX still verifies and authorizes every request independently. Session traffic travels between those devices, not through a DevinX-operated relay. Use of Tailscale is governed by Tailscale's privacy policy and your account settings.
 
+## App delivery
+
+The installed app may contact Expo over encrypted TLS to check for a compatible DevinX update. Update requests do not include Devin credentials, prompts, messages, repository names, attachments, local-session content, or Connector pairing secrets. Expo's handling of update-service transport data is governed by its privacy terms.
+
+## Your controls and deletion
+
+You can disconnect a cloud or computer connection from DevinX to remove its credentials and local cache from the iPhone. You can revoke an iPhone from DevinX Connector to end that device's access to the Mac. Removing local DevinX data does not delete sessions or account data retained by Cognition; use the controls provided by the Devin service or contact Cognition for those requests.
+
+Camera and photo-library access are requested only when you choose the related scanner or attachment feature. You can deny or later revoke those permissions in iOS Settings. DevinX does not capture a photo or video while scanning a Connector QR code.
+
 ## Data sharing and sale
 
-DevinX does not sell personal data and does not operate an intermediary server for normal app traffic. Data is shared only with services required for features you invoke: the Devin API, an explicitly paired computer, Tailscale for private-network transport, and, when configured, the scrubbed crash-reporting service.
+DevinX does not sell personal data, use data for advertising, or track users across other companies' apps and websites. It does not operate an intermediary server for session traffic. Data is shared only with services required for features you invoke or app delivery: the Devin API, an explicitly paired computer, Tailscale for private-network transport, Expo for compatible app updates, and, only if disclosed and configured in a future release, a scrubbed crash-reporting service.
 
 ## Contact
 
