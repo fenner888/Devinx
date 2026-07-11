@@ -15,6 +15,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (20)` was built locally from clean commit `5643f30`; Build 18 stopped only when disposable Xcode storage filled, and 19 was reserved during the clean retry
 - [x] Build 20 IPA signature and bundle metadata passed (`com.fenner888.devinx`, `0.1.0 (20)`); SHA-256 `a2f3e692d96715219178393a264fc3f78a9b5c73ebc01f0214cd210e6064a52a`
 - [x] Build 20 App Store Connect submission `6c98a795-35f3-4720-8408-182afd6a3cdb` finished with no error as an internal TestFlight checkpoint
+- [x] iOS `0.1.0 (21)` was built locally from clean commit `6cc2efc` after removing unused remote-push registration and correcting the release privacy disclosures
+- [x] Build 21 IPA signature, bundle metadata, and privacy artifact inspection passed (`com.fenner888.devinx`, `0.1.0 (21)`); no notification framework/bundle remained; SHA-256 `9f19ce5e9596d1bf1cd74adc4e2e05a28a709482b2e19d72e9cdc85165a73f1d`
+- [x] Build 21 App Store Connect submission `41696463-d06f-4d64-8a78-f08f432937ed` finished with no error as the consolidated internal TestFlight candidate
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -35,12 +38,13 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed; release environment is pinned to Node 20.19.4 (the local Node 23 shell emitted expected unsupported-engine warnings) |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 47 suites / 369 tests with handle detection enabled; Sentry's import-time timers are isolated by the test setup |
-| Production iOS export | passed; 13 MB total, 6.96 MB Hermes bundle, 101 assets |
+| Jest | passed 48 suites / 371 tests with handle detection enabled; Sentry's import-time timers are isolated by the test setup |
+| Production iOS export | passed; 13 MB total, 6.76 MB Hermes bundle, 101 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
-| Moderate dependency review | 22 transitive advisories: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
+| Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
+| App privacy artifact | Build 21 contains 11 valid privacy manifests, declares no collected SDK data or tracking, and contains no notification framework/privacy bundle; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
 | Connector app build/signature | passed build and strict code-sign verification with ad-hoc development signature |
@@ -49,7 +53,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [x] Confirm the intended TestFlight build contains the current self-disconnect, session-boundary, local-history, and companion-travel changes (Build 20 / `5643f30`)
+- [x] Confirm the intended TestFlight build contains the current self-disconnect, session-boundary, local-history, companion-travel, and privacy changes (Build 21 / `6cc2efc`)
 - [x] Grant content read and message send to the iPhone in Connector
 - [x] Discover and load a real desktop session
 - [x] Send a harmless message and confirm it reaches that session
@@ -66,9 +70,10 @@ The results below must be refreshed after release-document changes and before a 
 - [ ] Obtain an Apple Developer ID Application certificate
 - [ ] Sign, notarize, staple, and Gatekeeper-verify the macOS Connector and DMG
 - [ ] Provide a non-production review credential and Connector review instructions privately in App Store Connect
-- [ ] Confirm App Privacy answers against the exact production Sentry/push configuration
+- [x] Confirm App Privacy answers against the exact production Sentry/push configuration
+- [ ] Confirm Cognition and Expo retention terms and publish the final App Store Connect privacy answers from `docs/app-privacy-review.md`
 - [ ] Capture final iPhone screenshots without credentials or private session content
-- [ ] Review the production dependency lock, secret scan, dead code, and authorization matrix
+- [x] Review the production dependency lock, secret scan, dead code, and authorization matrix
 - [ ] Receive explicit approval before App Review submission or public artifact publication
 
 ## Platform scope
