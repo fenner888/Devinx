@@ -260,4 +260,65 @@ describe('Desktop Bridge development runner', () => {
     expect(acpStop).toHaveBeenCalledTimes(1);
     expect(listenerStop).toHaveBeenCalledTimes(1);
   });
+
+  it('restarts ACP session discovery after the child becomes unavailable', async () => {
+    const firstStop = jest.fn<Promise<void>, []>().mockResolvedValue();
+    let firstAvailable = true;
+    const first: AcpSessionLifecycle = {
+      start: jest.fn<Promise<void>, []>().mockResolvedValue(),
+      stop: firstStop,
+      isSessionListSupported: () => firstAvailable,
+      listSessions: async () => ({ sessions: [] }),
+      isSessionLoadSupported: () => firstAvailable,
+      loadSession: async () => ({ sessionId: 'session', cwd: '/', messages: [], truncated: false }),
+      isSessionPromptSupported: () => firstAvailable,
+      promptSession: async () => {},
+    };
+    const replacementStart = jest.fn<Promise<void>, []>().mockResolvedValue();
+    const replacement: AcpSessionLifecycle = {
+      start: replacementStart,
+      stop: jest.fn<Promise<void>, []>().mockResolvedValue(),
+      isSessionListSupported: () => true,
+      listSessions: async () => ({ sessions: [] }),
+      isSessionLoadSupported: () => true,
+      loadSession: async () => ({ sessionId: 'session', cwd: '/', messages: [], truncated: false }),
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
+    };
+    const createAcpClient = jest
+      .fn<AcpSessionLifecycle, [string]>()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(replacement);
+    const runner = new DesktopBridgeRunner(
+      { advertisedHost: '100.127.166.87', devinCliPath: '/usr/local/bin/devin' },
+      {
+        secretStore: new MemorySecretStore(),
+        tlsIdentityGenerator: new OpenSslTlsIdentityGenerator({ validityDays: 1 }),
+        qrRenderer: { render: jest.fn() },
+        createListener: (options) => {
+          const identity = tlsIdentityFromPem(options.tlsCertificatePem, options.tlsPrivateKeyPem);
+          return {
+            start: async () => ({
+              host: '100.127.166.87',
+              port: 45_831,
+              certificateFingerprint: identity.certificateFingerprint,
+            }),
+            stop: async () => {},
+          };
+        },
+        createAcpClient,
+      },
+    );
+
+    await runner.start();
+    await expect(runner.recoverSessionDiscovery()).resolves.toBe(true);
+    expect(createAcpClient).toHaveBeenCalledTimes(1);
+
+    firstAvailable = false;
+    await expect(runner.recoverSessionDiscovery()).resolves.toBe(true);
+    expect(firstStop).toHaveBeenCalledTimes(1);
+    expect(replacementStart).toHaveBeenCalledTimes(1);
+    expect(createAcpClient).toHaveBeenCalledTimes(2);
+    await runner.stop();
+  });
 });

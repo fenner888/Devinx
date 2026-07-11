@@ -12,6 +12,7 @@ import {
   createConnectorPlatformAdapter,
   discoverDevinCliFromPath,
   executableCandidates,
+  macOSDevinCliCandidates,
   selectPreferredConnectorAddress,
 } from '../../bridge/src/connector-platform';
 import { connectorStartupErrorCode } from '../../bridge/src/connector-cli';
@@ -56,6 +57,22 @@ describe('DevinX Connector platform and IPC boundary', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it('checks the supported Devin desktop installation when a GUI PATH omits the CLI', () => {
+    const candidates = macOSDevinCliCandidates({
+      HOME: '/Users/tester',
+      NODE_ENV: 'test',
+      PATH: '/usr/bin:/bin',
+    });
+
+    expect(candidates).toContain(
+      '/Applications/Devin.app/Contents/Resources/app/extensions/windsurf/devin/bin/devin',
+    );
+    expect(candidates).toContain(
+      '/Users/tester/Applications/Devin.app/Contents/Resources/app/extensions/windsurf/devin/bin/devin',
+    );
+    expect(candidates.every((candidate) => candidate.startsWith('/'))).toBe(true);
   });
 
   it('strictly validates bounded local connector commands and events', () => {

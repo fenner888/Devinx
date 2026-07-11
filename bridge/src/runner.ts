@@ -102,6 +102,41 @@ const unavailableSessions: SessionDiscoveryAdapter = {
   promptSession: () => Promise.reject(new Error('Session prompting is not enabled')),
 };
 
+class ReplaceableSessionDiscoveryAdapter implements SessionDiscoveryAdapter {
+  private current: SessionDiscoveryAdapter = unavailableSessions;
+
+  replace(adapter: SessionDiscoveryAdapter | null): void {
+    this.current = adapter ?? unavailableSessions;
+  }
+
+  isSessionListSupported(): boolean {
+    return this.current.isSessionListSupported();
+  }
+
+  listSessions(input?: unknown): ReturnType<SessionDiscoveryAdapter['listSessions']> {
+    return this.current.listSessions(input);
+  }
+
+  isSessionLoadSupported(): boolean {
+    return this.current.isSessionLoadSupported();
+  }
+
+  loadSession(input: string): ReturnType<SessionDiscoveryAdapter['loadSession']> {
+    return this.current.loadSession(input);
+  }
+
+  isSessionPromptSupported(): boolean {
+    return this.current.isSessionPromptSupported();
+  }
+
+  promptSession(
+    sessionId: string,
+    text: string,
+  ): ReturnType<SessionDiscoveryAdapter['promptSession']> {
+    return this.current.promptSession(sessionId, text);
+  }
+}
+
 export function createProductionRunnerDependencies(
   qrRenderer: PairingQrRenderer,
 ): DesktopBridgeRunnerDependencies {
@@ -117,6 +152,9 @@ export function createProductionRunnerDependencies(
 export class DesktopBridgeRunner {
   private listener: BridgeListenerLifecycle | null = null;
   private acp: AcpSessionLifecycle | null = null;
+  private readonly sessions = new ReplaceableSessionDiscoveryAdapter();
+  private acpRecovery: Promise<boolean> | null = null;
+  private devinCliPath: string | null = null;
   private pairing: PairingManager | null = null;
   private sessionHandles: SessionHandleRegistry | null = null;
   private devices: PersistentDeviceRegistry | null = null;
@@ -156,10 +194,12 @@ export class DesktopBridgeRunner {
 
       let sessions: SessionDiscoveryAdapter = unavailableSessions;
       if (options.devinCliPath) {
+        this.devinCliPath = options.devinCliPath;
         const acp = this.dependencies.createAcpClient(options.devinCliPath);
         this.acp = acp;
         await acp.start();
-        sessions = acp;
+        this.sessions.replace(acp);
+        sessions = this.sessions;
       }
 
       const pairing = new PairingManager(runtime.identity, runtime.devices);
@@ -274,14 +314,61 @@ export class DesktopBridgeRunner {
     return this.devices.revoke(deviceId);
   }
 
+  async recoverSessionDiscovery(): Promise<boolean> {
+    const executablePath = this.devinCliPath;
+    if (!executablePath || this.stopped || !this.started) return false;
+    const current = this.acp;
+    if (
+      current &&
+      (current.isSessionListSupported() ||
+        current.isSessionLoadSupported() ||
+        current.isSessionPromptSupported())
+    ) {
+      return current.isSessionListSupported();
+    }
+    if (this.acpRecovery) return this.acpRecovery;
+
+    const recovery = (async () => {
+      this.acp = null;
+      this.sessions.replace(null);
+      await current?.stop().catch(() => {});
+      if (this.stopped) return false;
+
+      const replacement = this.dependencies.createAcpClient(executablePath);
+      try {
+        await replacement.start();
+        if (this.stopped) {
+          await replacement.stop().catch(() => {});
+          return false;
+        }
+        this.acp = replacement;
+        this.sessions.replace(replacement);
+        return replacement.isSessionListSupported();
+      } catch {
+        await replacement.stop().catch(() => {});
+        return false;
+      }
+    })();
+    this.acpRecovery = recovery;
+    try {
+      return await recovery;
+    } finally {
+      if (this.acpRecovery === recovery) this.acpRecovery = null;
+    }
+  }
+
   async stop(): Promise<void> {
     if (this.stopped) return;
     this.stopped = true;
+    const recovery = this.acpRecovery;
+    if (recovery) await recovery.catch(() => false);
     const listener = this.listener;
     const acp = this.acp;
     const sessionHandles = this.sessionHandles;
     this.listener = null;
     this.acp = null;
+    this.sessions.replace(null);
+    this.devinCliPath = null;
     this.pairing = null;
     this.sessionHandles = null;
     this.devices = null;

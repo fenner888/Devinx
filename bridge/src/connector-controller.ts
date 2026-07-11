@@ -22,6 +22,7 @@ import {
 } from './runner';
 
 const CONNECTOR_EXTERNAL_PORT = 45_831;
+const ACP_RECOVERY_INTERVAL_MS = 5_000;
 
 export interface ConnectorControllerOptions {
   input: Readable;
@@ -131,6 +132,7 @@ export class ConnectorController {
         cliDetected: Boolean(devinCliPath),
       });
       this.writeDevices();
+      let nextAcpRecoveryAt = Date.now() + ACP_RECOVERY_INTERVAL_MS;
       while (!this.stopping) {
         const review = runner.pendingReviews()[0];
         if (review && review.pairingId !== this.presentedReviewId) {
@@ -145,6 +147,10 @@ export class ConnectorController {
         }
         if (Date.now() >= this.offerExpiresAt && !review) {
           this.offerExpiresAt = runner.showPairingOffer();
+        }
+        if (Date.now() >= nextAcpRecoveryAt) {
+          nextAcpRecoveryAt = Date.now() + ACP_RECOVERY_INTERVAL_MS;
+          await runner.recoverSessionDiscovery();
         }
         await delay(this.pollIntervalMs);
       }

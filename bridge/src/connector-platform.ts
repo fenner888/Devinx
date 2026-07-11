@@ -59,18 +59,54 @@ export function executableCandidates(environment: NodeJS.ProcessEnv): string[] {
   return [...candidates];
 }
 
-export async function discoverDevinCliFromPath(
-  environment: NodeJS.ProcessEnv,
-): Promise<string | null> {
-  for (const candidate of executableCandidates(environment)) {
+export function macOSDevinCliCandidates(environment: NodeJS.ProcessEnv): string[] {
+  const candidates = new Set(executableCandidates(environment));
+  candidates.add(
+    '/Applications/Devin.app/Contents/Resources/app/extensions/windsurf/devin/bin/devin',
+  );
+  const home = environment.HOME;
+  if (home && isAbsolute(home)) {
+    candidates.add(
+      join(
+        home,
+        'Applications',
+        'Devin.app',
+        'Contents',
+        'Resources',
+        'app',
+        'extensions',
+        'windsurf',
+        'devin',
+        'bin',
+        'devin',
+      ),
+    );
+  }
+  return [...candidates];
+}
+
+async function firstExecutable(candidates: readonly string[]): Promise<string | null> {
+  for (const candidate of candidates) {
     try {
       await access(candidate, constants.X_OK);
       return candidate;
     } catch {
-      // A PATH entry that does not contain an executable Devin CLI is expected.
+      // Missing candidates are expected while checking supported installation locations.
     }
   }
   return null;
+}
+
+export async function discoverDevinCliFromPath(
+  environment: NodeJS.ProcessEnv,
+): Promise<string | null> {
+  return firstExecutable(executableCandidates(environment));
+}
+
+export async function discoverMacOSDevinCli(
+  environment: NodeJS.ProcessEnv,
+): Promise<string | null> {
+  return firstExecutable(macOSDevinCliCandidates(environment));
 }
 
 export class MacOSConnectorPlatformAdapter implements ConnectorPlatformAdapter {
@@ -85,7 +121,7 @@ export class MacOSConnectorPlatformAdapter implements ConnectorPlatformAdapter {
   }
 
   discoverDevinCli(environment: NodeJS.ProcessEnv): Promise<string | null> {
-    return discoverDevinCliFromPath(environment);
+    return discoverMacOSDevinCli(environment);
   }
 }
 

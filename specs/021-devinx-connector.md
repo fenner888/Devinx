@@ -8,6 +8,10 @@ The local-computer feature is delivered as **DevinX Connector**. It is an option
 
 The user-facing action is **Connect this computer**. “Desktop Bridge,” ACP, listener addresses, ports, TLS fingerprints, and service managers are implementation details and must not be prerequisites for normal setup.
 
+On macOS, automatic Devin CLI discovery checks both executable entries inherited through `PATH` and the supported Devin desktop application locations in `/Applications` and the current user's `Applications` directory. A GUI launch must not silently disable session discovery merely because macOS did not inherit the user's interactive-shell `PATH`.
+
+The Connector supervises its ACP subprocess while it remains online. If ACP exits after startup, the authenticated listener stays available and the Connector attempts a bounded restart on a fixed interval. Capability checks fail closed during recovery, and no session request is replayed automatically.
+
 DevinX Connector is not an official Cognition component. It uses the supported Devin CLI ACP surface but owns its installation experience, private listener, QR pairing, device authorization, background lifecycle, and platform packaging.
 
 ## Required setup experience
