@@ -102,38 +102,64 @@ const unavailableSessions: SessionDiscoveryAdapter = {
   promptSession: () => Promise.reject(new Error('Session prompting is not enabled')),
 };
 
-class ReplaceableSessionDiscoveryAdapter implements SessionDiscoveryAdapter {
+const MAXIMUM_REHYDRATION_PAGES = 100;
+
+export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapter {
   private current: SessionDiscoveryAdapter = unavailableSessions;
+  private readonly listedSessionIds = new Set<string>();
+  private readonly loadedSessionIds = new Set<string>();
 
   replace(adapter: SessionDiscoveryAdapter | null): void {
     this.current = adapter ?? unavailableSessions;
+    this.listedSessionIds.clear();
+    this.loadedSessionIds.clear();
   }
 
   isSessionListSupported(): boolean {
     return this.current.isSessionListSupported();
   }
 
-  listSessions(input?: unknown): ReturnType<SessionDiscoveryAdapter['listSessions']> {
-    return this.current.listSessions(input);
+  async listSessions(input?: unknown): ReturnType<SessionDiscoveryAdapter['listSessions']> {
+    const page = await this.current.listSessions(input);
+    for (const session of page.sessions) this.listedSessionIds.add(session.sessionId);
+    return page;
   }
 
   isSessionLoadSupported(): boolean {
     return this.current.isSessionLoadSupported();
   }
 
-  loadSession(input: string): ReturnType<SessionDiscoveryAdapter['loadSession']> {
-    return this.current.loadSession(input);
+  async loadSession(input: string): ReturnType<SessionDiscoveryAdapter['loadSession']> {
+    await this.ensureSessionListed(input);
+    const loaded = await this.current.loadSession(input);
+    this.loadedSessionIds.add(input);
+    return loaded;
   }
 
   isSessionPromptSupported(): boolean {
     return this.current.isSessionPromptSupported();
   }
 
-  promptSession(
+  async promptSession(
     sessionId: string,
     text: string,
   ): ReturnType<SessionDiscoveryAdapter['promptSession']> {
+    if (!this.loadedSessionIds.has(sessionId)) await this.loadSession(sessionId);
     return this.current.promptSession(sessionId, text);
+  }
+
+  private async ensureSessionListed(sessionId: string): Promise<void> {
+    if (this.listedSessionIds.has(sessionId)) return;
+    const seenCursors = new Set<string>();
+    let cursor: string | undefined;
+    for (let pageIndex = 0; pageIndex < MAXIMUM_REHYDRATION_PAGES; pageIndex += 1) {
+      const page = await this.listSessions(cursor ? { cursor } : {});
+      if (this.listedSessionIds.has(sessionId)) return;
+      cursor = page.nextCursor;
+      if (!cursor || seenCursors.has(cursor)) break;
+      seenCursors.add(cursor);
+    }
+    throw new Error('Session is not available in the current ACP process');
   }
 }
 
@@ -152,7 +178,7 @@ export function createProductionRunnerDependencies(
 export class DesktopBridgeRunner {
   private listener: BridgeListenerLifecycle | null = null;
   private acp: AcpSessionLifecycle | null = null;
-  private readonly sessions = new ReplaceableSessionDiscoveryAdapter();
+  private readonly sessions = new RecoverableSessionDiscoveryAdapter();
   private acpRecovery: Promise<boolean> | null = null;
   private devinCliPath: string | null = null;
   private pairing: PairingManager | null = null;

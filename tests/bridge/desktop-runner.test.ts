@@ -12,6 +12,7 @@ import {
 } from '../../bridge/src/network';
 import {
   DesktopBridgeRunner,
+  RecoverableSessionDiscoveryAdapter,
   type AcpSessionLifecycle,
   type BridgeListenerLifecycle,
   type DesktopBridgeRunnerDependencies,
@@ -61,6 +62,47 @@ function interfaces(): NetworkInterfaceMap {
 }
 
 describe('Desktop Bridge development runner', () => {
+  it('securely rehydrates listed and loaded session state after ACP replacement', async () => {
+    const replacementList = jest.fn(async (input?: unknown) => {
+      const cursor = (input as { cursor?: string } | undefined)?.cursor;
+      return cursor
+        ? { sessions: [{ sessionId: 'session-kept', cwd: '/tmp/kept' }] }
+        : {
+            sessions: [{ sessionId: 'session-other', cwd: '/tmp/other' }],
+            nextCursor: 'page-2',
+          };
+    });
+    const replacementLoad = jest.fn(async (sessionId: string) => ({
+      sessionId,
+      cwd: '/tmp/kept',
+      messages: [],
+      truncated: false,
+    }));
+    const replacementPrompt = jest.fn<Promise<void>, [string, string]>().mockResolvedValue();
+    const replacement: AcpSessionLifecycle = {
+      start: jest.fn<Promise<void>, []>().mockResolvedValue(),
+      stop: jest.fn<Promise<void>, []>().mockResolvedValue(),
+      isSessionListSupported: () => true,
+      listSessions: replacementList,
+      isSessionLoadSupported: () => true,
+      loadSession: replacementLoad,
+      isSessionPromptSupported: () => true,
+      promptSession: replacementPrompt,
+    };
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace(replacement);
+
+    await expect(adapter.promptSession('session-kept', 'Continue.')).resolves.toBeUndefined();
+    expect(replacementList).toHaveBeenCalledTimes(2);
+    expect(replacementLoad).toHaveBeenCalledWith('session-kept');
+    expect(replacementPrompt).toHaveBeenCalledWith('session-kept', 'Continue.');
+
+    await expect(adapter.loadSession('session-missing')).rejects.toThrow(
+      'not available in the current ACP process',
+    );
+    expect(replacementLoad).toHaveBeenCalledTimes(1);
+  });
+
   it('discovers only active private IPv4 addresses and requires an exact interface match', () => {
     expect(discoverPrivateLanAddresses(interfaces())).toEqual(['100.127.166.87', '192.168.1.141']);
     expect(validateAdvertisedLanHost('192.168.1.141', interfaces())).toBe('192.168.1.141');
