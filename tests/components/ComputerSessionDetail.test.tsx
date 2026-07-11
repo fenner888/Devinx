@@ -3,6 +3,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 
 const mockMutate = jest.fn();
 const mockRefetch = jest.fn(async () => {});
+const mockCompanionProps = jest.fn();
 const mockReact = React;
 
 jest.mock('expo-router', () => ({
@@ -61,7 +62,14 @@ jest.mock('../../src/auth/ConnectionContext', () => ({
 }));
 
 jest.mock('../../src/components/pets', () => ({
-  DevinCompanion: () => null,
+  DevinCompanion: (props: unknown) => {
+    mockCompanionProps(props);
+    return null;
+  },
+}));
+
+jest.mock('../../src/components/DevinMarkdown', () => ({
+  DevinMarkdown: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 jest.mock('../../src/theme/index', () => ({
@@ -92,6 +100,11 @@ describe('Computer session detail', () => {
     fireEvent.press(screen.getByLabelText('Send computer session message'));
 
     expect(mockMutate).toHaveBeenCalledWith('Continue the task.', expect.any(Object));
+    expect(screen.getByText('Continue the task.')).toBeTruthy();
+    expect(screen.getByText('Devin is working…')).toBeTruthy();
+    expect(mockCompanionProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ state: 'thinking', travel: true, travelTrack: true }),
+    );
   });
 
   it('waits for a changed Devin reply to remain stable before ending refresh', () => {

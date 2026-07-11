@@ -10,6 +10,8 @@ import {
   Text,
   TextInput,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -23,6 +25,7 @@ import {
 import { ComputerBridgeError, type ComputerLoadedSession } from '@auth/computerBridge';
 import { useConnections } from '@auth/ConnectionContext';
 import { computerTransportLabel } from '@auth/pairedComputers';
+import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
 import { useTheme } from '@theme/index';
 
@@ -101,10 +104,18 @@ function HistoryMessage({ message }: { message: ComputerLoadedSession['messages'
   }
   return (
     <View className="mb-5">
-      <Text className="text-text-hi text-text14 leading-5" selectable>
-        {message.text}
-      </Text>
+      <DevinMarkdown>{message.text}</DevinMarkdown>
       <Text className="mt-1.5 text-text-low text-text11">Devin</Text>
+    </View>
+  );
+}
+
+function WorkingIndicator() {
+  const { tokens } = useTheme();
+  return (
+    <View className="mb-4 flex-row items-center">
+      <ActivityIndicator size="small" color={tokens.brandText.hex} />
+      <Text className="ml-2 text-text-mid text-text13">Devin is working…</Text>
     </View>
   );
 }
@@ -121,7 +132,10 @@ export default function ComputerSessionDetailScreen() {
   const { computers } = useConnections();
   const [companionActive, setCompanionActive] = useState(false);
   const [draft, setDraft] = useState('');
+  const [pendingText, setPendingText] = useState<string | null>(null);
   const [steeringActive, setSteeringActive] = useState(false);
+  const historyRef = useRef<ScrollView>(null);
+  const nearBottomRef = useRef(true);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshGeneration = useRef(0);
   const validParameters =
@@ -146,25 +160,39 @@ export default function ComputerSessionDetailScreen() {
     if (!text || !canPrompt || prompt.isPending || steeringActive) return;
     Keyboard.dismiss();
     setSteeringActive(true);
+    setPendingText(text);
+    setDraft('');
     const generation = refreshGeneration.current + 1;
     refreshGeneration.current = generation;
     const baselineReply = devinReplySignature(query.data);
+    const baselineUser = JSON.stringify(
+      query.data?.messages
+        .filter((message) => message.source === 'user')
+        .map((message) => message.text) ?? [],
+    );
     prompt.mutate(text, {
       onSuccess: () => {
-        setDraft('');
         let observedReply: string | null = null;
         const refreshUntilComplete = async (attempt: number) => {
           const result = await query.refetch();
           if (refreshGeneration.current !== generation) return;
           if (result.isSuccess && result.data) {
             const currentReply = devinReplySignature(result.data);
+            const currentUser = JSON.stringify(
+              result.data.messages
+                .filter((message) => message.source === 'user')
+                .map((message) => message.text),
+            );
+            if (currentUser !== baselineUser) setPendingText(null);
             if (hasSettledNewDevinReply(baselineReply, observedReply, currentReply)) {
+              setPendingText(null);
               setSteeringActive(false);
               return;
             }
             observedReply = currentReply === baselineReply ? null : currentReply;
           }
           if (attempt >= MAXIMUM_HISTORY_REFRESH_ATTEMPTS) {
+            setPendingText(null);
             setSteeringActive(false);
             return;
           }
@@ -179,9 +207,22 @@ export default function ComputerSessionDetailScreen() {
         );
       },
       onError: () => {
-        if (refreshGeneration.current === generation) setSteeringActive(false);
+        if (refreshGeneration.current === generation) {
+          setPendingText(null);
+          setDraft(text);
+          setSteeringActive(false);
+        }
       },
     });
+  }
+
+  useEffect(() => {
+    if (nearBottomRef.current) historyRef.current?.scrollToEnd({ animated: true });
+  }, [pendingText, query.data?.messages.length, steeringActive]);
+
+  function handleHistoryScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    nearBottomRef.current = layoutMeasurement.height + contentOffset.y >= contentSize.height - 80;
   }
 
   useFocusEffect(
@@ -259,8 +300,14 @@ export default function ComputerSessionDetailScreen() {
           </View>
         ) : (
           <ScrollView
+            ref={historyRef}
             className="flex-1"
             contentContainerClassName="px-5 pt-5 pb-12"
+            onScroll={handleHistoryScroll}
+            scrollEventThrottle={100}
+            onContentSizeChange={() => {
+              if (nearBottomRef.current) historyRef.current?.scrollToEnd({ animated: false });
+            }}
             refreshControl={
               <RefreshControl
                 refreshing={query.isRefetching}
@@ -286,12 +333,25 @@ export default function ComputerSessionDetailScreen() {
                 <HistoryMessage key={message.sequence} message={message} />
               ))
             )}
-            <View className="items-end pt-2">
+            {pendingText && (
+              <View className="mb-4 max-w-[88%] self-end items-end opacity-70">
+                <View className="rounded-2xl bg-tint-primary px-4 py-3">
+                  <Text className="text-text-hi text-text14">{pendingText}</Text>
+                </View>
+                <Text className="mt-1 text-text-low text-text11">Sending…</Text>
+              </View>
+            )}
+            {steeringActive && <WorkingIndicator />}
+            <View className="pt-2">
               <DevinCompanion
-                state={steeringActive ? 'working' : 'waiting'}
+                state={steeringActive ? 'thinking' : 'waiting'}
                 size={112}
                 active={companionActive}
-                accessibilityLabel="Devin companion, waiting"
+                travel={steeringActive}
+                travelTrack
+                accessibilityLabel={
+                  steeringActive ? 'Devin companion, working' : 'Devin companion, waiting'
+                }
               />
             </View>
           </ScrollView>
