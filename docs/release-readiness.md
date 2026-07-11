@@ -30,6 +30,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (25)` was built locally from clean commit `296e90a` after removing the dormant crash-reporting SDK, native plugin, build flags, and raw error-detail rendering
 - [x] Build 25 IPA signature, metadata, entitlements, production update channel/runtime, file protection, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (25)`, `NSFileProtectionComplete`); 10 privacy manifests contain no collected-data declarations, no reporting/notification artifacts or APS entitlement remain; SHA-256 `33dc35a39cb4943523ea70d00cdc7b285f3db7de7cf39822e629b197fc4dc713`
 - [x] Build 25 App Store Connect submission `edb84701-c0ff-4421-a70a-c3913dfd99b1` finished with no error as the definitive consolidated internal TestFlight candidate
+- [x] iOS `0.1.0 (27)` was built locally from clean commit `4badef2` after the free EAS iOS quota rejected the remote job; the retry selected Xcode 26.6 and Node 20.19.4 only for the build process
+- [x] Build 27 IPA signature, metadata, entitlements, production update channel/runtime, file protection, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (27)`, `NSFileProtectionComplete`); 10 privacy manifests and no notification/reporting artifacts remain; SHA-256 `3ef271fef8b4d0fd1059572110bbe4a3719b00d01d158454da3aeee6fb279c73`
+- [x] Build 27 App Store Connect submission `59a13e8c-d291-4f65-a588-a0ec04129c33` finished with no error and is processing as the local-session creation/model-control TestFlight checkpoint
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -39,6 +42,7 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] Authorized ACP text prompting and post-send history refresh implemented
 - [x] Per-computer removal and requesting-device revocation implemented
 - [x] Cloud-only, Computer-only, and combined modes represented in the app model
+- [x] Cloud and Computer session creation use separate pickers; local creation uses opaque workspace handles, dynamic model choices, and a separately revocable Mac permission
 - [x] Public support and privacy URLs available from the public repository
 
 ## Automated gates
@@ -50,13 +54,13 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed; release environment is pinned to Node 20.19.4 (the local Node 23 shell emitted expected unsupported-engine warnings) |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 51 suites / 379 tests with handle detection enabled; no analytics or crash-reporting SDK runtime is loaded by the test environment |
+| Jest | passed 52 suites / 400 tests with handle detection enabled; no analytics or crash-reporting SDK runtime is loaded by the test environment |
 | Production iOS export | passed after dormant SDK removal; 12 MB total, 5.38 MB Hermes bundle, 101 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 25 contains 10 valid privacy manifests with no collected-data declarations or tracking; no notification, crash-reporting, or APS artifact remains; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 27 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -66,6 +70,10 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
+- [ ] Install Build 27 and confirm Cloud and Computer expose their distinct pickers
+- [ ] Enable `Create new sessions` for the iPhone in Connector and create a harmless Computer session with an approved workspace and selected model
+- [ ] Confirm the selected model appears on the new local session and the initial prompt receives a reply
+- [ ] Confirm no raw Mac path or raw ACP session identifier appears on the phone
 - [x] Confirm the final TestFlight build contains the current self-disconnect, complete local-data wipe, session-boundary, local-history, companion-travel, privacy, accessibility, and dormant-SDK removal changes (Build 25 / `296e90a`)
 - [x] Grant content read and message send to the iPhone in Connector
 - [x] Discover and load a real desktop session

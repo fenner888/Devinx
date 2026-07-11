@@ -1,6 +1,7 @@
 # 025 — Local session creation and dynamic model controls
 
-Status: active implementation
+Status: implemented, automated-test validated, and submitted in iOS Build 27; physical
+workspace/model creation and response validation remain
 
 ## Product contract
 
