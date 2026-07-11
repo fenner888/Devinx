@@ -256,7 +256,16 @@ signOwnedCode(
   resolve(repositoryRoot, 'connector', 'macos', 'NodeRuntime.entitlements'),
 );
 validateRuntimeEntitlements(nodeRuntimePath);
-signOwnedCode(resolve(resourcesRoot, 'macos-keychain-helper'), identity);
+const keychainHelperPath = resolve(resourcesRoot, 'macos-keychain-helper');
+if (identity === '-') {
+  // Preserve the compiler's existing ad-hoc identity in development builds.
+  // Re-signing it changes the Keychain ACL identity and strands existing local
+  // bridge state behind an authorization prompt. Public builds use the stable
+  // Developer ID identity below.
+  run('/usr/bin/codesign', ['--verify', '--strict', '--verbose=2', keychainHelperPath]);
+} else {
+  signOwnedCode(keychainHelperPath, identity);
+}
 signOwnedCode(resolve(macOSRoot, 'DevinXConnector'), identity);
 signOwnedCode(appRoot, identity);
 run('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', appRoot]);

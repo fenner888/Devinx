@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 
 const repositoryRoot = resolve(__dirname, '..', '..');
 const scriptPath = resolve(repositoryRoot, 'scripts', 'connector', 'notarize-macos.mjs');
+const buildScriptPath = resolve(repositoryRoot, 'scripts', 'connector', 'build-macos.mjs');
 const runtimeEntitlementsPath = resolve(
   repositoryRoot,
   'connector',
@@ -59,5 +60,11 @@ describe('macOS Connector notarization policy', () => {
     expect(entitlements).not.toContain('allow-dyld-environment-variables');
     expect(entitlements).not.toContain('disable-executable-page-protection');
     expect(entitlements).not.toContain('disable-library-validation');
+  });
+
+  it('preserves the development Keychain helper identity across packaging', () => {
+    const buildSource = readFileSync(buildScriptPath, 'utf8');
+    expect(buildSource).toContain("if (identity === '-')");
+    expect(buildSource).toContain("['--verify', '--strict', '--verbose=2', keychainHelperPath]");
   });
 });

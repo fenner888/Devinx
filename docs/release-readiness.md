@@ -27,7 +27,7 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed; release environment is pinned to Node 20.19.4 (the local Node 23 shell emitted expected unsupported-engine warnings) |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 47 suites / 365 tests with handle detection enabled; Sentry's import-time timers are isolated by the test setup |
+| Jest | passed 47 suites / 366 tests with handle detection enabled; Sentry's import-time timers are isolated by the test setup |
 | Production iOS export | passed; 13 MB total, 6.96 MB Hermes bundle, 101 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 22 transitive advisories: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
@@ -36,7 +36,7 @@ The results below must be refreshed after release-document changes and before a 
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
 | Connector app build/signature | passed build and strict code-sign verification with ad-hoc development signature |
-| Connector DMG/checksum | passed after minimal-runtime-entitlement signing change; current arm64 development DMG SHA-256 `8374a3c52c7fef93cdadc4348137f8280b2aadee4f62957cf284b05eedaf7493` |
+| Connector DMG/checksum | passed after minimal-runtime-entitlement and Keychain-identity preservation changes; current arm64 development DMG SHA-256 `806b801cb03e67a290480cd4ab6f88debc566e86f6d59780a6ae6cbc374ee7d2` |
 | Developer ID/notarization workflow | prepared and fail-closed; checksum-verifies then minimally re-signs Node without debug/dynamic-loader entitlements, rejects development identities, notarizes/staples app before rebuilding and notarizing DMG |
 
 ## Required physical checkpoint
