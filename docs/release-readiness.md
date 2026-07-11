@@ -24,7 +24,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (23)` was built locally from clean commit `8566659` after aligning the public policy and in-app privacy controls with the exact release configuration
 - [x] Build 23 IPA signature, bundle metadata, entitlements, and privacy artifact inspection passed (`com.fenner888.devinx`, `0.1.0 (23)`); no notification artifacts or APS entitlement remained; SHA-256 `17b60c9b09836ca5dd57a2f6aec06a3f0f68c8d6661457ec5fc823ff2a97c247`
 - [x] Build 23 App Store Connect submission `e451bf7a-02f2-4851-a6c8-7d47101b4df4` finished with no error as the superseding consolidated internal TestFlight candidate
-- [ ] Build and inspect a superseding candidate containing the complete local-data wipe, corrected EAS Update privacy disclosure, and App Store-length subtitle from the post-Build-23 release audit
+- [x] iOS `0.1.0 (24)` was built locally from clean commit `80c615c`, containing the complete local-data wipe, corrected EAS Update privacy disclosure, App Store-length subtitle, and public-release audit
+- [x] Build 24 IPA signature, bundle metadata, entitlements, update channel/runtime, file protection, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (24)`, `NSFileProtectionComplete`); no notification artifacts or APS entitlement remained; SHA-256 `825986a8909ff27b4e118175abc1084bb2556c9a87c0e138ece17d117439cbe5`
+- [x] Build 24 App Store Connect submission `355f66a7-e791-4cbb-96d2-8262ca689229` finished with no error as the superseding consolidated internal TestFlight candidate
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -61,7 +63,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [ ] Confirm the final TestFlight build contains the current self-disconnect, complete local-data wipe, session-boundary, local-history, companion-travel, privacy, and accessibility changes
+- [x] Confirm the final TestFlight build contains the current self-disconnect, complete local-data wipe, session-boundary, local-history, companion-travel, privacy, and accessibility changes (Build 24 / `80c615c`)
 - [x] Grant content read and message send to the iPhone in Connector
 - [x] Discover and load a real desktop session
 - [x] Send a harmless message and confirm it reaches that session
