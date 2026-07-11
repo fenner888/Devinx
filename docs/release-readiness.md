@@ -24,6 +24,7 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (23)` was built locally from clean commit `8566659` after aligning the public policy and in-app privacy controls with the exact release configuration
 - [x] Build 23 IPA signature, bundle metadata, entitlements, and privacy artifact inspection passed (`com.fenner888.devinx`, `0.1.0 (23)`); no notification artifacts or APS entitlement remained; SHA-256 `17b60c9b09836ca5dd57a2f6aec06a3f0f68c8d6661457ec5fc823ff2a97c247`
 - [x] Build 23 App Store Connect submission `e451bf7a-02f2-4851-a6c8-7d47101b4df4` finished with no error as the superseding consolidated internal TestFlight candidate
+- [ ] Build and inspect a superseding candidate containing the complete local-data wipe, corrected EAS Update privacy disclosure, and App Store-length subtitle from the post-Build-23 release audit
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -44,8 +45,8 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed; release environment is pinned to Node 20.19.4 (the local Node 23 shell emitted expected unsupported-engine warnings) |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 49 suites / 372 tests with handle detection enabled; Sentry's import-time timers are isolated by the test setup |
-| Production iOS export | passed; 13 MB total, 6.76 MB Hermes bundle, 101 assets |
+| Jest | passed 50 suites / 376 tests with handle detection enabled; Sentry's import-time timers are isolated by the test setup |
+| Production iOS export | passed; 13 MB total, 6.77 MB Hermes bundle, 101 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
@@ -60,7 +61,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [x] Confirm the intended TestFlight build contains the current self-disconnect, session-boundary, local-history, companion-travel, privacy, and accessibility changes (Build 23 / `8566659`)
+- [ ] Confirm the final TestFlight build contains the current self-disconnect, complete local-data wipe, session-boundary, local-history, companion-travel, privacy, and accessibility changes
 - [x] Grant content read and message send to the iPhone in Connector
 - [x] Discover and load a real desktop session
 - [x] Send a harmless message and confirm it reaches that session
@@ -78,7 +79,8 @@ The results below must be refreshed after release-document changes and before a 
 - [ ] Sign, notarize, staple, and Gatekeeper-verify the macOS Connector and DMG
 - [ ] Provide a non-production review credential and Connector review instructions privately in App Store Connect
 - [x] Confirm App Privacy answers against the exact production Sentry/push configuration
-- [ ] Confirm Cognition and Expo retention terms and publish the final App Store Connect privacy answers from `docs/app-privacy-review.md`
+- [x] Review current official Cognition, Expo, and Tailscale privacy/retention materials and record the EAS Update randomized installation token in `docs/app-privacy-review.md`
+- [ ] Confirm the selected Devin account/agreement's exact retention treatment and publish the final App Store Connect privacy answers from `docs/app-privacy-review.md`
 - [ ] Capture final iPhone screenshots without credentials or private session content
 - [x] Review the production dependency lock, secret scan, dead code, and authorization matrix
 - [ ] Receive explicit approval before App Review submission or public artifact publication
