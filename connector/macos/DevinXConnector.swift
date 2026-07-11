@@ -443,10 +443,18 @@ private struct ConnectorView: View {
                                         Label(device.deviceName, systemImage: "iphone")
                                             .font(.headline)
                                         Spacer()
+                                        if device.id == model.devices.last?.id {
+                                            Text("Most recent")
+                                                .font(.caption)
+                                                .foregroundStyle(.blue)
+                                        }
                                         Text(device.status == "active" ? "Active" : "Revoked")
                                             .font(.caption)
                                             .foregroundStyle(device.status == "active" ? .green : .secondary)
                                     }
+                                    Text("Paired \(Date(timeIntervalSince1970: device.pairedAt / 1_000).formatted(date: .abbreviated, time: .shortened))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                     Toggle("Read session titles and history", isOn: Binding(
                                         get: { device.allowSessionContent },
                                         set: { model.updateDevice(device, content: $0) }

@@ -36,7 +36,7 @@ The results below must be refreshed after release-document changes and before a 
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
 | Connector app build/signature | passed build and strict code-sign verification with ad-hoc development signature |
-| Connector DMG/checksum | passed after minimal-runtime-entitlement and Keychain-identity preservation changes; current arm64 development DMG SHA-256 `806b801cb03e67a290480cd4ab6f88debc566e86f6d59780a6ae6cbc374ee7d2` |
+| Connector DMG/checksum | passed after minimal-runtime-entitlement and Keychain-identity preservation changes; the generated arm64 DMG matches its adjacent `.sha256` file |
 | Developer ID/notarization workflow | prepared and fail-closed; checksum-verifies then minimally re-signs Node without debug/dynamic-loader entitlements, rejects development identities, notarizes/staples app before rebuilding and notarizing DMG |
 
 ## Required physical checkpoint

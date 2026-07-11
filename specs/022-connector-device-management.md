@@ -10,7 +10,7 @@ Steering permission does not itself enable ACP prompting. The bridge advertises 
 
 ## Local IPC boundary
 
-The runtime emits a bounded `devices` snapshot containing device ID, sanitized display name, active/revoked status, pairing time, and two booleans: content read and prompt send. It never emits public keys, endpoints, raw session scopes, credentials, messages, or audit content.
+The runtime emits a bounded `devices` snapshot containing device ID, sanitized display name, active/revoked status, pairing time, and two booleans: content read and prompt send. The native list displays the pairing time and identifies the most recent record so repeated same-name test devices remain distinguishable. It never emits public keys, endpoints, raw session scopes, credentials, messages, or audit content.
 
 The native app may send only strict `update_device` and `revoke_device` commands. Updates always retain `bridge:health` and `session:metadata:read`; content and prompt grants are explicit independent booleans. Unknown or revoked device IDs fail closed. Every update is persisted to Keychain before a refreshed snapshot is emitted.
 
