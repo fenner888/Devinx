@@ -4,7 +4,7 @@ Mobile mission control for Devin sessions. Unofficial, independent client for th
 
 ## Status
 
-Phase 0 (Foundation & Ground Truth) complete. See `/specs/000-build-spec.md` for the full build plan and `/specs/` for the design token audit and API deltas.
+The cloud mobile client and macOS-first Connector foundation are implemented. Secure Tailscale pairing, per-device permissions, local session discovery/loading, authorized text steering, and per-computer disconnect are in the current source checkpoint. Physical release validation and Developer ID notarization remain release gates; see `docs/release-readiness.md`.
 
 ## Stack
 
@@ -35,16 +35,16 @@ npm run ios                   # or npm run android / npm run web
 | `npm run audit` | `npm audit --audit-level=high` |
 | `npm run ci` | lint → typecheck → test → build → audit (matches CI) |
 
-## Desktop Bridge development checkpoint
+## DevinX Connector development checkpoint
 
-The local Mac bridge is pairing-only by default and stores its identity in macOS Keychain. It requires an explicit active private address so it cannot silently select a VPN or public interface:
+The macOS Connector stores its identity and device grants in macOS Keychain and uses Tailscale-only transport in v1. Launch the packaged Connector, select the permissions for the iPhone, generate a short-lived QR code, and approve the named device locally. Read access and message sending are separate grants.
 
 ```bash
-npm run bridge:start -- --help
-npm run bridge:start -- --host 192.168.1.141
+npm run connector:build:macos
+open "artifacts/connector/DevinX Connector.app"
 ```
 
-After the QR code appears, open **Computer Connection** in DevinX on the iPhone, scan it, and type `yes` on the Mac only if the displayed device name is correct. Read-only Devin ACP discovery remains off unless an absolute CLI path is deliberately supplied. See `/specs/016-desktop-bridge-runner.md` for the security boundary and real-device checklist.
+After the QR code appears, open **Computer Connection** in DevinX on the iPhone and scan it. Approve only the expected device name. See `docs/devinx-connector.md`, `specs/020-tailscale-private-transport.md`, and `specs/023-authorized-local-session-steering.md` for the supported boundary.
 
 ## Security gates (spec §10)
 

@@ -204,7 +204,9 @@ export const light: ThemeTokens = {
   // [FALLBACK-REPLACED §1.2] textHi #16181D → #191919 (Devin --text-primary light)
   textHi: c('25 25 25', '#191919'),
   textHiStrong: c('0 0 0', '#000000'),
-  textMid: c('25 25 25 / .56', '#1919198F'),
+  // Accessibility override: the extracted 56% value is only 4.03:1 on the
+  // light canvas. 60% preserves the hierarchy while clearing WCAG AA text.
+  textMid: c('25 25 25 / .6', '#19191999'),
   textLow: c('25 25 25 / .4', '#19191966'),
   textInverse: c('255 255 255', '#FFFFFF'),
   textAlwaysBlack: c('13 15 13', '#0D0F0D'),
@@ -212,7 +214,9 @@ export const light: ThemeTokens = {
 
   // [FALLBACK-REPLACED §1.3] brand #2563EB → #317CFF (Devin --bg-accent-primary light)
   brand: c('49 124 255', '#317CFF'),
-  brandText: c('49 124 255', '#317CFF'),
+  // Accessibility override: keep the extracted blue for fills, but use a
+  // darker semantic link/text blue that clears 4.5:1 on light surfaces.
+  brandText: c('37 99 235', '#2563EB'),
   brandBorder: c('49 124 255', '#317CFF'),
   brandSecondaryBg: c('21 107 255 / .2', '#156BFF33'),
   brandSecondaryTint: c('49 124 255 / .08', '#317CFF14'),

@@ -1,6 +1,6 @@
 # 010 — iOS device signing
 
-Status: implemented; native-device validation pending
+Status: implemented; physical pairing has validated native signing, with release-candidate revoke/replay regression still required
 
 ## Purpose
 

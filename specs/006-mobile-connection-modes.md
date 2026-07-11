@@ -1,6 +1,6 @@
 # Phase 3C — Mobile Connection Modes
 
-Status: mode model, onboarding choice, secure paired-computer registry, Tailscale-only iOS networking, pairing and desktop approval, privacy-minimized local session discovery, and authorized read-only session loading are implemented. Steering and per-computer removal remain pending. Spec 020 supersedes this document's earlier multi-transport language.
+Status: implemented. The mode model, onboarding choice, secure paired-computer registry, Tailscale-only iOS networking, pairing and desktop approval, privacy-minimized discovery/loading, separately authorized steering, and per-computer removal are present. Spec 020 supersedes this document's earlier multi-transport language; spec 023 defines steering.
 
 ## Supported modes
 
@@ -28,7 +28,7 @@ The Secure Store boundary validates every record with Zod and caps the registry 
 
 - bridge and device IDs;
 - user-facing computer name;
-- canonical private-network HTTPS endpoint and pinned TLS certificate fingerprint;
+- canonical Tailscale `100.64.0.0/10` HTTP endpoint;
 - pinned bridge public key and fingerprint;
 - per-device public key and opaque ID for the private signing key held in iOS Keychain;
 - server-approved grants; and
@@ -39,7 +39,7 @@ React context receives summaries only. Device private keys, bridge keys, endpoin
 ## Disconnect behavior
 
 - Disconnect Cloud: wipes only Cloud key, org, attribution, and auth-kind values.
-- Remove a computer: will wipe that device credential after server-side revocation is attempted; implementation waits for transport.
+- Remove a computer: requires confirmed requesting-device revocation on the Connector before erasing that computer's phone credential and signing key. If the computer is offline, the credential remains so revocation can be retried safely.
 - Disconnect and wipe all: wipes Cloud and paired-computer credentials, cached sessions/messages, and query state.
 - Web preview credentials are memory-only and never use localStorage.
 
@@ -47,10 +47,9 @@ React context receives summaries only. Device private keys, bridge keys, endpoin
 
 Computer onboarding and Settings both reach the same in-app QR pairing flow. A Cloud-only user who adds a Mac moves to Cloud + Computer mode after the credential is securely stored. The camera starts only after an explicit Scan action and permission grant; cancel, background, scan completion, and view removal stop capture.
 
-Computer and Cloud + Computer modes issue signed, pinned health requests and list local sessions only when the bridge advertises read-only discovery. Home and the full Sessions screen render local rows with an explicit Mac name and collision-proof `local_` handle. Default metadata grants expose only workspace basename, title presence, and update time; the UI labels a withheld title instead of inventing or leaking it. Computer-only mode does not present its disabled Cloud composer as a working local-session creator.
+Computer and Cloud + Computer modes issue signed, authenticated health requests and list local sessions only when the Connector advertises authorized discovery. Home and the full Sessions screen render local rows with an explicit Mac name and collision-proof `local_` handle. Default metadata grants expose only workspace basename, title presence, and update time; the UI labels a withheld title instead of inventing or leaking it. Computer-only mode does not present its disabled Cloud composer as a working local-session creator.
 
 ## Remaining acceptance gates
 
-- Add per-computer revocation/removal and complete mode switching without trapping a configured user.
-- Add separately authorized local steering and per-device permission management.
+- Physically revalidate all three modes, per-computer removal, and steering in the release-candidate build.
 - Validate cold start, corrupt Secure Store, revoked device, offline computer, Cloud-only regression, and combined mode on real iPhone hardware.

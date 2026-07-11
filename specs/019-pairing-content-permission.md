@@ -12,7 +12,7 @@ This is not a general full-access option. Pairing-time choices can grant:
 - minimized session metadata; and
 - optionally, read-only session titles and user/Devin text history.
 
-They cannot grant session prompting, approvals, tools, files, commands, attachments, archive, termination, or arbitrary ACP actions. Steering remains disabled independently of the content choice.
+Read permission cannot grant session prompting, approvals, tools, files, commands, attachments, archive, termination, or arbitrary ACP actions. Spec 023 adds a separate per-device `session:prompt:send` grant for bounded text-only steering; it is never implied by the content choice.
 
 ## Trust boundary
 

@@ -1,6 +1,6 @@
 # Phase 3B — Computer Pairing and Device Credential Contract
 
-Status: bridge core, Keychain persistence, TLS channel binding, and submit/status routes implemented. iOS certificate pinning and user-interface wiring remain pending.
+Status: implemented and physically pairing-validated. Spec 020 replaces the earlier pinned-TLS product path with authenticated Tailscale-only HTTP for v1.
 
 ## Security properties
 
@@ -63,4 +63,4 @@ The offline contract does not make cleartext pairing safe. When transport is add
 - Confirm that read-only session metadata is acceptable as the default grant.
 - Run brute-force, replay, expiry, duplicate-device, denial, revocation, and wrong-bridge tests through the actual transport.
 
-The identity, discovery, title/path, cache, CLI distribution, capability negotiation, and private-LAN decisions are resolved in `011-encrypted-bridge-listener.md`. Bridge-side transport cases are automated; real-device TLS pinning and full Mac/iPhone approval tests remain required.
+The identity, discovery, title/path, cache, CLI distribution, capability negotiation, and private-network decisions are resolved in later specs. Bridge-side transport cases are automated and Mac/iPhone Tailscale approval has passed; the complete release-candidate revoke and steering checkpoint remains required.

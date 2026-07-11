@@ -1,6 +1,6 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: macOS-first implementation in progress; Windows and Linux are required roadmap targets
+Status: macOS implementation and automated packaging validation complete; physical release checkpoint and Developer ID notarization remain. Windows and Linux are required roadmap targets.
 
 ## Product decision
 

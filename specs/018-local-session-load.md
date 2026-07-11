@@ -40,7 +40,7 @@ Malformed JSON-RPC, invalid notification/session association, oversized messages
 
 ## Mobile boundary
 
-The local detail route is read-only. It shows the explicit Mac and workspace origin plus the bounded message history. It has no composer, permission response, tool control, file access, attachment action, share/deep-link action, or background cache. Local text is selectable but is deliberately not passed through the app's media-aware Markdown renderer, so replayed URLs cannot trigger an automatic external image, audio, or video request. The query remains in memory and is removed when normal TanStack garbage collection runs or all connection data is wiped.
+This spec originally made the local detail route read-only. Spec 023 supersedes that single point by adding a text-only composer when the requesting device currently has `session:prompt:send`. Permission response, tool control, file access, attachments, share/deep links, and background persistence remain unavailable. Local text is selectable but is deliberately not passed through the app's media-aware Markdown renderer, so replayed URLs cannot trigger an automatic external image, audio, or video request. The query remains in memory and is removed when normal TanStack garbage collection runs or all connection data is wiped.
 
 A local discovery row becomes tappable only when both conditions are true:
 

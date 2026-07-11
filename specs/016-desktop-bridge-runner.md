@@ -1,6 +1,6 @@
 # 016 — Desktop Bridge development runner
 
-Status: implemented and automated-test validated; real Mac-to-iPhone pairing pending
+Status: implemented and automated-test validated as a historical development runner. Specs 020 and 021 supersede its Wi-Fi/TLS setup with the packaged, Tailscale-only Connector, which has passed real Mac-to-iPhone pairing.
 
 ## Scope
 
@@ -58,4 +58,4 @@ Runner tests cover:
 - opt-in-only ACP startup; and
 - listener and ACP cleanup after a partial startup failure.
 
-The complete real-device checkpoint still requires a Mac and iPhone on the same private network. It must verify the camera scanner, Local Network prompt, TLS pin, pending approval display, denial, approval receipt, Keychain persistence, and clean reconnect after restarting the runner.
+This terminal runner is retained for protocol development and automated coverage, not user onboarding. Release validation uses the packaged Connector and must revalidate camera handling, pending approval, denial, approval receipt, Keychain persistence, revocation, and clean reconnect through Tailscale.

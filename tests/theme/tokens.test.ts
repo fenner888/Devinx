@@ -5,6 +5,36 @@
 
 import { dark, light, statusLabels, radii, fonts, typeScale } from '../../src/theme/tokens';
 
+function rgba(hex: string): [number, number, number, number] {
+  const value = hex.slice(1);
+  const normalized = value.length === 6 ? `${value}FF` : value;
+  return [0, 2, 4, 6].map((offset) => Number.parseInt(normalized.slice(offset, offset + 2), 16) / 255) as [
+    number,
+    number,
+    number,
+    number,
+  ];
+}
+
+function luminance(rgb: readonly number[]): number {
+  const linear = rgb.map((channel) =>
+    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+  );
+  return 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!;
+}
+
+function contrast(foreground: string, background: string): number {
+  const fg = rgba(foreground);
+  const bg = rgba(background);
+  const composited = fg.slice(0, 3).map((channel, index) => channel * fg[3] + bg[index]! * (1 - fg[3]));
+  const foregroundLuminance = luminance(composited);
+  const backgroundLuminance = luminance(bg);
+  return (
+    (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+    (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+  );
+}
+
 describe('design tokens (§5.0 extraction)', () => {
   it('uses a true-black product canvas in dark mode', () => {
     expect(dark.canvas.hex).toBe('#000000');
@@ -54,5 +84,16 @@ describe('design tokens (§5.0 extraction)', () => {
     expect(typeScale.text14).toBe(14);
     expect(typeScale).not.toHaveProperty('text15');
     expect(typeScale).not.toHaveProperty('text20');
+  });
+
+  it.each([
+    ['dark primary on canvas', dark.textHi.hex, dark.canvas.hex],
+    ['dark secondary on canvas', dark.textMid.hex, dark.canvas.hex],
+    ['dark link on canvas', dark.link.hex, dark.canvas.hex],
+    ['light primary on canvas', light.textHi.hex, light.canvas.hex],
+    ['light secondary on canvas', light.textMid.hex, light.canvas.hex],
+    ['light link on canvas', light.brandText.hex, light.canvas.hex],
+  ])('%s clears WCAG AA contrast for normal text', (_name, foreground, background) => {
+    expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
   });
 });

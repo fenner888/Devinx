@@ -1,94 +1,80 @@
 # Releasing DevinX
 
-Everything code-side is done. The remaining steps require **your** Expo and
-Sentry accounts — they can't be created from the repo. Each is one command.
+This document separates verified release evidence from work that still requires a physical device, Apple credentials, or explicit release approval. Never publish publicly or submit App Review from these instructions without the owner's approval.
 
-## 1. EAS project (required for device/store builds + push tokens)
+## Current checkpoint
 
-```bash
-npm i -g eas-cli
-eas login
-eas init                    # creates the EAS project, writes extra.eas.projectId into app.json
-```
+- Connector feature baseline: `128269b` (`feat: add secure DevinX Connector steering`); release-audit changes follow it on the same branch
+- iOS internal checkpoint: `0.1.0 (13)`
+- EAS build: `e0620751-6884-4e9a-867b-355f8e703a77` — finished
+- App Store Connect submission: `dcea8f15-013f-47f7-a0a7-92c3b3c05c1c` — finished
+- Build 13 is an internal TestFlight checkpoint, not an App Review submission.
+- The source checkpoint contains the newest per-computer self-disconnect behavior; confirm the App Store build number containing it before final release testing.
 
-After `eas init`, `app.json` → `expo.extra.eas.projectId` will be filled in.
-Push-token registration (`getPushToken`) starts working the moment that id
-exists — until then it no-ops by design.
+## Release gates
 
-Set the OTA updates URL (printed by `eas init`, or from the Expo dashboard):
-
-```json
-// app.json → expo.updates
-"url": "https://u.expo.dev/<your-project-id>"
-```
-
-Builds:
+Run the automated gates from a clean checkout:
 
 ```bash
-eas build --profile development --platform ios             # dev client on your device
-eas build --profile development-simulator --platform ios   # local iOS simulator
-eas build --profile preview --platform ios                 # TestFlight-style internal build
-eas build --profile production --platform all     # store builds
-eas submit --profile production                    # upload to App Store / Play
+npm ci --legacy-peer-deps
+npm run ci
+npx expo export --platform ios --output-dir /tmp/devinx-production-export
+npm audit --json
 ```
 
-Build profiles are defined in `eas.json`.
+Use the pinned Node version from `.nvmrc` (`20.19.4`). Other odd-numbered or unsupported Node releases can produce dependency engine warnings even when the checks happen to pass.
 
-## 2. Sentry (optional, for crash/error reporting)
+Record results in `docs/release-readiness.md`. Review every dependency finding instead of applying a breaking `npm audit fix --force`. Before a public release, also complete the authorization matrix, secret scan, dead-code review, privacy-label review, and physical-device checklist.
 
-1. Create a project at sentry.io (React Native).
-2. Put the DSN in `.env`:
+## Physical iPhone checkpoint
 
-```
-EXPO_PUBLIC_SENTRY_DSN=https://...@sentry.io/...
-```
+Using the TestFlight build intended for release:
 
-Until a DSN is set, `initSentry()` is a no-op (safe for dev). The
-secret-scrubbing `beforeSend` is already wired.
+1. Pair through Tailscale with DevinX Connector.
+2. On the Mac, grant **Read session content** and **Send messages** only to the test iPhone.
+3. Verify Computer-only, Cloud-only, and Cloud + Computer modes.
+4. Open a computer session, load bounded history, send a harmless prompt, and verify refreshed history.
+5. Confirm the keyboard dismisses after send and the Devin companion starts and stops cleanly.
+6. Remove the Mac from the iPhone and verify the Mac device grant is revoked; repeat with Mac-side revoke.
+7. Reopen the app after a cold launch and verify revoked credentials cannot be used.
 
-## 3. Push notifications (optional, self-hosted)
+Do not use production credentials or a destructive prompt for this checkpoint.
 
-The Devin API has no push, and iOS can't poll in the background, so pushes need
-a small always-on service. `scripts/notifier/index.mjs` is exactly that —
-it polls sessions and sends Expo pushes when one needs your input or finishes.
+## macOS Connector distribution
+
+Local development artifacts can be ad-hoc signed, but public distribution requires an Apple **Developer ID Application** certificate and notarization credentials. After those credentials are available:
+
+1. Sign the app and nested executable with hardened runtime.
+2. Build the DMG, sign it, and submit it with `notarytool`.
+3. Staple the accepted ticket to the app and DMG.
+4. Verify with `codesign --verify --deep --strict`, `spctl --assess`, and `stapler validate`.
+5. Publish the SHA-256 checksum beside the artifact.
+
+The existing Apple Development certificate is not a substitute for Developer ID distribution signing.
+
+## EAS builds
+
+The EAS project and OTA URL are already configured in `app.json`; do not run `eas init` again.
 
 ```bash
-DEVIN_API_KEY=cog_... DEVIN_ORG_ID=org-... \
-EXPO_PUSH_TOKENS='ExponentPushToken[...],ExponentPushToken[...]' \
-node scripts/notifier/index.mjs
+eas build --profile development --platform ios
+eas build --profile development-simulator --platform ios
+eas build --profile preview --platform ios
+eas build --profile production --platform ios
+eas submit --profile production --platform ios
 ```
 
-Device tokens come from the app (`getPushToken()` after step 1). Persist them
-however you like (a file, a KV store) and pass them in via `EXPO_PUSH_TOKENS`.
-Run it on any cheap VM / Pi / cron box. Everyone who wants pushes runs it;
-everyone else loses nothing.
+Building is authorized as part of development. App Review submission and public release require explicit approval.
 
-## 4. Pre-flight
+## Sentry
 
-```bash
-npm run ci      # lint → typecheck → test → build → audit
-```
+Sentry is optional. When `EXPO_PUBLIC_SENTRY_DSN` is absent, initialization is a no-op. When enabled, verify the scrubber with the automated tests and send a synthetic event containing no real credentials or user content.
 
-## 5. Device E2E
+## Push notifications
 
-Run the onboarding flow against a development or preview build without committing credentials:
+Push notifications require a user-operated notifier because the Devin API does not provide background push events. `scripts/notifier/index.mjs` polls sessions and sends Expo notifications. Keep all API keys and push tokens in environment/secrets management; never commit them or place them in client bundles.
 
-```bash
-DEVIN_API_KEY='cog_...' DEVIN_ORG_ID='org-...' \
-  .devin/maestro/run.sh onboarding
-
-E2E_PROMPT='Create a short plan for this repository. Do not modify files.' \
-E2E_FOLLOW_UP='Summarize the plan in one sentence.' \
-  .devin/maestro/run.sh cloud-session
-```
-
-Run the destructive wipe flow only on a test credential because it removes the device's stored connection:
-
-```bash
-.devin/maestro/run.sh disconnect-wipe
-```
-
-## 6. App Store metadata draft
+## App Store metadata draft
 
 **Name:** DevinX
 
@@ -100,20 +86,20 @@ Run the destructive wipe flow only on a test credential because it removes the d
 
 **Description:**
 
-> DevinX is a mobile mission-control client for the Devin API. Monitor active cloud sessions, surface work that needs your input, send follow-up messages, review pull requests and insights, create sessions with repository and attachment context, and track usage from your phone.
+> DevinX is a mobile mission-control client for the Devin API. Monitor active cloud sessions, surface work that needs your input, send follow-up messages, review pull requests and insights, create sessions with repository and attachment context, and track usage from your phone. You can also pair a Mac you control through Tailscale to view and explicitly steer authorized local Devin sessions.
 >
-> Your API credential stays in the device Keychain. App traffic goes directly to the Devin API without an intermediary DevinX backend.
+> Cloud credentials stay in the device Keychain. Computer credentials remain on the paired devices, and DevinX operates no relay for normal session traffic.
 >
 > DevinX is an independent, unofficial client for the Devin API. Not affiliated with, endorsed by, or a product of Cognition AI.
 
 **Review notes:**
 
-> This app requires an existing Devin account and a user-provided Devin API credential. Credentials are entered at runtime and stored in the iOS Keychain. The app is an independent API client and does not use Cognition or Devin logos. A test credential must be supplied privately in App Store Connect review notes; never commit it to this repository.
+> This app requires either an existing Devin account with a user-provided credential, a paired DevinX Connector, or both. Credentials are entered or paired at runtime and stored in the iOS Keychain. A test credential and any Connector review steps must be supplied privately in App Store Connect review notes; never commit credentials to the repository.
 
 **Privacy labels draft:**
 
-- User Content: collected only to provide app functionality; not linked by DevinX; sent directly to the Devin API
-- Identifiers: organization and account identifiers used for app functionality
+- User Content: used only for app functionality; sent to the selected Devin API or explicitly paired computer
+- Identifiers: organization/account identifiers and a paired-device identifier used for app functionality
 - Diagnostics: crash data only when Sentry is configured
 - Tracking: no
 - Data sale: no
@@ -121,19 +107,10 @@ Run the destructive wipe flow only on a test credential because it removes the d
 **Required URLs:**
 
 - Support: `https://github.com/fenner888/Devinx/issues`
-- Privacy policy: publish `PRIVACY.md` at a stable public HTTPS URL before submission
+- Privacy policy: `https://github.com/fenner888/Devinx/blob/main/PRIVACY.md`
 
-**Screenshot set:**
+The final privacy labels must be checked against the exact production configuration in App Store Connect.
 
-1. Home composer with repository and mode context
-2. Blocked-first Sessions board
-3. Active session timeline with attachment composer
-4. Pull request / Changes tab
-5. Usage and analytics
-6. Privacy and secure-storage explanation
+## Intentionally web-only
 
-## What's intentionally web-only (no API exists)
-
-Ask mode, DeepWiki, model/agent selection, plan/quota bars, and enterprise
-admin (SSO, IP allowlist, audit logs, member management). These have no public
-API; the app links out where relevant.
+Ask mode, DeepWiki, model/agent selection, plan/quota bars, and enterprise administration have no supported public API and remain web-only.

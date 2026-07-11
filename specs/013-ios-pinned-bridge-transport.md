@@ -1,6 +1,6 @@
 # 013 — iOS pinned Desktop Bridge transport
 
-Status: native transport, credential gates, and pairing orchestration implemented; scanner UI and real-device validation pending
+Status: compatibility implementation complete; spec 020 supersedes this pinned-TLS setup path with Tailscale-only v1 transport. Scanner and Tailscale pairing passed physical validation.
 
 ## Native-only trust boundary
 

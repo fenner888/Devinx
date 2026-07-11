@@ -1,6 +1,6 @@
 # 014 — Mobile pairing orchestration
 
-Status: protocol workflow and scanner UI implemented and unit validated; desktop approval runner and real Mac/iPhone validation pending
+Status: implemented, unit validated, and physically paired on a real Mac/iPhone through Tailscale. Release-candidate revocation and steering regression remain.
 
 ## Workflow
 
@@ -25,5 +25,4 @@ Only one pairing workflow may run in-process at once. Cancellation, denial, expi
 
 ## Remaining gates
 
-- Add a desktop setup/approval runner so the Mac can display an offer and approve or deny locally.
-- Validate certificate mismatch, local-network prompt, camera denial, cancellation, approval, storage, cold start, and revocation on a real Mac and iPhone.
+- Revalidate camera denial, cancellation, approval, storage, cold start, and both revocation directions in the release-candidate build.

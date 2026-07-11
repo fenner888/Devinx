@@ -1,12 +1,12 @@
 # 022 — Connector paired-device management
 
-Status: implementation in progress
+Status: implemented and automated-test validated; physical two-way revocation checkpoint remains
 
 ## Decision
 
 The macOS Connector is the authoritative control surface for paired iPhones. It lists only sanitized device identity and grant state, and lets the computer owner independently grant read-only content, grant message steering, or revoke a device. Metadata discovery remains the minimum active grant.
 
-Steering permission does not itself enable ACP prompting. The bridge advertises and accepts `session.prompt` only after the separately specified ACP handler is implemented and validated. This prevents a UI permission toggle from becoming an accidental capability.
+Steering permission does not itself enable ACP prompting. The bridge advertises and accepts `session.prompt` only when the separately validated ACP handler is available and the requesting device currently holds `session:prompt:send`. This prevents a UI permission toggle from becoming an accidental capability.
 
 ## Local IPC boundary
 
