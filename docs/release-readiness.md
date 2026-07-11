@@ -21,6 +21,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (22)` was built locally from clean commit `773f348` after the static accessibility audit named every icon-only control
 - [x] Build 22 IPA signature, bundle metadata, and privacy artifact inspection passed (`com.fenner888.devinx`, `0.1.0 (22)`); no notification framework/bundle remained; SHA-256 `1711e71b56eb6cb171724c2c49bbfc9ed5146444dff9cad3f7319856de634326`
 - [x] Build 22 App Store Connect submission `88a3d12a-367b-432c-84d9-4ffcb786144d` finished with no error as the superseding consolidated internal TestFlight candidate
+- [x] iOS `0.1.0 (23)` was built locally from clean commit `8566659` after aligning the public policy and in-app privacy controls with the exact release configuration
+- [x] Build 23 IPA signature, bundle metadata, entitlements, and privacy artifact inspection passed (`com.fenner888.devinx`, `0.1.0 (23)`); no notification artifacts or APS entitlement remained; SHA-256 `17b60c9b09836ca5dd57a2f6aec06a3f0f68c8d6661457ec5fc823ff2a97c247`
+- [x] Build 23 App Store Connect submission `e451bf7a-02f2-4851-a6c8-7d47101b4df4` finished with no error as the superseding consolidated internal TestFlight candidate
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -47,7 +50,7 @@ The results below must be refreshed after release-document changes and before a 
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 21 contains 11 valid privacy manifests, declares no collected SDK data or tracking, and contains no notification framework/privacy bundle; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 23 contains 11 valid privacy manifests; the app manifest declares no collected data or tracking, Sentry's bundled SDK manifest declares diagnostic categories although Sentry is disabled in this release, and no notification artifact or APS entitlement remains; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -57,7 +60,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [x] Confirm the intended TestFlight build contains the current self-disconnect, session-boundary, local-history, companion-travel, privacy, and accessibility changes (Build 22 / `773f348`)
+- [x] Confirm the intended TestFlight build contains the current self-disconnect, session-boundary, local-history, companion-travel, privacy, and accessibility changes (Build 23 / `8566659`)
 - [x] Grant content read and message send to the iPhone in Connector
 - [x] Discover and load a real desktop session
 - [x] Send a harmless message and confirm it reaches that session

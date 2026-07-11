@@ -1,13 +1,13 @@
-# Build 22 physical release checklist
+# Build 23 physical release checklist
 
 Use a non-sensitive Devin session and prompts that contain no credentials, private repository content, or customer data. Capture only pass/fail evidence unless a screenshot is explicitly safe.
 
 ## Local steering and history
 
-- Install internal TestFlight Build 22 and cold-launch DevinX.
+- Install internal TestFlight Build 23 and cold-launch DevinX.
 - Open the paired computer session used for the prior steering check.
 - Confirm prior user turns and Devin replies remain separate and in chronological order.
-- Send `Reply with exactly: Build 22 local steering works.`
+- Send `Reply with exactly: Build 23 local steering works.`
 - Confirm the keyboard dismisses, the pending user bubble appears immediately, and `Devin is working…` is visible.
 - Confirm Devin walks across the response-feed edge without sliding, snapping, or covering the composer.
 - Confirm the exact reply appears once, renders normally, remains after pull-to-refresh, and Devin stops smoothly.
