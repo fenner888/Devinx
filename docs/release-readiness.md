@@ -12,6 +12,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (17)` was built locally from clean commit `19dd249` after EAS's free remote-build quota rejected Build 15 and the first local-tooling attempt reserved Build 16
 - [x] Build 17 IPA signature and bundle metadata passed (`com.fenner888.devinx`, `0.1.0 (17)`); SHA-256 `a494a2f1e91e203080f65403f132a831924e707e8d4ec8194db4acb3bc27d93a`
 - [x] Build 17 App Store Connect submission `07b8efa3-b4ae-432a-a0ac-c005d1b344e3` finished with no error as an internal TestFlight checkpoint
+- [x] iOS `0.1.0 (20)` was built locally from clean commit `5643f30`; Build 18 stopped only when disposable Xcode storage filled, and 19 was reserved during the clean retry
+- [x] Build 20 IPA signature and bundle metadata passed (`com.fenner888.devinx`, `0.1.0 (20)`); SHA-256 `a2f3e692d96715219178393a264fc3f78a9b5c73ebc01f0214cd210e6064a52a`
+- [x] Build 20 App Store Connect submission `6c98a795-35f3-4720-8408-182afd6a3cdb` finished with no error as an internal TestFlight checkpoint
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -46,7 +49,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [x] Confirm the intended TestFlight build contains the current self-disconnect and session-boundary fixes (Build 17 / `19dd249`)
+- [x] Confirm the intended TestFlight build contains the current self-disconnect, session-boundary, local-history, and companion-travel changes (Build 20 / `5643f30`)
 - [x] Grant content read and message send to the iPhone in Connector
 - [x] Discover and load a real desktop session
 - [x] Send a harmless message and confirm it reaches that session
