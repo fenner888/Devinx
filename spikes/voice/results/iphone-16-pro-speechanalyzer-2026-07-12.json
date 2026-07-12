@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-07-12T20:44:10.314Z",
+  "device": "iPhone 16 Pro",
+  "os": "iOS 26.5.2",
+  "appVersion": "0.1.0",
+  "buildNumber": "37",
+  "engine": "SpeechAnalyzer/SpeechTranscriber",
+  "locale": "en_US",
+  "protocol": {
+    "fixtureCount": 5,
+    "runsPerCondition": 1,
+    "meanAudioSeconds": 52.71248979591837,
+    "naturalVoice": true
+  },
+  "hintsOff": {
+    "meanWordErrorRate": 0.09009272659740022,
+    "medianWordErrorRate": 0.08771929824561403,
+    "medianElapsedSeconds": 0.945774292,
+    "medianRealTimeFactor": 0.018497845592837275,
+    "peakResidentMiB": 129.6875,
+    "exactTechnicalTermMisses": 7,
+    "trackedTechnicalTerms": 20
+  },
+  "hintsOn": {
+    "meanWordErrorRate": 0.09009272659740022,
+    "medianWordErrorRate": 0.08771929824561403,
+    "medianElapsedSeconds": 0.788006166,
+    "medianRealTimeFactor": 0.015292361471686578,
+    "peakResidentMiB": 128.84375,
+    "exactTechnicalTermMisses": 7,
+    "trackedTechnicalTerms": 20
+  },
+  "identicalTranscriptsAcrossHintConditions": true,
+  "missedTerms": [
+    "OAuth",
+    "DevinX",
+    "TanStack Query",
+    "PostgreSQL",
+    "monorepo",
+    "TestFlight",
+    "kebab-case"
+  ],
+  "securityEvidence": {
+    "staticNoNetworkImportGate": true,
+    "successPathRecordingDeletionConfirmed": true,
+    "runtimeNetworkCaptureCompleted": false,
+    "interruptionDeletionMatrixCompleted": false
+  }
+}
