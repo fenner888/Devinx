@@ -33,6 +33,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (27)` was built locally from clean commit `4badef2` after the free EAS iOS quota rejected the remote job; the retry selected Xcode 26.6 and Node 20.19.4 only for the build process
 - [x] Build 27 IPA signature, metadata, entitlements, production update channel/runtime, file protection, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (27)`, `NSFileProtectionComplete`); 10 privacy manifests and no notification/reporting artifacts remain; SHA-256 `3ef271fef8b4d0fd1059572110bbe4a3719b00d01d158454da3aeee6fb279c73`
 - [x] Build 27 App Store Connect submission `59a13e8c-d291-4f65-a588-a0ec04129c33` finished with no error and is processing as the local-session creation/model-control TestFlight checkpoint
+- [x] iOS `0.1.0 (28)` was built locally from clean commit `fafbbe0` with the compact local-model menu and dismissible unavailable-picker states after the free EAS iOS quota rejected the remote job
+- [x] Build 28 IPA signature, metadata, entitlements, production update channel/runtime, file protection, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (28)`, `NSFileProtectionComplete`); 10 privacy manifests and no notification/reporting artifacts remain; SHA-256 `cd4a47ce67a52904dd0723f6feaecaa2b81c0982d1f375f149b2acf50845face`
+- [x] Build 28 App Store Connect submission `b84fc761-7198-4f2f-ad57-a07bbbc45adc` finished successfully after retrying Apple's transient upload-container HTTP 500 and is processing as the compact local-model-menu TestFlight checkpoint
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -54,13 +57,13 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed; release environment is pinned to Node 20.19.4 (the local Node 23 shell emitted expected unsupported-engine warnings) |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 52 suites / 400 tests with handle detection enabled; no analytics or crash-reporting SDK runtime is loaded by the test environment |
+| Jest | passed 52 suites / 402 tests with handle detection enabled; no analytics or crash-reporting SDK runtime is loaded by the test environment |
 | Production iOS export | passed after dormant SDK removal; 12 MB total, 5.38 MB Hermes bundle, 101 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 27 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 28 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -70,7 +73,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [ ] Install Build 27 and confirm Cloud and Computer expose their distinct pickers
+- [ ] Install Build 28 and confirm Cloud and Computer expose their distinct pickers and the Computer model menu is compact, dismissible, and correctly labeled
 - [ ] Enable `Create new sessions` for the iPhone in Connector and create a harmless Computer session with an approved workspace and selected model
 - [ ] Confirm the selected model appears on the new local session and the initial prompt receives a reply
 - [ ] Confirm no raw Mac path or raw ACP session identifier appears on the phone
