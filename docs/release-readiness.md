@@ -52,6 +52,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (33)` was built locally from clean commit `a659d7d` as the UI-freeze checkpoint; the Computer workspace picker now uses an inset floating sheet, explicit Close and Done actions, draft-before-commit selection, sanitized Current/Other sections, and bounded search for long approved lists
 - [x] Build 33 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (33)`, `NSFileProtectionComplete`); `get-task-allow=false`, 10 privacy manifests, and no APS entitlement remain; SHA-256 `5fae45aefebb676dcd49ce1b2d2d70d7b5f9b893e08e0037304a0fdf43d3b86c`
 - [x] Build 33 App Store Connect submission `ce5d6179-7006-4c08-b9a3-5a75179a49cc` finished successfully and is processing as the final UI-freeze TestFlight checkpoint
+- [x] iOS `0.1.0 (34)` was built locally from clean commit `b26d87f` with complete bounded Cloud repository pagination, stable identity deduplication, repeated/missing-cursor rejection, a fail-closed 1,000-repository safety bound, and an explicit retry state instead of a misleading partial picker
+- [x] Build 34 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (34)`, `NSFileProtectionComplete`); `get-task-allow=false`, 10 privacy manifests with no tracking/collected-data declarations, and no APS entitlement remain; SHA-256 `b61d5c8c35f117d8a2350872116ca94cb0fffd662dd7490d9fa6d2350e9bd7ec`
+- [x] Build 34 App Store Connect submission `fb17c8e7-ae2f-4b46-93b4-0fb66225c8d9` finished successfully and is processing as the consolidated repository-completeness and UI-freeze TestFlight candidate
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -77,13 +80,13 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed on Node 24.18.0, now pinned consistently for development, CI, rollback, and the checksum-verified Connector runtime |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 53 suites / 426 tests with handle detection enabled on pinned Node 24.18.0; no analytics or crash-reporting SDK runtime is loaded by the test environment |
-| Production iOS export | Build 33 passed local signed export; 19.8 MB IPA, 1,738 bundled modules, 100 assets |
+| Jest | passed 53 suites / 430 tests with handle detection enabled on pinned Node 24.18.0; no analytics or crash-reporting SDK runtime is loaded by the test environment |
+| Production iOS export | Build 34 passed local signed export; 19.8 MB IPA, 1,738 bundled modules, 100 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 33 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 34 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -93,7 +96,8 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [ ] Install Build 33 and confirm the destination sheet remains compact and the workspace sheet is inset, sectioned, bounded, dismisses without committing a draft, commits with Done, selects correctly, and shows no raw path or excessive empty space in either theme
+- [ ] Install Build 34 and confirm the destination sheet remains compact and the Computer workspace sheet is inset, sectioned, bounded, dismisses without committing a draft, commits with Done, selects correctly, and shows no raw path or excessive empty space in either theme
+- [ ] In Build 34 Cloud mode, confirm the Repository picker shows the complete connected-repository count/list for the test organization, remains distinct from Computer workspaces, searches the complete result, and never presents a partial API failure as an empty or complete list
 - [ ] Install Build 31 and confirm an existing Computer session shows the current model family, reasoning/speed, Mac, and workspace; change the variant, send a harmless turn, and confirm the selected exact model is used
 - [ ] In Build 31, confirm the Home composer no longer reserves excessive empty space; confirm Cloud and Computer session composers are elevated, multiline, and remain clear of the keyboard and home indicator
 - [ ] Install Build 29 and confirm Cloud and Computer expose their distinct pickers and the Computer model menu shows the live Recommended, Recent, searchable All Models catalog

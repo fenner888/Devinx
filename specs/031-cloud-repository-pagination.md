@@ -1,7 +1,7 @@
 # 031 — Complete Cloud repository pagination
 
-Status: implemented and automated-test validated; physical Cloud-account
-verification remains
+Status: implemented, automated-test validated, and uploaded in iOS Build 34;
+physical Cloud-account verification remains
 
 ## Intent
 
