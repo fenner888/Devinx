@@ -12,6 +12,8 @@ import {
   listRepositories,
   listConsumptionCycles,
   listDevinAcuLimits,
+  getCodeScanMetrics,
+  remediateFinding,
 } from '../../src/api/devin/endpoints';
 import { clearRateLimit } from '../../src/api/devin/client';
 import type { AuthProvider } from '../../src/auth/AuthProvider';
@@ -170,6 +172,47 @@ describe('endpoints — path building & response shaping', () => {
     const { items, hasNextPage } = await listSessions(mockAuth, { first: 100 });
     expect(items).toHaveLength(1);
     expect(hasNextPage).toBe(false);
+  });
+
+  it('gets code-scan metrics with a validated bounded UTC range', async () => {
+    mockFetch.mockResolvedValue(
+      ok({
+        scans_count: 1,
+        repos_scanned_count: 1,
+        prs_created_count: 0,
+        prs_open_count: 0,
+        prs_merged_count: 0,
+        prs_closed_count: 0,
+        avg_pr_time_to_merge_seconds: null,
+        avg_pr_open_duration_seconds: null,
+        open_critical_findings_count: 0,
+        open_high_findings_count: 0,
+        open_medium_findings_count: 0,
+        open_low_findings_count: 0,
+      }),
+    );
+
+    await getCodeScanMetrics(mockAuth, { timeAfter: 100, timeBefore: 200 });
+
+    const url = new URL(lastUrl());
+    expect(url.pathname).toBe('/v3/enterprise/code-scans/metrics');
+    expect(url.searchParams.get('time_after')).toBe('100');
+    expect(url.searchParams.get('time_before')).toBe('200');
+  });
+
+  it('binds remediation responses to the requested finding', async () => {
+    mockFetch.mockResolvedValue(ok({ finding_id: 'finding-1', session_id: 'session-1' }));
+
+    await expect(remediateFinding(mockAuth, 'scan-1', 'finding-1')).resolves.toEqual({
+      finding_id: 'finding-1',
+      session_id: 'session-1',
+    });
+    expect(lastUrl()).toContain('/code-scans/scan-1/findings/finding-1/remediate');
+
+    mockFetch.mockResolvedValue(ok({ finding_id: 'different-finding', session_id: 'session-2' }));
+    await expect(remediateFinding(mockAuth, 'scan-1', 'finding-1')).rejects.toThrow(
+      'did not match the requested finding',
+    );
   });
 
   it('listRepositories follows every cursor and removes duplicate repository identities', async () => {

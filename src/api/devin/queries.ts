@@ -34,6 +34,7 @@ import {
   triggerPrReview,
   getPrReview,
   listCodeScanFindings,
+  getCodeScanMetrics,
   remediateFinding,
   createKnowledgeNote,
   updateKnowledgeNote,
@@ -640,16 +641,37 @@ export function useCodeScanFindings() {
   });
 }
 
+export function useCodeScanMetrics() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.codeScanMetrics,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      const timeBefore = Math.floor(Date.now() / 1000);
+      return getCodeScanMetrics(provider, {
+        timeAfter: timeBefore - 30 * 24 * 60 * 60,
+        timeBefore,
+      });
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: shouldRetryQuery,
+  });
+}
+
 export function useRemediateFinding() {
   const queryClient = useQueryClient();
   const { provider } = useAuth();
   return useMutation({
     mutationFn: async (params: { scanId: string; findingId: string }) => {
       if (!provider) throw new Error('Not authenticated');
-      await remediateFinding(provider, params.scanId, params.findingId);
+      return remediateFinding(provider, params.scanId, params.findingId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.codeScanFindings });
+      queryClient.invalidateQueries({ queryKey: queryKeys.codeScanMetrics });
       queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
     },
   });

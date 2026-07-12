@@ -22,4 +22,5 @@ export const queryKeys = {
   repoIndexing: ['repoIndexing'] as const,
   prReview: (url: string) => ['prReview', url] as const,
   codeScanFindings: ['codeScanFindings'] as const,
+  codeScanMetrics: ['codeScanMetrics'] as const,
 } as const;

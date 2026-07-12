@@ -1,6 +1,6 @@
 # Devin API — Live Docs vs. Build Spec Deltas
 
-> Source: `https://docs.devin.ai/llms.txt` + crawled v3 API reference, 2026-07-07.
+> Source: `https://docs.devin.ai/llms.txt` + crawled v3 API reference, refreshed 2026-07-12.
 > Compared against build spec §2.3 (API facts) and §8.5 (endpoint coverage).
 
 ## Summary
@@ -144,6 +144,20 @@ derived. **Action:** `SessionResponse` type includes the enrichment fields
 vocabulary; a `deriveStatusLabel(session)` helper will be implemented in
 Session 2 to mirror the web app's state machine. The mobile app shows the
 web-app labels, never the raw enum strings.
+
+### D10a. Security Swarm exposes monitoring and remediation, not scan creation
+
+The documented v3 code-scan surface contains `GET /v3/enterprise/code-scans/metrics`,
+`GET /v3/enterprise/code-scans/findings`, and the organization-scoped finding
+remediation `POST`. Metrics require a UTC Unix-second range of at most 100 days.
+Finding reads require `ViewAccountCodeScans`; remediation requires
+`UseAccountCodeScans`. The remediation response returns both `finding_id` and
+the newly launched `session_id`.
+
+No public create-scan endpoint is documented. **Action:** DevinX provides a
+native Security Swarm metrics, scan-group, findings, and remediation dashboard,
+but hands new scan creation to Devin explicitly. It never guesses a write path.
+See `/specs/026-security-swarm-dashboard.md`.
 
 ### D11. v1 fallback status enum (for reference)
 

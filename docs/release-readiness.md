@@ -126,6 +126,10 @@ The results below must be refreshed after release-document changes and before a 
 - [ ] Re-pair, revoke on Mac, and confirm the phone loses access
 - [ ] Exercise Cloud-only, Computer-only, and Cloud + Computer after cold launch
 - [ ] Check light/dark appearance, reduced motion, VoiceOver labels, Dynamic Type, and camera/scanner layout on the physical phone
+- [ ] With an enterprise code-scan service user, confirm Security shows 30-day metrics, groups findings by Security Swarm scan, filters severities, and opens an existing remediation session without exposing raw scan identifiers
+- [ ] Launch one low-risk finding remediation from Security, confirm exactly one Devin session is created, and confirm a repeated launch returns the safe already-started state
+- [ ] Confirm **Start in Devin** is clearly presented as an external handoff until Cognition publishes a supported create-scan API
+- [ ] Re-open the QR pairing scanner in both themes and confirm the camera is immediately visible without scrolling, neither full-screen nor narrow, Cancel remains reachable, and backgrounding stops capture
 
 ## External release gates
 

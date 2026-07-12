@@ -5,6 +5,7 @@
  */
 
 import type { AuthProvider } from '@auth/AuthProvider';
+import { ApiSchemaError } from '@auth/AuthProvider';
 import { apiRequest } from './client';
 import { paths } from './types';
 import {
@@ -31,6 +32,10 @@ import {
   scheduleListResponseSchema,
   prReviewResponseSchema,
   codeScanFindingListResponseSchema,
+  codeScanMetricsSchema,
+  codeScanMetricsRangeSchema,
+  remediateFindingRequestSchema,
+  remediateFindingResponseSchema,
   knowledgeNoteCreateRequestSchema,
   knowledgeNoteResponseSchema,
   playbookCreateRequestSchema,
@@ -63,6 +68,9 @@ import type {
   ScheduleUpdateRequest,
   PrReviewResponse,
   CodeScanFinding,
+  CodeScanMetrics,
+  CodeScanMetricsRange,
+  RemediateFindingResponse,
   KnowledgeNoteCreateRequest,
   KnowledgeNoteUpdateRequest,
   PlaybookCreateRequest,
@@ -533,14 +541,39 @@ export async function listCodeScanFindings(auth: AuthProvider): Promise<CodeScan
   return items;
 }
 
+export async function getCodeScanMetrics(
+  auth: AuthProvider,
+  input: CodeScanMetricsRange,
+): Promise<CodeScanMetrics> {
+  const range = codeScanMetricsRangeSchema.parse(input);
+  return apiRequest<CodeScanMetrics>(auth, paths.codeScanMetrics(), {
+    method: 'GET',
+    query: { time_after: range.timeAfter, time_before: range.timeBefore },
+    schema: codeScanMetricsSchema,
+  });
+}
+
 export async function remediateFinding(
   auth: AuthProvider,
   scanId: string,
   findingId: string,
-): Promise<void> {
+): Promise<RemediateFindingResponse> {
+  const input = remediateFindingRequestSchema.parse({ scanId, findingId });
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  await apiRequest(auth, paths.codeScanRemediate(orgId, scanId, findingId), { method: 'POST' });
+  const response = await apiRequest<RemediateFindingResponse>(
+    auth,
+    paths.codeScanRemediate(orgId, input.scanId, input.findingId),
+    { method: 'POST', schema: remediateFindingResponseSchema },
+  );
+  if (response.finding_id !== input.findingId) {
+    throw new ApiSchemaError(
+      'Remediation response did not match the requested finding',
+      'code-scan-remediation',
+      [],
+    );
+  }
+  return response;
 }
 
 // ---------------------------------------------------------------------------
