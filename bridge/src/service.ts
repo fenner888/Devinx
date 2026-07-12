@@ -122,8 +122,9 @@ export interface SessionDiscoveryAdapter {
   promptSession(
     sessionId: string,
     text: string,
+    modelId?: string,
   ): Promise<void | { continuedSessionId: string }>;
-  createContinuation?(cwd: string, context: string, text: string): Promise<string>;
+  createContinuation?(cwd: string, context: string, text: string, modelId?: string): Promise<string>;
   releaseSessionOwnership?(sessionId: string): Promise<void>;
   isSessionCreateSupported?(): boolean;
   listModelCatalog?(): Promise<AcpModelCatalog>;
@@ -475,7 +476,11 @@ export class BridgeService {
     const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
     if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
     try {
-      const result = await this.dependencies.sessions.promptSession(rawSessionId, body.text);
+      const result = await this.dependencies.sessions.promptSession(
+        rawSessionId,
+        body.text,
+        body.modelId,
+      );
       const continuedSessionId = result?.continuedSessionId;
       return {
         status: 200,

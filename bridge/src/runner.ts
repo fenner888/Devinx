@@ -93,7 +93,7 @@ export interface BridgeListenerLifecycle {
 export interface AcpSessionLifecycle extends SessionDiscoveryAdapter {
   start(): Promise<void>;
   stop(): Promise<void>;
-  createContinuation?(cwd: string, context: string, text: string): Promise<string>;
+  createContinuation?(cwd: string, context: string, text: string, modelId?: string): Promise<string>;
   isSessionCreateSupported?(): boolean;
   listModelCatalog?(): Promise<AcpModelCatalog>;
   createSession?(cwd: string, modelId: string | null, text: string): Promise<string>;
@@ -284,6 +284,7 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   async promptSession(
     sessionId: string,
     text: string,
+    modelId?: string,
   ): ReturnType<SessionDiscoveryAdapter['promptSession']> {
     await this.ensureSessionListed(sessionId);
     if (!this.acpLoadedSessionIds.has(sessionId)) {
@@ -301,18 +302,18 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
         }
         const history = await this.history.loadSession(sessionId);
         if (history.messages.length === 0) throw new Error('Session continuation has no context');
-        const continuedSessionId = await createContinuation.call(
-          this.current,
-          history.cwd,
-          continuationContext(history.messages, history.truncated),
-          text,
-        );
+        const context = continuationContext(history.messages, history.truncated);
+        const continuedSessionId = modelId
+          ? await createContinuation.call(this.current, history.cwd, context, text, modelId)
+          : await createContinuation.call(this.current, history.cwd, context, text);
         this.listedSessionIds.add(continuedSessionId);
         this.acpLoadedSessionIds.add(continuedSessionId);
         return { continuedSessionId };
       }
     }
-    return this.current.promptSession(sessionId, text);
+    return modelId
+      ? this.current.promptSession(sessionId, text, modelId)
+      : this.current.promptSession(sessionId, text);
   }
 
   private async ensureSessionListed(sessionId: string): Promise<void> {

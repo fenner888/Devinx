@@ -227,7 +227,8 @@ export function useComputerSessionAccess(bridgeId: string, enabled = true) {
 
 export function usePromptComputerSession(bridgeId: string, sessionId: string) {
   return useMutation({
-    mutationFn: (text: string) => promptComputerSession(bridgeId, sessionId, text),
+    mutationFn: (input: { text: string; modelId?: string }) =>
+      promptComputerSession(bridgeId, sessionId, input.text, input.modelId),
   });
 }
 

@@ -1,6 +1,6 @@
 # Authorization matrix
 
-Reviewed against the active Phase 4A implementation on July 11, 2026. This matrix covers the user-controlled Connector HTTP boundary. Devin Cloud authorization remains enforced by the Devin API and the user's credential scopes.
+Reviewed against the active Phase 4A implementation on July 12, 2026. This matrix covers the user-controlled Connector HTTP boundary. Devin Cloud authorization remains enforced by the Devin API and the user's credential scopes.
 
 | Method | Required device grant | Input validation | Resource binding | Unauthorized result | Rate limit class |
 |---|---|---|---|---|---|
@@ -8,7 +8,7 @@ Reviewed against the active Phase 4A implementation on July 11, 2026. This matri
 | `device.revoke` | `bridge:health` | strict empty Zod object | requesting device revokes itself | indistinguishable `404` | mutation |
 | `session.list` | `session:metadata:read` | strict optional bounded cursor | opaque handles minted for this bridge | indistinguishable `404` | session list |
 | `session.load` | `session:content:read` | strict local-handle schema | handle must have been listed for this device/session scope | indistinguishable `404` | session history read |
-| `session.prompt` | `session:prompt:send` | strict handle plus bounded non-empty text | handle must have been listed for this device/session scope | indistinguishable `404` | mutation |
+| `session.prompt` | `session:prompt:send` | strict handle, bounded non-empty text, and optional bounded model ID | handle must have been listed for this device/session scope; model is revalidated against the loaded session's live ACP selector before prompt dispatch | indistinguishable `404` | mutation |
 | `session.create_options` | `session:metadata:read` | strict empty Zod object | only visible reviewed workspaces become opaque handles | indistinguishable `404` | mutation |
 | `session.create` | `session:create` | strict workspace handle, optional model ID, and bounded non-empty text | workspace handle must be issued by this bridge; workspace and model are revalidated immediately before ACP dispatch | indistinguishable `404` | mutation |
 

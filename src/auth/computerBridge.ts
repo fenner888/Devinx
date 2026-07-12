@@ -61,7 +61,11 @@ const deviceRevokeResponseSchema = z.object({ revoked: z.literal(true) }).strict
 const sessionListBodySchema = z.object({ cursor: cursorSchema.optional() }).strict();
 const sessionLoadBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
 const sessionPromptBodySchema = z
-  .object({ sessionId: localSessionIdSchema, text: z.string().trim().min(1).max(100_000) })
+  .object({
+    sessionId: localSessionIdSchema,
+    text: z.string().trim().min(1).max(100_000),
+    modelId: modelIdSchema.optional(),
+  })
   .strict();
 const sessionPromptResponseSchema = z
   .object({ accepted: z.literal(true), sessionId: localSessionIdSchema.optional() })
@@ -412,7 +416,7 @@ async function requestSessionLoad(
 
 async function requestSessionPrompt(
   credential: PairedComputerCredential,
-  input: { sessionId: string; text: string },
+  input: { sessionId: string; text: string; modelId?: string },
 ): Promise<void | { sessionId: string }> {
   const body = sessionPromptBodySchema.parse(input);
   const response = await requestComputer(credential, 'session.prompt', body);
@@ -461,7 +465,11 @@ export interface ComputerBridgeConnection {
   getHealth(): Promise<ComputerBridgeHealth>;
   listSessions(input?: { cursor?: string }): Promise<ComputerSessionPage>;
   loadSession(sessionId: string): Promise<ComputerLoadedSession>;
-  promptSession(sessionId: string, text: string): Promise<void | { sessionId: string }>;
+  promptSession(
+    sessionId: string,
+    text: string,
+    modelId?: string,
+  ): Promise<void | { sessionId: string }>;
   getCreateOptions(): Promise<ComputerCreateOptions>;
   createSession(input: {
     workspaceId: string;
@@ -476,7 +484,12 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
     getHealth: () => requestHealth(credential),
     listSessions: (input = {}) => requestSessionList(credential, input),
     loadSession: (sessionId) => requestSessionLoad(credential, { sessionId }),
-    promptSession: (sessionId, text) => requestSessionPrompt(credential, { sessionId, text }),
+    promptSession: (sessionId, text, modelId) =>
+      requestSessionPrompt(credential, {
+        sessionId,
+        text,
+        ...(modelId ? { modelId } : {}),
+      }),
     getCreateOptions: () => requestSessionCreateOptions(credential),
     createSession: (input) => requestSessionCreate(credential, input),
   };
@@ -534,8 +547,9 @@ export async function promptComputerSession(
   bridgeId: string,
   sessionId: string,
   text: string,
+  modelId?: string,
 ): Promise<void | { sessionId: string }> {
-  return (await openComputerBridge(bridgeId)).promptSession(sessionId, text);
+  return (await openComputerBridge(bridgeId)).promptSession(sessionId, text, modelId);
 }
 
 export async function getComputerCreateOptions(

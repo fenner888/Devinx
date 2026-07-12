@@ -37,6 +37,7 @@ jest.mock('../../src/api/bridge/queries', () => ({
         id: `local_${'L'.repeat(43)}`,
         origin: 'computer',
         workspaceName: 'DevinX',
+        model: { id: 'swe-1.7-high', name: 'SWE-1.7 High' },
       },
       messages: [{ sequence: 1, source: 'devin', text: 'Ready.' }],
       truncated: false,
@@ -49,6 +50,29 @@ jest.mock('../../src/api/bridge/queries', () => ({
   usePromptComputerSession: () => ({
     mutate: mockMutate,
     isPending: false,
+    error: null,
+  }),
+  useComputerCreateOptions: () => ({
+    data: {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      models: [
+        {
+          id: 'swe-1.7-high',
+          name: 'SWE-1.7 High',
+          recent: true,
+          recommended: true,
+        },
+        {
+          id: 'swe-1.7-medium',
+          name: 'SWE-1.7 Medium',
+          recent: false,
+          recommended: false,
+        },
+      ],
+      defaultModelId: 'swe-1.7-high',
+      catalogSource: 'live',
+    },
+    isLoading: false,
     error: null,
   }),
 }));
@@ -82,6 +106,7 @@ jest.mock('../../src/theme/index', () => ({
     tokens: {
       textMid: { hex: '#777777' },
       textLow: { hex: '#666666' },
+      textHi: { hex: '#eeeeee' },
       brandText: { hex: '#0088ff' },
       brand: { hex: '#0088ff' },
       textAlwaysWhite: { hex: '#ffffff' },
@@ -105,10 +130,18 @@ describe('Computer session detail', () => {
       'rounded-card',
     );
     expect(screen.getByLabelText('Computer session message').props.textAlignVertical).toBe('top');
+    expect(screen.getByLabelText('Model: SWE-1.7')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Reasoning and speed: High'));
+    fireEvent.press(screen.getByLabelText('Use Medium for SWE-1.7'));
+    expect(screen.getByLabelText('Reasoning and speed: Medium')).toBeTruthy();
     fireEvent.changeText(screen.getByLabelText('Computer session message'), 'Continue the task.');
     fireEvent.press(screen.getByLabelText('Send computer session message'));
 
-    expect(mockMutate).toHaveBeenCalledWith('Continue the task.', expect.any(Object));
+    expect(screen.getByLabelText('Workspace: DevinX')).toBeTruthy();
+    expect(mockMutate).toHaveBeenCalledWith(
+      { text: 'Continue the task.', modelId: 'swe-1.7-medium' },
+      expect.any(Object),
+    );
     expect(screen.getByText('Continue the task.')).toBeTruthy();
     expect(screen.getByText('Devin is working…')).toBeTruthy();
     expect(mockCompanionProps).toHaveBeenLastCalledWith(

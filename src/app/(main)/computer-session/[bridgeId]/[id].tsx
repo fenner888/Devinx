@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -19,6 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
   useComputerSessionAccess,
+  useComputerCreateOptions,
   useComputerSessionDetail,
   usePromptComputerSession,
 } from '@api/bridge/queries';
@@ -27,6 +28,13 @@ import { useConnections } from '@auth/ConnectionContext';
 import { computerTransportLabel } from '@auth/pairedComputers';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
+import { ComputerModelPickerSheets } from '@components/sessions/ComputerModelPickerSheets';
+import {
+  familyForModelId,
+  groupComputerModels,
+  preferredFamilyVariant,
+  splitComputerModelName,
+} from '@lib/computer-model-catalog';
 import { useTheme } from '@theme/index';
 
 const BRIDGE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
@@ -137,6 +145,9 @@ export default function ComputerSessionDetailScreen() {
   const [draft, setDraft] = useState('');
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [steeringActive, setSteeringActive] = useState(continuationPending);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showVariantPicker, setShowVariantPicker] = useState(false);
   const historyRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -150,6 +161,25 @@ export default function ComputerSessionDetailScreen() {
   const query = useComputerSessionDetail(bridgeId, sessionId, mayReadContent);
   const prompt = usePromptComputerSession(bridgeId, sessionId);
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
+  const localOptions = useComputerCreateOptions(bridgeId, canPrompt && Boolean(computer));
+  const localModels = useMemo(() => localOptions.data?.models ?? [], [localOptions.data?.models]);
+  const modelFamilies = useMemo(() => groupComputerModels(localModels), [localModels]);
+  const selectedFamily = familyForModelId(modelFamilies, selectedModelId);
+  const selectedVariant = selectedFamily
+    ? preferredFamilyVariant(selectedFamily, selectedModelId)
+    : undefined;
+  const fallbackModel = splitComputerModelName(query.data?.session.model?.name ?? 'Default model');
+  const modelLabel = selectedFamily?.name ?? fallbackModel.family;
+  const variantLabel = selectedVariant?.label ?? fallbackModel.variant;
+  const canChooseModel = localModels.length > 0 && !localOptions.isLoading && !localOptions.error;
+
+  useEffect(() => {
+    if (selectedModelId !== null || localModels.length === 0) return;
+    const currentModelId = query.data?.session.model?.id;
+    if (currentModelId && localModels.some((model) => model.id === currentModelId)) {
+      setSelectedModelId(currentModelId);
+    }
+  }, [localModels, query.data?.session.model?.id, selectedModelId]);
 
   useEffect(() => {
     if (!continuationPending || !mayReadContent || continuationRefreshStarted.current) return;
@@ -206,7 +236,7 @@ export default function ComputerSessionDetailScreen() {
         .filter((message) => message.source === 'user')
         .map((message) => message.text) ?? [],
     );
-    prompt.mutate(text, {
+    prompt.mutate({ text, ...(selectedModelId ? { modelId: selectedModelId } : {}) }, {
       onSuccess: (result) => {
         if (result?.sessionId && result.sessionId !== sessionId) {
           setPendingText(null);
@@ -440,9 +470,45 @@ export default function ComputerSessionDetailScreen() {
                 editable={!prompt.isPending && !steeringActive}
                 accessibilityLabel="Computer session message"
               />
-              <View className="mt-1 flex-row justify-end">
+              <View className="mt-1 flex-row items-center">
                 <Pressable
-                  className={`h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive ? 'bg-brand' : 'bg-tint-secondary'}`}
+                  className="mr-1 min-w-0 flex-row items-center rounded-full px-2 py-2"
+                  onPress={() => canChooseModel && setShowModelPicker(true)}
+                  disabled={!canChooseModel || steeringActive}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Model: ${modelLabel}`}
+                >
+                  <Ionicons name="hardware-chip-outline" size={15} color={tokens.textMid.hex} />
+                  <Text className="ml-1.5 max-w-24 text-text-mid text-text13" numberOfLines={1}>
+                    {modelLabel}
+                  </Text>
+                  {canChooseModel && (
+                    <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
+                  )}
+                </Pressable>
+                <Pressable
+                  className="min-w-0 flex-row items-center rounded-full px-2 py-2"
+                  onPress={() =>
+                    selectedFamily &&
+                    selectedFamily.variants.length > 1 &&
+                    setShowVariantPicker(true)
+                  }
+                  disabled={
+                    !selectedFamily || selectedFamily.variants.length <= 1 || steeringActive
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Reasoning and speed: ${variantLabel}`}
+                >
+                  <Ionicons name="sparkles-outline" size={14} color={tokens.textMid.hex} />
+                  <Text className="ml-1.5 max-w-20 text-text-mid text-text13" numberOfLines={1}>
+                    {variantLabel}
+                  </Text>
+                  {selectedFamily && selectedFamily.variants.length > 1 && (
+                    <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
+                  )}
+                </Pressable>
+                <Pressable
+                  className={`ml-auto h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive ? 'bg-brand' : 'bg-tint-secondary'}`}
                   onPress={sendPrompt}
                   disabled={!draft.trim() || prompt.isPending || steeringActive}
                   accessibilityRole="button"
@@ -460,9 +526,36 @@ export default function ComputerSessionDetailScreen() {
                 </Pressable>
               </View>
             </View>
+            <View className="flex-row items-center px-1 pt-2">
+              <View className="mr-4 flex-row items-center">
+                <Ionicons name="desktop-outline" size={14} color={tokens.textLow.hex} />
+                <Text className="ml-1.5 text-text-low text-text12" numberOfLines={1}>
+                  {computer?.computerName ?? 'Paired Mac'}
+                </Text>
+              </View>
+              <View
+                className="min-w-0 flex-1 flex-row items-center"
+                accessibilityLabel={`Workspace: ${query.data.session.workspaceName}`}
+              >
+                <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
+                <Text className="ml-1.5 flex-1 text-text-mid text-text12" numberOfLines={1}>
+                  {query.data.session.workspaceName}
+                </Text>
+              </View>
+            </View>
           </View>
         )}
       </KeyboardAvoidingView>
+      <ComputerModelPickerSheets
+        models={localModels}
+        selectedModelId={selectedModelId}
+        modelVisible={showModelPicker}
+        variantVisible={showVariantPicker}
+        onSelect={setSelectedModelId}
+        onCloseModel={() => setShowModelPicker(false)}
+        onCloseVariant={() => setShowVariantPicker(false)}
+        catalogSource={localOptions.data?.catalogSource}
+      />
     </SafeAreaView>
   );
 }

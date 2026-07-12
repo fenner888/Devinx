@@ -235,11 +235,11 @@ describe('authenticated mobile Computer Bridge client', () => {
     mockPostPinnedBridgeJson.mockResolvedValue({ status: 200, body: { accepted: true } });
 
     await expect(
-      promptComputerSession(BRIDGE_ID, sessionId, 'Continue the task.'),
+      promptComputerSession(BRIDGE_ID, sessionId, 'Continue the task.', 'swe-1.7-high'),
     ).resolves.toBeUndefined();
     expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
       method: 'session.prompt',
-      body: { sessionId, text: 'Continue the task.' },
+      body: { sessionId, text: 'Continue the task.', modelId: 'swe-1.7-high' },
     });
   });
 

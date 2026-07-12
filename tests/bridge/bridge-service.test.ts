@@ -50,7 +50,7 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   };
   loadPending: Promise<AcpLoadedSession> | null = null;
   loadFailure: Error | null = null;
-  prompts: Array<{ sessionId: string; text: string }> = [];
+  prompts: Array<{ sessionId: string; text: string; modelId?: string }> = [];
   continuedSessionId: string | null = null;
   createSupported = true;
   createOptions = {
@@ -100,8 +100,9 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   async promptSession(
     sessionId: string,
     text: string,
+    modelId?: string,
   ): Promise<void | { continuedSessionId: string }> {
-    this.prompts.push({ sessionId, text });
+    this.prompts.push({ sessionId, text, ...(modelId ? { modelId } : {}) });
     return this.continuedSessionId
       ? { continuedSessionId: this.continuedSessionId }
       : undefined;
@@ -227,14 +228,22 @@ describe('authenticated Desktop Bridge service', () => {
       bridge.handle(
         envelope(
           'session.prompt',
-          { sessionId: handle, text: 'Continue the review.' },
+          {
+            sessionId: handle,
+            text: 'Continue the review.',
+            modelId: 'gpt-5-6-sol-medium',
+          },
           permissions,
         ),
         context(),
       ),
     ).resolves.toEqual({ status: 200, body: { accepted: true } });
     expect(adapter.prompts).toEqual([
-      { sessionId: 'raw-private-session-id', text: 'Continue the review.' },
+      {
+        sessionId: 'raw-private-session-id',
+        text: 'Continue the review.',
+        modelId: 'gpt-5-6-sol-medium',
+      },
     ]);
   });
 

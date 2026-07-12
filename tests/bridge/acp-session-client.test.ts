@@ -301,6 +301,67 @@ if (request.method === 'initialize') {
     }
   });
 
+  it('applies an exact loaded-session model before prompting and rejects stale IDs', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-model', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    configOptions: [{
+      id: 'model', name: 'Model', category: 'model', type: 'select',
+      currentValue: 'swe-1.7-medium',
+      options: [
+        { value: 'swe-1.7-medium', name: 'SWE-1.7 Medium' },
+        { value: 'swe-1.7-high', name: 'SWE-1.7 High' }
+      ]
+    }]
+  } }) + '\\n');
+} else if (request.method === 'session/set_config_option') {
+  if (request.params.sessionId !== 'session-model' ||
+      request.params.configId !== 'model' ||
+      request.params.value !== 'swe-1.7-high') process.exit(31);
+  globalThis.modelConfigured = true;
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    configOptions: [{
+      id: 'model', name: 'Model', category: 'model', type: 'select',
+      currentValue: 'swe-1.7-high',
+      options: [
+        { value: 'swe-1.7-medium', name: 'SWE-1.7 Medium' },
+        { value: 'swe-1.7-high', name: 'SWE-1.7 High' }
+      ]
+    }]
+  } }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  if (!globalThis.modelConfigured || request.params.sessionId !== 'session-model') process.exit(32);
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    stopReason: 'end_turn'
+  } }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    try {
+      await client.start();
+      await client.listSessions();
+      const loaded = await client.loadSession('session-model');
+      expect(loaded.modelId).toBe('swe-1.7-medium');
+      await expect(
+        client.promptSession('session-model', 'Continue.', 'stale-model'),
+      ).rejects.toThrow('model is not available');
+      await expect(
+        client.promptSession('session-model', 'Continue.', 'swe-1.7-high'),
+      ).resolves.toBeUndefined();
+    } finally {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await client.stop();
+    }
+  });
+
   it('uses session close after a prompt when the agent advertises it', async () => {
     const executablePath = fakeCli(`
 if (request.method === 'initialize') {
@@ -407,7 +468,14 @@ if (request.method === 'initialize') {
       request.params.value !== 'gpt-5-6-sol-medium') process.exit(22);
   globalThis.modelConfigured = true;
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
-    configOptions: []
+    configOptions: [{
+      id: 'model', name: 'Model', category: 'model', type: 'select',
+      currentValue: 'gpt-5-6-sol-medium',
+      options: [
+        { value: 'adaptive', name: 'Adaptive' },
+        { value: 'gpt-5-6-sol-medium', name: 'GPT 5.6' }
+      ]
+    }]
   } }) + '\\n');
 } else if (request.method === 'session/prompt') {
   if (!globalThis.modelConfigured ||

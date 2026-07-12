@@ -229,6 +229,11 @@ export interface AcpModelCatalog {
   models: AcpModelOption[];
 }
 
+interface AcpModelSelector {
+  configId: string;
+  catalog: AcpModelCatalog;
+}
+
 export type AcpOperationFailureKind = 'session_in_use' | 'request_failed';
 
 export class AcpOperationError extends Error {
@@ -307,7 +312,9 @@ function trustedModelBadge(meta: Record<string, unknown> | undefined): AcpModelB
   return badge === 'new' || badge === 'free_promo' ? badge : undefined;
 }
 
-export function parseAcpModelCatalog(configOptions: unknown[] | null | undefined): AcpModelCatalog | null {
+function parseAcpModelSelector(
+  configOptions: unknown[] | null | undefined,
+): AcpModelSelector | null {
   const modelConfig = configOptions
     ?.map((option) => selectConfigOptionSchema.safeParse(option))
     .find(
@@ -321,19 +328,28 @@ export function parseAcpModelCatalog(configOptions: unknown[] | null | undefined
     throw new Error('ACP model catalog default is unavailable');
   }
   return {
-    defaultModelId: modelConfig.data.currentValue,
-    models: modelConfig.data.options.map((candidate) => ({
-      id: candidate.value,
-      name: candidate.name,
-      ...(candidate.description ? { description: candidate.description } : {}),
-      ...(typeof candidate._meta?.['cognition.ai/supportsImages'] === 'boolean'
-        ? { supportsImages: candidate._meta['cognition.ai/supportsImages'] }
-        : {}),
-      ...(trustedModelBadge(candidate._meta)
-        ? { badge: trustedModelBadge(candidate._meta) }
-        : {}),
-    })),
+    configId: modelConfig.data.id,
+    catalog: {
+      defaultModelId: modelConfig.data.currentValue,
+      models: modelConfig.data.options.map((candidate) => ({
+        id: candidate.value,
+        name: candidate.name,
+        ...(candidate.description ? { description: candidate.description } : {}),
+        ...(typeof candidate._meta?.['cognition.ai/supportsImages'] === 'boolean'
+          ? { supportsImages: candidate._meta['cognition.ai/supportsImages'] }
+          : {}),
+        ...(trustedModelBadge(candidate._meta)
+          ? { badge: trustedModelBadge(candidate._meta) }
+          : {}),
+      })),
+    },
   };
+}
+
+export function parseAcpModelCatalog(
+  configOptions: unknown[] | null | undefined,
+): AcpModelCatalog | null {
+  return parseAcpModelSelector(configOptions)?.catalog ?? null;
 }
 
 function cloneModelCatalog(catalog: AcpModelCatalog): AcpModelCatalog {
@@ -374,6 +390,7 @@ export class AcpSessionClient {
   private activePromptSessionId: string | null = null;
   private creatingContinuation = false;
   private modelCatalog: AcpModelCatalog | null = null;
+  private readonly sessionModelSelectors = new Map<string, AcpModelSelector>();
 
   constructor(options: AcpClientOptions) {
     this.options = acpClientOptionsSchema.parse(options);
@@ -395,6 +412,7 @@ export class AcpSessionClient {
     this.activePromptSessionId = null;
     this.creatingContinuation = false;
     this.modelCatalog = null;
+    this.sessionModelSelectors.clear();
     this.canListSessions = false;
     this.canLoadSessions = false;
     this.canEmbedContext = false;
@@ -554,8 +572,11 @@ export class AcpSessionClient {
         'session load',
       );
       if (loaded) {
-        const catalog = parseAcpModelCatalog(loaded.configOptions);
-        if (catalog) this.modelCatalog = catalog;
+        const selector = parseAcpModelSelector(loaded.configOptions);
+        if (selector) {
+          this.modelCatalog = selector.catalog;
+          this.sessionModelSelectors.set(sessionId, selector);
+        }
       }
       collector.accepting = false;
       if (collector.failed) throw new Error('ACP session replay failed validation');
@@ -565,19 +586,25 @@ export class AcpSessionClient {
         cwd: metadata.cwd,
         messages: collector.messages.map(({ source, text }) => ({ source, text })),
         truncated: collector.truncated,
+        modelId: this.sessionModelSelectors.get(sessionId)?.catalog.defaultModelId,
       };
     } finally {
       if (this.activeLoad === collector) this.activeLoad = null;
     }
   }
 
-  async promptSession(sessionIdInput: unknown, textInput: unknown): Promise<void> {
+  async promptSession(
+    sessionIdInput: unknown,
+    textInput: unknown,
+    modelInput?: unknown,
+  ): Promise<void> {
     if (!this.child) throw new Error('ACP client is not started');
     const sessionId = sessionIdSchema.parse(sessionIdInput);
     const text = z.string().trim().min(1).max(100_000).parse(textInput);
     if (!this.loadedSessions.has(sessionId)) {
       throw new Error('ACP session must be loaded before prompting');
     }
+    if (modelInput !== undefined) await this.selectSessionModel(sessionId, modelInput);
     this.startPrompt(sessionId, [{ type: 'text', text }]);
   }
 
@@ -585,6 +612,7 @@ export class AcpSessionClient {
     cwdInput: unknown,
     contextInput: unknown,
     textInput: unknown,
+    modelInput?: unknown,
   ): Promise<string> {
     if (!this.child) throw new Error('ACP client is not started');
     if (!this.canEmbedContext) throw new Error('ACP agent does not support embedded context');
@@ -607,6 +635,14 @@ export class AcpSessionClient {
       }
       this.listedSessions.set(created.sessionId, { cwd });
       this.loadedSessions.add(created.sessionId);
+      const selector = parseAcpModelSelector(created.configOptions);
+      if (selector) {
+        this.modelCatalog = selector.catalog;
+        this.sessionModelSelectors.set(created.sessionId, selector);
+      }
+      if (modelInput !== undefined) {
+        await this.selectSessionModel(created.sessionId, modelInput);
+      }
       this.startPrompt(created.sessionId, [
         {
           type: 'resource',
@@ -642,24 +678,13 @@ export class AcpSessionClient {
         newSessionResultSchema,
         'session creation',
       );
-      const catalog = parseAcpModelCatalog(created.configOptions);
-      if (catalog) this.modelCatalog = catalog;
+      const selector = parseAcpModelSelector(created.configOptions);
+      if (selector) {
+        this.modelCatalog = selector.catalog;
+        this.sessionModelSelectors.set(created.sessionId, selector);
+      }
       if (modelId) {
-        const modelConfig = created.configOptions
-          ?.map((option) => selectConfigOptionSchema.safeParse(option))
-          .find(
-            (option) =>
-              option.success &&
-              (option.data.category === 'model' || option.data.id === 'model') &&
-              option.data.options.some((candidate) => candidate.value === modelId),
-          );
-        if (!modelConfig?.success) throw new Error('ACP model is not available');
-        await this.request(
-          'session/set_config_option',
-          { sessionId: created.sessionId, configId: modelConfig.data.id, value: modelId },
-          setConfigOptionResultSchema,
-          'model selection',
-        );
+        await this.selectSessionModel(created.sessionId, modelId);
       }
       if (this.listedSessions.size >= MAX_CACHED_SESSIONS) {
         throw new Error('ACP listed session cache capacity reached');
@@ -678,6 +703,7 @@ export class AcpSessionClient {
     if (!this.loadedSessions.has(sessionId)) return;
     if (!this.child) {
       this.loadedSessions.delete(sessionId);
+      this.sessionModelSelectors.delete(sessionId);
       return;
     }
     if (this.canCloseSessions) {
@@ -689,6 +715,7 @@ export class AcpSessionClient {
           'session close',
         );
         this.loadedSessions.delete(sessionId);
+        this.sessionModelSelectors.delete(sessionId);
         return;
       } catch {
         // A declared but failed close must not leave a Connector-owned lock behind.
@@ -702,6 +729,26 @@ export class AcpSessionClient {
       this.listedSessions.set(listedSessionId, { ...metadata });
     }
     this.modelCatalog = modelCatalog;
+  }
+
+  private async selectSessionModel(sessionId: string, modelInput: unknown): Promise<void> {
+    const modelId = z.string().min(1).max(160).regex(/^[A-Za-z0-9._:+-]+$/).parse(modelInput);
+    const selector = this.sessionModelSelectors.get(sessionId);
+    if (!selector?.catalog.models.some((model) => model.id === modelId)) {
+      throw new Error('ACP model is not available');
+    }
+    const result = await this.request(
+      'session/set_config_option',
+      { sessionId, configId: selector.configId, value: modelId },
+      setConfigOptionResultSchema,
+      'model selection',
+    );
+    const updated = parseAcpModelSelector(result.configOptions);
+    if (!updated || updated.catalog.defaultModelId !== modelId) {
+      throw new Error('ACP model selection was not confirmed');
+    }
+    this.sessionModelSelectors.set(sessionId, updated);
+    this.modelCatalog = updated.catalog;
   }
 
   private startPrompt(sessionId: string, prompt: unknown[]): void {
@@ -735,6 +782,7 @@ export class AcpSessionClient {
     this.canCloseSessions = false;
     this.listedSessions.clear();
     this.loadedSessions.clear();
+    this.sessionModelSelectors.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
     this.creatingContinuation = false;

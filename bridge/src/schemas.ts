@@ -94,6 +94,7 @@ export const sessionPromptBodySchema = z
   .object({
     sessionId: sessionIdSchema,
     text: z.string().min(1).max(100_000),
+    modelId: modelIdSchema.optional(),
   })
   .strict();
 

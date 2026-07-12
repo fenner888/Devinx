@@ -146,7 +146,9 @@ describe('Desktop Bridge development runner', () => {
       messages: [],
       truncated: false,
     }));
-    const replacementPrompt = jest.fn<Promise<void>, [string, string]>().mockResolvedValue();
+    const replacementPrompt = jest
+      .fn<Promise<void>, [string, string, string?]>()
+      .mockResolvedValue();
     const replacement: AcpSessionLifecycle = {
       start: jest.fn<Promise<void>, []>().mockResolvedValue(),
       stop: jest.fn<Promise<void>, []>().mockResolvedValue(),
@@ -160,10 +162,16 @@ describe('Desktop Bridge development runner', () => {
     const adapter = new RecoverableSessionDiscoveryAdapter();
     adapter.replace(replacement);
 
-    await expect(adapter.promptSession('session-kept', 'Continue.')).resolves.toBeUndefined();
+    await expect(
+      adapter.promptSession('session-kept', 'Continue.', 'swe-1.7-high'),
+    ).resolves.toBeUndefined();
     expect(replacementList).toHaveBeenCalledTimes(2);
     expect(replacementLoad).toHaveBeenCalledWith('session-kept');
-    expect(replacementPrompt).toHaveBeenCalledWith('session-kept', 'Continue.');
+    expect(replacementPrompt).toHaveBeenCalledWith(
+      'session-kept',
+      'Continue.',
+      'swe-1.7-high',
+    );
 
     await expect(adapter.loadSession('session-missing')).rejects.toThrow(
       'not available in the current ACP process',
@@ -208,13 +216,16 @@ describe('Desktop Bridge development runner', () => {
     adapter.replace(locked);
     adapter.setHistory(history);
 
-    await expect(adapter.promptSession('session-locked', 'Continue.')).resolves.toEqual({
+    await expect(
+      adapter.promptSession('session-locked', 'Continue.', 'swe-1.7-high'),
+    ).resolves.toEqual({
       continuedSessionId: 'session-continuation',
     });
     expect(createContinuation).toHaveBeenCalledWith(
       '/tmp/project',
       expect.stringContaining('## User\n\nOriginal question'),
       'Continue.',
+      'swe-1.7-high',
     );
   });
 
