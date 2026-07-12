@@ -3,6 +3,8 @@
 Status: implemented, automated-test validated, and submitted in iOS Build 27; physical
 workspace/model creation and response validation remain
 
+Model discovery and picker parity are extended by `026-live-model-catalog-parity.md`.
+
 ## Product contract
 
 Cloud and Computer are separate composer destinations. Cloud retains the Devin API controls it

@@ -36,7 +36,15 @@ const localSessionIdSchema = z.string().regex(/^local_[A-Za-z0-9_-]{43}$/);
 const workspaceIdSchema = z.string().regex(/^workspace_[A-Za-z0-9_-]{43}$/);
 const modelIdSchema = z.string().min(1).max(160).regex(/^[A-Za-z0-9._:+-]+$/);
 const computerModelSchema = z
-  .object({ id: modelIdSchema, name: z.string().min(1).max(160) })
+  .object({
+    id: modelIdSchema,
+    name: z.string().min(1).max(160),
+    description: z.string().min(1).max(500).optional(),
+    supportsImages: z.boolean().optional(),
+    badge: z.enum(['new', 'free_promo']).optional(),
+    recent: z.boolean().default(false),
+    recommended: z.boolean().default(false),
+  })
   .strict();
 const bridgeMethodSchema = z.enum([
   'bridge.health',
@@ -64,9 +72,33 @@ const sessionCreateOptionsResponseSchema = z
     workspaces: z
       .array(z.object({ id: workspaceIdSchema, name: z.string().min(1).max(160) }).strict())
       .max(100),
-    models: z.array(computerModelSchema).max(100),
+    models: z.array(computerModelSchema).max(200),
+    defaultModelId: modelIdSchema.nullable().default(null),
+    catalogSource: z.enum(['live', 'recent']).default('recent'),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const modelIds = value.models.map((model) => model.id);
+    if (new Set(modelIds).size !== modelIds.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['models'],
+        message: 'Model IDs must be unique',
+      });
+    }
+    if (
+      value.defaultModelId !== null &&
+      !value.models.some(
+        (model) => model.id === value.defaultModelId && model.recommended,
+      )
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['defaultModelId'],
+        message: 'Default model must be present and recommended',
+      });
+    }
+  });
 const sessionCreateBodySchema = z
   .object({
     workspaceId: workspaceIdSchema,

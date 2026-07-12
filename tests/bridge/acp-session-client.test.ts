@@ -3,7 +3,11 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { AcpSessionClient, isAcpSessionInUseError } from '../../bridge/src/acp';
+import {
+  AcpSessionClient,
+  isAcpSessionInUseError,
+  parseAcpModelCatalog,
+} from '../../bridge/src/acp';
 
 describe('ACP session client', () => {
   const temporaryDirectories: string[] = [];
@@ -381,6 +385,124 @@ if (request.method === 'initialize') {
       await new Promise((resolve) => setTimeout(resolve, 20));
       await client.stop();
     }
+  });
+
+  it('sanitizes authoritative model metadata and ignores untrusted badge fields', () => {
+    expect(
+      parseAcpModelCatalog([
+        {
+          id: 'model',
+          name: 'Model',
+          category: 'model',
+          type: 'select',
+          currentValue: 'adaptive',
+          options: [
+            {
+              value: 'adaptive',
+              name: 'Adaptive',
+              description: 'Balances quality and cost',
+              _meta: {
+                'cognition.ai/supportsImages': true,
+                'cognition.ai/badge': 'new',
+                privateToken: 'do-not-return',
+              },
+            },
+            {
+              value: 'deepseek-v4',
+              name: 'DeepSeek V4 Pro',
+              _meta: { 'cognition.ai/badge': 'guessed-promo' },
+            },
+          ],
+        },
+      ]),
+    ).toEqual({
+      defaultModelId: 'adaptive',
+      models: [
+        {
+          id: 'adaptive',
+          name: 'Adaptive',
+          description: 'Balances quality and cost',
+          supportsImages: true,
+          badge: 'new',
+        },
+        { id: 'deepseek-v4', name: 'DeepSeek V4 Pro' },
+      ],
+    });
+  });
+
+  it('discovers and caches the full model catalog from a bounded existing-session load', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1,
+    agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [
+      { sessionId: 'session-locked', cwd: '/tmp/locked' },
+      { sessionId: 'session-catalog', cwd: '/tmp/catalog' }
+    ]
+  } }) + '\\n');
+} else if (request.method === 'session/load' && request.params.sessionId === 'session-locked') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, error: {
+    code: -32600, message: 'Session is already open in another process'
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    configOptions: [{
+      id: 'model', name: 'Model', category: 'model', type: 'select',
+      currentValue: 'adaptive',
+      options: [
+        { value: 'adaptive', name: 'Adaptive' },
+        { value: 'deepseek-v4', name: 'DeepSeek V4 Pro' }
+      ]
+    }]
+  } }) + '\\n');
+} else if (request.method === 'session/new' || request.method === 'session/prompt') {
+  process.exit(25);
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+    try {
+      await client.start();
+      const first = await client.listModelCatalog();
+      const second = await client.listModelCatalog();
+      expect(first).toEqual({
+        defaultModelId: 'adaptive',
+        models: [
+          { id: 'adaptive', name: 'Adaptive' },
+          { id: 'deepseek-v4', name: 'DeepSeek V4 Pro' },
+        ],
+      });
+      expect(second).toEqual(first);
+      expect(second).not.toBe(first);
+    } finally {
+      await client.stop();
+    }
+  });
+
+  it('rejects duplicate or unavailable defaults in ACP model catalogs', () => {
+    const base = {
+      id: 'model',
+      name: 'Model',
+      category: 'model',
+      type: 'select',
+      currentValue: 'missing',
+      options: [{ value: 'adaptive', name: 'Adaptive' }],
+    };
+    expect(() => parseAcpModelCatalog([base])).toThrow('default is unavailable');
+    expect(() =>
+      parseAcpModelCatalog([
+        {
+          ...base,
+          currentValue: 'adaptive',
+          options: [
+            { value: 'adaptive', name: 'Adaptive' },
+            { value: 'adaptive', name: 'Duplicate' },
+          ],
+        },
+      ]),
+    ).toThrow('duplicate IDs');
   });
 
   it('fails closed before prompting when a requested model is not offered', async () => {

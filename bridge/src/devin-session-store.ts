@@ -75,7 +75,17 @@ export interface DevinSessionPresentation {
 
 export interface DevinCreateOptions {
   workspaces: Array<{ path: string }>;
-  models: Array<{ id: string }>;
+  models: Array<{
+    id: string;
+    name?: string;
+    description?: string;
+    supportsImages?: boolean;
+    badge?: 'new' | 'free_promo';
+    recent?: boolean;
+    recommended?: boolean;
+  }>;
+  defaultModelId?: string | null;
+  catalogSource?: 'live' | 'recent';
 }
 
 function utf8Tail(value: string, maximumBytes: number): { text: string; truncated: boolean } {

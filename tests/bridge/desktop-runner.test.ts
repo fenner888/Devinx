@@ -63,6 +63,73 @@ function interfaces(): NetworkInterfaceMap {
 }
 
 describe('Desktop Bridge development runner', () => {
+  it('merges the live ACP catalog with history-only recent model markers', async () => {
+    const current: AcpSessionLifecycle = {
+      start: async () => {},
+      stop: async () => {},
+      isSessionListSupported: () => true,
+      listSessions: async () => ({ sessions: [] }),
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new Error('not used');
+      },
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
+      isSessionCreateSupported: () => true,
+      listModelCatalog: async () => ({
+        defaultModelId: 'adaptive',
+        models: [
+          { id: 'adaptive', name: 'Adaptive', description: 'Recommended' },
+          { id: 'deepseek-v4', name: 'DeepSeek V4 Pro', supportsImages: false },
+          { id: 'gpt-5-6-sol-medium', name: 'GPT-5.6 Sol Medium Thinking' },
+        ],
+      }),
+      createSession: async () => 'session-created',
+    };
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace(current);
+    adapter.setHistory({
+      start: async () => {},
+      stop: async () => {},
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new Error('not used');
+      },
+      listCreateOptions: async () => ({
+        workspaces: [{ path: '/tmp/project' }],
+        models: [{ id: 'gpt-5-6-sol-medium' }],
+      }),
+    });
+
+    await expect(adapter.listCreateOptions()).resolves.toEqual({
+      workspaces: [{ path: '/tmp/project' }],
+      models: [
+        {
+          id: 'adaptive',
+          name: 'Adaptive',
+          description: 'Recommended',
+          recent: false,
+          recommended: true,
+        },
+        {
+          id: 'deepseek-v4',
+          name: 'DeepSeek V4 Pro',
+          supportsImages: false,
+          recent: false,
+          recommended: false,
+        },
+        {
+          id: 'gpt-5-6-sol-medium',
+          name: 'GPT-5.6 Sol Medium Thinking',
+          recent: true,
+          recommended: false,
+        },
+      ],
+      defaultModelId: 'adaptive',
+      catalogSource: 'live',
+    });
+  });
+
   it('securely rehydrates listed and loaded session state after ACP replacement', async () => {
     const replacementList = jest.fn(async (input?: unknown) => {
       const cursor = (input as { cursor?: string } | undefined)?.cursor;

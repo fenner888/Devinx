@@ -55,7 +55,19 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   createSupported = true;
   createOptions = {
     workspaces: [{ path: '/Users/frank/Secret Project' }],
-    models: [{ id: 'gpt-5-6-sol-medium' }],
+    models: [
+      {
+        id: 'gpt-5-6-sol-medium',
+        name: 'GPT-5.6 Sol Medium Thinking',
+        description: 'Recommended for coding',
+        supportsImages: true,
+        badge: 'new' as const,
+        recent: true,
+        recommended: true,
+      },
+    ],
+    defaultModelId: 'gpt-5-6-sol-medium',
+    catalogSource: 'live' as const,
   };
   creations: Array<{ cwd: string; modelId: string | null; text: string }> = [];
 
@@ -318,7 +330,19 @@ describe('authenticated Desktop Bridge service', () => {
             name: 'Secret Project',
           },
         ],
-        models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
+        models: [
+          {
+            id: 'gpt-5-6-sol-medium',
+            name: 'GPT-5.6 Sol Medium Thinking',
+            description: 'Recommended for coding',
+            supportsImages: true,
+            badge: 'new',
+            recent: true,
+            recommended: true,
+          },
+        ],
+        defaultModelId: 'gpt-5-6-sol-medium',
+        catalogSource: 'live',
       },
     });
     expect(JSON.stringify(result)).not.toContain('/Users/frank');

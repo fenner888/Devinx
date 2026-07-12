@@ -134,6 +134,8 @@ const selectConfigOptionSchema = z
           .object({
             value: z.string().min(1).max(160),
             name: z.string().min(1).max(160),
+            description: z.string().min(1).max(500).optional(),
+            _meta: z.record(z.unknown()).optional(),
           })
           .passthrough(),
       )
@@ -210,6 +212,21 @@ export interface AcpLoadedSession {
   modelId?: string;
 }
 
+export type AcpModelBadge = 'new' | 'free_promo';
+
+export interface AcpModelOption {
+  id: string;
+  name: string;
+  description?: string;
+  supportsImages?: boolean;
+  badge?: AcpModelBadge;
+}
+
+export interface AcpModelCatalog {
+  defaultModelId: string;
+  models: AcpModelOption[];
+}
+
 export type AcpOperationFailureKind = 'session_in_use' | 'request_failed';
 
 export class AcpOperationError extends Error {
@@ -283,6 +300,44 @@ function supportsSessionLoad(agentCapabilities: Record<string, unknown>): boolea
   return agentCapabilities.loadSession === true;
 }
 
+function trustedModelBadge(meta: Record<string, unknown> | undefined): AcpModelBadge | undefined {
+  const badge = meta?.['cognition.ai/badge'];
+  return badge === 'new' || badge === 'free_promo' ? badge : undefined;
+}
+
+export function parseAcpModelCatalog(configOptions: unknown[] | null | undefined): AcpModelCatalog | null {
+  const modelConfig = configOptions
+    ?.map((option) => selectConfigOptionSchema.safeParse(option))
+    .find(
+      (option) =>
+        option.success && (option.data.category === 'model' || option.data.id === 'model'),
+    );
+  if (!modelConfig?.success) return null;
+  const ids = modelConfig.data.options.map((candidate) => candidate.value);
+  if (new Set(ids).size !== ids.length) throw new Error('ACP model catalog contains duplicate IDs');
+  if (!ids.includes(modelConfig.data.currentValue)) {
+    throw new Error('ACP model catalog default is unavailable');
+  }
+  return {
+    defaultModelId: modelConfig.data.currentValue,
+    models: modelConfig.data.options.map((candidate) => ({
+      id: candidate.value,
+      name: candidate.name,
+      ...(candidate.description ? { description: candidate.description } : {}),
+      ...(typeof candidate._meta?.['cognition.ai/supportsImages'] === 'boolean'
+        ? { supportsImages: candidate._meta['cognition.ai/supportsImages'] }
+        : {}),
+      ...(trustedModelBadge(candidate._meta)
+        ? { badge: trustedModelBadge(candidate._meta) }
+        : {}),
+    })),
+  };
+}
+
+function cloneModelCatalog(catalog: AcpModelCatalog): AcpModelCatalog {
+  return { defaultModelId: catalog.defaultModelId, models: catalog.models.map((model) => ({ ...model })) };
+}
+
 function utf8Tail(value: string, maximumBytes: number): { text: string; truncated: boolean } {
   const bytes = Buffer.from(value, 'utf8');
   try {
@@ -315,6 +370,7 @@ export class AcpSessionClient {
   private activeLoad: ReplayCollector | null = null;
   private activePromptSessionId: string | null = null;
   private creatingContinuation = false;
+  private modelCatalog: AcpModelCatalog | null = null;
 
   constructor(options: AcpClientOptions) {
     this.options = acpClientOptionsSchema.parse(options);
@@ -335,6 +391,7 @@ export class AcpSessionClient {
     this.activeLoad = null;
     this.activePromptSessionId = null;
     this.creatingContinuation = false;
+    this.modelCatalog = null;
     this.canListSessions = false;
     this.canLoadSessions = false;
     this.canEmbedContext = false;
@@ -425,6 +482,35 @@ export class AcpSessionClient {
     return Boolean(this.child);
   }
 
+  async listModelCatalog(): Promise<AcpModelCatalog> {
+    if (!this.child) throw new Error('ACP client is not started');
+    if (this.modelCatalog) return cloneModelCatalog(this.modelCatalog);
+    if (!this.canListSessions || !this.canLoadSessions) {
+      throw new Error('ACP agent does not support model discovery');
+    }
+    if (this.activeLoad || this.activePromptSessionId || this.creatingContinuation) {
+      throw new Error('ACP model discovery is busy');
+    }
+    let cursor: string | undefined;
+    let attempts = 0;
+    while (attempts < 20) {
+      const page = await this.listSessions(cursor ? { cursor } : {});
+      for (const session of page.sessions) {
+        if (attempts >= 20) break;
+        attempts += 1;
+        try {
+          await this.loadSession(session.sessionId);
+          if (this.modelCatalog) return cloneModelCatalog(this.modelCatalog);
+        } catch (error) {
+          if (!isAcpSessionInUseError(error)) continue;
+        }
+      }
+      if (!page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+    throw new Error('ACP model catalog is unavailable');
+  }
+
   async loadSession(input: unknown): Promise<AcpLoadedSession> {
     if (!this.child) throw new Error('ACP client is not started');
     if (!this.canLoadSessions) throw new Error('ACP agent does not support session loading');
@@ -446,12 +532,16 @@ export class AcpSessionClient {
     };
     this.activeLoad = collector;
     try {
-      await this.request(
+      const loaded = await this.request(
         'session/load',
         { sessionId, cwd: metadata.cwd, mcpServers: [] },
         loadSessionResultSchema,
         'session load',
       );
+      if (loaded) {
+        const catalog = parseAcpModelCatalog(loaded.configOptions);
+        if (catalog) this.modelCatalog = catalog;
+      }
       collector.accepting = false;
       if (collector.failed) throw new Error('ACP session replay failed validation');
       this.loadedSessions.add(sessionId);
@@ -537,6 +627,8 @@ export class AcpSessionClient {
         newSessionResultSchema,
         'session creation',
       );
+      const catalog = parseAcpModelCatalog(created.configOptions);
+      if (catalog) this.modelCatalog = catalog;
       if (modelId) {
         const modelConfig = created.configOptions
           ?.map((option) => selectConfigOptionSchema.safeParse(option))

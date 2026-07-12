@@ -57,7 +57,7 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed; release environment is pinned to Node 20.19.4 (the local Node 23 shell emitted expected unsupported-engine warnings) |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 52 suites / 402 tests with handle detection enabled; no analytics or crash-reporting SDK runtime is loaded by the test environment |
+| Jest | passed 52 suites / 407 tests with handle detection enabled; no analytics or crash-reporting SDK runtime is loaded by the test environment |
 | Production iOS export | passed after dormant SDK removal; 12 MB total, 5.38 MB Hermes bundle, 101 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
@@ -73,7 +73,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [ ] Install Build 28 and confirm Cloud and Computer expose their distinct pickers and the Computer model menu is compact, dismissible, and correctly labeled
+- [ ] Install the next internal build and confirm Cloud and Computer expose their distinct pickers and the Computer model menu shows the live Recommended, Recent, searchable All Models catalog
 - [ ] Enable `Create new sessions` for the iPhone in Connector and create a harmless Computer session with an approved workspace and selected model
 - [ ] Confirm the selected model appears on the new local session and the initial prompt receives a reply
 - [ ] Confirm no raw Mac path or raw ACP session identifier appears on the phone

@@ -116,6 +116,7 @@ export default function HomeScreen() {
   const [showDestinationPicker, setShowDestinationPicker] = useState(false);
   const [showWorkspacePicker, setShowWorkspacePicker] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [modelQuery, setModelQuery] = useState('');
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -190,7 +191,23 @@ export default function HomeScreen() {
   const selectedWorkspace = localOptions.data?.workspaces.find(
     (workspace) => workspace.id === selectedWorkspaceId,
   );
-  const selectedModel = localOptions.data?.models.find((model) => model.id === selectedModelId);
+  const localModels = localOptions.data?.models ?? [];
+  const recommendedModel = localModels.find((model) => model.recommended);
+  const selectedModel = selectedModelId
+    ? localModels.find((model) => model.id === selectedModelId)
+    : recommendedModel;
+  const recentModels = localModels.filter(
+    (model) => model.recent && model.id !== recommendedModel?.id,
+  );
+  const otherModels = localModels.filter(
+    (model) => !model.recent && model.id !== recommendedModel?.id,
+  );
+  const normalizedModelQuery = modelQuery.trim().toLowerCase();
+  const searchedModels = localModels.filter(
+    (model) =>
+      model.name.toLowerCase().includes(normalizedModelQuery) ||
+      model.description?.toLowerCase().includes(normalizedModelQuery),
+  );
   const canCreateComputerSession = Boolean(
     computer && selectedWorkspaceId && !localOptions.isLoading && !localOptions.error,
   );
@@ -253,7 +270,59 @@ export default function HomeScreen() {
       setShowWorkspacePicker(true);
       return;
     }
+    setModelQuery('');
     setShowModelPicker(true);
+  }
+
+  function modelOptionRow(
+    modelOption: (typeof localModels)[number],
+    options: { useDefault?: boolean } = {},
+  ) {
+    const useDefault = options.useDefault === true;
+    const selected = useDefault ? selectedModelId === null : modelOption.id === selectedModelId;
+    const badgeLabel = modelOption.badge === 'free_promo' ? 'Free promo' : modelOption.badge === 'new' ? 'New' : null;
+    return (
+      <Pressable
+        key={useDefault ? `default-${modelOption.id}` : modelOption.id}
+        className="min-h-14 flex-row items-center px-2 py-2.5"
+        onPress={() => {
+          setSelectedModelId(useDefault ? null : modelOption.id);
+          setShowModelPicker(false);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={`${useDefault ? 'Use recommended model' : 'Use model'} ${modelOption.name}${badgeLabel ? `, ${badgeLabel}` : ''}`}
+      >
+        <View className="w-8 items-start">
+          {selected && <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />}
+        </View>
+        <View className="flex-1 pr-2">
+          <View className="flex-row items-center">
+            <Text className="shrink text-text-hi text-text16" numberOfLines={1}>
+              {modelOption.name}
+            </Text>
+            {badgeLabel && (
+              <View
+                className={`ml-2 rounded-chip px-2 py-0.5 ${modelOption.badge === 'free_promo' ? 'bg-tint-green' : 'bg-tint-blue'}`}
+              >
+                <Text
+                  className={`text-text11 font-medium ${modelOption.badge === 'free_promo' ? 'text-finished' : 'text-brand-text'}`}
+                >
+                  {badgeLabel}
+                </Text>
+              </View>
+            )}
+          </View>
+          {modelOption.description && (
+            <Text className="mt-0.5 text-text-low text-text12" numberOfLines={2}>
+              {modelOption.description}
+            </Text>
+          )}
+        </View>
+        {modelOption.supportsImages && (
+          <Ionicons name="image-outline" size={15} color={tokens.textLow.hex} />
+        )}
+      </Pressable>
+    );
   }
 
   function handleSend() {
@@ -1034,55 +1103,105 @@ export default function HomeScreen() {
                 <Ionicons name="close" size={18} color={tokens.textLow.hex} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Pressable
-                className="min-h-14 flex-row items-center px-2 py-3"
-                onPress={() => {
-                  setSelectedModelId(null);
-                  setShowModelPicker(false);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Use Devin default model"
-              >
-                <View className="w-8 items-start">
-                  {selectedModelId === null && (
-                    <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />
-                  )}
-                </View>
-                <Text className="flex-1 text-text-hi text-text17">Default model</Text>
-              </Pressable>
-              {Boolean(localOptions.data?.models.length) && (
+            {localModels.length > 8 && (
+              <View className="mb-3 flex-row items-center rounded-input border border-border-subtle bg-surface1 px-3">
+                <Ionicons name="search" size={16} color={tokens.textLow.hex} />
+                <TextInput
+                  className="ml-2 min-h-11 flex-1 text-text14 text-text-hi"
+                  value={modelQuery}
+                  onChangeText={setModelQuery}
+                  placeholder="Search models"
+                  placeholderTextColor={tokens.textLow.hex}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  accessibilityLabel="Search local models"
+                />
+                {modelQuery.length > 0 && (
+                  <Pressable
+                    className="h-9 w-9 items-center justify-center"
+                    onPress={() => setModelQuery('')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear model search"
+                  >
+                    <Ionicons name="close-circle" size={17} color={tokens.textLow.hex} />
+                  </Pressable>
+                )}
+              </View>
+            )}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {normalizedModelQuery ? (
                 <>
-                  <View className="my-2 h-px bg-border-subtle" />
-                  <Text className="px-10 pb-2 pt-2 text-text-low text-text13 font-medium">
-                    Recent
+                  <Text className="px-10 pb-2 pt-1 text-text-low text-text13 font-medium">
+                    Results
                   </Text>
+                  {searchedModels.length > 0 ? (
+                    searchedModels.map((modelOption) =>
+                      modelOptionRow(modelOption, { useDefault: modelOption.recommended }),
+                    )
+                  ) : (
+                    <Text className="px-10 py-5 text-text-low text-text14">
+                      No matching models
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text className="px-10 pb-2 pt-1 text-text-low text-text13 font-medium">
+                    Recommended
+                  </Text>
+                  {recommendedModel ? (
+                    modelOptionRow(recommendedModel, { useDefault: true })
+                  ) : (
+                    <Pressable
+                      className="min-h-14 flex-row items-center px-2 py-3"
+                      onPress={() => {
+                        setSelectedModelId(null);
+                        setShowModelPicker(false);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Use Devin default model"
+                    >
+                      <View className="w-8 items-start">
+                        {selectedModelId === null && (
+                          <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />
+                        )}
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-text-hi text-text16">Default model</Text>
+                        <Text className="mt-0.5 text-text-low text-text12">
+                          Let Devin choose the recommended model
+                        </Text>
+                      </View>
+                    </Pressable>
+                  )}
+                  {recentModels.length > 0 && (
+                    <>
+                      <View className="my-2 h-px bg-border-subtle" />
+                      <Text className="px-10 pb-2 pt-2 text-text-low text-text13 font-medium">
+                        Recent
+                      </Text>
+                      {recentModels.map((modelOption) => modelOptionRow(modelOption))}
+                    </>
+                  )}
+                  {otherModels.length > 0 && (
+                    <>
+                      <View className="my-2 h-px bg-border-subtle" />
+                      <Text className="px-10 pb-2 pt-2 text-text-low text-text13 font-medium">
+                        All Models
+                      </Text>
+                      {otherModels.map((modelOption) => modelOptionRow(modelOption))}
+                    </>
+                  )}
+                  {localOptions.data?.catalogSource === 'recent' && (
+                    <Text className="px-10 pb-3 pt-4 text-text-low text-text11">
+                      Showing recent models while Devin refreshes the full catalog.
+                    </Text>
+                  )}
                 </>
               )}
-              {localOptions.data?.models.map((modelOption) => {
-                const selected = modelOption.id === selectedModelId;
-                return (
-                  <Pressable
-                    key={modelOption.id}
-                    className="min-h-14 flex-row items-center px-2 py-3"
-                    onPress={() => {
-                      setSelectedModelId(modelOption.id);
-                      setShowModelPicker(false);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Use model ${modelOption.name}`}
-                  >
-                    <View className="w-8 items-start">
-                      {selected && (
-                        <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />
-                      )}
-                    </View>
-                    <Text className="flex-1 text-text-hi text-text17" numberOfLines={1}>
-                      {modelOption.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
             </ScrollView>
           </View>
         </View>

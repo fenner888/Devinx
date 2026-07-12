@@ -11,7 +11,17 @@ let mockConnection = {
 let mockComputerCreateOptions:
   | {
       workspaces: Array<{ id: string; name: string }>;
-      models: Array<{ id: string; name: string }>;
+      models: Array<{
+        id: string;
+        name: string;
+        description?: string;
+        supportsImages?: boolean;
+        badge?: 'new' | 'free_promo';
+        recent?: boolean;
+        recommended?: boolean;
+      }>;
+      defaultModelId?: string | null;
+      catalogSource?: 'live' | 'recent';
     }
   | undefined = { workspaces: [], models: [] };
 let mockComputerCreateOptionsError: Error | null = null;
@@ -305,6 +315,56 @@ describe('home attachment control', () => {
     expect(screen.queryByLabelText('Close workspace picker')).toBeNull();
     fireEvent.press(screen.getByLabelText('Model: Default'));
     expect(alert).toHaveBeenCalledTimes(2);
+  });
+
+  it('organizes the live model catalog into recommended, recent, searchable options and badges', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      defaultModelId: 'adaptive',
+      catalogSource: 'live',
+      models: [
+        {
+          id: 'adaptive',
+          name: 'Adaptive',
+          description: 'Automatically balances quality and cost',
+          recommended: true,
+        },
+        { id: 'gpt-recent', name: 'GPT Recent', recent: true },
+        { id: 'deepseek-v4', name: 'DeepSeek V4 Pro', badge: 'new' },
+        { id: 'model-4', name: 'Model Four' },
+        { id: 'model-5', name: 'Model Five' },
+        { id: 'model-6', name: 'Model Six' },
+        { id: 'model-7', name: 'Model Seven' },
+        { id: 'model-8', name: 'Model Eight' },
+        { id: 'model-9', name: 'Model Nine' },
+      ],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByLabelText('Model: Adaptive')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Model: Adaptive'));
+    expect(screen.getByText('Recommended')).toBeTruthy();
+    expect(screen.getByText('Recent')).toBeTruthy();
+    expect(screen.getByText('All Models')).toBeTruthy();
+    expect(screen.getByLabelText('Use recommended model Adaptive')).toBeTruthy();
+    expect(screen.getByLabelText('Use model DeepSeek V4 Pro, New')).toBeTruthy();
+    expect(screen.getByText('New')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByLabelText('Search local models'), 'deepseek');
+    expect(screen.getByText('Results')).toBeTruthy();
+    expect(screen.queryByLabelText('Use model GPT Recent')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Use model DeepSeek V4 Pro, New'));
+    expect(screen.getByLabelText('Model: DeepSeek V4 Pro')).toBeTruthy();
   });
 
   it('always provides an explicit close control for local picker sheets', () => {

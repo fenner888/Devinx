@@ -2,7 +2,7 @@ import { basename } from 'node:path';
 
 import { z } from 'zod';
 
-import type { AcpLoadedSession, AcpSessionPage } from './acp';
+import type { AcpLoadedSession, AcpModelCatalog, AcpSessionPage } from './acp';
 import type { RateLimiter, RateLimitRule } from './rate-limit';
 import type { ReplayGuard } from './replay';
 import {
@@ -125,9 +125,20 @@ export interface SessionDiscoveryAdapter {
   ): Promise<void | { continuedSessionId: string }>;
   createContinuation?(cwd: string, context: string, text: string): Promise<string>;
   isSessionCreateSupported?(): boolean;
+  listModelCatalog?(): Promise<AcpModelCatalog>;
   listCreateOptions?(): Promise<{
     workspaces: Array<{ path: string }>;
-    models: Array<{ id: string }>;
+    models: Array<{
+      id: string;
+      name?: string;
+      description?: string;
+      supportsImages?: boolean;
+      badge?: 'new' | 'free_promo';
+      recent?: boolean;
+      recommended?: boolean;
+    }>;
+    defaultModelId?: string | null;
+    catalogSource?: 'live' | 'recent';
   }>;
   createSession?(cwd: string, modelId: string | null, text: string): Promise<string>;
 }
@@ -508,10 +519,46 @@ export class BridgeService {
               )
               .max(100),
             models: z
-              .array(z.object({ id: modelIdSchema, name: z.string().min(1).max(160) }).strict())
-              .max(100),
+              .array(
+                z
+                  .object({
+                    id: modelIdSchema,
+                    name: z.string().min(1).max(160),
+                    description: z.string().min(1).max(500).optional(),
+                    supportsImages: z.boolean().optional(),
+                    badge: z.enum(['new', 'free_promo']).optional(),
+                    recent: z.boolean(),
+                    recommended: z.boolean(),
+                  })
+                  .strict(),
+              )
+              .max(200),
+            defaultModelId: modelIdSchema.nullable(),
+            catalogSource: z.enum(['live', 'recent']),
           })
           .strict()
+          .superRefine((value, context) => {
+            const modelIds = value.models.map((model) => model.id);
+            if (new Set(modelIds).size !== modelIds.length) {
+              context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['models'],
+                message: 'Model IDs must be unique',
+              });
+            }
+            if (
+              value.defaultModelId !== null &&
+              !value.models.some(
+                (model) => model.id === value.defaultModelId && model.recommended,
+              )
+            ) {
+              context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['defaultModelId'],
+                message: 'Default model must be present and recommended',
+              });
+            }
+          })
           .parse({
             workspaces: options.workspaces.map((workspace, index) => ({
               id: this.dependencies.workspaceHandles.register(workspace.path, now),
@@ -519,8 +566,19 @@ export class BridgeService {
             })),
             models: options.models.map((model) => ({
               id: model.id,
-              name: modelDisplayName(model.id),
+              name: cleanDisplayText(model.name ?? modelDisplayName(model.id), 160, 'Default'),
+              ...(model.description
+                ? { description: cleanDisplayText(model.description, 500, 'Model option') }
+                : {}),
+              ...(typeof model.supportsImages === 'boolean'
+                ? { supportsImages: model.supportsImages }
+                : {}),
+              ...(model.badge ? { badge: model.badge } : {}),
+              recent: model.recent === true,
+              recommended: model.recommended === true,
             })),
+            defaultModelId: options.defaultModelId ?? null,
+            catalogSource: options.catalogSource ?? 'recent',
           }),
       };
     } catch {

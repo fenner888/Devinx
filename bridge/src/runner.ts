@@ -7,6 +7,7 @@ import {
   AcpSessionClient,
   isAcpSessionInUseError,
   type AcpHistoryMessage,
+  type AcpModelCatalog,
 } from './acp';
 import {
   DevinSessionStore,
@@ -94,6 +95,7 @@ export interface AcpSessionLifecycle extends SessionDiscoveryAdapter {
   stop(): Promise<void>;
   createContinuation?(cwd: string, context: string, text: string): Promise<string>;
   isSessionCreateSupported?(): boolean;
+  listModelCatalog?(): Promise<AcpModelCatalog>;
   createSession?(cwd: string, modelId: string | null, text: string): Promise<string>;
 }
 
@@ -236,7 +238,35 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     if (!this.isSessionCreateSupported() || !this.history?.listCreateOptions) {
       throw new Error('Session creation is not enabled');
     }
-    return this.history.listCreateOptions();
+    const historyOptions = await this.history.listCreateOptions();
+    const recentModelIds = new Set(historyOptions.models.map((model) => model.id));
+    try {
+      const catalog = await this.current.listModelCatalog?.();
+      if (catalog) {
+        return {
+          workspaces: historyOptions.workspaces,
+          models: catalog.models.map((model) => ({
+            ...model,
+            recent: recentModelIds.has(model.id),
+            recommended: model.id === catalog.defaultModelId,
+          })),
+          defaultModelId: catalog.defaultModelId,
+          catalogSource: 'live',
+        };
+      }
+    } catch {
+      // Recent history remains a safe fallback when live ACP discovery is temporarily unavailable.
+    }
+    return {
+      ...historyOptions,
+      models: historyOptions.models.map((model) => ({
+        ...model,
+        recent: true,
+        recommended: false,
+      })),
+      defaultModelId: null,
+      catalogSource: 'recent',
+    };
   }
 
   async createSession(cwd: string, modelId: string | null, text: string): Promise<string> {

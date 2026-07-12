@@ -274,7 +274,16 @@ describe('authenticated mobile Computer Bridge client', () => {
 
     await expect(getComputerCreateOptions(BRIDGE_ID)).resolves.toEqual({
       workspaces: [{ id: workspaceId, name: 'DevinX' }],
-      models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
+      models: [
+        {
+          id: 'gpt-5-6-sol-medium',
+          name: 'GPT 5.6 Sol Medium',
+          recent: false,
+          recommended: false,
+        },
+      ],
+      defaultModelId: null,
+      catalogSource: 'recent',
     });
     await expect(
       createComputerSession(BRIDGE_ID, {
