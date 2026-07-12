@@ -14,6 +14,12 @@ Run every fixture through:
 
 Capture for each run: device model, OS/build, release build identifier, engine/version/model, cold or warm run, audio duration, finalization latency, peak resident memory from Xcode Instruments, transcript, interruption result, and whether audio/model files remain after completion. Repeat each fixture three times and report the median.
 
+`SpeechAnalyzerBenchmark.swift` is a dependency-free file-transcription harness for Apple’s new API. `run-speech-analyzer-smoke.sh` compiles it with the active Xcode toolchain, generates synthetic macOS `say` audio, and writes smoke-test artifacts only to `$TMPDIR/devinx-voice-benchmark`. Those synthetic/Mac results validate the harness but are not the required natural-voice iPhone benchmark.
+
+`build-ios-speech-analyzer-app.sh simulator` creates an ad-hoc simulator bundle. `build-ios-speech-analyzer-app.sh device` creates a development-signed bundle using Mark’s existing wildcard development profile; it does not touch the DevinX app or provisioning profile. The device bundle writes result JSON into its own Documents container so `devicectl` can retrieve it after a run.
+
+When the paired phone is online and unlocked, `run-ios-device-benchmark.sh` builds, installs, executes every fixture with hints off/on, retrieves the private result container, and runs the same WER scorer. Set `AUDIO_DIR=/path/to/natural-recordings` to use matching `01-auth-refactor.wav` (or `.aiff`/`.m4a`) files; without it, the script uses synthetic audio only as a smoke check. Set `DEVICE` if the phone is not named `Marky`.
+
 ## Score a transcript
 
 Requires only the repository's existing Node runtime:

@@ -153,6 +153,18 @@ The fixtures, protocol, and dependency-free scorer live in `/spikes/voice/`. The
 | `whisper.rn` + `base.en` q5_1 | off/on | pending | pending | pending | pending | pending | pending | pending | pending |
 | WhisperKit + selected comparable model | off/on | pending | pending | pending | pending | pending | pending | pending | pending |
 
+### 8.1 Harness preflight completed July 12, 2026
+
+This is smoke evidence only and does not replace the table above:
+
+- Toolchain: macOS 26.5.1, Xcode 26.6, iPhoneOS SDK 26.5.
+- The dependency-free SpeechAnalyzer harness compiles and runs on macOS, type-checks against the physical iPhoneOS target, builds as an iOS app, and is development-signed with Mark’s existing wildcard profile. It is isolated under `/spikes/voice/` and does not modify DevinX.
+- The iPhone 17 simulator installs and launches the bundle but reports `SpeechTranscriber.isAvailable == false`; simulator performance/availability is therefore not usable as device evidence.
+- The paired physical device discovered by Xcode is `Marky`, an iPhone 16 Pro on iOS 26.5.2. It was offline during this run, so installation and hardware measurements were not possible.
+- On the Mac, all five synthetic `say` fixtures completed both with and without contextual strings. Overall WER by fixture was 6.78%, 11.40%, 11.71%, 13.64%, and 15.65% (median 11.71%). Hints produced identical transcripts in this synthetic smoke run. Median file-analysis time was 0.93 seconds, median file RTF was 0.0226, and maximum observed resident size was 21.5 MB.
+
+These values prove the harness and scoring pipeline, not mobile product quality: the voice is synthetic, the hardware is a Mac, every condition ran once, and file transcription can run faster than live capture. The decision remains blocked until natural recordings run three times per condition on the physical phone.
+
 Acceptance floors:
 
 - real-time factor ≤1.0 and streaming UI remains 60fps;
