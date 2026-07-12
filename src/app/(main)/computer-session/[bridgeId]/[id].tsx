@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   useComputerSessionAccess,
@@ -131,6 +131,7 @@ export default function ComputerSessionDetailScreen() {
   const continuationPending = singleParameter(parameters.continuing) === '1';
   const router = useRouter();
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const { computers } = useConnections();
   const [companionActive, setCompanionActive] = useState(false);
   const [draft, setDraft] = useState('');
@@ -415,40 +416,49 @@ export default function ComputerSessionDetailScreen() {
           </ScrollView>
         )}
         {canPrompt && mayReadContent && query.data && (
-          <View className="border-t border-border-subtle bg-canvas px-4 py-3">
+          <View
+            className="bg-canvas px-4 pt-2"
+            style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
+          >
             {prompt.error && (
               <Text className="mb-2 text-failed text-text12">
                 The message could not be sent. Confirm steering is enabled on the Mac.
               </Text>
             )}
-            <View className="flex-row items-end rounded-card border border-border bg-surface1 px-3 py-2">
+            <View
+              className="rounded-card border border-border bg-surface1 px-3 pt-3 pb-2"
+              testID="computer-session-composer"
+            >
               <TextInput
-                className="max-h-28 flex-1 px-1 py-2 text-text-hi text-text14"
+                className="min-h-[56px] max-h-28 px-1 text-text-hi text-text14"
                 value={draft}
                 onChangeText={(value) => setDraft(value.slice(0, 100_000))}
                 placeholder="Send a message to this Devin session…"
                 placeholderTextColor={tokens.textLow.hex}
                 multiline
+                textAlignVertical="top"
                 editable={!prompt.isPending && !steeringActive}
                 accessibilityLabel="Computer session message"
               />
-              <Pressable
-                className={`ml-2 h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive ? 'bg-brand' : 'bg-tint-secondary'}`}
-                onPress={sendPrompt}
-                disabled={!draft.trim() || prompt.isPending || steeringActive}
-                accessibilityRole="button"
-                accessibilityLabel="Send computer session message"
-              >
-                {prompt.isPending ? (
-                  <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
-                ) : (
-                  <Ionicons
-                    name="arrow-up"
-                    size={19}
-                    color={draft.trim() ? tokens.textAlwaysWhite.hex : tokens.textLow.hex}
-                  />
-                )}
-              </Pressable>
+              <View className="mt-1 flex-row justify-end">
+                <Pressable
+                  className={`h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive ? 'bg-brand' : 'bg-tint-secondary'}`}
+                  onPress={sendPrompt}
+                  disabled={!draft.trim() || prompt.isPending || steeringActive}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send computer session message"
+                >
+                  {prompt.isPending ? (
+                    <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+                  ) : (
+                    <Ionicons
+                      name="arrow-up"
+                      size={19}
+                      color={draft.trim() ? tokens.textAlwaysWhite.hex : tokens.textLow.hex}
+                    />
+                  )}
+                </Pressable>
+              </View>
             </View>
           </View>
         )}

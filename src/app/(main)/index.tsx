@@ -525,7 +525,7 @@ export default function HomeScreen() {
           </Text>
           <View className="rounded-cardLg border border-border bg-surface1">
             <TextInput
-              className="text-text-hi text-text16 px-5 pt-5 pb-3 min-h-[112px]"
+              className="min-h-[84px] max-h-40 px-5 pt-4 pb-2 text-text-hi text-text16"
               value={prompt}
               onChangeText={(v) => setPrompt(v.slice(0, MAX_PROMPT))}
               editable={canUseComposer}

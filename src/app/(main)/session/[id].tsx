@@ -383,12 +383,12 @@ export default function SessionDetailScreen() {
           {tab === 'insights' && <InsightsTab sessionId={validId} />}
         </View>
 
-        {/* Message steering bar — any non-terminal session (sleeping resumes).
-            Bottom inset clears the iOS home indicator without sitting too low. */}
+        {/* Message steering composer — any non-terminal session (sleeping resumes).
+            It floats above the home indicator instead of becoming a bottom shelf. */}
         {canSend && (
           <View
-            className="px-3 pt-2 border-t border-border-subtle bg-canvas"
-            style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+            className="bg-canvas px-4 pt-2"
+            style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
           >
             {session.status === 'suspended' && (
               <Text className="text-text-low text-text12 px-1 pb-1.5">
@@ -436,51 +436,58 @@ export default function SessionDetailScreen() {
                 ))}
               </View>
             )}
-            <View className="flex-row items-end bg-surface1 rounded-2xl border border-border px-2 py-2">
-              <Pressable
-                className="w-8 h-8 rounded-full items-center justify-center mr-1"
-                onPress={() => setShowAttachmentPicker(true)}
-                disabled={uploadAttachment.isPending}
-                accessibilityRole="button"
-                accessibilityLabel="Add attachment"
-              >
-                {uploadAttachment.isPending ? (
-                  <ActivityIndicator size="small" color={tokens.brandText.hex} />
-                ) : (
-                  <Ionicons name="add" size={20} color={tokens.textMid.hex} />
-                )}
-              </Pressable>
+            <View
+              className="rounded-card border border-border bg-surface1 px-3 pt-3 pb-2"
+              testID="cloud-session-composer"
+            >
               <TextInput
-                className="flex-1 text-text14 text-text-hi max-h-24 py-1"
+                className="min-h-[56px] max-h-28 px-1 text-text-hi text-text14"
                 value={messageText}
                 onChangeText={setMessageText}
                 placeholder="Ask Devin to build features, fix bugs, or work on your code"
                 placeholderTextColor={tokens.textLow.hex}
                 multiline
+                textAlignVertical="top"
+                accessibilityLabel="Cloud session message"
               />
-              <Pressable
-                className={`w-8 h-8 rounded-full items-center justify-center ml-2 ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
-                disabled={
-                  !messageText.trim() || sendMessage.isPending || uploadAttachment.isPending
-                }
-                onPress={handleSend}
-                accessibilityRole="button"
-                accessibilityLabel="Send message"
-              >
-                {sendMessage.isPending ? (
-                  <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
-                ) : (
-                  <Ionicons
-                    name="arrow-up"
-                    size={17}
-                    color={
-                      messageText.trim() && !uploadAttachment.isPending
-                        ? tokens.textAlwaysWhite.hex
-                        : tokens.textLow.hex
-                    }
-                  />
-                )}
-              </Pressable>
+              <View className="mt-1 flex-row items-center justify-between">
+                <Pressable
+                  className="h-9 w-9 items-center justify-center rounded-full"
+                  onPress={() => setShowAttachmentPicker(true)}
+                  disabled={uploadAttachment.isPending}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add attachment"
+                >
+                  {uploadAttachment.isPending ? (
+                    <ActivityIndicator size="small" color={tokens.brandText.hex} />
+                  ) : (
+                    <Ionicons name="add" size={22} color={tokens.textMid.hex} />
+                  )}
+                </Pressable>
+                <Pressable
+                  className={`h-10 w-10 items-center justify-center rounded-full ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
+                  disabled={
+                    !messageText.trim() || sendMessage.isPending || uploadAttachment.isPending
+                  }
+                  onPress={handleSend}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send message"
+                >
+                  {sendMessage.isPending ? (
+                    <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+                  ) : (
+                    <Ionicons
+                      name="arrow-up"
+                      size={19}
+                      color={
+                        messageText.trim() && !uploadAttachment.isPending
+                          ? tokens.textAlwaysWhite.hex
+                          : tokens.textLow.hex
+                      }
+                    />
+                  )}
+                </Pressable>
+              </View>
             </View>
             <View className="flex-row items-center px-1 pt-2">
               <View className="flex-row items-center mr-4">

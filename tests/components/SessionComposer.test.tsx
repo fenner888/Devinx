@@ -120,13 +120,15 @@ describe('active session composer', () => {
   });
 
   it('shows cloud and repository context', async () => {
-    const { getByText, getByLabelText } = render(
+    const { getByText, getByLabelText, getByTestId } = render(
       <ThemeProvider>
         <SessionDetailScreen />
       </ThemeProvider>,
     );
 
     expect(getByText('Devin Cloud')).toBeTruthy();
+    expect(getByTestId('cloud-session-composer').props.className).toContain('rounded-card');
+    expect(getByLabelText('Cloud session message').props.textAlignVertical).toBe('top');
     await waitFor(() => expect(getByLabelText('Repository: fenner888/Devinx')).toBeTruthy());
     expect(getByLabelText('Session mode: Fast')).toBeTruthy();
   });

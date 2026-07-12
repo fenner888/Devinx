@@ -20,6 +20,11 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: () => null,
 }));
 
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  useSafeAreaInsets: jest.fn(() => ({ top: 0, right: 0, bottom: 0, left: 0 })),
+}));
+
 jest.mock('../../src/api/bridge/queries', () => ({
   useComputerSessionAccess: () => ({
     data: {
@@ -96,6 +101,10 @@ describe('Computer session detail', () => {
     const screen = render(<ComputerSessionDetailScreen />);
 
     expect(screen.getByText('Steering enabled')).toBeTruthy();
+    expect(screen.getByTestId('computer-session-composer').props.className).toContain(
+      'rounded-card',
+    );
+    expect(screen.getByLabelText('Computer session message').props.textAlignVertical).toBe('top');
     fireEvent.changeText(screen.getByLabelText('Computer session message'), 'Continue the task.');
     fireEvent.press(screen.getByLabelText('Send computer session message'));
 

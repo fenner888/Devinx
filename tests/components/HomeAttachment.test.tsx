@@ -138,7 +138,7 @@ describe('home attachment control', () => {
   });
 
   it('uses Devin as the prominent home-screen visual anchor', () => {
-    const { getByText, queryByText } = render(
+    const { getByText, getByLabelText, queryByText } = render(
       <ThemeProvider>
         <HomeScreen />
       </ThemeProvider>,
@@ -146,6 +146,7 @@ describe('home attachment control', () => {
 
     expect(getByText('Devin is ready to build')).toBeTruthy();
     expect(getByText('What should Devin build?')).toBeTruthy();
+    expect(getByLabelText('Session prompt').props.className).toContain('min-h-[84px]');
     expect(
       queryByText('Describe a task — it runs in the cloud and you can steer it here.'),
     ).toBeNull();
