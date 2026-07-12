@@ -47,7 +47,7 @@ Default pairing grants `session:metadata:read`, not `session:content:read`. The 
 
 The row says **Session title hidden** when the bridge reports title presence without title content. A title is rendered only if a future explicit content grant causes the validated bridge response to include it. Raw ACP session IDs, full paths, extra directories, `_meta`, and unknown fields never reach the component.
 
-Computer-only Home disables the Cloud composer and explains that a new local task starts from Devin CLI or desktop. Cloud + Computer mode keeps the Cloud composer and combines recent items with explicit Mac-origin rows. The full Sessions screen searches Mac name, workspace, and an authorized title; Cloud tag filters do not pretend that local sessions have Cloud tags.
+Computer-only Home disables the Cloud composer and explains that a new local task starts from Devin CLI or desktop. In Cloud + Computer mode, Home Recent follows the active composer destination: Cloud shows Cloud sessions and Computer shows sessions from the selected Mac. The full Sessions screen remains the combined cross-origin view and searches Mac name, workspace, and an authorized title; Cloud tag filters do not pretend that local sessions have Cloud tags. Spec 032 supersedes the earlier merged Home Recent behavior.
 
 Local rows are intentionally not tappable in this phase. Opening one before `session.load` has a separately authorized, minimized, tested handler would create a misleading or insecure interaction.
 

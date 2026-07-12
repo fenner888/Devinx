@@ -184,22 +184,34 @@ export default function HomeScreen() {
   );
 
   const recent = useMemo<RecentSession[]>(() => {
-    const cloudItems: RecentSession[] = (usesCloud ? (sessions ?? []) : []).map((session) => ({
-      kind: 'cloud',
-      session,
-      updatedAt: session.updated_at * 1_000,
-    }));
-    const computerItems: RecentSession[] = (
-      usesComputer ? (computerSessions.data?.sessions ?? []) : []
-    ).map((session) => ({
-      kind: 'computer',
-      session,
-      updatedAt: session.updatedAt ? Date.parse(session.updatedAt) : 0,
-    }));
-    return [...cloudItems, ...computerItems]
+    if (destination === 'cloud') {
+      return (usesCloud ? (sessions ?? []) : [])
+        .map<RecentSession>((session) => ({
+          kind: 'cloud',
+          session,
+          updatedAt: session.updated_at * 1_000,
+        }))
+        .sort((left, right) => right.updatedAt - left.updatedAt)
+        .slice(0, 5);
+    }
+
+    return (usesComputer ? (computerSessions.data?.sessions ?? []) : [])
+      .filter((session) => session.bridgeId === computer?.bridgeId)
+      .map<RecentSession>((session) => ({
+        kind: 'computer',
+        session,
+        updatedAt: session.updatedAt ? Date.parse(session.updatedAt) : 0,
+      }))
       .sort((left, right) => right.updatedAt - left.updatedAt)
       .slice(0, 5);
-  }, [computerSessions.data?.sessions, sessions, usesCloud, usesComputer]);
+  }, [
+    computer?.bridgeId,
+    computerSessions.data?.sessions,
+    destination,
+    sessions,
+    usesCloud,
+    usesComputer,
+  ]);
   const selectedPlaybookTitle = selectedPlaybook
     ? (playbooks?.find((p) => p.playbook_id === selectedPlaybook)?.title ?? 'Playbook')
     : null;

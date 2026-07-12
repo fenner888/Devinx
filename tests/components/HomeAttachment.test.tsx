@@ -244,6 +244,84 @@ describe('home attachment control', () => {
     expect(computerScreen.queryByText('Hidden Cloud session')).toBeNull();
   });
 
+  it('scopes Home Recent to the active Cloud or selected-computer destination', () => {
+    mockConnection = {
+      mode: 'both',
+      hasCloudConnection: true,
+      usesCloud: true,
+      computers: [
+        { bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' },
+        { bridgeId: 'bridge_0987654321', computerName: 'Other Mac' },
+      ],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      models: [],
+    };
+    mockCloudSessions = [
+      {
+        session_id: 'devin-cloud-recent',
+        title: 'Cloud recent session',
+        status: 'running',
+        status_detail: 'working',
+        updated_at: 10,
+        pull_requests: [],
+      },
+    ];
+    mockComputerBoard = {
+      sessions: [
+        {
+          id: `local_${'L'.repeat(43)}`,
+          origin: 'computer',
+          title: 'Studio Mac recent session',
+          hasTitle: true,
+          canLoad: true,
+          workspaceName: 'DevinX',
+          bridgeId: 'bridge_1234567890',
+          computerName: 'Studio Mac',
+          updatedAt: '2026-07-12T12:00:00.000Z',
+        },
+        {
+          id: `local_${'M'.repeat(43)}`,
+          origin: 'computer',
+          title: 'Other Mac recent session',
+          hasTitle: true,
+          canLoad: true,
+          workspaceName: 'Other',
+          bridgeId: 'bridge_0987654321',
+          computerName: 'Other Mac',
+          updatedAt: '2026-07-12T13:00:00.000Z',
+        },
+      ],
+      computers: [
+        { bridgeId: 'bridge_1234567890', computerName: 'Studio Mac', state: 'ready' },
+        { bridgeId: 'bridge_0987654321', computerName: 'Other Mac', state: 'ready' },
+      ],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText('Cloud recent session')).toBeTruthy();
+    expect(screen.queryByText('Studio Mac recent session')).toBeNull();
+    expect(screen.queryByText('Other Mac recent session')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Session destination: Devin Cloud'));
+    fireEvent.press(screen.getByLabelText('Use Studio Mac'));
+
+    expect(screen.getByText('Studio Mac recent session')).toBeTruthy();
+    expect(screen.queryByText('Cloud recent session')).toBeNull();
+    expect(screen.queryByText('Other Mac recent session')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Session destination: Studio Mac'));
+    fireEvent.press(screen.getByLabelText('Use Devin Cloud'));
+
+    expect(screen.getByText('Cloud recent session')).toBeTruthy();
+    expect(screen.queryByText('Studio Mac recent session')).toBeNull();
+  });
+
   it('opens attachment sources without opening the execution mode picker', () => {
     const { getByLabelText, queryByText } = render(
       <ThemeProvider>
