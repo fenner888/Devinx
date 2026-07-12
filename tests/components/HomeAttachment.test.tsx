@@ -277,7 +277,7 @@ describe('home attachment control', () => {
     expect(screen.queryByLabelText('Select playbook')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Model: Default'));
-    fireEvent.press(screen.getByLabelText('Use model GPT 5.6 Sol Medium'));
+    fireEvent.press(screen.getByLabelText('Use model family GPT 5.6 Sol'));
     fireEvent.changeText(screen.getByLabelText('Session prompt'), 'Build the local feature');
     fireEvent.press(screen.getByLabelText('Start session'));
 
@@ -286,6 +286,50 @@ describe('home attachment control', () => {
         workspaceId: `workspace_${'W'.repeat(43)}`,
         modelId: 'gpt-5-6-sol-medium',
         text: 'Build the local feature',
+      },
+      expect.any(Object),
+    );
+  });
+
+  it('submits the exact local model variant selected through reasoning and speed', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      defaultModelId: 'adaptive',
+      catalogSource: 'live',
+      models: [
+        { id: 'adaptive', name: 'Adaptive', recommended: true },
+        { id: 'gpt-low', name: 'GPT-5.6 Sol Low Thinking', recent: true },
+        { id: 'gpt-high', name: 'GPT-5.6 Sol High Thinking' },
+      ],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Model: Adaptive'));
+    fireEvent.press(screen.getByLabelText('Use model family GPT-5.6 Sol'));
+    expect(screen.getByLabelText('Reasoning and speed: Low')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Reasoning and speed: Low'));
+    fireEvent.press(screen.getByLabelText('Use High for GPT-5.6 Sol'));
+    expect(screen.getByLabelText('Reasoning and speed: High')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByLabelText('Session prompt'), 'Use the exact model');
+    fireEvent.press(screen.getByLabelText('Start session'));
+
+    expect(mockCreateComputerSession).toHaveBeenCalledWith(
+      {
+        workspaceId: `workspace_${'W'.repeat(43)}`,
+        modelId: 'gpt-high',
+        text: 'Use the exact model',
       },
       expect.any(Object),
     );
@@ -356,14 +400,14 @@ describe('home attachment control', () => {
     expect(screen.getByText('Recommended')).toBeTruthy();
     expect(screen.getByText('Recent')).toBeTruthy();
     expect(screen.getByText('All Models')).toBeTruthy();
-    expect(screen.getByLabelText('Use recommended model Adaptive')).toBeTruthy();
-    expect(screen.getByLabelText('Use model DeepSeek V4 Pro, New')).toBeTruthy();
+    expect(screen.getByLabelText('Use model family Adaptive')).toBeTruthy();
+    expect(screen.getByLabelText('Use model family DeepSeek V4 Pro, New')).toBeTruthy();
     expect(screen.getByText('New')).toBeTruthy();
 
     fireEvent.changeText(screen.getByLabelText('Search local models'), 'deepseek');
     expect(screen.getByText('Results')).toBeTruthy();
-    expect(screen.queryByLabelText('Use model GPT Recent')).toBeNull();
-    fireEvent.press(screen.getByLabelText('Use model DeepSeek V4 Pro, New'));
+    expect(screen.queryByLabelText('Use model family GPT Recent')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Use model family DeepSeek V4 Pro, New'));
     expect(screen.getByLabelText('Model: DeepSeek V4 Pro')).toBeTruthy();
   });
 

@@ -18,6 +18,13 @@ The picker follows the current Devin interaction pattern:
 - trusted `New` or promotion badges render only when Devin supplies an explicit supported metadata
   value. DevinX never guesses or hardcodes time-sensitive promotions.
 
+When ACP exposes several exact IDs for one model family, DevinX may present those IDs as two
+controls: model family and reasoning/speed variant. Presentation grouping is derived only from the
+agent-provided display names using a bounded, tested suffix grammar (`None`, `Low`, `Medium`,
+`High`, `XHigh`, `Max`, `Minimal`, `Thinking`, `Fast`, `Lightning`, and `1M`). Unknown names remain
+standalone families and therefore cannot be misrouted. Every visible variant retains its exact ACP
+ID; DevinX never synthesizes an ID or submits a family label to the Connector.
+
 Cloud and Computer remain separate contracts. The public Cloud API currently exposes Devin mode,
 not arbitrary model IDs, so the Cloud composer must not claim model selection parity that the API
 cannot enforce.
@@ -67,6 +74,7 @@ it, so stale catalogs fail closed.
 - Bridge tests cover recent/live merging, bounded responses, stale-model rejection, and metadata
   minimization.
 - Mobile tests cover Recommended, Recent, All Models, search, deduplication, badges, dismissal,
-  accessibility labels, and selected-model behavior.
+  accessibility labels, model-family grouping, reasoning/speed selection, exact-ID resolution, and
+  selected-model behavior.
 - Physical QA confirms the list matches the installed Devin CLI and that a model absent from prior
   history can create and run a session over Tailscale.

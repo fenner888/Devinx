@@ -50,6 +50,12 @@ import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
 import { connectionModeUsesComputer } from '@lib/connections';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
 import {
+  familyForModelId,
+  groupComputerModels,
+  preferredFamilyVariant,
+  type ComputerModelFamily,
+} from '@lib/computer-model-catalog';
+import {
   deriveStatusKey,
   statusColorClass,
   statusLabel,
@@ -116,6 +122,7 @@ export default function HomeScreen() {
   const [showDestinationPicker, setShowDestinationPicker] = useState(false);
   const [showWorkspacePicker, setShowWorkspacePicker] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showModelVariantPicker, setShowModelVariantPicker] = useState(false);
   const [modelQuery, setModelQuery] = useState('');
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -191,22 +198,35 @@ export default function HomeScreen() {
   const selectedWorkspace = localOptions.data?.workspaces.find(
     (workspace) => workspace.id === selectedWorkspaceId,
   );
-  const localModels = localOptions.data?.models ?? [];
-  const recommendedModel = localModels.find((model) => model.recommended);
-  const selectedModel = selectedModelId
-    ? localModels.find((model) => model.id === selectedModelId)
-    : recommendedModel;
-  const recentModels = localModels.filter(
-    (model) => model.recent && model.id !== recommendedModel?.id,
+  const localModels = useMemo(() => localOptions.data?.models ?? [], [localOptions.data?.models]);
+  const modelFamilies = useMemo(() => groupComputerModels(localModels), [localModels]);
+  const selectedFamily = familyForModelId(
+    modelFamilies,
+    selectedModelId ?? localOptions.data?.defaultModelId,
   );
-  const otherModels = localModels.filter(
-    (model) => !model.recent && model.id !== recommendedModel?.id,
+  const selectedVariant = selectedFamily
+    ? preferredFamilyVariant(
+        selectedFamily,
+        selectedModelId ?? localOptions.data?.defaultModelId,
+      )
+    : undefined;
+  const recommendedFamily = modelFamilies.find((family) => family.recommended);
+  const recentModelFamilies = modelFamilies.filter(
+    (family) => family.recent && family.key !== recommendedFamily?.key,
+  );
+  const otherModelFamilies = modelFamilies.filter(
+    (family) => !family.recent && family.key !== recommendedFamily?.key,
   );
   const normalizedModelQuery = modelQuery.trim().toLowerCase();
-  const searchedModels = localModels.filter(
-    (model) =>
-      model.name.toLowerCase().includes(normalizedModelQuery) ||
-      model.description?.toLowerCase().includes(normalizedModelQuery),
+  const searchedModelFamilies = modelFamilies.filter(
+    (family) =>
+      family.name.toLowerCase().includes(normalizedModelQuery) ||
+      family.description?.toLowerCase().includes(normalizedModelQuery) ||
+      family.variants.some(
+        (variant) =>
+          variant.label.toLowerCase().includes(normalizedModelQuery) ||
+          variant.model.name.toLowerCase().includes(normalizedModelQuery),
+      ),
   );
   const canCreateComputerSession = Boolean(
     computer && selectedWorkspaceId && !localOptions.isLoading && !localOptions.error,
@@ -274,23 +294,21 @@ export default function HomeScreen() {
     setShowModelPicker(true);
   }
 
-  function modelOptionRow(
-    modelOption: (typeof localModels)[number],
-    options: { useDefault?: boolean } = {},
-  ) {
-    const useDefault = options.useDefault === true;
-    const selected = useDefault ? selectedModelId === null : modelOption.id === selectedModelId;
-    const badgeLabel = modelOption.badge === 'free_promo' ? 'Free promo' : modelOption.badge === 'new' ? 'New' : null;
+  function modelFamilyRow(family: ComputerModelFamily<(typeof localModels)[number]>) {
+    const selected = family.key === selectedFamily?.key;
+    const badgeLabel =
+      family.badge === 'free_promo' ? 'Free promo' : family.badge === 'new' ? 'New' : null;
     return (
       <Pressable
-        key={useDefault ? `default-${modelOption.id}` : modelOption.id}
+        key={family.key}
         className="min-h-14 flex-row items-center px-2 py-2.5"
         onPress={() => {
-          setSelectedModelId(useDefault ? null : modelOption.id);
+          const variant = preferredFamilyVariant(family, selectedModelId);
+          setSelectedModelId(variant.model.recommended ? null : variant.model.id);
           setShowModelPicker(false);
         }}
         accessibilityRole="button"
-        accessibilityLabel={`${useDefault ? 'Use recommended model' : 'Use model'} ${modelOption.name}${badgeLabel ? `, ${badgeLabel}` : ''}`}
+        accessibilityLabel={`Use model family ${family.name}${badgeLabel ? `, ${badgeLabel}` : ''}`}
       >
         <View className="w-8 items-start">
           {selected && <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />}
@@ -298,27 +316,27 @@ export default function HomeScreen() {
         <View className="flex-1 pr-2">
           <View className="flex-row items-center">
             <Text className="shrink text-text-hi text-text16" numberOfLines={1}>
-              {modelOption.name}
+              {family.name}
             </Text>
             {badgeLabel && (
               <View
-                className={`ml-2 rounded-chip px-2 py-0.5 ${modelOption.badge === 'free_promo' ? 'bg-tint-green' : 'bg-tint-blue'}`}
+                className={`ml-2 rounded-chip px-2 py-0.5 ${family.badge === 'free_promo' ? 'bg-tint-green' : 'bg-tint-blue'}`}
               >
                 <Text
-                  className={`text-text11 font-medium ${modelOption.badge === 'free_promo' ? 'text-finished' : 'text-brand-text'}`}
+                  className={`text-text11 font-medium ${family.badge === 'free_promo' ? 'text-finished' : 'text-brand-text'}`}
                 >
                   {badgeLabel}
                 </Text>
               </View>
             )}
           </View>
-          {modelOption.description && (
+          {family.description && (
             <Text className="mt-0.5 text-text-low text-text12" numberOfLines={2}>
-              {modelOption.description}
+              {family.description}
             </Text>
           )}
         </View>
-        {modelOption.supportsImages && (
+        {family.variants.some((variant) => variant.model.supportsImages) && (
           <Ionicons name="image-outline" size={15} color={tokens.textLow.hex} />
         )}
       </Pressable>
@@ -565,18 +583,34 @@ export default function HomeScreen() {
                   )}
                 </Pressable>
                 {isComputerDestination ? (
-                  <Pressable
-                    className="flex-row items-center rounded-full px-3 py-2"
-                    onPress={() => openLocalPicker('model')}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Model: ${selectedModel?.name ?? 'Default'}`}
-                  >
-                    <Ionicons name="hardware-chip-outline" size={15} color={tokens.textMid.hex} />
-                    <Text className="text-text-mid text-text13 ml-1.5 max-w-36" numberOfLines={1}>
-                      {selectedModel?.name ?? 'Default model'}
-                    </Text>
-                    <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
-                  </Pressable>
+                  <>
+                    <Pressable
+                      className="flex-row items-center rounded-full px-3 py-2"
+                      onPress={() => openLocalPicker('model')}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Model: ${selectedFamily?.name ?? 'Default'}`}
+                    >
+                      <Ionicons name="hardware-chip-outline" size={15} color={tokens.textMid.hex} />
+                      <Text className="text-text-mid text-text13 ml-1.5 max-w-28" numberOfLines={1}>
+                        {selectedFamily?.name ?? 'Default model'}
+                      </Text>
+                      <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
+                    </Pressable>
+                    {selectedFamily && selectedFamily.variants.length > 1 && selectedVariant && (
+                      <Pressable
+                        className="flex-row items-center rounded-full px-2 py-2"
+                        onPress={() => setShowModelVariantPicker(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Reasoning and speed: ${selectedVariant.label}`}
+                      >
+                        <Ionicons name="sparkles-outline" size={14} color={tokens.textMid.hex} />
+                        <Text className="ml-1.5 max-w-20 text-text-mid text-text13" numberOfLines={1}>
+                          {selectedVariant.label}
+                        </Text>
+                        <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
+                      </Pressable>
+                    )}
+                  </>
                 ) : (
                   <>
                     <Pressable
@@ -1137,10 +1171,8 @@ export default function HomeScreen() {
                   <Text className="px-10 pb-2 pt-1 text-text-low text-text13 font-medium">
                     Results
                   </Text>
-                  {searchedModels.length > 0 ? (
-                    searchedModels.map((modelOption) =>
-                      modelOptionRow(modelOption, { useDefault: modelOption.recommended }),
-                    )
+                  {searchedModelFamilies.length > 0 ? (
+                    searchedModelFamilies.map((family) => modelFamilyRow(family))
                   ) : (
                     <Text className="px-10 py-5 text-text-low text-text14">
                       No matching models
@@ -1152,8 +1184,8 @@ export default function HomeScreen() {
                   <Text className="px-10 pb-2 pt-1 text-text-low text-text13 font-medium">
                     Recommended
                   </Text>
-                  {recommendedModel ? (
-                    modelOptionRow(recommendedModel, { useDefault: true })
+                  {recommendedFamily ? (
+                    modelFamilyRow(recommendedFamily)
                   ) : (
                     <Pressable
                       className="min-h-14 flex-row items-center px-2 py-3"
@@ -1177,22 +1209,22 @@ export default function HomeScreen() {
                       </View>
                     </Pressable>
                   )}
-                  {recentModels.length > 0 && (
+                  {recentModelFamilies.length > 0 && (
                     <>
                       <View className="my-2 h-px bg-border-subtle" />
                       <Text className="px-10 pb-2 pt-2 text-text-low text-text13 font-medium">
                         Recent
                       </Text>
-                      {recentModels.map((modelOption) => modelOptionRow(modelOption))}
+                      {recentModelFamilies.map((family) => modelFamilyRow(family))}
                     </>
                   )}
-                  {otherModels.length > 0 && (
+                  {otherModelFamilies.length > 0 && (
                     <>
                       <View className="my-2 h-px bg-border-subtle" />
                       <Text className="px-10 pb-2 pt-2 text-text-low text-text13 font-medium">
                         All Models
                       </Text>
-                      {otherModels.map((modelOption) => modelOptionRow(modelOption))}
+                      {otherModelFamilies.map((family) => modelFamilyRow(family))}
                     </>
                   )}
                   {localOptions.data?.catalogSource === 'recent' && (
@@ -1202,6 +1234,74 @@ export default function HomeScreen() {
                   )}
                 </>
               )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        statusBarTranslucent
+        visible={showModelVariantPicker}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowModelVariantPicker(false)}
+      >
+        <View className="flex-1 items-center justify-center px-8">
+          <Pressable
+            className="absolute inset-0 bg-scrim"
+            onPress={() => setShowModelVariantPicker(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close reasoning and speed picker"
+          />
+          <View
+            className="w-full max-w-96 overflow-hidden rounded-sheet border border-border bg-surface2 px-5 py-4 shadow-2xl"
+            style={{ maxHeight: Math.min(height * 0.7, 540) }}
+            accessibilityViewIsModal
+          >
+            <View className="mb-3 flex-row items-center justify-between">
+              <View className="flex-1 pr-3">
+                <Text className="text-text-low text-text14 font-medium">Reasoning &amp; speed</Text>
+                {selectedFamily && (
+                  <Text className="mt-0.5 text-text-hi text-text16" numberOfLines={1}>
+                    {selectedFamily.name}
+                  </Text>
+                )}
+              </View>
+              <Pressable
+                className="h-9 w-9 items-center justify-center rounded-full"
+                onPress={() => setShowModelVariantPicker(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close reasoning and speed menu"
+              >
+                <Ionicons name="close" size={18} color={tokens.textLow.hex} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {selectedFamily?.variants.map((variant) => {
+                const selected = variant.model.id === selectedVariant?.model.id;
+                return (
+                  <Pressable
+                    key={variant.model.id}
+                    className="min-h-14 flex-row items-center px-2 py-3"
+                    onPress={() => {
+                      setSelectedModelId(variant.model.recommended ? null : variant.model.id);
+                      setShowModelVariantPicker(false);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Use ${variant.label} for ${selectedFamily.name}`}
+                  >
+                    <View className="w-8 items-start">
+                      {selected && (
+                        <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />
+                      )}
+                    </View>
+                    <Text className="flex-1 text-text-hi text-text16">{variant.label}</Text>
+                    {variant.model.supportsImages && (
+                      <Ionicons name="image-outline" size={15} color={tokens.textLow.hex} />
+                    )}
+                  </Pressable>
+                );
+              })}
             </ScrollView>
           </View>
         </View>
