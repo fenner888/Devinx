@@ -98,10 +98,10 @@ The results below must be refreshed after release-document changes and before a 
 
 - [ ] Install Build 34 and confirm the destination sheet remains compact and the Computer workspace sheet is inset, sectioned, bounded, dismisses without committing a draft, commits with Done, selects correctly, and shows no raw path or excessive empty space in either theme
 - [ ] In Build 34 Cloud mode, confirm the Repository picker shows the complete connected-repository count/list for the test organization, remains distinct from Computer workspaces, searches the complete result, and never presents a partial API failure as an empty or complete list
-- [ ] Install Build 31 and confirm an existing Computer session shows the current model family, reasoning/speed, Mac, and workspace; change the variant, send a harmless turn, and confirm the selected exact model is used
-- [ ] In Build 31, confirm the Home composer no longer reserves excessive empty space; confirm Cloud and Computer session composers are elevated, multiline, and remain clear of the keyboard and home indicator
-- [ ] Install Build 29 and confirm Cloud and Computer expose their distinct pickers and the Computer model menu shows the live Recommended, Recent, searchable All Models catalog
-- [ ] Select a multi-variant Computer model family, change its reasoning/speed value, create a harmless session, and confirm the exact selected variant is used
+- [ ] In Build 34, confirm an existing Computer session shows the current model family, reasoning/speed, Mac, and workspace; change the variant, send a harmless turn, and confirm the selected exact model is used
+- [ ] In Build 34, confirm the Home composer does not reserve excessive empty space; confirm Cloud and Computer session composers are elevated, multiline, and remain clear of the keyboard and home indicator
+- [ ] In Build 34, confirm Cloud and Computer expose their distinct pickers and the Computer model menu shows the live Recommended, Recent, searchable All Models catalog
+- [ ] In Build 34, select a multi-variant Computer model family, change its reasoning/speed value, create a harmless session, and confirm the exact selected variant is used
 - [x] After the phone-created turn finishes, open that session in Devin Desktop; then send a later phone turn and confirm ownership can alternate without a permanent unavailable state
 - [ ] Enable `Create new sessions` for the iPhone in Connector and create a harmless Computer session with an approved workspace and selected model
 - [ ] Confirm the selected model appears on the new local session and the initial prompt receives a reply
