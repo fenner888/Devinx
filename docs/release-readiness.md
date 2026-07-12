@@ -39,6 +39,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (29)` was built locally from clean commit `0131a19` after the free EAS iOS quota rejected the remote job; it contains the live ACP catalog grouped into 30 model families with a separate reasoning/speed control that preserves all 143 exact model IDs
 - [x] Build 29 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (29)`, `NSFileProtectionComplete`); 10 privacy manifests and no APS entitlement remain; SHA-256 `de28a1103ade24d345ef3233f8d9b344e710ba1f256045644325d7a54277bd44`
 - [x] Build 29 App Store Connect submission `e5492fc8-656f-4797-9bcf-5cc096fc69ab` finished successfully and is processing as the live-model-family and reasoning/speed TestFlight checkpoint
+- [x] iOS `0.1.0 (30)` was built locally from clean commit `41672d7` after the free EAS iOS quota rejected the remote job; it contains the compact Home prompt area and elevated multiline Cloud and Computer session composers
+- [x] Build 30 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (30)`, `NSFileProtectionComplete`); 10 privacy manifests and no APS entitlement remain; SHA-256 `0e445202f7328c3bae20a45d486e06eb056d94ca4290350b047d425f9e50afe4`
+- [x] Build 30 App Store Connect submission `bfbf3515-412d-4d5c-bdb9-06c29d090278` finished successfully and is processing as the session-composer layout TestFlight checkpoint
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -65,12 +68,12 @@ The results below must be refreshed after release-document changes and before a 
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
 | Jest | passed 53 suites / 424 tests with handle detection enabled on pinned Node 24.18.0; no analytics or crash-reporting SDK runtime is loaded by the test environment |
-| Production iOS export | Build 29 passed local signed export; 19.8 MB IPA, 1,737 bundled modules, 100 assets |
+| Production iOS export | Build 30 passed local signed export; 19.8 MB IPA, 1,737 bundled modules, 100 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 29 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 30 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -80,6 +83,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
+- [ ] Install Build 30 and confirm the Home composer no longer reserves excessive empty space; confirm Cloud and Computer session composers are elevated, multiline, and remain clear of the keyboard and home indicator
 - [ ] Install Build 29 and confirm Cloud and Computer expose their distinct pickers and the Computer model menu shows the live Recommended, Recent, searchable All Models catalog
 - [ ] Select a multi-variant Computer model family, change its reasoning/speed value, create a harmless session, and confirm the exact selected variant is used
 - [x] After the phone-created turn finishes, open that session in Devin Desktop; then send a later phone turn and confirm ownership can alternate without a permanent unavailable state

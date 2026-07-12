@@ -1,5 +1,8 @@
 # 028 — Session composer layout
 
+Status: implemented, automated-test validated, and uploaded in iOS Build 30;
+physical layout and keyboard verification remain
+
 ## Intent
 
 The Home composer starts a new session and may expose destination, model, mode,
