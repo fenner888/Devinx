@@ -20,23 +20,22 @@ export function VoiceMicButton({
 }) {
   const { tokens } = useTheme();
   const busy = voice.phase === 'preparing';
+  // The expanded recording row owns Stop and Cancel while the microphone is
+  // live. Hiding the compact control avoids presenting two Stop actions.
+  if (voice.isRecording) return null;
   return (
     <Pressable
-      className={`h-11 w-11 items-center justify-center rounded-full ${voice.isRecording ? 'bg-tint-blue' : ''}`}
-      onPress={voice.isRecording ? voice.stop : voice.start}
+      className="h-11 w-11 items-center justify-center rounded-full"
+      onPress={voice.start}
       disabled={disabled || voice.phase === 'stopping' || voice.phase === 'structuring'}
       accessibilityRole="button"
-      accessibilityLabel={voice.isRecording ? 'Stop dictation' : 'Start on-device dictation'}
+      accessibilityLabel="Start on-device dictation"
       accessibilityState={{ disabled: disabled || voice.phase === 'stopping', busy }}
     >
       {busy ? (
         <ActivityIndicator size="small" color={tokens.brandText.hex} />
       ) : (
-        <Ionicons
-          name={voice.isRecording ? 'stop' : 'mic-outline'}
-          size={20}
-          color={voice.isRecording ? tokens.brandText.hex : tokens.textMid.hex}
-        />
+        <Ionicons name="mic-outline" size={20} color={tokens.textMid.hex} />
       )}
     </Pressable>
   );
@@ -123,16 +122,14 @@ export function VoiceComposerStatus({ voice }: { voice: VoiceComposerController 
           onPress={voice.structure}
           disabled={voice.phase === 'structuring'}
           accessibilityRole="button"
-          accessibilityLabel="Preview structured work order"
+          accessibilityLabel="Preview organized Devin prompt"
         >
           {voice.phase === 'structuring' ? (
             <ActivityIndicator size="small" color={tokens.brandText.hex} />
           ) : (
             <Ionicons name="sparkles-outline" size={15} color={tokens.brandText.hex} />
           )}
-          <Text className="ml-2 text-brand-text text-text13 font-medium">
-            Structure into work order
-          </Text>
+          <Text className="ml-2 text-brand-text text-text13 font-medium">Organize prompt</Text>
         </Pressable>
       )}
 
@@ -176,11 +173,12 @@ export function VoiceComposerStatus({ voice }: { voice: VoiceComposerController 
           >
             <View className="mb-3 flex-row items-center justify-between">
               <View className="flex-1 pr-3">
-                <Text className="text-text-hi text-text17 font-medium">Structure preview</Text>
+                <Text className="text-text-hi text-text17 font-medium">Organized prompt preview</Text>
                 <Text className="mt-1 text-text-mid text-text12">
                   {voice.scribePreview?.kind === 'foundationModel'
                     ? 'Structured privately with Apple Intelligence on this device.'
-                    : 'Structured with DevinX’s private on-device template.'}
+                    : 'Organized with DevinX’s private on-device template.'}{' '}
+                  Nothing is sent until you approve and submit it.
                 </Text>
               </View>
               <Pressable
@@ -217,9 +215,9 @@ export function VoiceComposerStatus({ voice }: { voice: VoiceComposerController 
                 className="min-h-12 flex-1 items-center justify-center rounded-button bg-brand"
                 onPress={voice.applyStructured}
                 accessibilityRole="button"
-                accessibilityLabel="Use structured work order"
+                accessibilityLabel="Use organized prompt"
               >
-                <Text className="text-always-white text-text14 font-medium">Use structured</Text>
+                <Text className="text-always-white text-text14 font-medium">Use organized</Text>
               </Pressable>
             </View>
           </View>
