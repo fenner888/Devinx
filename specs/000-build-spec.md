@@ -60,6 +60,8 @@ Devin Teams/Enterprise users (engineers, EMs, solo builders) who run multiple as
 - **Public:** none
 - **Internal:** session titles, statuses, tags, message content (belongs to user's org; lives on device only, in memory + encrypted cache)
 - **Sensitive:** Devin API key / future PAT (Keychain only, never logged, never leaves device in v1), org ID, session secrets composer fields (never persisted)
+- **Sensitive (voice):** raw microphone audio exists only in memory or a protected temporary directory while transcription is active. It is deleted after finalization, never cached or backed up, and never leaves the device. Transcripts become ordinary prompt content and inherit every prompt-content rule in this specification. Vocabulary hints contain only non-secret cached names and a static developer vocabulary.
+- **Public artifacts:** optional on-device speech model files. They contain no user data and are excluded from iCloud backup.
 - **Regulated:** none directly; note that session content MAY contain user's proprietary code → treat all fetched content as sensitive-by-default
 
 **SECURITY FLAGS:**
@@ -334,6 +336,57 @@ When Devin needs input (question, secret request, decision), that session is pur
 - Privacy: analytics opt-in toggle (default OFF), "What data leaves your device?" explainer screen (answer in v1: "Only requests to api.devin.ai. Optionally, anonymous usage events to PostHog if you opt in. That's the whole list.").
 - About: version, disclaimer, licenses, link to Devin docs & status.
 
+### 7.8 Voice Spec (Dictation + Scribe)
+
+**Status:** approved direction, pending Session 4a findings. Session 4b MUST NOT begin until `/specs/007-voice-spec-analysis.md` is reviewed and its engine, packaging, and scribe-tier decisions are approved.
+
+Voice Spec removes the mobile prompt-authoring bottleneck without changing Devin into a voice assistant:
+
+1. **Dictation:** explicit-tap, on-device speech-to-text in both New Session and Session Detail composers. Interim text streams dimmed at the cursor and becomes normal editable text when finalized; typing and dictation mix freely and dictation never replaces the entire field.
+2. **Scribe:** an optional, user-confirmed “Structure into work order” pass for dictations of at least 15 words. It produces editable plain text with **Goal**, **Scope / repo**, **Acceptance criteria**, and **Constraints / non-goals**. It never auto-applies.
+
+#### 7.8.1 Session 4a analysis gate
+
+Evaluate `whisper.rn`, a Swift-native WhisperKit Expo module, and an app-owned Expo module using Apple SpeechAnalyzer/SpeechTranscriber. Use five 30–90 second fixtures with realistic technical vocabulary (including TypeScript, Zod, Expo Router, TanStack Query, RLS, OAuth, PR, monorepo, auth middleware, kebab-case, and `api.devin.ai`). Record technical-term word error rate, end-to-end latency, real-time factor, peak memory, supported hardware/OS, maintenance health, Expo/EAS compatibility, and interruption behavior on an iPhone 13-class device. Measure vocabulary biasing using repo, playbook, and tag names plus a capped static developer vocabulary; secret names and values are forbidden.
+
+Decide whether models are bundled or downloaded on first use. Evaluate binary/cellular impact, progress/retry UX, Settings → Storage deletion, iCloud-backup exclusion, and whether a tiny instant fallback plus an optional higher-accuracy model is justified. Do not fabricate device numbers: an unrun benchmark leaves the engine decision provisional and blocks Session 4b.
+
+Evaluate scribe in this order: Apple Foundation Models on supported iOS 26 devices; a deterministic template and filler/punctuation cleanup that ships for every device; cloud LLM scribe as a documented Phase 2 option only. Cloud STT and cloud scribe are out of v1.
+
+#### 7.8.2 Build architecture (after 4a approval only)
+
+```text
+components/VoiceInput/   -> mic button, waveform strip, scribe chip (pure UI)
+lib/voice/
+  engine.ts              -> TranscriptionEngine interface + approved implementation
+  hints.ts               -> capped, secret-safe vocabulary hint assembly
+  scribe.ts              -> ScribeEngine interface: foundationModel | template
+  models.ts              -> optional model download/manage
+```
+
+No component imports an engine implementation directly. Native modules require an EAS development/TestFlight build and are not supported in Expo Go. The first-use permission copy is: “DevinX uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded.” Permission is never requested during onboarding.
+
+#### 7.8.3 Recording UX
+
+- A mic target sits in every composer accessory row. During recording, the row expands into a `brand` waveform on `surface2`, a JetBrains Mono `textMid` timer, and cancel/stop targets of at least 44pt. The visible recording indicator remains on screen whenever the microphone is live.
+- Respect Reduce Motion with static level bars. Warn with haptics after five minutes.
+- On backgrounding, interruption, or phone call: stop recording and preserve partial transcript. Support Bluetooth/AirPods routing and design explicit no-speech, permission-denied, model-missing, download/retry, and interruption states.
+- Permission denial includes a deep link to iOS Settings. After finalization, insert at the current cursor and preserve all existing typed text.
+
+#### 7.8.4 Voice security and privacy gates
+
+1. Audio is on-device only. Add a CI test proving `lib/voice/` has no network imports and no request may contain audio bytes.
+2. Any temporary audio uses a dedicated directory with `NSFileProtectionComplete`; deletion after finalization is verified by a test asserting the directory is empty.
+3. Recording starts only from an explicit tap. No wake word, background listening, or onboarding permission request. Backgrounding stops recording and preserves text.
+4. Transcript-bearing state is excluded from logs, analytics, and diagnostics. Extend the diagnostic scrubber test before any future reporting provider is enabled.
+5. Settings → Privacy states: “Voice is transcribed on your device. Audio never leaves your phone.” App Store privacy remains “Data Not Collected.”
+6. Optional model artifacts are public, excluded from backup, removable, and never mixed with user content.
+7. Any future cloud scribe is a separately reviewed, opt-in, per-use Phase 2 feature with a distinct consent screen and updated privacy disclosures.
+
+#### 7.8.5 Explicit voice non-goals (v1)
+
+No voice conversation, wake word, cloud STT, cloud scribe, response TTS, Android voice work before the Android build exists, or Willow dependency. Third-party dictation keyboards continue to work as standard text input.
+
 ---
 
 ## 8. API Client Module Design
@@ -374,8 +427,8 @@ Every response parses through zod schemas in `/src/api/devin/schemas.ts`. Unknow
 Sessions: create, list (with status/tag filters, pagination), detail, messages list (cursor), message send, archive, terminate, tags add/remove, insights generate/get.
 Reference data: playbooks list, knowledge list, secrets list (names/IDs only — never values), org members (for attribution picker, permission-gated).
 Attachments: upload, download.
-Consumption: org cycle + daily.
-Explicitly NOT called in v1: any write to playbooks/knowledge/secrets, any enterprise/* endpoint, audit logs.
+Consumption: org daily; read-only enterprise billing cycle and ACU-limit endpoints when the credential has `ManageBilling`, with graceful permission-gated fallback. Self-serve quota and credit-balance values remain web-only until Devin publishes an API.
+Explicitly NOT called in v1: any write to enterprise billing/limit endpoints, audit logs, or undocumented endpoint; playbook/knowledge/secret writes are separately permission-gated features and never required for the core session flow.
 
 ---
 
@@ -405,6 +458,7 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 8. **Supply chain:** lockfile committed, Dependabot on, `npm audit` gate in CI (fail on high/critical), no dependency added without CI passing, secret scanning + push protection on the repo.
 9. **Deep links:** `devinx://session/{id}` validates the ID format and requires an authenticated state; no auth material ever accepted via URL.
 10. **Phase 2 notifier (when built):** separate read-only service key, provided by the user, stored server-side encrypted (KMS/env), org ID hashed in KV, device tokens purgeable via in-app toggle, notifier holds NO message content — payloads are "Session {title} needs input," never the question text. Its own mini spec + review before build.
+11. **Voice:** every §7.8.4 gate blocks Session 4b release. Audio never leaves the device; temp files are protected and verifiably deleted; transcript content is scrubbed from diagnostics; microphone access is explicit and visible.
 
 ---
 
@@ -418,6 +472,11 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 | E2E (Maestro) | onboard → validate → board → open session → send message → archive → disconnect-wipes-everything | The golden path + the wipe test |
 | Security | key-leak grep gate, diagnostic scrub/no-transmission test, logout wipe assertion, deep-link fuzz | All pass in CI |
 | Performance | cold start <2s to cached board; 60fps list scroll with 200 sessions; battery: Balanced polling <2%/hr foreground | Measured on a real mid-tier device |
+| Voice unit | hint caps/secret exclusion, filler cleanup, template output, engine interface conformance | Every branch |
+| Voice integration | five technical fixtures end-to-end with WER compared to the approved 4a record | No regression beyond approved bounds |
+| Voice security | no-network-imports, temp-audio deletion, transcript scrubber | All pass in CI |
+| Voice E2E | mic → injected fixture → transcript → scribe preview → send; denial and interruption paths | Golden path + both failures |
+| Voice performance/accessibility | real-time factor ≤1.0 on iPhone 13-class, 60fps streaming, memory ceiling recorded, VoiceOver/Switch Control/Reduce Motion | Measured on device |
 
 ### 11.2 Release Checklist (App Store additions to standard gates)
 - [ ] All §10 gates green in CI
@@ -447,6 +506,10 @@ One session per phase. Each session: reads `/specs/000-build-spec.md` + its phas
 
 **Session 4 — Composer + Usage + Settings** — §7.5 full composer with attachments upload and session-secret hygiene, §7.6 consumption views with permission-gating, §7.7 settings incl. privacy explainer.
 
+**Session 4a — Voice Spec Analysis** — execute §7.8.1. Deliver only `/specs/007-voice-spec-analysis.md` plus throwaway `/spikes/voice/` benchmark assets. Mark reviews and approves the engine, packaging, and scribe-tier decision before implementation.
+
+**Session 4b — Voice Spec Build** — after Session 4a approval, implement §7.8.2–§7.8.4, make the voice matrix green, and attach a speak → structure → send demo video to the PR. Add the voice golden path to Maestro and the on-device mic explanation to TestFlight review notes.
+
 **Session 5 — Ship** — §11 testing matrix to green, Maestro E2E, performance passes, EAS build profiles, TestFlight submission config, App Store metadata drafts (with disclaimer), release checklist run. Output: TestFlight build.
 
 **Session 6 (Phase 2, post-meetup, demand-gated)** — Notifier mini-spec first (§10.10), then Vercel service + Expo Push integration + in-app watch toggles.
@@ -461,7 +524,7 @@ One session per phase. Each session: reads `/specs/000-build-spec.md` + its phas
 
 ## 13. MoSCoW Summary
 
-**Must (MVP/TestFlight):** connect/validate/Keychain, session board with blocked-first triage, session detail + message steering, new session composer (prompt/playbook/tags/ACU), archive/terminate, adaptive polling, offline cache, disconnect-wipe, dark theme with extracted tokens, all §10 gates.
+**Must (MVP/TestFlight):** connect/validate/Keychain, session board with blocked-first triage, session detail + message steering, new session composer (prompt/playbook/tags/ACU), archive/terminate, adaptive polling, offline cache, disconnect-wipe, dark theme with extracted tokens, approved on-device dictation + deterministic scribe fallback, all §10 gates.
 **Should (≤30 days post):** consumption view, insights, attachments both directions, light theme polish, Android build, composer templates.
 **Could:** push notifier (Phase 2), scheduled sessions management, PAT mode GA flip, iPad layout, widgets (blocked-session count on home screen — sleeper hit), Apple Watch glance.
 **Won't (write it down):** undocumented Devin Desktop integration, scraping CLI/Desktop files or IPC, enterprise/* endpoints, playbook/knowledge/secret WRITES, a DevinX-operated relay in v1, storing bridge session content on DevinX infrastructure, Android-first anything.

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "fixtures": [
+    { "id": "01-auth-refactor", "reference": "fixtures/01-auth-refactor.txt", "target_seconds": 45 },
+    { "id": "02-expo-session", "reference": "fixtures/02-expo-session.txt", "target_seconds": 50 },
+    { "id": "03-database-rls", "reference": "fixtures/03-database-rls.txt", "target_seconds": 55 },
+    { "id": "04-monorepo-release", "reference": "fixtures/04-monorepo-release.txt", "target_seconds": 50 },
+    { "id": "05-api-investigation", "reference": "fixtures/05-api-investigation.txt", "target_seconds": 55 }
+  ],
+  "technical_terms": [
+    "TypeScript", "Zod", "Expo Router", "TanStack Query", "RLS", "OAuth", "PR",
+    "monorepo", "auth middleware", "kebab-case", "api.devin.ai", "Secure Store",
+    "React Native", "PostgreSQL", "GitHub Actions", "EAS", "TestFlight"
+  ]
+}
