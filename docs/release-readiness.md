@@ -55,6 +55,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (34)` was built locally from clean commit `b26d87f` with complete bounded Cloud repository pagination, stable identity deduplication, repeated/missing-cursor rejection, a fail-closed 1,000-repository safety bound, and an explicit retry state instead of a misleading partial picker
 - [x] Build 34 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (34)`, `NSFileProtectionComplete`); `get-task-allow=false`, 10 privacy manifests with no tracking/collected-data declarations, and no APS entitlement remain; SHA-256 `b61d5c8c35f117d8a2350872116ca94cb0fffd662dd7490d9fa6d2350e9bd7ec`
 - [x] Build 34 App Store Connect submission `fb17c8e7-ae2f-4b46-93b4-0fb66225c8d9` finished successfully and is processing as the consolidated repository-completeness and UI-freeze TestFlight candidate
+- [x] iOS `0.1.0 (35)` was built locally from clean commit `e8824a7` after correcting Home Recent to follow the active destination: Cloud now shows only Cloud recents, Computer shows only recents from the selected Mac, and the full Sessions screen remains the combined cross-origin archive
+- [x] Build 35 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (35)`, `NSFileProtectionComplete`); `get-task-allow=false`, 10 privacy manifests with no tracking/collected-data declarations, and no APS entitlement remain; SHA-256 `730c84633a5d13c6c8af4156e206cafb2ba0f9322932a8f2b73454dcddf42b85`
+- [x] Build 35 App Store Connect submission `8fb4b9d8-c094-4015-8741-5fd08047fc66` finished successfully and is processing as the superseding destination-scoped Recent candidate
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -80,13 +83,13 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed on Node 24.18.0, now pinned consistently for development, CI, rollback, and the checksum-verified Connector runtime |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 53 suites / 430 tests with handle detection enabled on pinned Node 24.18.0; no analytics or crash-reporting SDK runtime is loaded by the test environment |
-| Production iOS export | Build 34 passed local signed export; 19.8 MB IPA, 1,738 bundled modules, 100 assets |
+| Jest | passed 53 suites / 431 tests with handle detection enabled on pinned Node 24.18.0; no analytics or crash-reporting SDK runtime is loaded by the test environment |
+| Production iOS export | Build 35 passed local signed export; 19.8 MB IPA, 1,738 bundled modules, 100 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 34 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 35 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -96,12 +99,13 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [ ] Install Build 34 and confirm the destination sheet remains compact and the Computer workspace sheet is inset, sectioned, bounded, dismisses without committing a draft, commits with Done, selects correctly, and shows no raw path or excessive empty space in either theme
-- [ ] In Build 34 Cloud mode, confirm the Repository picker shows the complete connected-repository count/list for the test organization, remains distinct from Computer workspaces, searches the complete result, and never presents a partial API failure as an empty or complete list
-- [ ] In Build 34, confirm an existing Computer session shows the current model family, reasoning/speed, Mac, and workspace; change the variant, send a harmless turn, and confirm the selected exact model is used
-- [ ] In Build 34, confirm the Home composer does not reserve excessive empty space; confirm Cloud and Computer session composers are elevated, multiline, and remain clear of the keyboard and home indicator
-- [ ] In Build 34, confirm Cloud and Computer expose their distinct pickers and the Computer model menu shows the live Recommended, Recent, searchable All Models catalog
-- [ ] In Build 34, select a multi-variant Computer model family, change its reasoning/speed value, create a harmless session, and confirm the exact selected variant is used
+- [ ] Install Build 35 and confirm switching Home from Cloud to Computer changes Recent from Cloud sessions to sessions from the selected Mac, switching back restores Cloud recents, and View all still opens the combined cross-origin Sessions screen
+- [ ] In Build 35, confirm the destination sheet remains compact and the Computer workspace sheet is inset, sectioned, bounded, dismisses without committing a draft, commits with Done, selects correctly, and shows no raw path or excessive empty space in either theme
+- [ ] In Build 35 Cloud mode, confirm the Repository picker shows the complete connected-repository count/list for the test organization, remains distinct from Computer workspaces, searches the complete result, and never presents a partial API failure as an empty or complete list
+- [ ] In Build 35, confirm an existing Computer session shows the current model family, reasoning/speed, Mac, and workspace; change the variant, send a harmless turn, and confirm the selected exact model is used
+- [ ] In Build 35, confirm the Home composer does not reserve excessive empty space; confirm Cloud and Computer session composers are elevated, multiline, and remain clear of the keyboard and home indicator
+- [ ] In Build 35, confirm Cloud and Computer expose their distinct pickers and the Computer model menu shows the live Recommended, Recent, searchable All Models catalog
+- [ ] In Build 35, select a multi-variant Computer model family, change its reasoning/speed value, create a harmless session, and confirm the exact selected variant is used
 - [x] After the phone-created turn finishes, open that session in Devin Desktop; then send a later phone turn and confirm ownership can alternate without a permanent unavailable state
 - [ ] Enable `Create new sessions` for the iPhone in Connector and create a harmless Computer session with an approved workspace and selected model
 - [ ] Confirm the selected model appears on the new local session and the initial prompt receives a reply

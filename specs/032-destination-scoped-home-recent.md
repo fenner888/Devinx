@@ -1,7 +1,7 @@
 # 032 — Destination-scoped Home Recent
 
-Status: implemented and automated-test validated; physical switching
-verification remains
+Status: implemented, automated-test validated, and uploaded in iOS Build 35;
+physical switching verification remains
 
 ## Intent
 
