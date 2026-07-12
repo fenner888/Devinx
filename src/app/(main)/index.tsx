@@ -632,7 +632,6 @@ export default function HomeScreen() {
                     <Ionicons name="add" size={22} color={tokens.textMid.hex} />
                   )}
                 </Pressable>
-                <VoiceMicButton voice={voice} disabled={!canUseComposer || composerPending} />
                 {isComputerDestination ? (
                   <>
                     <Pressable
@@ -699,29 +698,35 @@ export default function HomeScreen() {
                   </>
                 )}
               </View>
-              <Pressable
-                className={`w-10 h-10 rounded-full items-center justify-center ${canUseComposer && prompt.trim() && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
-                onPress={handleSend}
-                disabled={
-                  !canUseComposer || !prompt.trim() || composerPending || uploadAttachment.isPending
-                }
-                accessibilityRole="button"
-                accessibilityLabel="Start session"
-              >
-                {composerPending ? (
-                  <ActivityIndicator color={tokens.textAlwaysWhite.hex} size="small" />
-                ) : (
-                  <Ionicons
-                    name="arrow-up"
-                    size={20}
-                    color={
-                      canUseComposer && prompt.trim() && !uploadAttachment.isPending
-                        ? tokens.textAlwaysWhite.hex
-                        : tokens.textLow.hex
-                    }
-                  />
-                )}
-              </Pressable>
+              <View className="flex-row items-center gap-1">
+                <VoiceMicButton voice={voice} disabled={!canUseComposer || composerPending} />
+                <Pressable
+                  className={`w-10 h-10 rounded-full items-center justify-center ${canUseComposer && prompt.trim() && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
+                  onPress={handleSend}
+                  disabled={
+                    !canUseComposer ||
+                    !prompt.trim() ||
+                    composerPending ||
+                    uploadAttachment.isPending
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Start session"
+                >
+                  {composerPending ? (
+                    <ActivityIndicator color={tokens.textAlwaysWhite.hex} size="small" />
+                  ) : (
+                    <Ionicons
+                      name="arrow-up"
+                      size={20}
+                      color={
+                        canUseComposer && prompt.trim() && !uploadAttachment.isPending
+                          ? tokens.textAlwaysWhite.hex
+                          : tokens.textLow.hex
+                      }
+                    />
+                  )}
+                </Pressable>
+              </View>
             </View>
           </View>
           <View className="flex-row items-center px-2 pt-2 gap-4">

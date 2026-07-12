@@ -498,31 +498,33 @@ export default function SessionDetailScreen() {
                       <Ionicons name="add" size={22} color={tokens.textMid.hex} />
                     )}
                   </Pressable>
-                  <VoiceMicButton voice={voice} disabled={sendMessage.isPending} />
                 </View>
-                <Pressable
-                  className={`h-10 w-10 items-center justify-center rounded-full ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
-                  disabled={
-                    !messageText.trim() || sendMessage.isPending || uploadAttachment.isPending
-                  }
-                  onPress={handleSend}
-                  accessibilityRole="button"
-                  accessibilityLabel="Send message"
-                >
-                  {sendMessage.isPending ? (
-                    <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
-                  ) : (
-                    <Ionicons
-                      name="arrow-up"
-                      size={19}
-                      color={
-                        messageText.trim() && !uploadAttachment.isPending
-                          ? tokens.textAlwaysWhite.hex
-                          : tokens.textLow.hex
-                      }
-                    />
-                  )}
-                </Pressable>
+                <View className="flex-row items-center gap-1">
+                  <VoiceMicButton voice={voice} disabled={sendMessage.isPending} />
+                  <Pressable
+                    className={`h-10 w-10 items-center justify-center rounded-full ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
+                    disabled={
+                      !messageText.trim() || sendMessage.isPending || uploadAttachment.isPending
+                    }
+                    onPress={handleSend}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send message"
+                  >
+                    {sendMessage.isPending ? (
+                      <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+                    ) : (
+                      <Ionicons
+                        name="arrow-up"
+                        size={19}
+                        color={
+                          messageText.trim() && !uploadAttachment.isPending
+                            ? tokens.textAlwaysWhite.hex
+                            : tokens.textLow.hex
+                        }
+                      />
+                    )}
+                  </Pressable>
+                </View>
               </View>
             </View>
             <View className="flex-row items-center px-1 pt-2">

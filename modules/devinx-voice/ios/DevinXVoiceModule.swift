@@ -209,6 +209,7 @@ private final class LiveSpeechSession: NSObject {
   private var stopped = false
   private var tapInstalled = false
   private var engineStarted = false
+  private var audioConverter: AVAudioConverter?
 
   init(
     hints: [String],
@@ -254,9 +255,11 @@ private final class LiveSpeechSession: NSObject {
           let analysisFormat = await SpeechAnalyzer.bestAvailableAudioFormat(
             compatibleWith: [transcriber],
             considering: naturalFormat
-          ) else {
+          ),
+          let converter = AVAudioConverter(from: naturalFormat, to: analysisFormat) else {
       throw VoiceError.audioUnavailable
     }
+    audioConverter = converter
     try await analyzer.prepareToAnalyze(in: analysisFormat)
 
     var continuation: AsyncStream<AnalyzerInput>.Continuation?
@@ -283,9 +286,17 @@ private final class LiveSpeechSession: NSObject {
       try await analyzer.start(inputSequence: inputStream)
     }
 
-    inputNode.installTap(onBus: 0, bufferSize: 1_024, format: analysisFormat) {
-      [onLevel] buffer, _ in
-      inputContinuation.yield(AnalyzerInput(buffer: buffer))
+    // AVAudioEngine must capture in the input node's native hardware format.
+    // SpeechAnalyzer may require a different format, so convert each buffer
+    // before yielding it rather than installing an incompatible tap format.
+    inputNode.installTap(onBus: 0, bufferSize: 1_024, format: naturalFormat) {
+      [onLevel, converter, analysisFormat] buffer, _ in
+      guard let converted = Self.convert(
+        buffer,
+        using: converter,
+        to: analysisFormat
+      ) else { return }
+      inputContinuation.yield(AnalyzerInput(buffer: converted))
       onLevel(Self.normalizedLevel(buffer))
     }
     tapInstalled = true
@@ -307,6 +318,7 @@ private final class LiveSpeechSession: NSObject {
     }
     inputContinuation?.finish()
     inputContinuation = nil
+    audioConverter = nil
     do {
       try await analyzer.finalizeAndFinishThroughEndOfInput()
       try await analysisTask?.value
@@ -332,6 +344,7 @@ private final class LiveSpeechSession: NSObject {
     }
     inputContinuation?.finish()
     inputContinuation = nil
+    audioConverter = nil
     await analyzer.cancelAndFinishNow()
     analysisTask?.cancel()
     resultTask?.cancel()
@@ -359,6 +372,37 @@ private final class LiveSpeechSession: NSObject {
     }
     let rms = sqrt(sum / Double(frameCount))
     return min(1, max(0, (20 * log10(max(rms, 0.000_001)) + 60) / 60))
+  }
+
+  private nonisolated static func convert(
+    _ input: AVAudioPCMBuffer,
+    using converter: AVAudioConverter,
+    to outputFormat: AVAudioFormat
+  ) -> AVAudioPCMBuffer? {
+    let ratio = outputFormat.sampleRate / input.format.sampleRate
+    let capacity = AVAudioFrameCount(
+      max(1, ceil(Double(input.frameLength) * ratio) + 8)
+    )
+    guard let output = AVAudioPCMBuffer(
+      pcmFormat: outputFormat,
+      frameCapacity: capacity
+    ) else { return nil }
+
+    var suppliedInput = false
+    var conversionError: NSError?
+    let status = converter.convert(to: output, error: &conversionError) { _, inputStatus in
+      if suppliedInput {
+        inputStatus.pointee = .noDataNow
+        return nil
+      }
+      suppliedInput = true
+      inputStatus.pointee = .haveData
+      return input
+    }
+    guard status != .error, conversionError == nil, output.frameLength > 0 else {
+      return nil
+    }
+    return output
   }
 }
 

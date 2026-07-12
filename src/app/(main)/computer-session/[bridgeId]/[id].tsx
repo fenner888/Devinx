@@ -494,10 +494,6 @@ export default function ComputerSessionDetailScreen() {
               />
               <VoiceComposerStatus voice={voice} />
               <View className="mt-1 flex-row items-center">
-                <VoiceMicButton
-                  voice={voice}
-                  disabled={!canPrompt || prompt.isPending || steeringActive}
-                />
                 <Pressable
                   className="mr-1 min-w-0 flex-row items-center rounded-full px-2 py-2"
                   onPress={() => canChooseModel && setShowModelPicker(true)}
@@ -534,23 +530,29 @@ export default function ComputerSessionDetailScreen() {
                     <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
                   )}
                 </Pressable>
-                <Pressable
-                  className={`ml-auto h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive ? 'bg-brand' : 'bg-tint-secondary'}`}
-                  onPress={sendPrompt}
-                  disabled={!draft.trim() || prompt.isPending || steeringActive}
-                  accessibilityRole="button"
-                  accessibilityLabel="Send computer session message"
-                >
-                  {prompt.isPending ? (
-                    <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
-                  ) : (
-                    <Ionicons
-                      name="arrow-up"
-                      size={19}
-                      color={draft.trim() ? tokens.textAlwaysWhite.hex : tokens.textLow.hex}
-                    />
-                  )}
-                </Pressable>
+                <View className="ml-auto flex-row items-center gap-1">
+                  <VoiceMicButton
+                    voice={voice}
+                    disabled={!canPrompt || prompt.isPending || steeringActive}
+                  />
+                  <Pressable
+                    className={`h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive ? 'bg-brand' : 'bg-tint-secondary'}`}
+                    onPress={sendPrompt}
+                    disabled={!draft.trim() || prompt.isPending || steeringActive}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send computer session message"
+                  >
+                    {prompt.isPending ? (
+                      <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+                    ) : (
+                      <Ionicons
+                        name="arrow-up"
+                        size={19}
+                        color={draft.trim() ? tokens.textAlwaysWhite.hex : tokens.textLow.hex}
+                      />
+                    )}
+                  </Pressable>
+                </View>
               </View>
             </View>
             <View className="flex-row items-center px-1 pt-2">

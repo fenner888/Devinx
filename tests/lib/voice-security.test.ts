@@ -24,6 +24,15 @@ describe('voice privacy gates', () => {
     expect(nativeSource).toContain('AVAudioPCMBuffer');
   });
 
+  it('captures the microphone in its native format and converts for SpeechAnalyzer', () => {
+    const nativeSource = fs.readFileSync(voiceFiles[3]!, 'utf8');
+    expect(nativeSource).toContain('format: naturalFormat');
+    expect(nativeSource).toContain('AVAudioConverter(from: naturalFormat, to: analysisFormat)');
+    expect(nativeSource).not.toContain(
+      'installTap(onBus: 0, bufferSize: 1_024, format: analysisFormat)',
+    );
+  });
+
   it('keeps the exact on-device microphone disclosure in app configuration', () => {
     const appConfig = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8')) as {
       expo: { ios: { infoPlist: Record<string, unknown> } };

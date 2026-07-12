@@ -296,9 +296,6 @@ export default function ComposeScreen() {
             onSelectionChange={voice.onSelectionChange}
           />
           <VoiceComposerStatus voice={voice} />
-          <View className="mb-2 items-end">
-            <VoiceMicButton voice={voice} disabled={createSession.isPending} />
-          </View>
           {draft.prompt.length > MAX_PROMPT * 0.9 && (
             <Text className="text-text-low text-text11 mb-4">
               {MAX_PROMPT - draft.prompt.length} characters remaining
@@ -500,9 +497,10 @@ export default function ComposeScreen() {
         </ScrollView>
 
         {/* Submit bar */}
-        <View className="border-t border-border-subtle px-4 py-3">
+        <View className="flex-row items-center gap-2 border-t border-border-subtle px-4 py-3">
+          <VoiceMicButton voice={voice} disabled={createSession.isPending} />
           <Pressable
-            className={`rounded-button py-3 items-center ${canSubmit ? 'bg-brand' : 'bg-tint-secondary'}`}
+            className={`flex-1 rounded-button py-3 items-center ${canSubmit ? 'bg-brand' : 'bg-tint-secondary'}`}
             disabled={!canSubmit}
             onPress={handleSubmit}
           >
