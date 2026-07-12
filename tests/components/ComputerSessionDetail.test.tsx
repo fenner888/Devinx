@@ -126,6 +126,8 @@ describe('Computer session detail', () => {
     const screen = render(<ComputerSessionDetailScreen />);
 
     expect(screen.getByText('Steering enabled')).toBeTruthy();
+    expect(screen.getByTestId('computer-session-companion-dock')).toBeTruthy();
+    expect(screen.getByTestId('computer-session-composer-shell')).toBeTruthy();
     expect(screen.getByTestId('computer-session-composer').props.className).toContain(
       'rounded-card',
     );

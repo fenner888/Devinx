@@ -431,24 +431,27 @@ export default function ComputerSessionDetailScreen() {
               </View>
             )}
             {steeringActive && <WorkingIndicator />}
-            <View className="pt-2">
-              <DevinCompanion
-                state={steeringActive ? 'thinking' : 'waiting'}
-                size={112}
-                active={companionActive}
-                travel={steeringActive}
-                travelTrack
-                accessibilityLabel={
-                  steeringActive ? 'Devin companion, working' : 'Devin companion, waiting'
-                }
-              />
-            </View>
           </ScrollView>
+        )}
+        {query.data && (
+          <View className="bg-canvas px-4 pb-1" testID="computer-session-companion-dock">
+            <DevinCompanion
+              state={steeringActive ? 'thinking' : 'waiting'}
+              size={112}
+              active={companionActive}
+              travel={steeringActive}
+              travelTrack
+              accessibilityLabel={
+                steeringActive ? 'Devin companion, working' : 'Devin companion, waiting'
+              }
+            />
+          </View>
         )}
         {canPrompt && mayReadContent && query.data && (
           <View
             className="bg-canvas px-4 pt-2"
             style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
+            testID="computer-session-composer-shell"
           >
             {prompt.error && (
               <Text className="mb-2 text-failed text-text12">

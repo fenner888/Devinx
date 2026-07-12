@@ -127,6 +127,8 @@ describe('active session composer', () => {
     );
 
     expect(getByText('Devin Cloud')).toBeTruthy();
+    expect(getByTestId('cloud-session-companion-dock')).toBeTruthy();
+    expect(getByTestId('cloud-session-composer-shell')).toBeTruthy();
     expect(getByTestId('cloud-session-composer').props.className).toContain('rounded-card');
     expect(getByLabelText('Cloud session message').props.textAlignVertical).toBe('top');
     await waitFor(() => expect(getByLabelText('Repository: fenner888/Devinx')).toBeTruthy());

@@ -57,7 +57,6 @@ import { AttachmentPickerSheet, type PickedAttachment } from '@components/Attach
 import { DevinCompanion } from '@components/pets';
 import { getSessionMode, getSessionRepository } from '@lib/session-repository';
 import { devinStateForStatusKey } from '@/pets/devin/model';
-import type { DevinPetState } from '@/pets/devin/types';
 
 type Tab = 'timeline' | 'worklog' | 'changes' | 'insights';
 
@@ -372,10 +371,6 @@ export default function SessionDetailScreen() {
               pendingText={pendingText}
               isSending={sendMessage.isPending}
               isWorking={isWorking}
-              companionState={companionState}
-              companionSize={keyboardVisible ? 72 : 104}
-              companionActive={companionActive}
-              companionAccessibilityLabel={`Devin companion, ${label}`}
             />
           )}
           {tab === 'worklog' && <WorklogTab session={session} />}
@@ -383,12 +378,29 @@ export default function SessionDetailScreen() {
           {tab === 'insights' && <InsightsTab sessionId={validId} />}
         </View>
 
+        {/* Keep Devin immediately above the composer instead of at the end of
+            short or long scrollable histories. The transparent track remains
+            in normal layout flow and never overlays messages or controls. */}
+        {tab === 'timeline' && (
+          <View className="bg-canvas px-4 pb-1" testID="cloud-session-companion-dock">
+            <DevinCompanion
+              state={companionState}
+              size={keyboardVisible ? 72 : 104}
+              active={companionActive}
+              travel={isWorking && companionState === 'thinking'}
+              travelTrack
+              accessibilityLabel={`Devin companion, ${label}`}
+            />
+          </View>
+        )}
+
         {/* Message steering composer — any non-terminal session (sleeping resumes).
             It floats above the home indicator instead of becoming a bottom shelf. */}
         {canSend && (
           <View
             className="bg-canvas px-4 pt-2"
             style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
+            testID="cloud-session-composer-shell"
           >
             {session.status === 'suspended' && (
               <Text className="text-text-low text-text12 px-1 pb-1.5">
@@ -796,20 +808,12 @@ function TimelineTab({
   pendingText,
   isSending,
   isWorking,
-  companionState,
-  companionSize,
-  companionActive,
-  companionAccessibilityLabel,
 }: {
   messages: SessionMessage[];
   isLoading: boolean;
   pendingText: string | null;
   isSending: boolean;
   isWorking: boolean;
-  companionState: DevinPetState;
-  companionSize: number;
-  companionActive: boolean;
-  companionAccessibilityLabel: string;
 }) {
   const listRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
@@ -837,14 +841,6 @@ function TimelineTab({
     return (
       <View className="flex-1 items-center justify-center px-6">
         <Text className="text-text-mid text-text14">No messages yet.</Text>
-        <View className="mt-4">
-          <DevinCompanion
-            state={companionState}
-            size={companionSize}
-            active={companionActive}
-            accessibilityLabel={companionAccessibilityLabel}
-          />
-        </View>
       </View>
     );
   }
@@ -879,18 +875,6 @@ function TimelineTab({
       )}
       {/* Live "Devin is working" indicator. */}
       {isWorking && <WorkingIndicator />}
-      {/* Devin traverses the response-feed edge directly above the composer
-          while active, without adding a separate shelf or background bar. */}
-      <View className="mb-2">
-        <DevinCompanion
-          state={companionState}
-          size={companionSize}
-          active={companionActive}
-          travel={isWorking && companionState === 'thinking'}
-          travelTrack
-          accessibilityLabel={companionAccessibilityLabel}
-        />
-      </View>
     </ScrollView>
   );
 }
