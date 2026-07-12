@@ -1,7 +1,7 @@
 # 030 — Composer picker visual system
 
-Status: implementation in progress; physical verification required in the next
-TestFlight checkpoint
+Status: implemented, automated-test validated, and uploaded in iOS Build 32;
+physical visual and interaction verification remain
 
 ## Intent
 
