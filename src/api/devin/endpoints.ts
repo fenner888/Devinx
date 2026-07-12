@@ -631,17 +631,43 @@ export async function getWeeklyActiveUsers(
 // Repositories (v3beta1)
 // ---------------------------------------------------------------------------
 
+const MAX_REPOSITORY_PAGES = 10;
+type RepositoryPage = {
+  items: RepositoryResponse[];
+  end_cursor: Cursor | null;
+  has_next_page: boolean;
+};
+
 export async function listRepositories(auth: AuthProvider): Promise<RepositoryResponse[]> {
-  const data = await apiRequest<{ items: RepositoryResponse[] }>(
-    auth,
-    paths.repositories(await orgIdOf(auth)),
-    {
+  const repositoryPath = paths.repositories(await orgIdOf(auth));
+  const repositories: RepositoryResponse[] = [];
+  const seenRepositories = new Set<string>();
+  const seenCursors = new Set<string>();
+  let cursor: Cursor | null = null;
+
+  for (let page = 0; page < MAX_REPOSITORY_PAGES; page++) {
+    const data: RepositoryPage = await apiRequest<RepositoryPage>(auth, repositoryPath, {
       method: 'GET',
-      query: { first: 100 },
+      query: { first: 100, after: cursor },
       schema: repositoryListResponseSchema,
-    },
-  );
-  return data.items;
+    });
+
+    for (const repository of data.items) {
+      const identity = `${repository.git_connection_id}:${repository.provider_repository_id}`;
+      if (seenRepositories.has(identity)) continue;
+      seenRepositories.add(identity);
+      repositories.push(repository);
+    }
+
+    if (!data.has_next_page) return repositories;
+    if (!data.end_cursor || seenCursors.has(data.end_cursor)) {
+      throw new Error('Repository pagination returned an invalid cursor');
+    }
+    seenCursors.add(data.end_cursor);
+    cursor = data.end_cursor;
+  }
+
+  throw new Error('Repository list exceeds the supported pagination limit');
 }
 
 // ---------------------------------------------------------------------------

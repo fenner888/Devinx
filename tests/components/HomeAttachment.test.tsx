@@ -1,6 +1,7 @@
 const mockUploadAttachment = jest.fn();
 const mockCreateSession = jest.fn();
 const mockCreateComputerSession = jest.fn();
+const mockRefetchRepositories = jest.fn();
 const mockDevinCompanion = jest.fn((_props: unknown) => null);
 let mockConnection = {
   mode: 'cloud',
@@ -27,6 +28,7 @@ let mockComputerCreateOptions:
 let mockComputerCreateOptionsError: Error | null = null;
 let mockComputerCreateOptionsLoading = false;
 let mockCloudSessions: Array<Record<string, unknown>> = [];
+let mockRepositoriesError: Error | null = null;
 let mockComputerBoard: {
   sessions: Array<Record<string, unknown>>;
   computers: Array<Record<string, unknown>>;
@@ -69,6 +71,9 @@ jest.mock('@api/devin/queries', () => ({
         last_updated_at: null,
       },
     ],
+    isLoading: false,
+    error: mockRepositoriesError,
+    refetch: mockRefetchRepositories,
   })),
   useCodeScanFindings: jest.fn(() => ({ data: [] })),
   useUploadAttachment: jest.fn(() => ({ isPending: false, mutateAsync: mockUploadAttachment })),
@@ -134,6 +139,7 @@ describe('home attachment control', () => {
     mockComputerCreateOptionsError = null;
     mockComputerCreateOptionsLoading = false;
     mockCloudSessions = [];
+    mockRepositoriesError = null;
     mockComputerBoard = { sessions: [], computers: [] };
   });
 
@@ -538,6 +544,22 @@ describe('home attachment control', () => {
 
     expect(queryByLabelText('Use repository fenner888/Devinx')).toBeNull();
     expect(getByText('No repositories match your search.')).toBeTruthy();
+  });
+
+  it('does not present a partial Cloud repository result as complete', () => {
+    mockRepositoriesError = new Error('Repository pagination returned an invalid cursor');
+    const { getByLabelText, getByText, queryByLabelText } = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(getByLabelText('Repository: Any repository'));
+
+    expect(getByText('Connected repositories could not be loaded completely.')).toBeTruthy();
+    expect(queryByLabelText('Use repository fenner888/Devinx')).toBeNull();
+    fireEvent.press(getByLabelText('Try loading repositories again'));
+    expect(mockRefetchRepositories).toHaveBeenCalledTimes(1);
   });
 
   it('includes the selected repository when starting a session', () => {

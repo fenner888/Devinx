@@ -120,7 +120,12 @@ export default function HomeScreen() {
   const createSession = useCreateSession();
   const uploadAttachment = useUploadAttachment();
   const { data: playbooks } = usePlaybooks();
-  const { data: repositories, isLoading: repositoriesLoading } = useRepositories();
+  const {
+    data: repositories,
+    isLoading: repositoriesLoading,
+    error: repositoriesError,
+    refetch: refetchRepositories,
+  } = useRepositories();
   const { data: scanFindings } = useCodeScanFindings();
 
   const [prompt, setPrompt] = useState('');
@@ -881,7 +886,7 @@ export default function HomeScreen() {
               <Text className="text-text-low text-text12 font-medium uppercase tracking-wide">
                 Connected repositories
               </Text>
-              {!repositoriesLoading && (
+              {!repositoriesLoading && !repositoriesError && (
                 <Text className="text-text-low text-text12">{filteredRepositories.length}</Text>
               )}
             </View>
@@ -930,7 +935,25 @@ export default function HomeScreen() {
                   </View>
                 )}
 
+                {!repositoriesLoading && repositoriesError && (
+                  <View className="items-center px-5 py-8">
+                    <Ionicons name="cloud-offline-outline" size={22} color={tokens.textLow.hex} />
+                    <Text className="mt-2 text-center text-text-mid text-text14">
+                      Connected repositories could not be loaded completely.
+                    </Text>
+                    <Pressable
+                      className="mt-3 min-h-11 items-center justify-center rounded-card bg-tint-blue px-4"
+                      onPress={() => refetchRepositories()}
+                      accessibilityRole="button"
+                      accessibilityLabel="Try loading repositories again"
+                    >
+                      <Text className="text-brand-text text-text14 font-medium">Try again</Text>
+                    </Pressable>
+                  </View>
+                )}
+
                 {!repositoriesLoading &&
+                  !repositoriesError &&
                   filteredRepositories.map((repository, index) => {
                     const isSelected = selectedRepo === repository.repo_path;
                     return (
@@ -976,16 +999,18 @@ export default function HomeScreen() {
                     );
                   })}
 
-                {!repositoriesLoading && filteredRepositories.length === 0 && (
-                  <View className="items-center px-5 py-8">
-                    <Ionicons name="search-outline" size={22} color={tokens.textLow.hex} />
-                    <Text className="text-text-mid text-text14 mt-2">
-                      {repoQuery.trim()
-                        ? 'No repositories match your search.'
-                        : 'No connected repositories found.'}
-                    </Text>
-                  </View>
-                )}
+                {!repositoriesLoading &&
+                  !repositoriesError &&
+                  filteredRepositories.length === 0 && (
+                    <View className="items-center px-5 py-8">
+                      <Ionicons name="search-outline" size={22} color={tokens.textLow.hex} />
+                      <Text className="text-text-mid text-text14 mt-2">
+                        {repoQuery.trim()
+                          ? 'No repositories match your search.'
+                          : 'No connected repositories found.'}
+                      </Text>
+                    </View>
+                  )}
               </View>
             </ScrollView>
           </View>

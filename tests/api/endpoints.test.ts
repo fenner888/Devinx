@@ -9,6 +9,7 @@ import {
   getDailyConsumption,
   listSessions,
   getSessionConsumption,
+  listRepositories,
 } from '../../src/api/devin/endpoints';
 import { clearRateLimit } from '../../src/api/devin/client';
 import type { AuthProvider } from '../../src/auth/AuthProvider';
@@ -62,6 +63,17 @@ const sessionFixture = {
   title: 't',
   updated_at: 2,
   url: 'https://app.devin.ai/sessions/devin-abc',
+};
+
+const repositoryFixture = {
+  provider_repository_id: 'provider-repo-1',
+  git_connection_id: 'connection-1',
+  git_connection_host: 'github.com',
+  repo_name: 'DevinX',
+  repo_path: 'fenner888/DevinX',
+  repo_description: null,
+  repo_language: 'TypeScript',
+  last_updated_at: null,
 };
 
 beforeEach(() => {
@@ -121,5 +133,66 @@ describe('endpoints — path building & response shaping', () => {
     const { items, hasNextPage } = await listSessions(mockAuth, { first: 100 });
     expect(items).toHaveLength(1);
     expect(hasNextPage).toBe(false);
+  });
+
+  it('listRepositories follows every cursor and removes duplicate repository identities', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        ok({ items: [repositoryFixture], end_cursor: 'repository-page-2', has_next_page: true }),
+      )
+      .mockResolvedValueOnce(
+        ok({
+          items: [
+            repositoryFixture,
+            {
+              ...repositoryFixture,
+              provider_repository_id: 'provider-repo-2',
+              repo_name: 'Push',
+              repo_path: 'fenner888/Push',
+            },
+          ],
+          end_cursor: null,
+          has_next_page: false,
+        }),
+      );
+
+    const repositories = await listRepositories(mockAuth);
+
+    expect(repositories.map((repository) => repository.repo_path)).toEqual([
+      'fenner888/DevinX',
+      'fenner888/Push',
+    ]);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(new URL(mockFetch.mock.calls[0]?.[0] as string).searchParams.has('after')).toBe(false);
+    expect(new URL(mockFetch.mock.calls[1]?.[0] as string).searchParams.get('after')).toBe(
+      'repository-page-2',
+    );
+  });
+
+  it('listRepositories rejects repeated continuation cursors instead of returning a partial list', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        ok({ items: [repositoryFixture], end_cursor: 'repeat', has_next_page: true }),
+      )
+      .mockResolvedValueOnce(ok({ items: [], end_cursor: 'repeat', has_next_page: true }));
+
+    await expect(listRepositories(mockAuth)).rejects.toThrow(
+      'Repository pagination returned an invalid cursor',
+    );
+  });
+
+  it('listRepositories fails closed when the reviewed page bound is exceeded', async () => {
+    mockFetch.mockImplementation(async () =>
+      ok({
+        items: [],
+        end_cursor: `cursor-${mockFetch.mock.calls.length}`,
+        has_next_page: true,
+      }),
+    );
+
+    await expect(listRepositories(mockAuth)).rejects.toThrow(
+      'Repository list exceeds the supported pagination limit',
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(10);
   });
 });
