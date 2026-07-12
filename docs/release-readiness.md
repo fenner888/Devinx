@@ -112,8 +112,8 @@ The results below must be refreshed after release-document changes and before a 
 - [x] In Build 35, local session creation and exact model/variant selection behaved correctly
 - [ ] In Build 36, confirm Devin remains in the transparent track immediately above both Cloud and Computer session composers with short and long histories, while the keyboard is open, and during start/walk/stop transitions
 - [x] After the phone-created turn finishes, open that session in Devin Desktop; then send a later phone turn and confirm ownership can alternate without a permanent unavailable state
-- [ ] Enable `Create new sessions` for the iPhone in Connector and create a harmless Computer session with an approved workspace and selected model
-- [ ] Confirm the selected model appears on the new local session and the initial prompt receives a reply
+- [x] Enable `Create new sessions` for the iPhone in Connector and create a harmless Computer session with an approved workspace and selected model
+- [x] Confirm the selected model appears on the new local session and the initial prompt receives a reply
 - [ ] Confirm no raw Mac path or raw ACP session identifier appears on the phone
 - [x] Confirm the final TestFlight build contains the current self-disconnect, complete local-data wipe, session-boundary, local-history, companion-travel, privacy, accessibility, and dormant-SDK removal changes (Build 25 / `296e90a`)
 - [x] Grant content read and message send to the iPhone in Connector
