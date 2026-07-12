@@ -493,7 +493,9 @@ export default function ComputerSessionDetailScreen() {
                 onSelectionChange={voice.onSelectionChange}
               />
               <VoiceComposerStatus voice={voice} />
-              <View className="mt-1 flex-row items-center">
+              <View
+                className={`mt-1 flex-row items-center ${voice.isRecording ? 'hidden' : ''}`}
+              >
                 <Pressable
                   className="mr-1 min-w-0 flex-row items-center rounded-full px-2 py-2"
                   onPress={() => canChooseModel && setShowModelPicker(true)}

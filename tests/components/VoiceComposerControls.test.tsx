@@ -48,7 +48,7 @@ function controller(overrides: Partial<VoiceComposerController> = {}): VoiceComp
 describe('voice composer controls', () => {
   it('shows only the expanded Stop action while recording', () => {
     const voice = controller({ phase: 'recording', isRecording: true, elapsedSeconds: 2 });
-    const { getAllByLabelText, queryByLabelText } = render(
+    const { getAllByLabelText, getByText, queryByLabelText } = render(
       <ThemeProvider>
         <View>
           <VoiceComposerStatus voice={voice} />
@@ -59,6 +59,8 @@ describe('voice composer controls', () => {
 
     expect(getAllByLabelText('Stop dictation')).toHaveLength(1);
     expect(queryByLabelText('Start on-device dictation')).toBeNull();
+    expect(getByText('Listening')).toBeTruthy();
+    expect(getByText('0:02 · On device')).toBeTruthy();
   });
 
   it('describes the optional scribe action as organizing the prompt', () => {

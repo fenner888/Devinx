@@ -615,7 +615,9 @@ export default function HomeScreen() {
               </View>
             )}
             <VoiceComposerStatus voice={voice} />
-            <View className="flex-row items-center justify-between px-4 pb-4">
+            <View
+              className={`flex-row items-center justify-between px-4 pb-4 ${voice.isRecording ? 'hidden' : ''}`}
+            >
               <View className="flex-row items-center gap-1">
                 <Pressable
                   className="w-9 h-9 rounded-full items-center justify-center"
@@ -729,7 +731,9 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
-          <View className="flex-row items-center px-2 pt-2 gap-4">
+          <View
+            className={`flex-row items-center px-2 pt-2 gap-4 ${voice.isRecording ? 'hidden' : ''}`}
+          >
             <Pressable
               className="flex-row items-center"
               onPress={() => canChooseDestination && setShowDestinationPicker(true)}

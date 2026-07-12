@@ -497,7 +497,9 @@ export default function ComposeScreen() {
         </ScrollView>
 
         {/* Submit bar */}
-        <View className="flex-row items-center gap-2 border-t border-border-subtle px-4 py-3">
+        <View
+          className={`flex-row items-center gap-2 border-t border-border-subtle px-4 py-3 ${voice.isRecording ? 'hidden' : ''}`}
+        >
           <VoiceMicButton voice={voice} disabled={createSession.isPending} />
           <Pressable
             className={`flex-1 rounded-button py-3 items-center ${canSubmit ? 'bg-brand' : 'bg-tint-secondary'}`}

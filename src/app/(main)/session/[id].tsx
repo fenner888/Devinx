@@ -483,7 +483,9 @@ export default function SessionDetailScreen() {
                 onSelectionChange={voice.onSelectionChange}
               />
               <VoiceComposerStatus voice={voice} />
-              <View className="mt-1 flex-row items-center justify-between">
+              <View
+                className={`mt-1 flex-row items-center justify-between ${voice.isRecording ? 'hidden' : ''}`}
+              >
                 <View className="flex-row items-center">
                   <Pressable
                     className="h-11 w-11 items-center justify-center rounded-full"

@@ -71,18 +71,20 @@ export function VoiceComposerStatus({ voice }: { voice: VoiceComposerController 
     <>
       {voice.isRecording && (
         <View
-          className="mx-1 mb-2 rounded-input bg-surface2 px-3 py-2"
+          className="mx-1 mb-2 overflow-hidden rounded-input bg-tint-blue px-3 py-2"
           accessibilityLabel={`Recording dictation, ${formatElapsed(voice.elapsedSeconds)}`}
         >
-          <View className="flex-row items-center">
+          <View className="min-h-11 flex-row items-center">
             <View className="mr-2 h-2 w-2 rounded-full bg-failed" />
             <Waveform level={voice.level} reduceMotion={voice.reduceMotion} />
-            <Text className="ml-3 font-mono text-text-mid text-text13">
-              {formatElapsed(voice.elapsedSeconds)}
-            </Text>
-            <View className="flex-1" />
+            <View className="ml-3 flex-1">
+              <Text className="text-brand-text text-text13 font-medium">Listening</Text>
+              <Text className="mt-0.5 font-mono text-text-mid text-text11">
+                {formatElapsed(voice.elapsedSeconds)} · On device
+              </Text>
+            </View>
             <Pressable
-              className="h-11 w-11 items-center justify-center rounded-full"
+              className="mr-1 h-11 w-11 items-center justify-center rounded-full bg-tint-secondary"
               onPress={voice.cancel}
               accessibilityRole="button"
               accessibilityLabel="Cancel dictation and discard unfinished words"
@@ -104,12 +106,14 @@ export function VoiceComposerStatus({ voice }: { voice: VoiceComposerController 
             </Pressable>
           </View>
           {voice.volatileText ? (
-            <Text className="mt-1 text-text-low text-text13" accessibilityLiveRegion="polite">
+            <Text
+              className="border-t border-border-subtle px-1 pb-1 pt-2 text-text-mid text-text13"
+              accessibilityLiveRegion="polite"
+              numberOfLines={3}
+            >
               {voice.volatileText}
             </Text>
-          ) : (
-            <Text className="mt-1 text-text-low text-text12">Listening on this device…</Text>
-          )}
+          ) : null}
           {voice.elapsedSeconds >= 300 && (
             <Text className="mt-1 text-blocked text-text12">Recording has passed five minutes.</Text>
           )}
