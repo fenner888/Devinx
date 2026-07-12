@@ -58,10 +58,10 @@ The results below must be refreshed after release-document changes and before a 
 
 | Gate | Current result |
 |---|---|
-| Lockfile install | passed; the mobile release declares Node 20.19.4, while existing bridge `node:sqlite` tests require the local Node 23 runtime; reconcile the engine declaration before public release |
+| Lockfile install | passed on Node 24.18.0, now pinned consistently for development, CI, rollback, and the checksum-verified Connector runtime |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 53 suites / 419 tests with handle detection enabled on Node 23; no analytics or crash-reporting SDK runtime is loaded by the test environment |
+| Jest | passed 53 suites / 420 tests with handle detection enabled on pinned Node 24.18.0; no analytics or crash-reporting SDK runtime is loaded by the test environment |
 | Production iOS export | Build 29 passed local signed export; 19.8 MB IPA, 1,737 bundled modules, 100 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |

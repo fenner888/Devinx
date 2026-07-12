@@ -14,7 +14,7 @@ This plan covers internal TestFlight and a future public release. It does not au
 
 1. Record the incident start time, selected binary version/build, production runtime version, current update ID, and reason for rollback.
 2. Freeze further production updates and identify a previously verified clean commit compatible with the same runtime.
-3. In a clean worktree on pinned Node 20.19.4, run `npm ci`, `npm run ci`, and a production export. Re-run secret and privacy gates if the rollback touches data flow.
+3. In a clean worktree on pinned Node 24.18.0, run `npm ci`, `npm run ci`, and a production export. Re-run secret and privacy gates if the rollback touches data flow.
 4. Show the exact commit, channel, message, and diff to the release owner. Obtain explicit approval before invoking `eas update --channel production`.
 5. Publish the known-good compatible update, record the returned update/group IDs, and verify it on an internal TestFlight installation after a cold launch.
 6. Verify Cloud-only, Computer-only, and combined routing, then repeat the exact failing scenario. Confirm no incompatible binary consumes the update.

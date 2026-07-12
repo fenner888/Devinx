@@ -85,7 +85,7 @@
     "typescript": "~5.9.2"
   },
   "engines": {
-    "node": "20.19.4"
+    "node": "24.18.0"
   },
   "overrides": {
     "@xmldom/xmldom": "0.8.13",

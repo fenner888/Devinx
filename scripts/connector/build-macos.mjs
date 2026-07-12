@@ -19,9 +19,13 @@ import { spawnSync } from 'node:child_process';
 
 import { build } from 'esbuild';
 
-const NODE_VERSION = 'v24.18.0';
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '..', '..');
+const pinnedNodeVersion = readFileSync(resolve(repositoryRoot, '.nvmrc'), 'utf8').trim();
+if (!/^24\.\d+\.\d+$/.test(pinnedNodeVersion)) {
+  throw new Error('DevinX Connector requires a pinned Node 24 runtime in .nvmrc');
+}
+const NODE_VERSION = `v${pinnedNodeVersion}`;
 const outputRoot = resolve(repositoryRoot, 'artifacts', 'connector');
 const appRoot = resolve(outputRoot, 'DevinX Connector.app');
 const contentsRoot = resolve(appRoot, 'Contents');

@@ -1,6 +1,6 @@
 # 026 — Live local model catalog parity
 
-Status: implementation in progress
+Status: implemented and automated-test validated in iOS Build 29; exact selected-model physical verification remains
 
 ## Product contract
 

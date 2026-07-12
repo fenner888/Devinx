@@ -22,7 +22,7 @@ npx expo export --platform ios --output-dir /tmp/devinx-production-export
 npm audit --json
 ```
 
-Use the pinned Node version from `.nvmrc` (`20.19.4`). Other odd-numbered or unsupported Node releases can produce dependency engine warnings even when the checks happen to pass.
+Use the pinned Node version from `.nvmrc` (`24.18.0`). It matches the checksum-verified runtime packaged with DevinX Connector and supports the built-in read-only SQLite API used for local history. Other odd-numbered or unsupported Node releases can produce dependency engine warnings even when the checks happen to pass.
 
 Record results in `docs/release-readiness.md`. Review every dependency finding instead of applying a breaking `npm audit fix --force`. Before a public release, also complete the authorization matrix, secret scan, dead-code review, privacy-label review, and physical-device checklist.
 

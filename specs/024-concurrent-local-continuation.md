@@ -1,6 +1,6 @@
 # 024 — Concurrent local history and continuation
 
-Status: active implementation
+Status: implemented and automated-test validated; physical locked-session continuation validation remains
 
 ## Product requirement
 

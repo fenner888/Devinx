@@ -5,6 +5,8 @@ import { spawnSync } from 'node:child_process';
 const repositoryRoot = resolve(__dirname, '..', '..');
 const scriptPath = resolve(repositoryRoot, 'scripts', 'connector', 'notarize-macos.mjs');
 const buildScriptPath = resolve(repositoryRoot, 'scripts', 'connector', 'build-macos.mjs');
+const nodeVersionPath = resolve(repositoryRoot, '.nvmrc');
+const packagePath = resolve(repositoryRoot, 'package.json');
 const runtimeEntitlementsPath = resolve(
   repositoryRoot,
   'connector',
@@ -66,5 +68,18 @@ describe('macOS Connector notarization policy', () => {
     const buildSource = readFileSync(buildScriptPath, 'utf8');
     expect(buildSource).toContain("if (identity === '-')");
     expect(buildSource).toContain("['--verify', '--strict', '--verbose=2', keychainHelperPath]");
+  });
+
+  it('uses one supported Node runtime for development and the packaged Connector', () => {
+    const nodeVersion = readFileSync(nodeVersionPath, 'utf8').trim();
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf8')) as {
+      engines?: { node?: string };
+    };
+    const buildSource = readFileSync(buildScriptPath, 'utf8');
+
+    expect(nodeVersion).toMatch(/^24\.\d+\.\d+$/);
+    expect(packageJson.engines?.node).toBe(nodeVersion);
+    expect(buildSource).toContain("readFileSync(resolve(repositoryRoot, '.nvmrc')");
+    expect(buildSource).not.toMatch(/const NODE_VERSION = 'v\d/);
   });
 });

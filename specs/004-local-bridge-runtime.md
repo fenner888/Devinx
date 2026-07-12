@@ -4,7 +4,7 @@ Status: accepted for the protocol/security core. Network transport and final mac
 
 ## Decision
 
-Implement the first Desktop Bridge core in strict TypeScript on the repository's pinned Node runtime (`>=20.19.4`) using only Node built-ins and the existing pinned Zod dependency.
+Implement the Desktop Bridge core in strict TypeScript on the repository's exact pinned Node 24 runtime using only Node built-ins and the existing pinned Zod dependency. The same `.nvmrc` version is packaged into DevinX Connector after checksum verification so development, CI, and distributed behavior do not drift.
 
 The core is deliberately transport-independent. It validates signed request envelopes, canonicalizes signed data, authenticates a paired device, enforces expiry and replay protection, validates method-specific bodies, and checks server-side permissions before any handler can reach ACP.
 
