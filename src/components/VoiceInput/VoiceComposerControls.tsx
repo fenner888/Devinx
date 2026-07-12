@@ -105,15 +105,6 @@ export function VoiceComposerStatus({ voice }: { voice: VoiceComposerController 
               )}
             </Pressable>
           </View>
-          {voice.volatileText ? (
-            <Text
-              className="border-t border-border-subtle px-1 pb-1 pt-2 text-text-mid text-text13"
-              accessibilityLiveRegion="polite"
-              numberOfLines={3}
-            >
-              {voice.volatileText}
-            </Text>
-          ) : null}
           {voice.elapsedSeconds >= 300 && (
             <Text className="mt-1 text-blocked text-text12">Recording has passed five minutes.</Text>
           )}

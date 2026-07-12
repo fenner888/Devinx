@@ -32,7 +32,6 @@ export interface VoiceComposerController {
   elapsedSeconds: number;
   level: number;
   reduceMotion: boolean;
-  volatileText: string;
   error: string | null;
   permissionDenied: boolean;
   canStructure: boolean;
@@ -121,7 +120,6 @@ export function useVoiceComposer({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [level, setLevel] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const [volatileText, setVolatileText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [dictatedWords, setDictatedWords] = useState(0);
@@ -213,7 +211,6 @@ export function useVoiceComposer({
     sessionRef.current?.removeListeners();
     sessionRef.current = null;
     setPhase('idle');
-    setVolatileText('');
     setLevel(0);
   }, []);
 
@@ -224,7 +221,6 @@ export function useVoiceComposer({
     setPhase('preparing');
     setElapsedSeconds(0);
     setLevel(0);
-    setVolatileText('');
     lastFinalRef.current = '';
     warnedAtFiveMinutesRef.current = false;
     try {
@@ -251,7 +247,6 @@ export function useVoiceComposer({
       sessionRef.current = await speechAnalyzerEngine.start(voiceHints, {
         onTranscript(update) {
           insertFinalizedText(update.finalText);
-          setVolatileText(update.volatileText);
         },
         onLevel(nextLevel) {
           setLevel(nextLevel);
@@ -337,7 +332,6 @@ export function useVoiceComposer({
     elapsedSeconds,
     level,
     reduceMotion,
-    volatileText,
     error,
     permissionDenied,
     canStructure: dictatedWords >= SCRIBE_WORD_THRESHOLD && phase === 'idle',

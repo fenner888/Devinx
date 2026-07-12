@@ -26,7 +26,6 @@ function controller(overrides: Partial<VoiceComposerController> = {}): VoiceComp
     elapsedSeconds: 0,
     level: 0,
     reduceMotion: false,
-    volatileText: '',
     error: null,
     permissionDenied: false,
     canStructure: false,
@@ -61,6 +60,17 @@ describe('voice composer controls', () => {
     expect(queryByLabelText('Start on-device dictation')).toBeNull();
     expect(getByText('Listening')).toBeTruthy();
     expect(getByText('0:02 · On device')).toBeTruthy();
+  });
+
+  it('does not duplicate provisional transcript text below the composer', () => {
+    const voice = controller({ phase: 'recording', isRecording: true });
+    const { queryByText } = render(
+      <ThemeProvider>
+        <VoiceComposerStatus voice={voice} />
+      </ThemeProvider>,
+    );
+
+    expect(queryByText("Macy's giving me directions")).toBeNull();
   });
 
   it('describes the optional scribe action as organizing the prompt', () => {
