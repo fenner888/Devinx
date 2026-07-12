@@ -36,6 +36,10 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (28)` was built locally from clean commit `fafbbe0` with the compact local-model menu and dismissible unavailable-picker states after the free EAS iOS quota rejected the remote job
 - [x] Build 28 IPA signature, metadata, entitlements, production update channel/runtime, file protection, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (28)`, `NSFileProtectionComplete`); 10 privacy manifests and no notification/reporting artifacts remain; SHA-256 `cd4a47ce67a52904dd0723f6feaecaa2b81c0982d1f375f149b2acf50845face`
 - [x] Build 28 App Store Connect submission `b84fc761-7198-4f2f-ad57-a07bbbc45adc` finished successfully after retrying Apple's transient upload-container HTTP 500 and is processing as the compact local-model-menu TestFlight checkpoint
+- [x] iOS `0.1.0 (29)` was built locally from clean commit `0131a19` after the free EAS iOS quota rejected the remote job; it contains the live ACP catalog grouped into 30 model families with a separate reasoning/speed control that preserves all 143 exact model IDs
+- [x] Build 29 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (29)`, `NSFileProtectionComplete`); 10 privacy manifests and no APS entitlement remain; SHA-256 `de28a1103ade24d345ef3233f8d9b344e710ba1f256045644325d7a54277bd44`
+- [x] Build 29 App Store Connect submission `e5492fc8-656f-4797-9bcf-5cc096fc69ab` finished successfully and is processing as the live-model-family and reasoning/speed TestFlight checkpoint
+- [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -54,16 +58,16 @@ The results below must be refreshed after release-document changes and before a 
 
 | Gate | Current result |
 |---|---|
-| Lockfile install | passed; release environment is pinned to Node 20.19.4 (the local Node 23 shell emitted expected unsupported-engine warnings) |
+| Lockfile install | passed; the mobile release declares Node 20.19.4, while existing bridge `node:sqlite` tests require the local Node 23 runtime; reconcile the engine declaration before public release |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 52 suites / 407 tests with handle detection enabled; no analytics or crash-reporting SDK runtime is loaded by the test environment |
-| Production iOS export | passed after dormant SDK removal; 12 MB total, 5.38 MB Hermes bundle, 101 assets |
+| Jest | passed 53 suites / 419 tests with handle detection enabled on Node 23; no analytics or crash-reporting SDK runtime is loaded by the test environment |
+| Production iOS export | Build 29 passed local signed export; 19.8 MB IPA, 1,737 bundled modules, 100 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 28 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 29 contains 10 privacy manifests and no notification/reporting artifact; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -73,7 +77,8 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-- [ ] Install the next internal build and confirm Cloud and Computer expose their distinct pickers and the Computer model menu shows the live Recommended, Recent, searchable All Models catalog
+- [ ] Install Build 29 and confirm Cloud and Computer expose their distinct pickers and the Computer model menu shows the live Recommended, Recent, searchable All Models catalog
+- [ ] Select a multi-variant Computer model family, change its reasoning/speed value, create a harmless session, and confirm the exact selected variant is used
 - [ ] Enable `Create new sessions` for the iPhone in Connector and create a harmless Computer session with an approved workspace and selected model
 - [ ] Confirm the selected model appears on the new local session and the initial prompt receives a reply
 - [ ] Confirm no raw Mac path or raw ACP session identifier appears on the phone
