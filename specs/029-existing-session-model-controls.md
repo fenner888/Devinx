@@ -1,7 +1,7 @@
 # 029 — Existing Computer session model controls
 
-Status: implementation in progress; coordinated Connector and iOS physical
-validation required before the next TestFlight upload
+Status: implemented, automated-test validated, and uploaded in iOS Build 31;
+coordinated Connector and iPhone physical validation remain
 
 ## Product contract
 
