@@ -1,6 +1,6 @@
 # 027 — Session ownership handoff
 
-Status: implemented and automated-test validated; physical alternating-owner validation remains
+Status: implemented, automated-test validated, and physically validated with Build 29 against the real macOS Connector
 
 ## Product requirement
 

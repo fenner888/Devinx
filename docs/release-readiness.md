@@ -42,6 +42,7 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
+- [x] Build 29 physically validated alternating ownership: a phone-created session became available in Devin Desktop after its turn settled, while Desktop-open sessions continued through the protected continuation path
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -81,7 +82,7 @@ The results below must be refreshed after release-document changes and before a 
 
 - [ ] Install Build 29 and confirm Cloud and Computer expose their distinct pickers and the Computer model menu shows the live Recommended, Recent, searchable All Models catalog
 - [ ] Select a multi-variant Computer model family, change its reasoning/speed value, create a harmless session, and confirm the exact selected variant is used
-- [ ] After the phone-created turn finishes, open that session in Devin Desktop; then send a later phone turn and confirm ownership can alternate without a permanent unavailable state
+- [x] After the phone-created turn finishes, open that session in Devin Desktop; then send a later phone turn and confirm ownership can alternate without a permanent unavailable state
 - [ ] Enable `Create new sessions` for the iPhone in Connector and create a harmless Computer session with an approved workspace and selected model
 - [ ] Confirm the selected model appears on the new local session and the initial prompt receives a reply
 - [ ] Confirm no raw Mac path or raw ACP session identifier appears on the phone
