@@ -292,6 +292,40 @@ describe('home attachment control', () => {
     );
   });
 
+  it('uses grouped destination and workspace picker surfaces', () => {
+    mockConnection = {
+      mode: 'both',
+      hasCloudConnection: true,
+      usesCloud: true,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [
+        { id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' },
+        { id: `workspace_${'X'.repeat(43)}`, name: 'Push' },
+      ],
+      models: [],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Session destination: Devin Cloud'));
+    expect(screen.getByTestId('destination-picker-group').props.className).toContain(
+      'overflow-hidden',
+    );
+    expect(screen.getByLabelText('Close destination picker')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Use Studio Mac'));
+
+    fireEvent.press(screen.getByLabelText('Workspace: DevinX'));
+    expect(screen.getByTestId('workspace-picker-group').props.className).toContain(
+      'overflow-hidden',
+    );
+    expect(screen.getByLabelText('Use workspace Push')).toBeTruthy();
+  });
+
   it('submits the exact local model variant selected through reasoning and speed', () => {
     mockConnection = {
       mode: 'computer',

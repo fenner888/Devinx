@@ -1007,62 +1007,109 @@ export default function HomeScreen() {
       >
         <View className="flex-1 bg-scrim justify-end">
           <View
-            className="bg-surface2 rounded-t-sheet px-5 pt-4"
+            className="rounded-t-sheet bg-surface2 pt-3"
             style={{ paddingBottom: Math.max(insets.bottom, 16) }}
             accessibilityViewIsModal
           >
-            <Text className="mb-4 text-text-hi text-text17 font-medium">Run this session on</Text>
-            {canCreateCloudSession && (
+            <View className="mb-3 h-1 w-10 self-center rounded-full bg-border" />
+            <View className="mb-4 flex-row items-start justify-between px-5">
+              <View className="flex-1 pr-3">
+                <Text className="text-text-hi text-text17 font-medium">Run this session on</Text>
+                <Text className="mt-1 text-text-low text-text12">
+                  Choose Devin Cloud or a paired computer
+                </Text>
+              </View>
               <Pressable
-                className={`mb-2 flex-row items-center rounded-card border border-border-subtle px-4 py-4 ${destination === 'cloud' ? 'bg-tint-blue' : 'bg-surface1'}`}
-                onPress={() => {
-                  setDestination('cloud');
-                  setShowDestinationPicker(false);
-                }}
+                className="h-10 w-10 items-center justify-center rounded-full bg-tint-secondary"
+                onPress={() => setShowDestinationPicker(false)}
                 accessibilityRole="button"
-                accessibilityLabel="Use Devin Cloud"
+                accessibilityLabel="Close destination picker"
               >
-                <Ionicons name="cloud-outline" size={19} color={tokens.brandText.hex} />
-                <View className="ml-3 flex-1">
-                  <Text className="text-text-hi text-text14 font-medium">Devin Cloud</Text>
-                  <Text className="mt-0.5 text-text-low text-text12">
-                    Cloud repositories, playbooks, attachments, and Devin modes
-                  </Text>
-                </View>
+                <Ionicons name="close" size={19} color={tokens.textMid.hex} />
               </Pressable>
-            )}
-            {computers.map((computerOption, index) => {
-              const selected =
-                destination === 'computer' && computerOption.bridgeId === computer?.bridgeId;
-              return (
+            </View>
+            <View
+              className="mx-5 overflow-hidden rounded-cardLg border border-border-subtle bg-surface1"
+              testID="destination-picker-group"
+            >
+              {canCreateCloudSession && (
                 <Pressable
-                  key={computerOption.bridgeId}
-                  className={`flex-row items-center rounded-card border border-border-subtle px-4 py-4 ${index > 0 || canCreateCloudSession ? 'mt-2' : ''} ${selected ? 'bg-tint-blue' : 'bg-surface1'}`}
+                  className={`min-h-16 flex-row items-center px-4 py-3 ${computers.length > 0 ? 'border-b border-border-subtle' : ''} ${destination === 'cloud' ? 'bg-tint-blue' : ''}`}
                   onPress={() => {
-                    setSelectedComputerBridgeId(computerOption.bridgeId);
-                    setSelectedWorkspaceId(null);
-                    setSelectedModelId(null);
-                    setDestination('computer');
+                    setDestination('cloud');
                     setShowDestinationPicker(false);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={`Use ${computerOption.computerName}`}
+                  accessibilityLabel="Use Devin Cloud"
+                  accessibilityState={{ selected: destination === 'cloud' }}
                 >
-                  <Ionicons name="desktop-outline" size={19} color={tokens.brandText.hex} />
-                  <View className="ml-3 flex-1">
-                    <Text className="text-text-hi text-text14 font-medium">
-                      {computerOption.computerName}
-                    </Text>
+                  <View
+                    className={`mr-3 h-9 w-9 items-center justify-center rounded-card ${destination === 'cloud' ? 'bg-brand' : 'bg-tint-secondary'}`}
+                  >
+                    <Ionicons
+                      name="cloud-outline"
+                      size={18}
+                      color={
+                        destination === 'cloud'
+                          ? tokens.textAlwaysWhite.hex
+                          : tokens.textMid.hex
+                      }
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-text-hi text-text14 font-medium">Devin Cloud</Text>
                     <Text className="mt-0.5 text-text-low text-text12">
-                      Local workspaces and models supplied by Devin on this computer
+                      Repositories, playbooks, attachments, and Devin modes
                     </Text>
                   </View>
-                  {selected && (
-                    <Ionicons name="checkmark-circle" size={20} color={tokens.brandText.hex} />
+                  {destination === 'cloud' && (
+                    <Ionicons name="checkmark" size={21} color={tokens.brandText.hex} />
                   )}
                 </Pressable>
-              );
-            })}
+              )}
+              {computers.map((computerOption, index) => {
+                const selected =
+                  destination === 'computer' && computerOption.bridgeId === computer?.bridgeId;
+                const hasFollowingComputer = index < computers.length - 1;
+                return (
+                  <Pressable
+                    key={computerOption.bridgeId}
+                    className={`min-h-16 flex-row items-center px-4 py-3 ${hasFollowingComputer ? 'border-b border-border-subtle' : ''} ${selected ? 'bg-tint-blue' : ''}`}
+                    onPress={() => {
+                      setSelectedComputerBridgeId(computerOption.bridgeId);
+                      setSelectedWorkspaceId(null);
+                      setSelectedModelId(null);
+                      setDestination('computer');
+                      setShowDestinationPicker(false);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Use ${computerOption.computerName}`}
+                    accessibilityState={{ selected }}
+                  >
+                    <View
+                      className={`mr-3 h-9 w-9 items-center justify-center rounded-card ${selected ? 'bg-brand' : 'bg-tint-secondary'}`}
+                    >
+                      <Ionicons
+                        name="desktop-outline"
+                        size={18}
+                        color={selected ? tokens.textAlwaysWhite.hex : tokens.textMid.hex}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-text-hi text-text14 font-medium">
+                        {computerOption.computerName}
+                      </Text>
+                      <Text className="mt-0.5 text-text-low text-text12">
+                        Local workspaces and models from this computer
+                      </Text>
+                    </View>
+                    {selected && (
+                      <Ionicons name="checkmark" size={21} color={tokens.brandText.hex} />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         </View>
       </Modal>
@@ -1076,12 +1123,18 @@ export default function HomeScreen() {
       >
         <View className="flex-1 bg-scrim justify-end">
           <View
-            className="bg-surface2 rounded-t-sheet px-5 pt-4 max-h-[65%]"
+            className="max-h-[65%] rounded-t-sheet bg-surface2 pt-3"
             style={{ paddingBottom: Math.max(insets.bottom, 16) }}
             accessibilityViewIsModal
           >
-            <View className="mb-1 flex-row items-center justify-between">
-              <Text className="text-text-hi text-text17 font-medium">Select workspace</Text>
+            <View className="mb-3 h-1 w-10 self-center rounded-full bg-border" />
+            <View className="mb-4 flex-row items-start justify-between px-5">
+              <View className="flex-1 pr-3">
+                <Text className="text-text-hi text-text17 font-medium">Select workspace</Text>
+                <Text className="mt-1 text-text-low text-text12">
+                  Approved workspaces previously used by Devin on this Mac
+                </Text>
+              </View>
               <Pressable
                 className="h-10 w-10 items-center justify-center rounded-full bg-tint-secondary"
                 onPress={() => setShowWorkspacePicker(false)}
@@ -1091,33 +1144,46 @@ export default function HomeScreen() {
                 <Ionicons name="close" size={19} color={tokens.textMid.hex} />
               </Pressable>
             </View>
-            <Text className="mb-4 text-text-low text-text12">
-              Approved workspaces previously used by Devin on this Mac
-            </Text>
-            <ScrollView>
-              {localOptions.data?.workspaces.map((workspace) => {
-                const selected = workspace.id === selectedWorkspaceId;
-                return (
-                  <Pressable
-                    key={workspace.id}
-                    className={`mb-2 flex-row items-center rounded-card border border-border-subtle px-4 py-3.5 ${selected ? 'bg-tint-blue' : 'bg-surface1'}`}
-                    onPress={() => {
-                      setSelectedWorkspaceId(workspace.id);
-                      setShowWorkspacePicker(false);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Use workspace ${workspace.name}`}
-                  >
-                    <Ionicons name="folder-outline" size={18} color={tokens.textMid.hex} />
-                    <Text className="ml-3 flex-1 text-text-hi text-text14" numberOfLines={1}>
-                      {workspace.name}
-                    </Text>
-                    {selected && (
-                      <Ionicons name="checkmark-circle" size={20} color={tokens.brandText.hex} />
-                    )}
-                  </Pressable>
-                );
-              })}
+            <ScrollView contentContainerClassName="px-5" showsVerticalScrollIndicator={false}>
+              <View
+                className="overflow-hidden rounded-cardLg border border-border-subtle bg-surface1"
+                testID="workspace-picker-group"
+              >
+                {localOptions.data?.workspaces.map((workspace, index) => {
+                  const selected = workspace.id === selectedWorkspaceId;
+                  const hasFollowingWorkspace =
+                    index < (localOptions.data?.workspaces.length ?? 0) - 1;
+                  return (
+                    <Pressable
+                      key={workspace.id}
+                      className={`min-h-16 flex-row items-center px-4 py-3 ${hasFollowingWorkspace ? 'border-b border-border-subtle' : ''} ${selected ? 'bg-tint-blue' : ''}`}
+                      onPress={() => {
+                        setSelectedWorkspaceId(workspace.id);
+                        setShowWorkspacePicker(false);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Use workspace ${workspace.name}`}
+                      accessibilityState={{ selected }}
+                    >
+                      <View
+                        className={`mr-3 h-9 w-9 items-center justify-center rounded-card ${selected ? 'bg-brand' : 'bg-tint-secondary'}`}
+                      >
+                        <Ionicons
+                          name="folder-outline"
+                          size={18}
+                          color={selected ? tokens.textAlwaysWhite.hex : tokens.textMid.hex}
+                        />
+                      </View>
+                      <Text className="flex-1 text-text-hi text-text14" numberOfLines={1}>
+                        {workspace.name}
+                      </Text>
+                      {selected && (
+                        <Ionicons name="checkmark" size={21} color={tokens.brandText.hex} />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
             </ScrollView>
           </View>
         </View>
