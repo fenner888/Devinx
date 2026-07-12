@@ -218,6 +218,32 @@ describe('Desktop Bridge development runner', () => {
     );
   });
 
+  it('releases ACP ownership after a read-only fallback load', async () => {
+    const releaseSessionOwnership = jest.fn<Promise<void>, [string]>().mockResolvedValue();
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace({
+      isSessionListSupported: () => true,
+      listSessions: async () => ({
+        sessions: [{ sessionId: 'session-readable', cwd: '/tmp/project' }],
+      }),
+      isSessionLoadSupported: () => true,
+      loadSession: async () => ({
+        sessionId: 'session-readable',
+        cwd: '/tmp/project',
+        messages: [{ source: 'devin', text: 'Done.' }],
+        truncated: false,
+      }),
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
+      releaseSessionOwnership,
+    });
+
+    await expect(adapter.loadSession('session-readable')).resolves.toMatchObject({
+      sessionId: 'session-readable',
+    });
+    expect(releaseSessionOwnership).toHaveBeenCalledWith('session-readable');
+  });
+
   it('discovers only active private IPv4 addresses and requires an exact interface match', () => {
     expect(discoverPrivateLanAddresses(interfaces())).toEqual(['100.127.166.87', '192.168.1.141']);
     expect(validateAdvertisedLanHost('192.168.1.141', interfaces())).toBe('192.168.1.141');

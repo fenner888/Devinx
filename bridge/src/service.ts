@@ -124,6 +124,7 @@ export interface SessionDiscoveryAdapter {
     text: string,
   ): Promise<void | { continuedSessionId: string }>;
   createContinuation?(cwd: string, context: string, text: string): Promise<string>;
+  releaseSessionOwnership?(sessionId: string): Promise<void>;
   isSessionCreateSupported?(): boolean;
   listModelCatalog?(): Promise<AcpModelCatalog>;
   listCreateOptions?(): Promise<{

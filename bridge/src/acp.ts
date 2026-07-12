@@ -75,6 +75,8 @@ const initializeResultSchema = z
   })
   .passthrough();
 
+const closeSessionResultSchema = z.object({}).passthrough();
+
 const absolutePathSchema = z.string().min(1).max(4096).refine(isAbsolute, 'Path must be absolute');
 
 const acpSessionInfoSchema = z
@@ -365,6 +367,7 @@ export class AcpSessionClient {
   private canListSessions = false;
   private canLoadSessions = false;
   private canEmbedContext = false;
+  private canCloseSessions = false;
   private readonly listedSessions = new Map<string, CachedSessionMetadata>();
   private readonly loadedSessions = new Set<string>();
   private activeLoad: ReplayCollector | null = null;
@@ -395,6 +398,7 @@ export class AcpSessionClient {
     this.canListSessions = false;
     this.canLoadSessions = false;
     this.canEmbedContext = false;
+    this.canCloseSessions = false;
     const child = spawn(this.options.executablePath, ['acp'], {
       cwd: workingDirectory,
       env: environment,
@@ -427,6 +431,13 @@ export class AcpSessionClient {
             | Record<string, unknown>
             | undefined
         )?.embeddedContext === true;
+      this.canCloseSessions = Boolean(
+        (
+          initialization.agentCapabilities.sessionCapabilities as
+            | Record<string, unknown>
+            | undefined
+        )?.close,
+      );
     } catch (error) {
       await this.stop();
       throw error;
@@ -500,7 +511,11 @@ export class AcpSessionClient {
         attempts += 1;
         try {
           await this.loadSession(session.sessionId);
-          if (this.modelCatalog) return cloneModelCatalog(this.modelCatalog);
+          if (this.modelCatalog) {
+            const catalog = cloneModelCatalog(this.modelCatalog);
+            await this.releaseSessionOwnership(session.sessionId);
+            return catalog;
+          }
         } catch (error) {
           if (!isAcpSessionInUseError(error)) continue;
         }
@@ -658,6 +673,37 @@ export class AcpSessionClient {
     }
   }
 
+  async releaseSessionOwnership(sessionIdInput: unknown): Promise<void> {
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    if (!this.loadedSessions.has(sessionId)) return;
+    if (!this.child) {
+      this.loadedSessions.delete(sessionId);
+      return;
+    }
+    if (this.canCloseSessions) {
+      try {
+        await this.request(
+          'session/close',
+          { sessionId },
+          closeSessionResultSchema,
+          'session close',
+        );
+        this.loadedSessions.delete(sessionId);
+        return;
+      } catch {
+        // A declared but failed close must not leave a Connector-owned lock behind.
+      }
+    }
+    const listedSessions = [...this.listedSessions.entries()];
+    const modelCatalog = this.modelCatalog ? cloneModelCatalog(this.modelCatalog) : null;
+    await this.stop();
+    await this.start();
+    for (const [listedSessionId, metadata] of listedSessions) {
+      this.listedSessions.set(listedSessionId, { ...metadata });
+    }
+    this.modelCatalog = modelCatalog;
+  }
+
   private startPrompt(sessionId: string, prompt: unknown[]): void {
     if (this.activeLoad || this.activePromptSessionId) {
       throw new Error('ACP session prompting is busy');
@@ -670,13 +716,14 @@ export class AcpSessionClient {
       'session prompt',
       this.options.promptTimeoutMs,
     ).then(
-      () => {
-        if (this.activePromptSessionId === sessionId) this.activePromptSessionId = null;
-      },
-      () => {
-        if (this.activePromptSessionId === sessionId) this.activePromptSessionId = null;
-      },
+      () => this.finishPrompt(sessionId),
+      () => this.finishPrompt(sessionId),
     );
+  }
+
+  private async finishPrompt(sessionId: string): Promise<void> {
+    if (this.activePromptSessionId === sessionId) this.activePromptSessionId = null;
+    await this.releaseSessionOwnership(sessionId).catch(() => this.stop().catch(() => {}));
   }
 
   async stop(): Promise<void> {
@@ -685,6 +732,7 @@ export class AcpSessionClient {
     this.canListSessions = false;
     this.canLoadSessions = false;
     this.canEmbedContext = false;
+    this.canCloseSessions = false;
     this.listedSessions.clear();
     this.loadedSessions.clear();
     this.activeLoad = null;
@@ -930,6 +978,7 @@ export class AcpSessionClient {
     this.canListSessions = false;
     this.canLoadSessions = false;
     this.canEmbedContext = false;
+    this.canCloseSessions = false;
     this.listedSessions.clear();
     this.loadedSessions.clear();
     if (this.activeLoad) this.activeLoad.failed = true;
@@ -955,6 +1004,7 @@ export class AcpSessionClient {
     this.canListSessions = false;
     this.canLoadSessions = false;
     this.canEmbedContext = false;
+    this.canCloseSessions = false;
     this.listedSessions.clear();
     this.loadedSessions.clear();
     if (this.activeLoad) this.activeLoad.failed = true;

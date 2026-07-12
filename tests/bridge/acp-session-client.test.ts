@@ -291,8 +291,53 @@ if (request.method === 'initialize') {
       await client.listSessions();
       await client.loadSession('session-prompt');
       await expect(client.promptSession('session-prompt', 'Continue.')).resolves.toBeUndefined();
-    } finally {
       await new Promise((resolve) => setTimeout(resolve, 40));
+      expect(client.isSessionPromptSupported()).toBe(true);
+      await expect(client.promptSession('session-prompt', 'Again.')).rejects.toThrow(
+        'must be loaded before prompting',
+      );
+    } finally {
+      await client.stop();
+    }
+  });
+
+  it('uses session close after a prompt when the agent advertises it', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1,
+    agentCapabilities: { loadSession: true, sessionCapabilities: { list: {}, close: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  globalThis.listCount = (globalThis.listCount || 0) + 1;
+  if (globalThis.listCount > 1 && !globalThis.closed) process.exit(28);
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-close', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    stopReason: 'end_turn'
+  } }) + '\\n');
+} else if (request.method === 'session/close') {
+  if (request.params.sessionId !== 'session-close') process.exit(27);
+  globalThis.closed = true;
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {} }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+    try {
+      await client.start();
+      await client.listSessions();
+      await client.loadSession('session-close');
+      await client.promptSession('session-close', 'Continue.');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(client.isSessionPromptSupported()).toBe(true);
+      await expect(client.listSessions()).resolves.toEqual({
+        sessions: [{ sessionId: 'session-close', cwd: '/tmp/project' }],
+        nextCursor: undefined,
+      });
+    } finally {
       await client.stop();
     }
   });
@@ -435,7 +480,7 @@ if (request.method === 'initialize') {
 if (request.method === 'initialize') {
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
     protocolVersion: 1,
-    agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+    agentCapabilities: { loadSession: true, sessionCapabilities: { list: {}, close: {} } }
   } }) + '\\n');
 } else if (request.method === 'session/list') {
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
@@ -459,6 +504,9 @@ if (request.method === 'initialize') {
       ]
     }]
   } }) + '\\n');
+} else if (request.method === 'session/close') {
+  if (request.params.sessionId !== 'session-catalog') process.exit(29);
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {} }) + '\\n');
 } else if (request.method === 'session/new' || request.method === 'session/prompt') {
   process.exit(25);
 }`);

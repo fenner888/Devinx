@@ -219,6 +219,8 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     }
     const loaded = await this.current.loadSession(input);
     this.acpLoadedSessionIds.add(input);
+    await this.current.releaseSessionOwnership?.(input);
+    this.acpLoadedSessionIds.delete(input);
     return loaded;
   }
 
