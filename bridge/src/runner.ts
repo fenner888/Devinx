@@ -8,6 +8,7 @@ import {
   isAcpSessionInUseError,
   type AcpHistoryMessage,
   type AcpModelCatalog,
+  type AcpSessionActivity,
 } from './acp';
 import {
   DevinSessionStore,
@@ -130,6 +131,8 @@ const unavailableSessions: SessionDiscoveryAdapter = {
   listSessions: () => Promise.reject(new Error('Session discovery is not enabled')),
   isSessionLoadSupported: () => false,
   loadSession: () => Promise.reject(new Error('Session loading is not enabled')),
+  isSessionActivitySupported: () => false,
+  getSessionActivity: () => Promise.resolve(null),
   isSessionPromptSupported: () => false,
   promptSession: () => Promise.reject(new Error('Session prompting is not enabled')),
   isSessionCreateSupported: () => false,
@@ -205,6 +208,15 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
 
   isSessionLoadSupported(): boolean {
     return Boolean(this.history?.isSessionLoadSupported()) || this.current.isSessionLoadSupported();
+  }
+
+  isSessionActivitySupported(): boolean {
+    return Boolean(this.current.isSessionActivitySupported?.());
+  }
+
+  async getSessionActivity(input: string): Promise<AcpSessionActivity | null> {
+    await this.ensureSessionListed(input);
+    return this.current.getSessionActivity?.(input) ?? null;
   }
 
   async loadSession(input: string): ReturnType<SessionDiscoveryAdapter['loadSession']> {

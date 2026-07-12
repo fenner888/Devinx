@@ -124,7 +124,13 @@ function requestTimeIsValid(
 }
 
 function sessionIsAllowed(method: BridgeMethod, body: unknown, device: DeviceRecord): boolean {
-  if (method !== 'session.load' && method !== 'session.prompt') return true;
+  if (
+    method !== 'session.load' &&
+    method !== 'session.activity' &&
+    method !== 'session.prompt'
+  ) {
+    return true;
+  }
   if (!device.allowedSessionIds) return true;
   const sessionId = (body as BridgeBodyByMethod['session.load']).sessionId;
   return device.allowedSessionIds.includes(sessionId);

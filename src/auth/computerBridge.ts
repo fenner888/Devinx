@@ -51,6 +51,7 @@ const bridgeMethodSchema = z.enum([
   'device.revoke',
   'session.list',
   'session.load',
+  'session.activity',
   'session.prompt',
   'session.create_options',
   'session.create',
@@ -60,6 +61,23 @@ const deviceRevokeBodySchema = z.object({}).strict();
 const deviceRevokeResponseSchema = z.object({ revoked: z.literal(true) }).strict();
 const sessionListBodySchema = z.object({ cursor: cursorSchema.optional() }).strict();
 const sessionLoadBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
+const sessionActivityBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
+const computerSessionActivitySchema = z
+  .object({
+    active: z.boolean(),
+    kind: z.enum([
+      'thinking',
+      'reading',
+      'editing',
+      'executing',
+      'searching',
+      'fetching',
+      'responding',
+    ]),
+    label: z.string().min(1).max(160),
+    updatedAt: z.number().int().nonnegative(),
+  })
+  .strict();
 const sessionPromptBodySchema = z
   .object({
     sessionId: localSessionIdSchema,
@@ -228,6 +246,7 @@ export type ComputerBridgeHealth = z.infer<typeof computerBridgeHealthSchema>;
 export type ComputerSessionSummary = z.infer<typeof computerSessionSummarySchema>;
 export type ComputerSessionPage = z.infer<typeof computerSessionPageSchema>;
 export type ComputerLoadedSession = z.infer<typeof computerLoadedSessionSchema>;
+export type ComputerSessionActivity = z.infer<typeof computerSessionActivitySchema>;
 export type ComputerCreateOptions = z.infer<typeof sessionCreateOptionsResponseSchema>;
 export type ComputerModel = z.infer<typeof computerModelSchema>;
 
@@ -256,6 +275,7 @@ const permissionByMethod = {
   'device.revoke': 'bridge:health',
   'session.list': 'session:metadata:read',
   'session.load': 'session:content:read',
+  'session.activity': 'session:content:read',
   'session.prompt': 'session:prompt:send',
   'session.create_options': 'session:metadata:read',
   'session.create': 'session:create',
@@ -266,6 +286,7 @@ function bodyForMethod(method: SupportedMethod, input: unknown): object {
   if (method === 'device.revoke') return deviceRevokeBodySchema.parse(input);
   if (method === 'session.list') return sessionListBodySchema.parse(input);
   if (method === 'session.load') return sessionLoadBodySchema.parse(input);
+  if (method === 'session.activity') return sessionActivityBodySchema.parse(input);
   if (method === 'session.prompt') return sessionPromptBodySchema.parse(input);
   if (method === 'session.create_options') return sessionCreateOptionsBodySchema.parse(input);
   return sessionCreateBodySchema.parse(input);
@@ -414,6 +435,22 @@ async function requestSessionLoad(
   return result.data;
 }
 
+async function requestSessionActivity(
+  credential: PairedComputerCredential,
+  input: { sessionId: string },
+): Promise<ComputerSessionActivity> {
+  const body = sessionActivityBodySchema.parse(input);
+  const response = await requestComputer(credential, 'session.activity', body);
+  const result = computerSessionActivitySchema.safeParse(response.body);
+  if (!result.success) {
+    throw new ComputerBridgeError(
+      'The paired Mac returned invalid session activity.',
+      'invalid_response',
+    );
+  }
+  return result.data;
+}
+
 async function requestSessionPrompt(
   credential: PairedComputerCredential,
   input: { sessionId: string; text: string; modelId?: string },
@@ -465,6 +502,7 @@ export interface ComputerBridgeConnection {
   getHealth(): Promise<ComputerBridgeHealth>;
   listSessions(input?: { cursor?: string }): Promise<ComputerSessionPage>;
   loadSession(sessionId: string): Promise<ComputerLoadedSession>;
+  getSessionActivity(sessionId: string): Promise<ComputerSessionActivity>;
   promptSession(
     sessionId: string,
     text: string,
@@ -484,6 +522,7 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
     getHealth: () => requestHealth(credential),
     listSessions: (input = {}) => requestSessionList(credential, input),
     loadSession: (sessionId) => requestSessionLoad(credential, { sessionId }),
+    getSessionActivity: (sessionId) => requestSessionActivity(credential, { sessionId }),
     promptSession: (sessionId, text, modelId) =>
       requestSessionPrompt(credential, {
         sessionId,
@@ -541,6 +580,13 @@ export async function loadComputerSession(
   sessionId: string,
 ): Promise<ComputerLoadedSession> {
   return (await openComputerBridge(bridgeId)).loadSession(sessionId);
+}
+
+export async function getComputerSessionActivity(
+  bridgeId: string,
+  sessionId: string,
+): Promise<ComputerSessionActivity> {
+  return (await openComputerBridge(bridgeId)).getSessionActivity(sessionId);
 }
 
 export async function promptComputerSession(

@@ -1,6 +1,6 @@
 import { generateKeyPairSync, randomBytes, randomUUID, sign } from 'node:crypto';
 
-import type { AcpLoadedSession, AcpSessionPage } from '../../bridge/src/acp';
+import type { AcpLoadedSession, AcpSessionActivity, AcpSessionPage } from '../../bridge/src/acp';
 import { FixedWindowRateLimiter } from '../../bridge/src/rate-limit';
 import { InMemoryReplayGuard } from '../../bridge/src/replay';
 import { BridgeService, type SessionDiscoveryAdapter } from '../../bridge/src/service';
@@ -50,6 +50,12 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   };
   loadPending: Promise<AcpLoadedSession> | null = null;
   loadFailure: Error | null = null;
+  activity: AcpSessionActivity | null = {
+    active: true,
+    kind: 'editing',
+    label: 'Editing\nsrc/session.ts',
+    updatedAt: NOW,
+  };
   prompts: Array<{ sessionId: string; text: string; modelId?: string }> = [];
   continuedSessionId: string | null = null;
   createSupported = true;
@@ -91,6 +97,14 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     if (this.loadFailure) throw this.loadFailure;
     if (this.loadPending) return this.loadPending;
     return this.loaded;
+  }
+
+  isSessionActivitySupported(): boolean {
+    return true;
+  }
+
+  async getSessionActivity(): Promise<AcpSessionActivity | null> {
+    return this.activity;
   }
 
   isSessionPromptSupported(): boolean {
@@ -478,6 +492,41 @@ describe('authenticated Desktop Bridge service', () => {
       ),
     ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
     expect(adapter.loadCalls).toBe(0);
+  });
+
+  it('returns minimized live activity only for an authorized listed session', async () => {
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+
+    await expect(
+      bridge.handle(
+        envelope('session.activity', { sessionId: handle }, ['session:content:read']),
+        context(),
+      ),
+    ).resolves.toEqual({
+      status: 200,
+      body: {
+        active: true,
+        kind: 'editing',
+        label: 'Editing src/session.ts',
+        updatedAt: NOW,
+      },
+    });
+    await expect(
+      bridge.handle(
+        envelope('session.activity', { sessionId: handle }, ['bridge:health']),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
+    await expect(
+      bridge.handle(
+        envelope('session.activity', { sessionId: `local_${'U'.repeat(43)}` }, [
+          'session:content:read',
+        ]),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
   });
 
   it('allows only one ACP session-load operation at a time', async () => {

@@ -61,7 +61,7 @@ import {
   useVoiceComposer,
 } from '@components/VoiceInput';
 import { getSessionMode, getSessionRepository } from '@lib/session-repository';
-import { devinStateForStatusKey } from '@/pets/devin/model';
+import { activityForCloudSession } from '@/pets/devin/activity';
 
 type Tab = 'timeline' | 'worklog' | 'changes' | 'insights';
 
@@ -276,14 +276,8 @@ export default function SessionDetailScreen() {
     session.status === 'running' ||
     session.status === 'resuming' ||
     session.status_detail === 'working';
-  // Optimistic sends may briefly lead server polling. Otherwise the canonical
-  // status key must win so running/waiting sessions do not look active.
   const companionIsSending = sendMessage.isPending || !!pendingText;
-  const canonicalCompanionState = devinStateForStatusKey(statusKey);
-  const companionState =
-    companionIsSending || canonicalCompanionState === 'working'
-      ? 'thinking'
-      : canonicalCompanionState;
+  const companionActivity = activityForCloudSession(session, statusKey, companionIsSending);
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
@@ -402,12 +396,13 @@ export default function SessionDetailScreen() {
         {tab === 'timeline' && (
           <View className="bg-canvas px-4 pb-1" testID="cloud-session-companion-dock">
             <DevinCompanion
-              state={companionState}
+              state={companionActivity.state}
               size={keyboardVisible ? 72 : 104}
+              message={companionActivity.message}
               active={companionActive}
-              travel={isWorking && companionState === 'thinking'}
+              travel={isWorking && companionActivity.travel}
               travelTrack
-              accessibilityLabel={`Devin companion, ${label}`}
+              accessibilityLabel={`Devin companion, ${companionActivity.message}`}
             />
           </View>
         )}

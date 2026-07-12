@@ -196,20 +196,31 @@ export function DevinCompanion({
   if (usesTravelTrack) {
     return (
       <View
-        testID="devin-companion-track"
-        style={[{ height: displaySize }, styles.touchThrough, styles.travelTrack]}
-        onLayout={handleTrackLayout}
+        style={styles.touchThrough}
         accessible
         accessibilityLabel={accessibilityLabel ?? `Devin companion, ${state}`}
       >
-        <Animated.View
-          style={[
-            styles.travelFrame,
-            { height: displaySize, width: displaySize, transform: [{ translateX: travelX }] },
-          ]}
+        {visibleMessage && (
+          <View className="mb-1 self-center rounded-full border border-border-subtle bg-surface1 px-3 py-1.5">
+            <Text className="max-w-72 text-center text-text-mid text-text12" numberOfLines={2}>
+              {visibleMessage}
+            </Text>
+          </View>
+        )}
+        <View
+          testID="devin-companion-track"
+          style={[{ height: displaySize }, styles.travelTrack]}
+          onLayout={handleTrackLayout}
         >
-          {frame}
-        </Animated.View>
+          <Animated.View
+            style={[
+              styles.travelFrame,
+              { height: displaySize, width: displaySize, transform: [{ translateX: travelX }] },
+            ]}
+          >
+            {frame}
+          </Animated.View>
+        </View>
       </View>
     );
   }

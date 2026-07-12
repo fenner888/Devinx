@@ -2,7 +2,7 @@ import { basename } from 'node:path';
 
 import { z } from 'zod';
 
-import type { AcpLoadedSession, AcpModelCatalog, AcpSessionPage } from './acp';
+import type { AcpLoadedSession, AcpModelCatalog, AcpSessionActivity, AcpSessionPage } from './acp';
 import type { RateLimiter, RateLimitRule } from './rate-limit';
 import type { ReplayGuard } from './replay';
 import {
@@ -17,6 +17,7 @@ import {
   modelIdSchema,
   sessionCreateBodySchema,
   sessionCreateOptionsBodySchema,
+  sessionActivityBodySchema,
   sessionListBodySchema,
   sessionLoadBodySchema,
   sessionPromptBodySchema,
@@ -39,6 +40,7 @@ const serviceOptionsSchema = z
     healthLimit: z.number().int().min(1).max(10_000).default(120),
     sessionListLimit: z.number().int().min(1).max(10_000).default(30),
     sessionLoadLimit: z.number().int().min(1).max(10_000).default(30),
+    sessionActivityLimit: z.number().int().min(1).max(10_000).default(180),
     mutationLimit: z.number().int().min(1).max(10_000).default(10),
     windowMs: z
       .number()
@@ -111,6 +113,23 @@ const localLoadedSessionSchema = z
   })
   .strict();
 
+const localSessionActivitySchema = z
+  .object({
+    active: z.boolean(),
+    kind: z.enum([
+      'thinking',
+      'reading',
+      'editing',
+      'executing',
+      'searching',
+      'fetching',
+      'responding',
+    ]),
+    label: z.string().min(1).max(160),
+    updatedAt: z.number().int().nonnegative(),
+  })
+  .strict();
+
 type LocalLoadedSession = z.infer<typeof localLoadedSessionSchema>;
 
 export interface SessionDiscoveryAdapter {
@@ -118,6 +137,8 @@ export interface SessionDiscoveryAdapter {
   listSessions(input?: unknown): Promise<AcpSessionPage>;
   isSessionLoadSupported(): boolean;
   loadSession(sessionId: string): Promise<AcpLoadedSession>;
+  isSessionActivitySupported?(): boolean;
+  getSessionActivity?(sessionId: string): Promise<AcpSessionActivity | null>;
   isSessionPromptSupported(): boolean;
   promptSession(
     sessionId: string,
@@ -157,6 +178,7 @@ export interface BridgeServiceOptions {
   healthLimit?: number;
   sessionListLimit?: number;
   sessionLoadLimit?: number;
+  sessionActivityLimit?: number;
   mutationLimit?: number;
   windowMs?: number;
 }
@@ -290,6 +312,7 @@ export class BridgeService {
       healthLimit: dependencies.healthLimit,
       sessionListLimit: dependencies.sessionListLimit,
       sessionLoadLimit: dependencies.sessionLoadLimit,
+      sessionActivityLimit: dependencies.sessionActivityLimit,
       mutationLimit: dependencies.mutationLimit,
       windowMs: dependencies.windowMs,
     });
@@ -318,9 +341,11 @@ export class BridgeService {
         ? this.rates.sessionListLimit
         : authorization.request.method === 'session.load'
           ? this.rates.sessionLoadLimit
-        : authorization.request.method === 'bridge.health'
-          ? this.rates.healthLimit
-          : this.rates.mutationLimit;
+          : authorization.request.method === 'session.activity'
+            ? this.rates.sessionActivityLimit
+            : authorization.request.method === 'bridge.health'
+              ? this.rates.healthLimit
+              : this.rates.mutationLimit;
     if (
       !this.consumeRate(
         `device:${authorization.request.device.deviceId}:${authorization.request.method}`,
@@ -366,6 +391,9 @@ export class BridgeService {
     }
     if (authorization.request.method === 'session.load') {
       return this.loadSession(authorization, context.now);
+    }
+    if (authorization.request.method === 'session.activity') {
+      return this.sessionActivity(authorization, context.now);
     }
     if (authorization.request.method === 'session.prompt') {
       return this.promptSession(authorization, context.now);
@@ -462,6 +490,35 @@ export class BridgeService {
       return { status: 503, body: { error: 'temporarily_unavailable' } };
     } finally {
       this.loading = false;
+    }
+  }
+
+  private async sessionActivity(
+    authorization: RequestAuthorization,
+    now: number,
+  ): Promise<BridgeServiceResponse> {
+    if (
+      !this.dependencies.sessions.isSessionActivitySupported?.() ||
+      !this.dependencies.sessions.getSessionActivity
+    ) {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+    const body = sessionActivityBodySchema.parse(authorization.request.body);
+    const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
+    if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
+    try {
+      const activity = await this.dependencies.sessions.getSessionActivity(rawSessionId);
+      return {
+        status: 200,
+        body: localSessionActivitySchema.parse({
+          active: activity?.active ?? false,
+          kind: activity?.kind ?? 'thinking',
+          label: cleanDisplayText(activity?.label ?? 'Waiting for the next step', 160, 'Working'),
+          updatedAt: activity?.updatedAt ?? now,
+        }),
+      };
+    } catch {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
     }
   }
 

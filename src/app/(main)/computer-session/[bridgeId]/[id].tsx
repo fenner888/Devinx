@@ -19,6 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
   useComputerSessionAccess,
+  useComputerSessionActivity,
   useComputerCreateOptions,
   useComputerSessionDetail,
   usePromptComputerSession,
@@ -41,6 +42,7 @@ import {
   splitComputerModelName,
 } from '@lib/computer-model-catalog';
 import { useTheme } from '@theme/index';
+import { activityForComputerSession } from '@/pets/devin/activity';
 
 const BRIDGE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 const LOCAL_SESSION_ID_PATTERN = /^local_[A-Za-z0-9_-]{43}$/;
@@ -164,6 +166,11 @@ export default function ComputerSessionDetailScreen() {
   const access = useComputerSessionAccess(bridgeId, validParameters && Boolean(computer));
   const mayReadContent = validParameters && Boolean(access.data?.capabilities.sessionLoad);
   const query = useComputerSessionDetail(bridgeId, sessionId, mayReadContent);
+  const sessionActivity = useComputerSessionActivity(
+    bridgeId,
+    sessionId,
+    mayReadContent,
+  );
   const prompt = usePromptComputerSession(bridgeId, sessionId);
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
   const localOptions = useComputerCreateOptions(bridgeId, canPrompt && Boolean(computer));
@@ -177,6 +184,7 @@ export default function ComputerSessionDetailScreen() {
   const modelLabel = selectedFamily?.name ?? fallbackModel.family;
   const variantLabel = selectedVariant?.label ?? fallbackModel.variant;
   const canChooseModel = localModels.length > 0 && !localOptions.isLoading && !localOptions.error;
+  const companionActivity = activityForComputerSession(sessionActivity.data, steeringActive);
   const voice = useVoiceComposer({
     value: draft,
     onChangeText: setDraft,
@@ -453,14 +461,13 @@ export default function ComputerSessionDetailScreen() {
         {query.data && (
           <View className="bg-canvas px-4 pb-1" testID="computer-session-companion-dock">
             <DevinCompanion
-              state={steeringActive ? 'thinking' : 'waiting'}
+              state={companionActivity.state}
               size={112}
+              message={companionActivity.message}
               active={companionActive}
-              travel={steeringActive}
+              travel={companionActivity.travel}
               travelTrack
-              accessibilityLabel={
-                steeringActive ? 'Devin companion, working' : 'Devin companion, waiting'
-              }
+              accessibilityLabel={`Devin companion, ${companionActivity.message}`}
             />
           </View>
         )}

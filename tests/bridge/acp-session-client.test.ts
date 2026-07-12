@@ -301,6 +301,68 @@ if (request.method === 'initialize') {
     }
   });
 
+  it('exposes sanitized tool activity without exposing tool input or agent thoughts', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-activity', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: {
+    sessionId: 'session-activity', update: {
+      sessionUpdate: 'agent_thought_chunk',
+      content: { type: 'text', text: 'private reasoning must not leave the Mac' }
+    }
+  } }) + '\\n');
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: {
+    sessionId: 'session-activity', update: {
+      sessionUpdate: 'tool_call', toolCallId: 'call-1', kind: 'edit',
+      title: 'Editing src/session.ts', rawInput: { token: 'private-token' }
+    }
+  } }) + '\\n');
+  setTimeout(() => process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' }
+  }) + '\\n'), 40);
+}`);
+    const client = new AcpSessionClient({
+      executablePath,
+      requestTimeoutMs: 1_000,
+      promptTimeoutMs: 1_000,
+    });
+
+    try {
+      await client.start();
+      await client.listSessions();
+      await client.loadSession('session-activity');
+      await client.promptSession('session-activity', 'Make the change.');
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const activity = await client.getSessionActivity('session-activity');
+      expect(activity).toMatchObject({
+        active: true,
+        kind: 'editing',
+        label: 'Editing src/session.ts',
+      });
+      expect(JSON.stringify(activity)).not.toMatch(/private-token|private reasoning|call-1/);
+      let completedActivity = await client.getSessionActivity('session-activity');
+      for (let attempt = 0; attempt < 20 && completedActivity?.active !== false; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        completedActivity = await client.getSessionActivity('session-activity');
+      }
+      expect(completedActivity).toMatchObject({
+        active: false,
+        label: 'Response ready',
+      });
+    } finally {
+      await client.stop();
+    }
+  });
+
   it('applies an exact loaded-session model before prompting and rejects stale IDs', async () => {
     const executablePath = fakeCli(`
 if (request.method === 'initialize') {

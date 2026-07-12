@@ -5,6 +5,7 @@ import { useConnections } from '@auth/ConnectionContext';
 import {
   ComputerBridgeError,
   getComputerBridgeHealth,
+  getComputerSessionActivity,
   getComputerCreateOptions,
   createComputerSession,
   loadComputerSession,
@@ -211,6 +212,23 @@ export function useComputerSessionDetail(bridgeId: string, sessionId: string, en
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+    retry: false,
+  });
+}
+
+export function useComputerSessionActivity(
+  bridgeId: string,
+  sessionId: string,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['computerSessionActivity', bridgeId, sessionId],
+    queryFn: () => getComputerSessionActivity(bridgeId, sessionId),
+    enabled,
+    staleTime: 750,
+    gcTime: 60_000,
+    refetchInterval: () => (AppState.currentState === 'active' ? 1_500 : false),
+    refetchOnWindowFocus: true,
     retry: false,
   });
 }

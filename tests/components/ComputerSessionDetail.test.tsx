@@ -47,6 +47,7 @@ jest.mock('../../src/api/bridge/queries', () => ({
     error: null,
     refetch: mockRefetch,
   }),
+  useComputerSessionActivity: () => ({ data: undefined }),
   usePromptComputerSession: () => ({
     mutate: mockMutate,
     isPending: false,

@@ -218,7 +218,7 @@ describe('active session composer', () => {
       expect(props).toEqual(
         expect.objectContaining({ size: 104, state: 'waiting', travel: false, travelTrack: true }),
       );
-      expect(props?.accessibilityLabel).toBe('Devin companion, Waiting for response');
+      expect(props?.accessibilityLabel).toBe('Devin companion, Waiting for your reply');
     });
   });
 });

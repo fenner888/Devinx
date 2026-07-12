@@ -198,9 +198,9 @@ export const sessionResponseSchema = z
     // Web-app-only enrichment fields (best-effort, all optional).
     latest_status_contents: z
       .object({
-        enum: z.string().optional(),
-        reason: z.string().optional(),
-        user_action_required: z.string().optional(),
+        enum: z.string().max(80).optional(),
+        reason: z.string().max(500).optional(),
+        user_action_required: z.string().max(500).optional(),
       })
       .nullable()
       .optional(),
@@ -208,8 +208,8 @@ export const sessionResponseSchema = z
     latest_permission_contents: z
       .object({
         type: z.string().optional(),
-        tool_name: z.string().optional(),
-        permission_type: z.string().optional(),
+        tool_name: z.string().max(160).optional(),
+        permission_type: z.string().max(160).optional(),
       })
       .nullable()
       .optional(),

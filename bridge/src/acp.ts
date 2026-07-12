@@ -181,6 +181,60 @@ const textReplayUpdateSchema = z
   })
   .passthrough();
 
+const toolActivityUpdateSchema = z
+  .object({
+    sessionUpdate: z.enum(['tool_call', 'tool_call_update']),
+    toolCallId: z.string().min(1).max(512),
+    title: z.string().min(1).max(500).optional(),
+    kind: z
+      .enum(['read', 'edit', 'delete', 'move', 'search', 'execute', 'think', 'fetch', 'other'])
+      .optional(),
+    status: z.string().min(1).max(80).optional(),
+  })
+  .passthrough();
+
+export type AcpActivityKind =
+  | 'thinking'
+  | 'reading'
+  | 'editing'
+  | 'executing'
+  | 'searching'
+  | 'fetching'
+  | 'responding';
+
+export interface AcpSessionActivity {
+  kind: AcpActivityKind;
+  label: string;
+  active: boolean;
+  updatedAt: number;
+}
+
+interface ActiveAcpSessionActivity extends AcpSessionActivity {
+  sessionId: string;
+  toolCallId?: string;
+}
+
+function activityKindForTool(
+  kind: z.infer<typeof toolActivityUpdateSchema>['kind'],
+): AcpActivityKind {
+  if (kind === 'read') return 'reading';
+  if (kind === 'edit' || kind === 'delete' || kind === 'move') return 'editing';
+  if (kind === 'execute') return 'executing';
+  if (kind === 'search') return 'searching';
+  if (kind === 'fetch') return 'fetching';
+  return 'thinking';
+}
+
+function defaultActivityLabel(kind: AcpActivityKind): string {
+  if (kind === 'reading') return 'Reading project files';
+  if (kind === 'editing') return 'Editing files';
+  if (kind === 'executing') return 'Running a command';
+  if (kind === 'searching') return 'Searching the project';
+  if (kind === 'fetching') return 'Fetching information';
+  if (kind === 'responding') return 'Writing a response';
+  return 'Thinking through the task';
+}
+
 export interface AcpClientOptions {
   executablePath: string;
   requestTimeoutMs?: number;
@@ -388,6 +442,7 @@ export class AcpSessionClient {
   private readonly loadedSessions = new Set<string>();
   private activeLoad: ReplayCollector | null = null;
   private activePromptSessionId: string | null = null;
+  private activeActivity: ActiveAcpSessionActivity | null = null;
   private creatingContinuation = false;
   private modelCatalog: AcpModelCatalog | null = null;
   private readonly sessionModelSelectors = new Map<string, AcpModelSelector>();
@@ -410,6 +465,7 @@ export class AcpSessionClient {
     this.loadedSessions.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.activeActivity = null;
     this.creatingContinuation = false;
     this.modelCatalog = null;
     this.sessionModelSelectors.clear();
@@ -505,6 +561,17 @@ export class AcpSessionClient {
 
   isSessionPromptSupported(): boolean {
     return Boolean(this.child);
+  }
+
+  isSessionActivitySupported(): boolean {
+    return Boolean(this.child);
+  }
+
+  async getSessionActivity(sessionIdInput: unknown): Promise<AcpSessionActivity | null> {
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    if (this.activeActivity?.sessionId !== sessionId) return null;
+    const { kind, label, active, updatedAt } = this.activeActivity;
+    return { kind, label, active, updatedAt };
   }
 
   isSessionCreateSupported(): boolean {
@@ -756,6 +823,13 @@ export class AcpSessionClient {
       throw new Error('ACP session prompting is busy');
     }
     this.activePromptSessionId = sessionId;
+    this.activeActivity = {
+      sessionId,
+      kind: 'thinking',
+      label: 'Thinking through your request',
+      active: true,
+      updatedAt: Date.now(),
+    };
     this.request(
       'session/prompt',
       { sessionId, prompt },
@@ -769,8 +843,18 @@ export class AcpSessionClient {
   }
 
   private async finishPrompt(sessionId: string): Promise<void> {
-    if (this.activePromptSessionId === sessionId) this.activePromptSessionId = null;
+    if (this.activePromptSessionId !== sessionId) return;
+    this.activePromptSessionId = null;
     await this.releaseSessionOwnership(sessionId).catch(() => this.stop().catch(() => {}));
+    if (!this.activePromptSessionId) {
+      this.activeActivity = {
+        sessionId,
+        kind: 'responding',
+        label: 'Response ready',
+        active: false,
+        updatedAt: Date.now(),
+      };
+    }
   }
 
   async stop(): Promise<void> {
@@ -785,6 +869,7 @@ export class AcpSessionClient {
     this.sessionModelSelectors.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.activeActivity = null;
     this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
@@ -923,7 +1008,9 @@ export class AcpSessionClient {
       const result = sessionUpdateNotificationSchema.safeParse(input);
       if (!result.success || result.data.sessionId !== this.activePromptSessionId) {
         this.abort(child, new Error('ACP prompt update failed validation'));
+        return;
       }
+      this.updatePromptActivity(result.data.sessionId, result.data.update);
       return;
     }
     if (!collector || !collector.accepting) {
@@ -972,6 +1059,72 @@ export class AcpSessionClient {
       text: updateResult.data.content.text,
       messageId: updateResult.data.messageId ?? undefined,
     });
+  }
+
+  private updatePromptActivity(sessionId: string, update: Record<string, unknown>): void {
+    const updateType = update.sessionUpdate;
+    if (updateType === 'tool_call' || updateType === 'tool_call_update') {
+      const parsed = toolActivityUpdateSchema.safeParse(update);
+      if (!parsed.success) return;
+      const previous =
+        this.activeActivity?.sessionId === sessionId &&
+        this.activeActivity.toolCallId === parsed.data.toolCallId
+          ? this.activeActivity
+          : undefined;
+      const status = parsed.data.status?.toLowerCase();
+      if (status === 'completed' || status === 'failed') {
+        this.activeActivity = {
+          sessionId,
+          kind: 'thinking',
+          label: status === 'failed' ? 'Recovering from a tool error' : 'Checking the next step',
+          active: true,
+          updatedAt: Date.now(),
+        };
+        return;
+      }
+      const kind = parsed.data.kind
+        ? activityKindForTool(parsed.data.kind)
+        : previous?.kind ?? 'thinking';
+      const title = parsed.data.title?.replace(/\s+/g, ' ').trim();
+      this.activeActivity = {
+        sessionId,
+        toolCallId: parsed.data.toolCallId,
+        kind,
+        label: title || previous?.label || defaultActivityLabel(kind),
+        active: true,
+        updatedAt: Date.now(),
+      };
+      return;
+    }
+    if (updateType === 'plan' || updateType === 'plan_update') {
+      this.activeActivity = {
+        sessionId,
+        kind: 'thinking',
+        label: 'Planning the next steps',
+        active: true,
+        updatedAt: Date.now(),
+      };
+      return;
+    }
+    if (updateType === 'agent_thought_chunk') {
+      this.activeActivity = {
+        sessionId,
+        kind: 'thinking',
+        label: 'Thinking through the task',
+        active: true,
+        updatedAt: Date.now(),
+      };
+      return;
+    }
+    if (updateType === 'agent_message_chunk') {
+      this.activeActivity = {
+        sessionId,
+        kind: 'responding',
+        label: 'Writing a response',
+        active: true,
+        updatedAt: Date.now(),
+      };
+    }
   }
 
   private collectReplayText(collector: ReplayCollector, input: CollectedReplayMessage): void {

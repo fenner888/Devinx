@@ -2,6 +2,7 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { AccessibilityInfo, Animated, AppState, type AppStateStatus } from 'react-native';
 import { DevinCompanion } from '../../src/components/pets/DevinCompanion';
 import { DEVIN_FRAME_SETS } from '../../src/pets/devin/assets';
+import { DEVIN_STATE_ANIMATIONS } from '../../src/pets/devin/model';
 
 describe('DevinCompanion', () => {
   let reduceMotionEnabled = false;
@@ -52,9 +53,13 @@ describe('DevinCompanion', () => {
     const { getByTestId, unmount } = render(<DevinCompanion state="idle" />);
     await resolveMotionPreference();
 
-    expect(getByTestId('devin-companion-frame').props.source).toBe(DEVIN_FRAME_SETS.idle[0]);
-    act(() => jest.advanceTimersByTime(250));
-    expect(getByTestId('devin-companion-frame').props.source).toBe(DEVIN_FRAME_SETS.idle[1]);
+    expect(getByTestId('devin-companion-frame').props.source).toBe(
+      DEVIN_STATE_ANIMATIONS.idle.frames[0],
+    );
+    act(() => jest.advanceTimersByTime(350));
+    expect(getByTestId('devin-companion-frame').props.source).toBe(
+      DEVIN_STATE_ANIMATIONS.idle.frames[1],
+    );
 
     unmount();
     expect(clearIntervalSpy).toHaveBeenCalled();
@@ -74,8 +79,10 @@ describe('DevinCompanion', () => {
   it('resets to the first frame when state changes', async () => {
     const { getByTestId, rerender } = render(<DevinCompanion state="idle" />);
     await resolveMotionPreference();
-    act(() => jest.advanceTimersByTime(250));
-    expect(getByTestId('devin-companion-frame').props.source).toBe(DEVIN_FRAME_SETS.idle[1]);
+    act(() => jest.advanceTimersByTime(350));
+    expect(getByTestId('devin-companion-frame').props.source).toBe(
+      DEVIN_STATE_ANIMATIONS.idle.frames[1],
+    );
 
     rerender(<DevinCompanion state="waiting" />);
 

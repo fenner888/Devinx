@@ -3,7 +3,9 @@ import { DEVIN_FRAME_SETS } from './assets';
 import type { DevinAnimationDefinition, DevinPetState } from './types';
 
 export const DEVIN_STATE_ANIMATIONS: Record<DevinPetState, DevinAnimationDefinition> = {
-  idle: { frames: DEVIN_FRAME_SETS.idle, fps: 4, loop: true },
+  // The waiting row is the canonical seated Devin. The older idle row changes
+  // the leg silhouette between frames and looks inconsistent at home-screen size.
+  idle: { frames: DEVIN_FRAME_SETS.waiting, fps: 3, loop: true },
   thinking: { frames: DEVIN_FRAME_SETS.running, fps: 5, loop: true },
   working: { frames: DEVIN_FRAME_SETS.review, fps: 6, loop: true },
   success: { frames: DEVIN_FRAME_SETS.jumping, fps: 8, loop: false },

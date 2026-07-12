@@ -34,6 +34,7 @@ export const bridgeMethodSchema = z.enum([
   'device.revoke',
   'session.list',
   'session.load',
+  'session.activity',
   'session.prompt',
   'session.create_options',
   'session.create',
@@ -90,6 +91,12 @@ export const sessionLoadBodySchema = z
   })
   .strict();
 
+export const sessionActivityBodySchema = z
+  .object({
+    sessionId: sessionIdSchema,
+  })
+  .strict();
+
 export const sessionPromptBodySchema = z
   .object({
     sessionId: sessionIdSchema,
@@ -141,6 +148,7 @@ export const bodySchemas = {
   'device.revoke': deviceRevokeBodySchema,
   'session.list': sessionListBodySchema,
   'session.load': sessionLoadBodySchema,
+  'session.activity': sessionActivityBodySchema,
   'session.prompt': sessionPromptBodySchema,
   'session.create_options': sessionCreateOptionsBodySchema,
   'session.create': sessionCreateBodySchema,
@@ -151,6 +159,7 @@ export const permissionByMethod = {
   'device.revoke': 'bridge:health',
   'session.list': 'session:metadata:read',
   'session.load': 'session:content:read',
+  'session.activity': 'session:content:read',
   'session.prompt': 'session:prompt:send',
   'session.create_options': 'session:metadata:read',
   'session.create': 'session:create',
@@ -164,6 +173,7 @@ export type BridgeHealthBody = z.infer<typeof bridgeHealthBodySchema>;
 export type DeviceRevokeBody = z.infer<typeof deviceRevokeBodySchema>;
 export type SessionListBody = z.infer<typeof sessionListBodySchema>;
 export type SessionLoadBody = z.infer<typeof sessionLoadBodySchema>;
+export type SessionActivityBody = z.infer<typeof sessionActivityBodySchema>;
 export type SessionPromptBody = z.infer<typeof sessionPromptBodySchema>;
 export type SessionCreateOptionsBody = z.infer<typeof sessionCreateOptionsBodySchema>;
 export type SessionCreateBody = z.infer<typeof sessionCreateBodySchema>;
@@ -173,6 +183,7 @@ export type BridgeBodyByMethod = {
   'device.revoke': DeviceRevokeBody;
   'session.list': SessionListBody;
   'session.load': SessionLoadBody;
+  'session.activity': SessionActivityBody;
   'session.prompt': SessionPromptBody;
   'session.create_options': SessionCreateOptionsBody;
   'session.create': SessionCreateBody;
