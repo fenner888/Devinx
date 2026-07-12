@@ -292,7 +292,7 @@ describe('home attachment control', () => {
     );
   });
 
-  it('uses grouped destination and workspace picker surfaces', () => {
+  it('uses grouped destination and a deliberate floating workspace picker', () => {
     mockConnection = {
       mode: 'both',
       hasCloudConnection: true,
@@ -320,10 +320,17 @@ describe('home attachment control', () => {
     fireEvent.press(screen.getByLabelText('Use Studio Mac'));
 
     fireEvent.press(screen.getByLabelText('Workspace: DevinX'));
-    expect(screen.getByTestId('workspace-picker-group').props.className).toContain(
-      'overflow-hidden',
-    );
+    expect(screen.getByTestId('workspace-picker-group')).toBeTruthy();
+    expect(screen.getByText('Current Workspace')).toBeTruthy();
+    expect(screen.getByText('Other Workspaces')).toBeTruthy();
     expect(screen.getByLabelText('Use workspace Push')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Use workspace Push'));
+    expect(screen.getByLabelText('Use workspace Push').props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(screen.getByLabelText('Done choosing workspace')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Done choosing workspace'));
+    expect(screen.getByLabelText('Workspace: Push')).toBeTruthy();
   });
 
   it('submits the exact local model variant selected through reasoning and speed', () => {

@@ -101,12 +101,7 @@ export default function HomeScreen() {
   const defaultTags = useAppPreferences((state) => state.defaultTags);
   const { data: sessions } = useSessions('board');
   const computerSessions = useComputerSessions();
-  const {
-    mode: connectionMode,
-    hasCloudConnection,
-    usesCloud,
-    computers = [],
-  } = useConnections();
+  const { mode: connectionMode, hasCloudConnection, usesCloud, computers = [] } = useConnections();
   const usesComputer = connectionModeUsesComputer(connectionMode);
   const canCreateCloudSession = usesCloud && hasCloudConnection;
   const [selectedComputerBridgeId, setSelectedComputerBridgeId] = useState<string | null>(
@@ -139,6 +134,8 @@ export default function HomeScreen() {
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [showDestinationPicker, setShowDestinationPicker] = useState(false);
   const [showWorkspacePicker, setShowWorkspacePicker] = useState(false);
+  const [draftWorkspaceId, setDraftWorkspaceId] = useState<string | null>(null);
+  const [workspaceQuery, setWorkspaceQuery] = useState('');
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showModelVariantPicker, setShowModelVariantPicker] = useState(false);
   const [modelQuery, setModelQuery] = useState('');
@@ -169,10 +166,7 @@ export default function HomeScreen() {
     if (!options.workspaces.some((workspace) => workspace.id === selectedWorkspaceId)) {
       setSelectedWorkspaceId(options.workspaces[0]?.id ?? null);
     }
-    if (
-      selectedModelId !== null &&
-      !options.models.some((model) => model.id === selectedModelId)
-    ) {
+    if (selectedModelId !== null && !options.models.some((model) => model.id === selectedModelId)) {
       setSelectedModelId(null);
     }
   }, [localOptions.data, selectedModelId, selectedWorkspaceId]);
@@ -216,6 +210,14 @@ export default function HomeScreen() {
   const selectedWorkspace = localOptions.data?.workspaces.find(
     (workspace) => workspace.id === selectedWorkspaceId,
   );
+  const approvedWorkspaces = localOptions.data?.workspaces ?? [];
+  const normalizedWorkspaceQuery = workspaceQuery.trim().toLowerCase();
+  const otherWorkspaces = approvedWorkspaces.filter(
+    (workspace) =>
+      workspace.id !== selectedWorkspaceId &&
+      (normalizedWorkspaceQuery.length === 0 ||
+        workspace.name.toLowerCase().includes(normalizedWorkspaceQuery)),
+  );
   const localModels = useMemo(() => localOptions.data?.models ?? [], [localOptions.data?.models]);
   const modelFamilies = useMemo(() => groupComputerModels(localModels), [localModels]);
   const selectedFamily = familyForModelId(
@@ -223,10 +225,7 @@ export default function HomeScreen() {
     selectedModelId ?? localOptions.data?.defaultModelId,
   );
   const selectedVariant = selectedFamily
-    ? preferredFamilyVariant(
-        selectedFamily,
-        selectedModelId ?? localOptions.data?.defaultModelId,
-      )
+    ? preferredFamilyVariant(selectedFamily, selectedModelId ?? localOptions.data?.defaultModelId)
     : undefined;
   const recommendedFamily = modelFamilies.find((family) => family.recommended);
   const recentModelFamilies = modelFamilies.filter(
@@ -249,9 +248,7 @@ export default function HomeScreen() {
   const canCreateComputerSession = Boolean(
     computer && selectedWorkspaceId && !localOptions.isLoading && !localOptions.error,
   );
-  const canUseComposer = isComputerDestination
-    ? canCreateComputerSession
-    : canCreateCloudSession;
+  const canUseComposer = isComputerDestination ? canCreateComputerSession : canCreateCloudSession;
   const composerPending = createSession.isPending || createComputerSession.isPending;
   const normalizedRepoQuery = repoQuery.trim().toLowerCase();
   const filteredRepositories = (repositories ?? []).filter(
@@ -303,6 +300,8 @@ export default function HomeScreen() {
         );
         return;
       }
+      setDraftWorkspaceId(selectedWorkspaceId ?? localOptions.data.workspaces[0]?.id ?? null);
+      setWorkspaceQuery('');
       setShowWorkspacePicker(true);
       return;
     }
@@ -361,12 +360,7 @@ export default function HomeScreen() {
 
   function handleSend() {
     if (isComputerDestination) {
-      if (
-        !computer ||
-        !selectedWorkspaceId ||
-        !prompt.trim() ||
-        createComputerSession.isPending
-      ) {
+      if (!computer || !selectedWorkspaceId || !prompt.trim() || createComputerSession.isPending) {
         return;
       }
       hapticLight();
@@ -386,9 +380,7 @@ export default function HomeScreen() {
           onError: (error) => {
             hapticError();
             setComposerError(
-              error instanceof Error
-                ? error.message
-                : 'The local session could not be created.',
+              error instanceof Error ? error.message : 'The local session could not be created.',
             );
           },
         },
@@ -588,7 +580,9 @@ export default function HomeScreen() {
                 <Pressable
                   className="w-9 h-9 rounded-full items-center justify-center"
                   onPress={() => setShowAttachmentPicker(true)}
-                  disabled={isComputerDestination || !canCreateCloudSession || uploadAttachment.isPending}
+                  disabled={
+                    isComputerDestination || !canCreateCloudSession || uploadAttachment.isPending
+                  }
                   accessibilityRole="button"
                   accessibilityLabel="Add attachment"
                 >
@@ -620,7 +614,10 @@ export default function HomeScreen() {
                         accessibilityLabel={`Reasoning and speed: ${selectedVariant.label}`}
                       >
                         <Ionicons name="sparkles-outline" size={14} color={tokens.textMid.hex} />
-                        <Text className="ml-1.5 max-w-20 text-text-mid text-text13" numberOfLines={1}>
+                        <Text
+                          className="ml-1.5 max-w-20 text-text-mid text-text13"
+                          numberOfLines={1}
+                        >
                           {selectedVariant.label}
                         </Text>
                         <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
@@ -665,10 +662,7 @@ export default function HomeScreen() {
                 className={`w-10 h-10 rounded-full items-center justify-center ${canUseComposer && prompt.trim() && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
                 onPress={handleSend}
                 disabled={
-                  !canUseComposer ||
-                  !prompt.trim() ||
-                  composerPending ||
-                  uploadAttachment.isPending
+                  !canUseComposer || !prompt.trim() || composerPending || uploadAttachment.isPending
                 }
                 accessibilityRole="button"
                 accessibilityLabel="Start session"
@@ -695,7 +689,7 @@ export default function HomeScreen() {
               onPress={() => canChooseDestination && setShowDestinationPicker(true)}
               disabled={!canChooseDestination}
               accessibilityRole="button"
-              accessibilityLabel={`Session destination: ${isComputerDestination ? computer?.computerName ?? 'Computer' : 'Devin Cloud'}`}
+              accessibilityLabel={`Session destination: ${isComputerDestination ? (computer?.computerName ?? 'Computer') : 'Devin Cloud'}`}
             >
               <Ionicons
                 name={isComputerDestination ? 'desktop-outline' : 'cloud-outline'}
@@ -703,7 +697,7 @@ export default function HomeScreen() {
                 color={tokens.textLow.hex}
               />
               <Text className="text-text-mid text-text12 ml-1.5" numberOfLines={1}>
-                {isComputerDestination ? computer?.computerName ?? 'Computer' : 'Devin Cloud'}
+                {isComputerDestination ? (computer?.computerName ?? 'Computer') : 'Devin Cloud'}
               </Text>
               {canChooseDestination && (
                 <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
@@ -729,7 +723,7 @@ export default function HomeScreen() {
               <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
               <Text className="text-text-mid text-text12 ml-1.5 flex-1" numberOfLines={1}>
                 {isComputerDestination
-                  ? selectedWorkspace?.name ?? 'Select workspace'
+                  ? (selectedWorkspace?.name ?? 'Select workspace')
                   : selectedRepoName}
               </Text>
               <Ionicons name="chevron-down" size={13} color={tokens.textLow.hex} />
@@ -1050,9 +1044,7 @@ export default function HomeScreen() {
                       name="cloud-outline"
                       size={18}
                       color={
-                        destination === 'cloud'
-                          ? tokens.textAlwaysWhite.hex
-                          : tokens.textMid.hex
+                        destination === 'cloud' ? tokens.textAlwaysWhite.hex : tokens.textMid.hex
                       }
                     />
                   </View>
@@ -1119,71 +1111,157 @@ export default function HomeScreen() {
         visible={showWorkspacePicker}
         animationType="slide"
         transparent
-        onRequestClose={() => setShowWorkspacePicker(false)}
+        onRequestClose={() => {
+          setDraftWorkspaceId(selectedWorkspaceId);
+          setShowWorkspacePicker(false);
+        }}
       >
-        <View className="flex-1 bg-scrim justify-end">
+        <View className="flex-1 justify-end">
+          <Pressable
+            className="absolute inset-0 bg-scrim"
+            onPress={() => {
+              setDraftWorkspaceId(selectedWorkspaceId);
+              setShowWorkspacePicker(false);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss workspace picker"
+          />
           <View
-            className="max-h-[65%] rounded-t-sheet bg-surface2 pt-3"
-            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+            className="mx-3 mb-2 max-h-[70%] overflow-hidden rounded-sheet border border-border bg-surface2 pt-3 shadow-2xl"
+            style={{ paddingBottom: Math.max(insets.bottom, 12) }}
             accessibilityViewIsModal
           >
             <View className="mb-3 h-1 w-10 self-center rounded-full bg-border" />
-            <View className="mb-4 flex-row items-start justify-between px-5">
-              <View className="flex-1 pr-3">
-                <Text className="text-text-hi text-text17 font-medium">Select workspace</Text>
-                <Text className="mt-1 text-text-low text-text12">
-                  Approved workspaces previously used by Devin on this Mac
-                </Text>
-              </View>
+            <View className="mb-3 flex-row items-center px-4">
               <Pressable
-                className="h-10 w-10 items-center justify-center rounded-full bg-tint-secondary"
-                onPress={() => setShowWorkspacePicker(false)}
+                className="h-11 w-14 items-start justify-center"
+                onPress={() => {
+                  setDraftWorkspaceId(selectedWorkspaceId);
+                  setShowWorkspacePicker(false);
+                }}
                 accessibilityRole="button"
                 accessibilityLabel="Close workspace picker"
               >
-                <Ionicons name="close" size={19} color={tokens.textMid.hex} />
+                <Ionicons name="close" size={20} color={tokens.textMid.hex} />
+              </Pressable>
+              <Text className="flex-1 text-center text-text-hi text-text17 font-semibold">
+                Choose Workspace
+              </Text>
+              <Pressable
+                className="h-11 w-14 items-end justify-center"
+                onPress={() => {
+                  if (draftWorkspaceId) setSelectedWorkspaceId(draftWorkspaceId);
+                  setShowWorkspacePicker(false);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Done choosing workspace"
+              >
+                <Text className="text-brand-text text-text14 font-medium">Done</Text>
               </Pressable>
             </View>
-            <ScrollView contentContainerClassName="px-5" showsVerticalScrollIndicator={false}>
-              <View
-                className="overflow-hidden rounded-cardLg border border-border-subtle bg-surface1"
-                testID="workspace-picker-group"
-              >
-                {localOptions.data?.workspaces.map((workspace, index) => {
-                  const selected = workspace.id === selectedWorkspaceId;
-                  const hasFollowingWorkspace =
-                    index < (localOptions.data?.workspaces.length ?? 0) - 1;
-                  return (
-                    <Pressable
-                      key={workspace.id}
-                      className={`min-h-16 flex-row items-center px-4 py-3 ${hasFollowingWorkspace ? 'border-b border-border-subtle' : ''} ${selected ? 'bg-tint-blue' : ''}`}
-                      onPress={() => {
-                        setSelectedWorkspaceId(workspace.id);
-                        setShowWorkspacePicker(false);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Use workspace ${workspace.name}`}
-                      accessibilityState={{ selected }}
-                    >
-                      <View
-                        className={`mr-3 h-9 w-9 items-center justify-center rounded-card ${selected ? 'bg-brand' : 'bg-tint-secondary'}`}
-                      >
-                        <Ionicons
-                          name="folder-outline"
-                          size={18}
-                          color={selected ? tokens.textAlwaysWhite.hex : tokens.textMid.hex}
-                        />
-                      </View>
-                      <Text className="flex-1 text-text-hi text-text14" numberOfLines={1}>
-                        {workspace.name}
-                      </Text>
-                      {selected && (
-                        <Ionicons name="checkmark" size={21} color={tokens.brandText.hex} />
-                      )}
-                    </Pressable>
-                  );
-                })}
+            {approvedWorkspaces.length > 6 && (
+              <View className="mx-4 mb-3 flex-row items-center rounded-cardLg border border-border-subtle bg-surface1 px-3">
+                <Ionicons name="search" size={17} color={tokens.textLow.hex} />
+                <TextInput
+                  className="ml-2 min-h-12 flex-1 text-text-hi text-text14"
+                  value={workspaceQuery}
+                  onChangeText={setWorkspaceQuery}
+                  placeholder="Search workspaces"
+                  placeholderTextColor={tokens.textLow.hex}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  accessibilityLabel="Search workspaces"
+                />
               </View>
+            )}
+            <ScrollView
+              contentContainerClassName="px-4 pb-1"
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              testID="workspace-picker-group"
+            >
+              {selectedWorkspace && (
+                <View className="mb-4">
+                  <Text className="mb-2 px-1 text-text-low text-text12 font-medium">
+                    Current Workspace
+                  </Text>
+                  <Pressable
+                    className={`min-h-16 flex-row items-center rounded-cardLg border px-4 py-3 ${draftWorkspaceId === selectedWorkspace.id ? 'border-brand bg-tint-blue' : 'border-border-subtle bg-surface1'}`}
+                    onPress={() => setDraftWorkspaceId(selectedWorkspace.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Use workspace ${selectedWorkspace.name}`}
+                    accessibilityState={{ selected: draftWorkspaceId === selectedWorkspace.id }}
+                  >
+                    <View className="mr-3 h-9 w-9 items-center justify-center rounded-card bg-tint-secondary">
+                      <Ionicons name="folder-outline" size={18} color={tokens.textMid.hex} />
+                    </View>
+                    <View className="flex-1 pr-2">
+                      <Text className="text-text-hi text-text14 font-medium" numberOfLines={1}>
+                        {selectedWorkspace.name}
+                      </Text>
+                      <Text className="mt-0.5 text-text-low text-text12" numberOfLines={1}>
+                        {computer?.computerName ?? 'Paired computer'}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={
+                        draftWorkspaceId === selectedWorkspace.id
+                          ? 'checkmark-circle'
+                          : 'ellipse-outline'
+                      }
+                      size={22}
+                      color={
+                        draftWorkspaceId === selectedWorkspace.id
+                          ? tokens.brandText.hex
+                          : tokens.textLow.hex
+                      }
+                    />
+                  </Pressable>
+                </View>
+              )}
+
+              {otherWorkspaces.length > 0 && (
+                <View>
+                  <Text className="mb-2 px-1 text-text-low text-text12 font-medium">
+                    Other Workspaces
+                  </Text>
+                  <View className="gap-2">
+                    {otherWorkspaces.map((workspace) => {
+                      const selected = workspace.id === draftWorkspaceId;
+                      return (
+                        <Pressable
+                          key={workspace.id}
+                          className={`min-h-16 flex-row items-center rounded-cardLg border px-4 py-3 ${selected ? 'border-brand bg-tint-blue' : 'border-border-subtle bg-surface1'}`}
+                          onPress={() => setDraftWorkspaceId(workspace.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Use workspace ${workspace.name}`}
+                          accessibilityState={{ selected }}
+                        >
+                          <View className="mr-3 h-9 w-9 items-center justify-center rounded-card bg-tint-secondary">
+                            <Ionicons name="folder-outline" size={18} color={tokens.textMid.hex} />
+                          </View>
+                          <View className="flex-1 pr-2">
+                            <Text
+                              className="text-text-hi text-text14 font-medium"
+                              numberOfLines={1}
+                            >
+                              {workspace.name}
+                            </Text>
+                            <Text className="mt-0.5 text-text-low text-text12" numberOfLines={1}>
+                              {computer?.computerName ?? 'Paired computer'}
+                            </Text>
+                          </View>
+                          <Ionicons
+                            name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+                            size={22}
+                            color={selected ? tokens.brandText.hex : tokens.textLow.hex}
+                          />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -1244,10 +1322,7 @@ export default function HomeScreen() {
                 )}
               </View>
             )}
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {normalizedModelQuery ? (
                 <>
                   <Text className="px-10 pb-2 pt-1 text-text-low text-text13 font-medium">
@@ -1256,9 +1331,7 @@ export default function HomeScreen() {
                   {searchedModelFamilies.length > 0 ? (
                     searchedModelFamilies.map((family) => modelFamilyRow(family))
                   ) : (
-                    <Text className="px-10 py-5 text-text-low text-text14">
-                      No matching models
-                    </Text>
+                    <Text className="px-10 py-5 text-text-low text-text14">No matching models</Text>
                   )}
                 </>
               ) : (
