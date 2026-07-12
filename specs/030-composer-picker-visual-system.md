@@ -1,8 +1,7 @@
 # 030 — Composer picker visual system
 
-Status: Build 32 baseline implemented; final workspace-picker refinement is
-implemented and automated-test validated for the Build 33 UI-freeze checkpoint;
-physical visual and interaction verification remain
+Status: implemented, automated-test validated, and uploaded in iOS Build 33 as
+the UI-freeze checkpoint; physical visual and interaction verification remain
 
 ## Intent
 
