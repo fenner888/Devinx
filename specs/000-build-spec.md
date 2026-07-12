@@ -338,7 +338,7 @@ When Devin needs input (question, secret request, decision), that session is pur
 
 ### 7.8 Voice Spec (Dictation + Scribe)
 
-**Status:** approved direction, pending Session 4a findings. Session 4b MUST NOT begin until `/specs/007-voice-spec-analysis.md` is reviewed and its engine, packaging, and scribe-tier decisions are approved.
+**Status:** Session 4a approved July 12, 2026; Session 4b authorized. The selected v1 engine is an app-owned Expo module around Apple SpeechAnalyzer/SpeechTranscriber. Whisper is deferred to a later compatibility/accuracy build. V1 bundles no Whisper model; unsupported devices retain ordinary typing with a clear voice-unavailable state. Scribe uses the deterministic template on every device and Apple Foundation Models only as an availability-checked progressive enhancement. All §7.8.4 security gates remain mandatory before merge or release.
 
 Voice Spec removes the mobile prompt-authoring bottleneck without changing Devin into a voice assistant:
 
@@ -347,9 +347,9 @@ Voice Spec removes the mobile prompt-authoring bottleneck without changing Devin
 
 #### 7.8.1 Session 4a analysis gate
 
-Evaluate `whisper.rn`, a Swift-native WhisperKit Expo module, and an app-owned Expo module using Apple SpeechAnalyzer/SpeechTranscriber. Use five 30–90 second fixtures with realistic technical vocabulary (including TypeScript, Zod, Expo Router, TanStack Query, RLS, OAuth, PR, monorepo, auth middleware, kebab-case, and `api.devin.ai`). Record technical-term word error rate, end-to-end latency, real-time factor, peak memory, supported hardware/OS, maintenance health, Expo/EAS compatibility, and interruption behavior on an iPhone 13-class device. Measure vocabulary biasing using repo, playbook, and tag names plus a capped static developer vocabulary; secret names and values are forbidden.
+Evaluate `whisper.rn`, a Swift-native WhisperKit Expo module, and an app-owned Expo module using Apple SpeechAnalyzer/SpeechTranscriber. Use five 30–90 second fixtures with realistic technical vocabulary (including TypeScript, Zod, Expo Router, TanStack Query, RLS, OAuth, PR, monorepo, auth middleware, kebab-case, and `api.devin.ai`). Record technical-term word error rate, end-to-end latency, real-time factor, peak memory, supported hardware/OS, maintenance health, Expo/EAS compatibility, and interruption behavior. Measure vocabulary biasing using repo, playbook, and tag names plus a capped static developer vocabulary; secret names and values are forbidden. Documentary evaluation is sufficient for candidates explicitly deferred by the decision authority; a later Whisper build must run the same physical protocol before it can replace or supplement SpeechAnalyzer.
 
-Decide whether models are bundled or downloaded on first use. Evaluate binary/cellular impact, progress/retry UX, Settings → Storage deletion, iCloud-backup exclusion, and whether a tiny instant fallback plus an optional higher-accuracy model is justified. Do not fabricate device numbers: an unrun benchmark leaves the engine decision provisional and blocks Session 4b.
+Decide whether models are bundled or downloaded on first use. Evaluate binary/cellular impact, progress/retry UX, Settings → Storage deletion, iCloud-backup exclusion, and whether a tiny instant fallback plus an optional higher-accuracy model is justified. The approved v1 uses only Apple’s system-managed language asset and therefore ships no app-managed speech model.
 
 Evaluate scribe in this order: Apple Foundation Models on supported iOS 26 devices; a deterministic template and filler/punctuation cleanup that ships for every device; cloud LLM scribe as a documented Phase 2 option only. Cloud STT and cloud scribe are out of v1.
 

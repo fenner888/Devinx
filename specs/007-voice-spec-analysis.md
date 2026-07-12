@@ -1,23 +1,23 @@
 # Session 4a — Voice Spec Analysis
 
 **Date:** July 12, 2026  
-**Status:** Physical SpeechAnalyzer benchmark complete; Whisper comparator and final approval pending
+**Status:** Approved for Session 4b; Whisper deferred to a later build
 **Decision authority:** Mark Fenner  
-**Build gate:** Session 4b is blocked until the technical-vocabulary result in §8 is compared with an on-device Whisper candidate (or Mark explicitly accepts the measured tradeoff) and Mark approves §10.
+**Build gate:** Session 4b is authorized. It cannot merge or ship until the security and lifecycle evidence in §9 is complete.
 
 ## 1. Executive decision
 
-Do not install a shipping transcription dependency or begin Session 4b Voice UI yet. A natural-voice TestFlight benchmark now establishes that Apple SpeechAnalyzer is available, fast, memory-stable across the five fixtures, and accurate enough on ordinary prompt language. It does **not** establish that contextual strings solve developer vocabulary: hints produced byte-for-byte identical transcripts, and 7 of 20 tracked technical terms were not preserved exactly.
+Proceed with Session 4b using the app-owned SpeechAnalyzer module. A natural-voice TestFlight benchmark establishes that Apple SpeechAnalyzer is available, fast, memory-stable across the five fixtures, and strong enough for the v1 starting point. The decision explicitly accepts the measured developer-vocabulary tradeoff for v1: hints produced byte-for-byte identical transcripts, and 7 of 20 tracked technical terms were not preserved exactly. Whisper remains a later accuracy/compatibility option rather than a v1 dependency.
 
 The provisional architecture is:
 
-- **Leading primary candidate:** a small DevinX-owned iOS Expo module around Apple `SpeechAnalyzer` + `SpeechTranscriber` on iOS 26. On the tested iPhone 16 Pro, mean overall WER was 9.01%, median post-recording file analysis was 0.946 seconds without hints, and peak observed app resident memory was 129.7 MiB.
-- **Required comparator:** `whisper.rn` with quantized `base.en`, focused on whether it materially reduces the 35.0% exact technical-term miss rate. It remains the broad-OS fallback under evaluation, not an approved shipping dependency.
+- **Approved primary:** a small DevinX-owned iOS Expo module around Apple `SpeechAnalyzer` + `SpeechTranscriber` on iOS 26. On the tested iPhone 16 Pro, mean overall WER was 9.01%, median post-recording file analysis was 0.946 seconds without hints, and peak observed app resident memory was 129.7 MiB.
+- **V1 fallback:** ordinary editable text input plus a clear voice-unavailable explanation when SpeechAnalyzer or its locale asset is unavailable. `whisper.rn` and WhisperKit are deferred to a later build and are not v1 dependencies.
 - **Do not select:** the current `expo-speech-recognition` wrapper as the new-API candidate. It explicitly implements legacy `SFSpeechRecognizer`, not SpeechAnalyzer.
-- **Scribe:** Apple Foundation Models on eligible Apple Intelligence devices after a quality check, with the deterministic template implementation on every device. The template path is mandatory and cloud scribe remains out of v1.
+- **Approved scribe architecture:** Apple Foundation Models on eligible Apple Intelligence devices after a quality check, with the deterministic template implementation on every device. The template path is mandatory and cloud scribe remains out of v1.
 - **Privacy:** audio stays on device. No voice implementation may import networking, retain recordings, log transcripts, or change the App Store “Data Not Collected” posture.
 
-This recommendation overturns “install `whisper.rn` first” as the immediate default, but not yet as the measured fallback. Apple’s engine removes a third-party native binary and Whisper model from current devices, supplies live finalized results, and uses system-managed language assets. The benchmark proves availability on an iPhone 16 Pro, not on the iPhone 13-class floor, and it shows no measurable contextual-string benefit in the file-analysis path. Apple reports iOS 26 on 79% of active iPhones as of June 7, 2026. [Apple SpeechAnalyzer session](https://developer.apple.com/videos/play/wwdc2025/277/) · [Apple OS adoption](https://developer.apple.com/support/app-store/)
+This decision overturns “install `whisper.rn` first” for v1. Apple’s engine removes a third-party native binary and Whisper model, supplies live finalized results, and uses system-managed language assets. The benchmark proves availability on an iPhone 16 Pro and shows no measurable contextual-string benefit in the file-analysis path. The shipping module must retain the app’s existing deployment floor, compile SpeechAnalyzer behind iOS 26 availability checks, and never raise the entire app’s minimum OS merely to enable voice. Apple reports iOS 26 on 79% of active iPhones as of June 7, 2026. [Apple SpeechAnalyzer session](https://developer.apple.com/videos/play/wwdc2025/277/) · [Apple OS adoption](https://developer.apple.com/support/app-store/)
 
 ## 2. Repository baseline
 
@@ -145,7 +145,7 @@ This ships on every device and is the only guaranteed scribe tier:
 
 ## 8. Required physical benchmark
 
-The fixtures, protocol, and dependency-free scorer live in `/spikes/voice/`. Build 37 supplied the first natural-device results. Blank comparator rows remain a release gate, not a documentation defect.
+The fixtures, protocol, and dependency-free scorer live in `/spikes/voice/`. Build 37 supplied the natural-device result used for the v1 decision. Blank Whisper rows document deferred work and do not block SpeechAnalyzer v1; they become mandatory before any later build adds or switches to Whisper.
 
 | Engine / exact model | Hints | Exact tech-term miss rate | Mean overall WER | Median file-analysis time | Median RTF | Peak memory | Device availability | Temp dir empty | Network silent |
 |---|---|---:|---:|---:|---:|---:|---|---|---|
@@ -165,7 +165,7 @@ The fixtures, protocol, and dependency-free scorer live in `/spikes/voice/`. Bui
 - Sharing results was enabled only after the native removal call returned success for every fixture, which confirms success-path deletion. The run did not capture runtime network traffic, exercise interruption/background failure deletion, measure live interim-result latency, or measure UI frame rate.
 - Aggregate evidence is stored at `/spikes/voice/results/iphone-16-pro-speechanalyzer-2026-07-12.json`. Raw audio is intentionally absent and was deleted on-device.
 
-**Interpretation:** SpeechAnalyzer comfortably clears the real-time and overall-WER performance bar on the tested device. It does not clear the developer-vocabulary question by itself, and the hint mechanism as exercised here has zero demonstrated value. The next benchmark should test `whisper.rn` with quantized `base.en` against the same fixtures. WhisperKit is required only if that comparator materially improves technical terms or exposes a platform/integration limitation that changes the decision.
+**Interpretation:** SpeechAnalyzer comfortably clears the real-time and overall-WER performance bar on the tested device. The hint mechanism as exercised here has zero demonstrated value, and v1 must not advertise otherwise. Mark accepted the technical-term result as strong enough for the starting implementation on July 12, 2026. A future Whisper build should test quantized `base.en` against these same fixtures before claiming an accuracy or compatibility improvement.
 
 ### 8.2 Harness preflight completed July 12, 2026
 
@@ -177,14 +177,14 @@ This is smoke evidence only and does not replace the table above:
 - The paired physical device discovered by Xcode is `Marky`, an iPhone 16 Pro on iOS 26.5.2. Direct installation was correctly rejected because Developer Mode is disabled; build 37 therefore used the production TestFlight path.
 - On the Mac, all five synthetic `say` fixtures completed both with and without contextual strings. Overall WER by fixture was 6.78%, 11.40%, 11.71%, 13.64%, and 15.65% (median 11.71%). Hints produced identical transcripts in this synthetic smoke run. Median file-analysis time was 0.93 seconds, median file RTF was 0.0226, and maximum observed resident size was 21.5 MB.
 
-These Mac values prove the harness and scoring pipeline, not mobile product quality. The natural-device result above supersedes them for SpeechAnalyzer product quality. The final cross-engine decision remains blocked until the developer-vocabulary comparator is measured.
+These Mac values prove the harness and scoring pipeline, not mobile product quality. The natural-device result above supersedes them for SpeechAnalyzer product quality. Cross-engine comparison is deferred until a later build evaluates Whisper.
 
 Acceptance floors:
 
 - real-time factor ≤1.0 and streaming UI remains 60fps;
 - zero audio network traffic and empty protected temp directory after every success, cancel, interruption, and failure;
 - no memory termination across five consecutive 90-second runs;
-- technical-term WER no worse than 15% relative to the best candidate unless the storage/memory advantage is substantial and approved explicitly;
+- technical-term accuracy is reviewed explicitly; the v1 SpeechAnalyzer tradeoff was accepted on July 12, 2026 in exchange for no third-party runtime or app-managed model;
 - no lost or duplicated words across interim/final result replacement.
 
 ## 9. Security review
@@ -201,14 +201,14 @@ Session 4b cannot merge without:
 
 ## 10. Approval record
 
-Mark must choose after §8 is filled:
+Decision recorded July 12, 2026:
 
-- [ ] **Transcription engine:** SpeechAnalyzer local module / `whisper.rn` / WhisperKit
-- [ ] **Fallback policy:** exact OS/hardware availability behavior
-- [ ] **Model packaging:** none / bundled exact model / downloaded exact model
-- [ ] **Scribe:** template only / Foundation Models plus template
-- [ ] **Measured limits accepted:** WER, latency, RTF, peak memory, binary/download size
-- [ ] **Security evidence reviewed:** network silence, temp deletion, transcript scrubbing
-- [ ] **Session 4b authorized**
+- [x] **Transcription engine:** app-owned SpeechAnalyzer/SpeechTranscriber Expo module
+- [x] **Fallback policy:** standard typing and a clear unavailable state; revisit Whisper in a later build
+- [x] **Model packaging:** no app-managed speech model; use Apple’s system-managed locale asset
+- [x] **Scribe:** deterministic template for all devices; Foundation Models only when available and after its quality check
+- [x] **Measured limits accepted:** 9.01% mean WER, 0.946s median file analysis, 0.0185 median RTF, 129.7 MiB peak, and the documented technical-term tradeoff
+- [ ] **Security evidence complete:** runtime network silence, deletion across every lifecycle path, and transcript scrubbing
+- [x] **Session 4b authorized**
 
-Until every selected line is checked, the approved deliverable is this analysis and the benchmark spike only.
+Session 4b may begin. It cannot merge or ship until the remaining security evidence is checked and the full §7.8 lifecycle/accessibility matrix passes.
