@@ -55,6 +55,11 @@ import { useTheme } from '@theme/index';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
 import { DevinCompanion } from '@components/pets';
+import {
+  VoiceComposerStatus,
+  VoiceMicButton,
+  useVoiceComposer,
+} from '@components/VoiceInput';
 import { getSessionMode, getSessionRepository } from '@lib/session-repository';
 import { devinStateForStatusKey } from '@/pets/devin/model';
 
@@ -105,6 +110,19 @@ export default function SessionDetailScreen() {
   const updateTags = useUpdateTags(validId);
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
+  const voice = useVoiceComposer({
+    value: messageText,
+    onChangeText: setMessageText,
+    disabled: !session || sendMessage.isPending,
+    hints: {
+      repositories: sessionRepository ? [sessionRepository] : [],
+      tags: session?.tags ?? [],
+    },
+    scribeContext: {
+      destination: 'Devin Cloud',
+      repository: sessionRepository ?? undefined,
+    },
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -453,6 +471,7 @@ export default function SessionDetailScreen() {
               testID="cloud-session-composer"
             >
               <TextInput
+                ref={voice.inputRef}
                 className="min-h-[56px] max-h-28 px-1 text-text-hi text-text14"
                 value={messageText}
                 onChangeText={setMessageText}
@@ -461,21 +480,26 @@ export default function SessionDetailScreen() {
                 multiline
                 textAlignVertical="top"
                 accessibilityLabel="Cloud session message"
+                onSelectionChange={voice.onSelectionChange}
               />
+              <VoiceComposerStatus voice={voice} />
               <View className="mt-1 flex-row items-center justify-between">
-                <Pressable
-                  className="h-9 w-9 items-center justify-center rounded-full"
-                  onPress={() => setShowAttachmentPicker(true)}
-                  disabled={uploadAttachment.isPending}
-                  accessibilityRole="button"
-                  accessibilityLabel="Add attachment"
-                >
-                  {uploadAttachment.isPending ? (
-                    <ActivityIndicator size="small" color={tokens.brandText.hex} />
-                  ) : (
-                    <Ionicons name="add" size={22} color={tokens.textMid.hex} />
-                  )}
-                </Pressable>
+                <View className="flex-row items-center">
+                  <Pressable
+                    className="h-11 w-11 items-center justify-center rounded-full"
+                    onPress={() => setShowAttachmentPicker(true)}
+                    disabled={uploadAttachment.isPending}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add attachment"
+                  >
+                    {uploadAttachment.isPending ? (
+                      <ActivityIndicator size="small" color={tokens.brandText.hex} />
+                    ) : (
+                      <Ionicons name="add" size={22} color={tokens.textMid.hex} />
+                    )}
+                  </Pressable>
+                  <VoiceMicButton voice={voice} disabled={sendMessage.isPending} />
+                </View>
                 <Pressable
                   className={`h-10 w-10 items-center justify-center rounded-full ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
                   disabled={

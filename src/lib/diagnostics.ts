@@ -38,7 +38,7 @@ export function scrubDiagnosticValue(value: unknown, depth = 0): unknown {
   for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
     if (/authorization|api[-_]?key|token|secret|password|cookie|header/i.test(key)) {
       output[key] = '[redacted]';
-    } else if (/message|prompt|body|content|text/i.test(key)) {
+    } else if (/message|prompt|body|content|text|transcript/i.test(key)) {
       output[key] = '[content_redacted]';
     } else {
       output[key] = scrubDiagnosticValue(nestedValue, depth + 1);

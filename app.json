@@ -13,6 +13,7 @@
       "infoPlist": {
         "NSFileProtection": "NSFileProtectionComplete",
         "NSCameraUsageDescription": "Allow DevinX to scan a pairing code shown by DevinX Connector.",
+        "NSMicrophoneUsageDescription": "DevinX uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded.",
         "NSLocalNetworkUsageDescription": "Allow DevinX to connect securely to a computer you approve in DevinX Connector.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
@@ -68,7 +69,12 @@
       ],
       "expo-web-browser",
       "expo-video",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "DevinX uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded."
+        }
+      ],
       "expo-asset",
       [
         "expo-image-picker",

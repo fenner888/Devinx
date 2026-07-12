@@ -60,12 +60,16 @@ describe('diagnostic secret scrubber (§10.2 gate)', () => {
   });
 
   it('redacts message/prompt/body/content keys regardless of value', () => {
-    const out = scrubDiagnosticValue({ message: 'hello', prompt: 'fix the bug' }) as Record<
-      string,
-      unknown
-    >;
+    const out = scrubDiagnosticValue({
+      message: 'hello',
+      prompt: 'fix the bug',
+      transcript: 'spoken private requirement',
+      volatileText: 'unfinished private words',
+    }) as Record<string, unknown>;
     expect(out.message).toBe('[content_redacted]');
     expect(out.prompt).toBe('[content_redacted]');
+    expect(out.transcript).toBe('[content_redacted]');
+    expect(out.volatileText).toBe('[content_redacted]');
   });
 
   it('does not transmit or throw when the local diagnostic boundary is called', () => {

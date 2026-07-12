@@ -16,6 +16,11 @@ const rows = [
       'Credentials stay in the system Keychain. Compose drafts, prompt templates, session context, and the read cache stay on this device and are wiped when you disconnect. Your appearance choice may remain.',
   },
   {
+    title: 'Voice dictation and Scribe',
+    detail:
+      'Voice is transcribed on your device. Audio never leaves your phone and is not saved. Scribe uses Apple Intelligence on-device when available, with a deterministic on-device template fallback.',
+  },
+  {
     title: 'Crash reports',
     detail:
       'This release does not bundle or configure a crash-reporting SDK, so crash reports are not transmitted. If reporting is enabled in a future release, this disclosure and the App Store privacy answers must be updated first.',

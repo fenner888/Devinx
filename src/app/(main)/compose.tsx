@@ -34,6 +34,11 @@ import {
 } from '@api/devin/queries';
 import { ModeSettings } from '@components/ModeSettings';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
+import {
+  VoiceComposerStatus,
+  VoiceMicButton,
+  useVoiceComposer,
+} from '@components/VoiceInput';
 import type { DevinMode } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
@@ -131,6 +136,24 @@ export default function ComposeScreen() {
   const updateDraft = useCallback((patch: Partial<Draft>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
   }, []);
+  const updatePrompt = useCallback((prompt: string) => {
+    setDraft((current) => ({ ...current, prompt }));
+  }, []);
+  const voice = useVoiceComposer({
+    value: draft.prompt,
+    onChangeText: updatePrompt,
+    disabled: !loaded || createSession.isPending,
+    maximumLength: MAX_PROMPT,
+    hints: {
+      repositories: (repositories ?? []).map((repository) => repository.repo_name),
+      playbooks: (playbooks ?? []).map((playbook) => playbook.title),
+      tags: draft.tags,
+    },
+    scribeContext: {
+      destination: 'Devin Cloud',
+      repository: draft.repos.join(', ') || undefined,
+    },
+  });
 
   function addTag() {
     const tag = tagInput.trim().toLowerCase();
@@ -261,6 +284,7 @@ export default function ComposeScreen() {
             Prompt {'\u2022'} {draft.prompt.length}/{MAX_PROMPT}
           </Text>
           <TextInput
+            ref={voice.inputRef}
             className="bg-surface1 rounded-input px-3 py-3 text-text14 text-text-hi mb-1 min-h-32"
             value={draft.prompt}
             onChangeText={(v) => updateDraft({ prompt: v.slice(0, MAX_PROMPT) })}
@@ -269,7 +293,12 @@ export default function ComposeScreen() {
             multiline
             textAlignVertical="top"
             maxLength={MAX_PROMPT}
+            onSelectionChange={voice.onSelectionChange}
           />
+          <VoiceComposerStatus voice={voice} />
+          <View className="mb-2 items-end">
+            <VoiceMicButton voice={voice} disabled={createSession.isPending} />
+          </View>
           {draft.prompt.length > MAX_PROMPT * 0.9 && (
             <Text className="text-text-low text-text11 mb-4">
               {MAX_PROMPT - draft.prompt.length} characters remaining

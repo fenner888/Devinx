@@ -30,6 +30,11 @@ import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
 import { ComputerModelPickerSheets } from '@components/sessions/ComputerModelPickerSheets';
 import {
+  VoiceComposerStatus,
+  VoiceMicButton,
+  useVoiceComposer,
+} from '@components/VoiceInput';
+import {
   familyForModelId,
   groupComputerModels,
   preferredFamilyVariant,
@@ -172,6 +177,18 @@ export default function ComputerSessionDetailScreen() {
   const modelLabel = selectedFamily?.name ?? fallbackModel.family;
   const variantLabel = selectedVariant?.label ?? fallbackModel.variant;
   const canChooseModel = localModels.length > 0 && !localOptions.isLoading && !localOptions.error;
+  const voice = useVoiceComposer({
+    value: draft,
+    onChangeText: setDraft,
+    disabled: !canPrompt || prompt.isPending || steeringActive,
+    hints: {
+      repositories: query.data?.session.workspaceName ? [query.data.session.workspaceName] : [],
+    },
+    scribeContext: {
+      destination: computer?.computerName ?? 'Paired computer',
+      repository: query.data?.session.workspaceName,
+    },
+  });
 
   useEffect(() => {
     if (selectedModelId !== null || localModels.length === 0) return;
@@ -463,6 +480,7 @@ export default function ComputerSessionDetailScreen() {
               testID="computer-session-composer"
             >
               <TextInput
+                ref={voice.inputRef}
                 className="min-h-[56px] max-h-28 px-1 text-text-hi text-text14"
                 value={draft}
                 onChangeText={(value) => setDraft(value.slice(0, 100_000))}
@@ -472,8 +490,14 @@ export default function ComputerSessionDetailScreen() {
                 textAlignVertical="top"
                 editable={!prompt.isPending && !steeringActive}
                 accessibilityLabel="Computer session message"
+                onSelectionChange={voice.onSelectionChange}
               />
+              <VoiceComposerStatus voice={voice} />
               <View className="mt-1 flex-row items-center">
+                <VoiceMicButton
+                  voice={voice}
+                  disabled={!canPrompt || prompt.isPending || steeringActive}
+                />
                 <Pressable
                   className="mr-1 min-w-0 flex-row items-center rounded-full px-2 py-2"
                   onPress={() => canChooseModel && setShowModelPicker(true)}

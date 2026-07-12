@@ -42,6 +42,11 @@ import { ModeSettings } from '@components/ModeSettings';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
 import { DevinCompanion } from '@components/pets';
 import {
+  VoiceComposerStatus,
+  VoiceMicButton,
+  useVoiceComposer,
+} from '@components/VoiceInput';
+import {
   ComputerDiscoveryNotices,
   ComputerSessionRow,
 } from '@components/sessions/ComputerSessionRow';
@@ -275,6 +280,21 @@ export default function HomeScreen() {
       repository.repo_path.toLowerCase().includes(normalizedRepoQuery),
   );
   const companionSize = Math.round(Math.min(height < 700 ? 184 : 220, Math.max(164, width * 0.54)));
+  const voice = useVoiceComposer({
+    value: prompt,
+    onChangeText: setPrompt,
+    disabled: !canUseComposer || composerPending,
+    maximumLength: MAX_PROMPT,
+    hints: {
+      repositories: (repositories ?? []).map((repository) => repository.repo_name),
+      playbooks: (playbooks ?? []).map((playbook) => playbook.title),
+      tags: defaultTags,
+    },
+    scribeContext: {
+      destination: isComputerDestination ? computer?.computerName ?? 'Computer' : 'Devin Cloud',
+      repository: isComputerDestination ? selectedWorkspace?.name : selectedRepo ?? undefined,
+    },
+  });
 
   async function handleAttachment(file: PickedAttachment) {
     setComposerError(null);
@@ -534,6 +554,7 @@ export default function HomeScreen() {
           </Text>
           <View className="rounded-cardLg border border-border bg-surface1">
             <TextInput
+              ref={voice.inputRef}
               className="min-h-[84px] max-h-40 px-5 pt-4 pb-2 text-text-hi text-text16"
               value={prompt}
               onChangeText={(v) => setPrompt(v.slice(0, MAX_PROMPT))}
@@ -550,6 +571,7 @@ export default function HomeScreen() {
               autoCorrect
               textAlignVertical="top"
               accessibilityLabel="Session prompt"
+              onSelectionChange={voice.onSelectionChange}
             />
             {!isComputerDestination && (attachments.length > 0 || uploadingAttachmentName) && (
               <View className="flex-row flex-wrap px-4 pb-2">
@@ -592,6 +614,7 @@ export default function HomeScreen() {
                 ))}
               </View>
             )}
+            <VoiceComposerStatus voice={voice} />
             <View className="flex-row items-center justify-between px-4 pb-4">
               <View className="flex-row items-center gap-1">
                 <Pressable
@@ -609,6 +632,7 @@ export default function HomeScreen() {
                     <Ionicons name="add" size={22} color={tokens.textMid.hex} />
                   )}
                 </Pressable>
+                <VoiceMicButton voice={voice} disabled={!canUseComposer || composerPending} />
                 {isComputerDestination ? (
                   <>
                     <Pressable
