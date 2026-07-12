@@ -478,11 +478,13 @@ export class BridgeService {
             ? { id: loaded.modelId, name: modelDisplayName(loaded.modelId) }
             : undefined,
         },
-        messages: loaded.messages.map((message, index) => ({
-          sequence: index + 1,
-          source: message.source,
-          text: message.text,
-        })),
+        messages: loaded.messages
+          .filter((message) => message.text.trim().length > 0)
+          .map((message, index) => ({
+            sequence: index + 1,
+            source: message.source,
+            text: message.text,
+          })),
         truncated: loaded.truncated,
       });
       return { status: 200, body: fitLoadedSessionResponse(response) };

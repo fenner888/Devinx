@@ -467,7 +467,7 @@ export default function ComputerSessionDetailScreen() {
               active={companionActive}
               travel={companionActivity.travel}
               travelTrack
-              accessibilityLabel={`Devin companion, ${companionActivity.message}`}
+              accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
             />
           </View>
         )}

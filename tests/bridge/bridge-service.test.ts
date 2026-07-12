@@ -468,6 +468,35 @@ describe('authenticated Desktop Bridge service', () => {
     expect(JSON.stringify(result)).not.toContain('/Users/frank');
   });
 
+  it('omits empty replay entries and keeps message sequences contiguous', async () => {
+    adapter.loaded.messages = [
+      { source: 'user', text: 'Please review this.' },
+      { source: 'devin', text: '' },
+      { source: 'devin', text: '   ' },
+      { source: 'devin', text: 'The review is complete.' },
+    ];
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id;
+
+    const result = await bridge.handle(
+      envelope('session.load', { sessionId: handle }, ['session:content:read']),
+      context(),
+    );
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        session: { id: handle, origin: 'computer', workspaceName: 'Secret Project' },
+        messages: [
+          { sequence: 1, source: 'user', text: 'Please review this.' },
+          { sequence: 2, source: 'devin', text: 'The review is complete.' },
+        ],
+        truncated: false,
+      },
+    });
+  });
+
   it('conceals missing permission, unknown handles, and denied session scopes with 404', async () => {
     const bridge = service();
     const listed = await bridge.handle(envelope('session.list', {}), context());

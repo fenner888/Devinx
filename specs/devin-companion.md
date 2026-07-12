@@ -12,6 +12,7 @@ Integrate the generated Devin pet as a restrained, in-app React Native companion
 - Do not add a dependency or change auth, secrets, Secure Store, API clients, or endpoint schemas.
 - Use existing theme tokens and exact status vocabulary from `statusLabels`.
 - Keep the presentation calm and engineering-grade: no hearts, sparkles, or constant speech. Horizontal travel is reserved for active session work and stops when Devin is waiting, sleeping, finished, or in an error state.
+- Do not show a persistent companion message for passive idle, sleeping, or waiting states. A subtle message may appear only for active work, a meaningful completion or failure, or an actionable state that needs the user's attention.
 
 ## Source assets
 
@@ -81,6 +82,7 @@ Behavior:
 - Make the stable outer container accessible; animated frame images are not separate accessibility elements.
 - Remain non-interactive and allow touches to reach the surrounding UI.
 - `compact={false}` uses the requested size and may show a subtle status message.
+- Omit the status bubble entirely when `message` is absent; never synthesize generic filler such as "Waiting for your next message."
 - `compact={true}` uses the requested smaller presentation and suppresses the message.
 
 ## Placement
@@ -91,7 +93,7 @@ Make Devin the centered visual anchor between a compact readiness card and the f
 
 ### Session Detail
 
-Place a compact companion in a dedicated transparent track immediately above the session composer. The track is a stable sibling between the scrollable timeline and composer, so short histories cannot leave Devin floating high in unused space and long histories scroll behind their own viewport without moving the companion away from the input. It must not live inside the composer, overlap messages or controls, or add a visible shelf/background strip. Session Detail intentionally uses a much smaller companion than Home so timeline content remains primary. Keep its transparent track mounted throughout the session. An optimistic send or canonical active-work state uses `thinking`, rises at Devin's current position, and begins walking immediately without jumping to another edge. Devin walks from edge to edge with the direction-specific standing frames. When work ends, stop movement at the current position and transition directly to waiting, success, error, sleeping, or another canonical animation. Sending immediately dismisses the keyboard so the timeline, track, and composer remain visible. Use the exhaustive canonical status mapping and canonical status label for accessibility. Do not duplicate the existing header status with visible companion copy.
+Place a compact companion in a dedicated transparent track immediately above the session composer. The track is a stable sibling between the scrollable timeline and composer, so short histories cannot leave Devin floating high in unused space and long histories scroll behind their own viewport without moving the companion away from the input. It must not live inside the composer, overlap messages or controls, or add a visible shelf/background strip. Session Detail intentionally uses a much smaller companion than Home so timeline content remains primary. Keep its transparent track mounted throughout the session. An optimistic send or canonical active-work state uses `thinking`, rises at Devin's current position, and begins walking immediately without jumping to another edge. Devin walks from edge to edge with the direction-specific standing frames. When work ends, stop movement at the current position and transition directly to waiting, success, error, sleeping, or another canonical animation. Passive waiting and sleeping states remain visually quiet without a companion message bubble; reserve visible copy for active, terminal, or actionable events. Sending immediately dismisses the keyboard so the timeline, track, and composer remain visible. Use the exhaustive canonical status mapping and canonical status label for accessibility. Do not duplicate the existing header status with visible companion copy.
 
 ## Tests and validation
 

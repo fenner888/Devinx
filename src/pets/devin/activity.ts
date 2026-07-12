@@ -6,7 +6,7 @@ import type { DevinPetState } from './types';
 
 export interface DevinSessionActivity {
   state: DevinPetState;
-  message: string;
+  message?: string;
   travel: boolean;
 }
 
@@ -16,7 +16,6 @@ const STATUS_ACTIVITY: Partial<Record<StatusLabelKey, string>> = {
   crashed: 'The session needs attention',
   closed: 'Session closed',
   done: 'Task complete',
-  sleeping: 'Waiting for your next message',
   approveSession: 'Waiting for session approval',
   approveDeployment: 'Waiting for deployment approval',
   approvalRequired: 'Waiting for your approval',
@@ -65,10 +64,11 @@ export function activityForCloudSession(
   const state = devinStateForStatusKey(statusKey);
   if (statusKey !== 'working') {
     const toolName = cleanActivityText(session.latest_permission_contents?.tool_name);
-    const fallback = STATUS_ACTIVITY[statusKey] ?? 'Waiting';
+    const fallback = STATUS_ACTIVITY[statusKey];
     return {
       state,
-      message: toolName && statusKey === 'approvalRequired' ? `Approval needed: ${toolName}` : fallback,
+      message:
+        toolName && statusKey === 'approvalRequired' ? `Approval needed: ${toolName}` : fallback,
       travel: false,
     };
   }
@@ -103,5 +103,5 @@ export function activityForComputerSession(
   if (steeringActive) {
     return { state: 'thinking', message: 'Working through Devin on your Mac', travel: true };
   }
-  return { state: 'waiting', message: 'Waiting for your next message', travel: false };
+  return { state: 'waiting', travel: false };
 }

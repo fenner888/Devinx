@@ -64,4 +64,21 @@ describe('Devin live activity', () => {
       ),
     ).toEqual({ state: 'working', message: 'Editing app.tsx', travel: false });
   });
+
+  it('does not show a passive message bubble while an inactive computer session waits', () => {
+    expect(activityForComputerSession(undefined, false)).toEqual({
+      state: 'waiting',
+      travel: false,
+    });
+  });
+
+  it('does not show a generic bubble for passive cloud states', () => {
+    expect(
+      activityForCloudSession(
+        session({ status: 'suspended', status_detail: 'inactivity' }),
+        'sleeping',
+        false,
+      ),
+    ).toEqual({ state: 'sleeping', message: undefined, travel: false });
+  });
 });

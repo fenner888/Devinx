@@ -402,7 +402,7 @@ export default function SessionDetailScreen() {
               active={companionActive}
               travel={isWorking && companionActivity.travel}
               travelTrack
-              accessibilityLabel={`Devin companion, ${companionActivity.message}`}
+              accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
             />
           </View>
         )}
