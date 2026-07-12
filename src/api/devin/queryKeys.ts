@@ -11,6 +11,7 @@ export const queryKeys = {
   knowledge: ['knowledge'] as const,
   secrets: ['secrets'] as const,
   consumption: ['consumption'] as const,
+  billingLimits: ['billingLimits'] as const,
   insights: (id: string) => ['insights', id] as const,
   tags: (id: string) => ['tags', id] as const,
   schedules: ['schedules'] as const,

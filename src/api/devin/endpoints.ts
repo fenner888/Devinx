@@ -22,6 +22,8 @@ import {
   secretListResponseSchema,
   attachmentResponseSchema,
   consumptionResponseSchema,
+  consumptionCycleListResponseSchema,
+  devinAcuLimitListResponseSchema,
   selfResponseSchema,
   repositoryIndexingListSchema,
   repositoryIndexingSchema,
@@ -52,6 +54,8 @@ import type {
   SecretResponse,
   AttachmentResponse,
   DailyConsumptionResponse,
+  ConsumptionCycle,
+  DevinAcuLimit,
   SessionInsightsResponse,
   InsightsGenerateResponse,
   ScheduleResponse,
@@ -370,6 +374,48 @@ export async function getDailyConsumption(
       ),
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Read-only enterprise billing cycles. Requires enterprise ManageBilling. */
+export async function listConsumptionCycles(auth: AuthProvider): Promise<ConsumptionCycle[]> {
+  const items: ConsumptionCycle[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 5; page++) {
+    const data: {
+      items: ConsumptionCycle[];
+      end_cursor?: string | null;
+      has_next_page?: boolean;
+    } = await apiRequest(auth, paths.consumptionCycles(), {
+      method: 'GET',
+      query: { first: 100, after: cursor },
+      schema: consumptionCycleListResponseSchema,
+    });
+    items.push(...data.items);
+    if (!data.has_next_page || !data.end_cursor) break;
+    cursor = data.end_cursor;
+  }
+  return items.sort((a, b) => b.after - a.after);
+}
+
+/** Read-only enterprise ACU limits. Requires enterprise ManageBilling. */
+export async function listDevinAcuLimits(auth: AuthProvider): Promise<DevinAcuLimit[]> {
+  const items: DevinAcuLimit[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 5; page++) {
+    const data: {
+      items: DevinAcuLimit[];
+      end_cursor?: string | null;
+      has_next_page?: boolean;
+    } = await apiRequest(auth, paths.devinAcuLimits(), {
+      method: 'GET',
+      query: { first: 100, after: cursor },
+      schema: devinAcuLimitListResponseSchema,
+    });
+    items.push(...data.items);
+    if (!data.has_next_page || !data.end_cursor) break;
+    cursor = data.end_cursor;
+  }
+  return items;
 }
 
 // ---------------------------------------------------------------------------

@@ -10,6 +10,8 @@ import {
   listSessions,
   getSessionConsumption,
   listRepositories,
+  listConsumptionCycles,
+  listDevinAcuLimits,
 } from '../../src/api/devin/endpoints';
 import { clearRateLimit } from '../../src/api/devin/client';
 import type { AuthProvider } from '../../src/auth/AuthProvider';
@@ -124,6 +126,41 @@ describe('endpoints — path building & response shaping', () => {
     const total = await getSessionConsumption(mockAuth, 'devin-abc');
     expect(total).toBe(3.5);
     expect(lastUrl()).toContain('/consumption/daily/sessions/devin-abc');
+  });
+
+  it('listConsumptionCycles uses the read-only enterprise billing endpoint', async () => {
+    mockFetch.mockResolvedValue(
+      ok({
+        items: [{ after: 1751342400, before: 1754020800 }],
+        end_cursor: null,
+        has_next_page: false,
+      }),
+    );
+    const cycles = await listConsumptionCycles(mockAuth);
+    expect(cycles).toHaveLength(1);
+    expect(lastUrl()).toContain('/v3/enterprise/consumption/cycles');
+  });
+
+  it('listDevinAcuLimits follows pagination and preserves organization scope', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        ok({
+          items: [{ cycle_acu_limit: 100, org_id: 'org-other' }],
+          end_cursor: 'next-limits-page',
+          has_next_page: true,
+        }),
+      )
+      .mockResolvedValueOnce(
+        ok({
+          items: [{ cycle_acu_limit: 250, org_id: 'org-abc' }],
+          end_cursor: null,
+          has_next_page: false,
+        }),
+      );
+    const limits = await listDevinAcuLimits(mockAuth);
+    expect(limits).toHaveLength(2);
+    expect(limits[1]?.org_id).toBe('org-abc');
+    expect(lastUrl()).toContain('/v3/enterprise/consumption/acu-limits/devin');
   });
 
   it('listSessions unwraps the paginated items envelope', async () => {

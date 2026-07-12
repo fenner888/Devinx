@@ -11,10 +11,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import { useDailyConsumption, useOrgMetrics, type OrgMetricsBundle } from '@api/devin/queries';
+import { useBillingLimits, useDailyConsumption, useOrgMetrics, type OrgMetricsBundle } from '@api/devin/queries';
 import { ApiError } from '@api/devin/client';
 import { useTheme } from '@theme/index';
-import type { DailyConsumptionResponse } from '@api/devin/types';
+import type { ConsumptionCycle, DailyConsumptionResponse, DevinAcuLimit } from '@api/devin/types';
 
 type Tab = 'overview' | 'sessions' | 'reviews' | 'automations';
 
@@ -97,7 +97,8 @@ export default function UsageScreen() {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('overview');
   const metrics = useOrgMetrics(30);
-  const { data: daily } = useDailyConsumption(30);
+  const { data: daily } = useDailyConsumption(45);
+  const billing = useBillingLimits();
 
   const isPermissionError = metrics.error instanceof ApiError && metrics.error.code === 'permission';
   const bundle = metrics.data;
@@ -163,7 +164,18 @@ export default function UsageScreen() {
 
       {bundle && (
         <ScrollView className="flex-1 px-4 py-4" contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-          {tab === 'overview' && <OverviewTab bundle={bundle} daily={daily} />}
+          {tab === 'overview' && (
+            <OverviewTab
+              bundle={bundle}
+              daily={daily}
+              billing={billing.data}
+              billingPermissionDenied={
+                billing.error instanceof ApiError && billing.error.code === 'permission'
+              }
+              billingFailed={!!billing.error}
+              billingLoading={billing.isLoading}
+            />
+          )}
           {tab === 'sessions' && <SessionsTab bundle={bundle} />}
           {tab === 'reviews' && <ReviewsTab bundle={bundle} />}
           {tab === 'automations' && <AutomationsTab bundle={bundle} onManage={() => router.push('/(main)/automations')} />}
@@ -173,7 +185,21 @@ export default function UsageScreen() {
   );
 }
 
-function OverviewTab({ bundle, daily }: { bundle: OrgMetricsBundle; daily?: DailyConsumptionResponse[] }) {
+function OverviewTab({
+  bundle,
+  daily,
+  billing,
+  billingPermissionDenied,
+  billingFailed,
+  billingLoading,
+}: {
+  bundle: OrgMetricsBundle;
+  daily?: DailyConsumptionResponse[];
+  billing?: { currentCycle?: ConsumptionCycle; orgLimit?: DevinAcuLimit };
+  billingPermissionDenied: boolean;
+  billingFailed: boolean;
+  billingLoading: boolean;
+}) {
   const s = bundle.sessions;
   const totalAcu = s.avg_acus_per_session * s.sessions_created_count;
   const hasDaily = !!daily && daily.length > 0;
@@ -192,7 +218,13 @@ function OverviewTab({ bundle, daily }: { bundle: OrgMetricsBundle; daily?: Dail
       </View>
       {hasDaily && <ConsumptionChart data={daily} />}
       {hasDaily && <ConsumptionSummary data={daily} />}
-      <PlanAndQuotas />
+      <PlanAndQuotas
+        daily={daily}
+        billing={billing}
+        permissionDenied={billingPermissionDenied}
+        failed={billingFailed}
+        loading={billingLoading}
+      />
     </>
   );
 }
@@ -284,34 +316,113 @@ function AutomationsTab({ bundle, onManage }: { bundle: OrgMetricsBundle; onMana
   );
 }
 
+function dateFromUnix(timestamp: number): string {
+  return new Date(timestamp * 1000).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function cycleConsumption(
+  daily: DailyConsumptionResponse[] | undefined,
+  cycle?: ConsumptionCycle,
+): number | undefined {
+  if (!daily || !cycle) return undefined;
+  const start = new Date(cycle.after * 1000).toISOString().slice(0, 10);
+  const end = new Date(cycle.before * 1000).toISOString().slice(0, 10);
+  return daily
+    .filter((day) => day.date >= start && day.date < end)
+    .reduce((total, day) => total + dayTotal(day), 0);
+}
+
 /**
- * Plan, quota, and on-demand balance aren't exposed by the public Devin API —
- * only ACU consumption is. Hand off to the web app's Usage & Limits page.
+ * Enterprise cycle and organization limits are rendered in-app when the
+ * connected service user has ManageBilling. Self-serve allowance and credit
+ * balance remain web-only because the Devin v3 API does not expose them.
  */
-function PlanAndQuotas() {
+function PlanAndQuotas({
+  daily,
+  billing,
+  permissionDenied,
+  failed,
+  loading,
+}: {
+  daily?: DailyConsumptionResponse[];
+  billing?: { currentCycle?: ConsumptionCycle; orgLimit?: DevinAcuLimit };
+  permissionDenied: boolean;
+  failed: boolean;
+  loading: boolean;
+}) {
   const { tokens } = useTheme();
+  const cycle = billing?.currentCycle;
+  const limit = billing?.orgLimit?.cycle_acu_limit;
+  const used = cycleConsumption(daily, cycle);
+  const remaining = limit === undefined || used === undefined ? undefined : Math.max(0, limit - used);
   return (
-    <Pressable
-      className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4"
-      onPress={() => {
-        WebBrowser.openBrowserAsync('https://app.devin.ai/settings/usage-limits').catch(() => {});
-      }}
-      accessibilityRole="button"
-      accessibilityLabel="Plan and quotas (opens in browser)"
-    >
-      <View className="flex-row items-center">
+    <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
+      <View className="flex-row items-center mb-3">
         <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
           <Ionicons name="card-outline" size={15} color={tokens.brandText.hex} />
         </View>
         <View className="flex-1">
-          <Text className="text-text-hi text-text14">Plan, quotas & billing</Text>
-          <Text className="text-text-low text-text12 mt-0.5">
-            Daily/weekly quota and on-demand balance aren't exposed by the Devin API — manage them on the web.
-          </Text>
+          <Text className="text-text-hi text-text14">Current cycle & limits</Text>
+          <Text className="text-text-low text-text12 mt-0.5">Read directly from Devin when billing access is available.</Text>
         </View>
-        <Ionicons name="open-outline" size={15} color={tokens.textLow.hex} />
       </View>
-    </Pressable>
+
+      {cycle && (
+        <StatGrid
+          items={[
+            { label: 'Cycle usage', value: used === undefined ? 'Unavailable' : `${formatAcu(used)} ACU` },
+            { label: 'Organization limit', value: limit === undefined ? 'No cap set' : `${formatAcu(limit)} ACU` },
+            { label: 'Cycle starts', value: dateFromUnix(cycle.after) },
+            {
+              label: 'Remaining',
+              value:
+                limit === undefined
+                  ? 'Unlimited'
+                  : remaining === undefined
+                    ? 'Unavailable'
+                    : `${formatAcu(remaining)} ACU`,
+            },
+          ]}
+        />
+      )}
+
+      {!cycle && permissionDenied && (
+        <Text className="text-text-mid text-text13 mb-3">
+          The connected service user does not have enterprise ManageBilling access. Your in-app activity analytics remain available above.
+        </Text>
+      )}
+      {!cycle && failed && !permissionDenied && (
+        <Text className="text-text-mid text-text13 mb-3">Current billing-cycle details could not be loaded.</Text>
+      )}
+      {!cycle && loading && (
+        <View className="flex-row items-center mb-3">
+          <ActivityIndicator size="small" color={tokens.brand.hex} />
+          <Text className="text-text-mid text-text13 ml-2">Loading billing-cycle details…</Text>
+        </View>
+      )}
+      {!cycle && !loading && !failed && (
+        <Text className="text-text-mid text-text13 mb-3">No active enterprise billing cycle was returned for this account.</Text>
+      )}
+
+      <Text className="text-text-low text-text12 mb-3">
+        The connected Devin v3 credential does not expose self-serve daily/weekly allowance or on-demand credit balance.
+      </Text>
+      <Pressable
+        className="flex-row items-center border-t border-border-subtle pt-3"
+        onPress={() => {
+          WebBrowser.openBrowserAsync('https://app.devin.ai/settings/usage-limits').catch(() => {});
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Manage billing on Devin web"
+      >
+        <Text className="text-brand-text text-text13 flex-1">Manage billing on Devin web</Text>
+        <Ionicons name="open-outline" size={15} color={tokens.brandText.hex} />
+      </Pressable>
+    </View>
   );
 }
 

@@ -21,6 +21,8 @@ import {
   archiveSession,
   terminateSession,
   getDailyConsumption,
+  listConsumptionCycles,
+  listDevinAcuLimits,
   getInsights,
   generateInsights,
   replaceTags,
@@ -379,6 +381,30 @@ export function useDailyConsumption(rangeDays = 30) {
         time_after: now - rangeDays * 86_400,
         time_before: now,
       });
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+export function useBillingLimits() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.billingLimits,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      const orgId = (await provider.orgPath()).replace('/v3/organizations/', '');
+      const [cycles, limits] = await Promise.all([
+        listConsumptionCycles(provider),
+        listDevinAcuLimits(provider),
+      ]);
+      const now = Math.floor(Date.now() / 1000);
+      return {
+        currentCycle: cycles.find((cycle) => cycle.after <= now && cycle.before > now),
+        orgLimit: limits.find((limit) => limit.org_id === orgId),
+      };
     },
     enabled: isAuthenticated && !!provider,
     staleTime: 5 * 60_000,

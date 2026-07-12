@@ -493,14 +493,22 @@ export const consumptionResponseSchema = z
 
 export const consumptionCycleSchema = z
   .object({
-    start: unixTimestampSchema,
-    end: unixTimestampSchema,
-    acus: acuCountSchema,
-    org_id: z.string().optional(),
+    after: unixTimestampSchema,
+    before: unixTimestampSchema,
   })
   .passthrough();
 
 export const consumptionCycleListResponseSchema = paginatedResponseSchema(consumptionCycleSchema);
+
+export const devinAcuLimitSchema = z
+  .object({
+    cycle_acu_limit: acuCountSchema,
+    org_id: z.string().optional(),
+    user_id: z.string().optional(),
+  })
+  .passthrough();
+
+export const devinAcuLimitListResponseSchema = paginatedResponseSchema(devinAcuLimitSchema);
 
 // ---------------------------------------------------------------------------
 // Errors

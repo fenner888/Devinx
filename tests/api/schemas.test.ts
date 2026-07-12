@@ -16,6 +16,8 @@ import {
   secretResponseSchema,
   attachmentResponseSchema,
   consumptionResponseSchema,
+  consumptionCycleListResponseSchema,
+  devinAcuLimitListResponseSchema,
   sessionCreateRequestSchema,
 } from '../../src/api/devin/schemas';
 
@@ -284,6 +286,24 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(out.total_acus).toBeUndefined();
     expect(out.consumption_by_date[0]?.acus_by_product.deepwiki).toBe(0.25);
     expect(out.consumption_by_date[1]?.acus_by_product).toEqual({});
+  });
+
+  it('parses enterprise consumption cycles using after/before timestamps', () => {
+    const out = consumptionCycleListResponseSchema.parse({
+      items: [{ after: 1751342400, before: 1754020800 }],
+      end_cursor: null,
+      has_next_page: false,
+    });
+    expect(out.items[0]).toEqual(expect.objectContaining({ after: 1751342400, before: 1754020800 }));
+  });
+
+  it('parses organization ACU limits without requiring optional user scope', () => {
+    const out = devinAcuLimitListResponseSchema.parse({
+      items: [{ cycle_acu_limit: 250, org_id: 'org-abc' }],
+      end_cursor: null,
+      has_next_page: false,
+    });
+    expect(out.items[0]?.cycle_acu_limit).toBe(250);
   });
 
   it('parses a session create request with all optional fields', () => {

@@ -85,11 +85,24 @@ user-ID field (spec §7.1 already allows this fallback).
 
 `GET /v3/enterprise/consumption/cycles` requires `ManageBilling`. There is
 **no org-scoped** cycles list. Spec §8.5 said "Consumption: org cycle + daily."
-**Action:** daily is org-scoped (`paths.consumptionDaily`) and works for v1.
-Cycles list is encoded (`paths.consumptionCycles`) but gated behind
-enterprise permission; the Usage screen (§7.6) shows a graceful locked state
-if the key lacks `ManageBilling`, exactly as spec §7.6 prescribes for
-missing consumption permission.
+**Action (updated July 12, 2026):** daily is org-scoped
+(`paths.consumptionDaily`). The read-only cycles list and read-only Devin ACU
+limits list are now called only for the in-app Usage view and remain gated by
+enterprise `ManageBilling`. The screen shows current-cycle usage and the
+organization cap when authorized, and a graceful locked state otherwise. No
+billing or limit mutation endpoint is called.
+
+### D7a. Devin ACU limits are readable only at enterprise scope
+
+`GET /v3/enterprise/consumption/acu-limits/devin` returns paginated
+organization-level `cycle_acu_limit` values and also requires enterprise
+`ManageBilling`. **Action:** the Usage screen selects only the connected
+`org_id`, validates every page, and bounds pagination. Self-serve
+daily/weekly quota and on-demand credit balance are not exposed by the Devin
+v3 API and remain a clearly labeled web-only management link. Devin Desktop
+documents a separate `server.codeium.com` team-credit API, but it requires a
+different Billing Read service key and authorization contract. DevinX does
+not request or repurpose that additional secret in the Cloud account flow.
 
 ### D8. Insights response is richer than spec implied
 
@@ -163,13 +176,14 @@ v1 schema file will be added. Noted here for completeness.
 | Attachments: upload   | `POST /v3/organizations/{org_id}/attachments`                     | ✅     |
 | Attachments: download | `GET  /v3/organizations/{org_id}/attachments/{uuid}/{name}`       | ✅     |
 | Consumption: daily    | `GET  /v3/organizations/{org_id}/consumption/daily`               | ✅     |
-| Consumption: cycle    | enterprise only (D7)                                              | ⚠️ D7  |
+| Consumption: cycle    | `GET /v3/enterprise/consumption/cycles` (read-only, gated)        | ⚠️ D7  |
+| Consumption: ACU cap  | `GET /v3/enterprise/consumption/acu-limits/devin` (read-only)     | ⚠️ D7a |
 
-**Explicitly NOT called in v1 (spec §8.5):** any write to
-playbooks/knowledge/secrets, any `enterprise/*` endpoint (except the members
-
-- cycles fallbacks above, both permission-gated), audit logs. Confirmed —
-  these are not wired in Phase 0.
+**Explicitly NOT called by the core v1 flow (spec §8.5):** billing/limit
+writes, undocumented endpoints, or audit logs. The member lookup plus the two
+read-only billing calls above are the documented, permission-gated enterprise
+exceptions. Playbook/knowledge/secret writes remain optional, separately
+permission-gated resource-management features.
 
 ## Open questions for Mark
 

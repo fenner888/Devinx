@@ -386,12 +386,18 @@ export interface DailyConsumptionResponse {
 }
 
 export interface ConsumptionCycle {
-  /** Cycle start timestamp. */
-  start: UnixTimestamp;
-  end: UnixTimestamp;
-  acus: AcuCount;
-  /** Org the cycle belongs to. */
+  /** Inclusive billing-cycle start timestamp. */
+  after: UnixTimestamp;
+  /** Exclusive billing-cycle end timestamp. */
+  before: UnixTimestamp;
+}
+
+export interface DevinAcuLimit {
+  cycle_acu_limit: AcuCount;
+  /** Present for organization-level limits. */
   org_id?: string;
+  /** Present for user-level limits if Devin adds them to this response. */
+  user_id?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -437,6 +443,8 @@ export const paths = {
   consumptionDaily: (orgId: OrgId) => `/v3/organizations/${orgId}/consumption/daily`,
   /** Enterprise-level (requires ManageBilling). */
   consumptionCycles: () => `/v3/enterprise/consumption/cycles`,
+  /** Read-only enterprise Devin ACU limits (requires ManageBilling). */
+  devinAcuLimits: () => `/v3/enterprise/consumption/acu-limits/devin`,
   playbook: (orgId: OrgId, playbookId: string) =>
     `/v3/organizations/${orgId}/playbooks/${playbookId}`,
   knowledgeNote: (orgId: OrgId, noteId: string) =>
