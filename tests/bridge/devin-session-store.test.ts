@@ -213,6 +213,48 @@ describe('read-only Devin session store', () => {
     await store.stop();
   });
 
+  it('ignores an empty historical model without blocking workspaces or minimized history', async () => {
+    const databasePath = join(directory, 'sessions.db');
+    const database = createFixture(databasePath);
+    database
+      .prepare(
+        `INSERT INTO sessions(
+          id, working_directory, main_chain_id, model, agent_mode, last_activity_at, hidden
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'session-empty-model',
+        '/Users/example/model-unavailable',
+        1,
+        '',
+        'agent',
+        '2026-07-12T12:00:00.000Z',
+        0,
+      );
+    insertNode(database, {
+      sessionId: 'session-empty-model',
+      nodeId: 1,
+      role: 'assistant',
+      content: 'History remains available.',
+    });
+    database.close();
+    await chmod(databasePath, 0o600);
+
+    const store = new DevinSessionStore({ databasePath });
+    await store.start();
+    await expect(store.listCreateOptions()).resolves.toEqual({
+      workspaces: [{ path: '/Users/example/model-unavailable' }],
+      models: [],
+    });
+    await expect(store.loadSession('session-empty-model')).resolves.toEqual({
+      sessionId: 'session-empty-model',
+      cwd: '/Users/example/model-unavailable',
+      messages: [{ source: 'devin', text: 'History remains available.' }],
+      truncated: false,
+    });
+    await store.stop();
+  });
+
   it('rejects a symbolic-link database path before opening SQLite', async () => {
     const databasePath = join(directory, 'sessions.db');
     const linkedPath = join(directory, 'linked.db');

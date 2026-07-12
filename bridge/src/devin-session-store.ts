@@ -21,7 +21,7 @@ const sessionRowSchema = z
   .object({
     workingDirectory: z.string().min(1).max(4_096).refine(isAbsolute),
     mainChainId: z.number().int().nonnegative(),
-    modelId: modelIdSchema,
+    modelId: z.union([modelIdSchema, z.literal('')]),
   })
   .strict();
 
@@ -190,7 +190,7 @@ export class DevinSessionStore {
         .prepare(
           `SELECT model AS id
            FROM sessions
-           WHERE hidden = 0
+           WHERE hidden = 0 AND model <> ''
            GROUP BY model
            ORDER BY MAX(last_activity_at) DESC
            LIMIT ?`,
@@ -297,7 +297,7 @@ export class DevinSessionStore {
         cwd: session.workingDirectory,
         messages,
         truncated,
-        modelId: session.modelId,
+        ...(session.modelId ? { modelId: session.modelId } : {}),
       };
     } catch {
       try {

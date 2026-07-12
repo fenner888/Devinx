@@ -343,7 +343,9 @@ describe('home attachment control', () => {
       computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
     };
     mockComputerCreateOptions = undefined;
-    mockComputerCreateOptionsError = new Error('not authorized');
+    mockComputerCreateOptionsError = Object.assign(new Error('not authorized'), {
+      code: 'permission_denied',
+    });
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const screen = render(
       <ThemeProvider>
@@ -359,6 +361,36 @@ describe('home attachment control', () => {
     expect(screen.queryByLabelText('Close workspace picker')).toBeNull();
     fireEvent.press(screen.getByLabelText('Model: Default'));
     expect(alert).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not mislabel a Connector handler failure as a missing permission', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = undefined;
+    mockComputerCreateOptionsError = Object.assign(new Error('temporarily unavailable'), {
+      code: 'unavailable',
+    });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(
+      screen.getByText(
+        'DevinX Connector could not load workspaces and models. Confirm Connector and Devin for Terminal are ready, then try again.',
+      ),
+    ).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Workspace: Unavailable'));
+    expect(alert).toHaveBeenCalledWith(
+      'Mac options unavailable',
+      expect.stringContaining('could not load workspaces and models'),
+    );
   });
 
   it('organizes the live model catalog into recommended, recent, searchable options and badges', () => {

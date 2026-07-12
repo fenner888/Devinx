@@ -36,6 +36,10 @@ cannot enforce.
 1. the reviewed session store supplies opaque workspace handles and ordered recent model IDs;
 2. the active ACP agent supplies the authoritative model selector from session `configOptions`.
 
+Recent model IDs are optional hints. Empty historical model markers are ignored rather than making
+workspace discovery unavailable; they never become selectable IDs. The live ACP catalog remains
+authoritative for creation.
+
 The Connector obtains ACP configuration from a bounded existing-session load and caches the
 sanitized catalog for the Connector process lifetime. It does not create a probe session, send a
 prompt, expose replayed content, or return raw ACP extensions. If live discovery is unavailable, the

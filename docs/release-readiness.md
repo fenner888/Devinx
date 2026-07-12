@@ -40,6 +40,7 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] Build 29 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (29)`, `NSFileProtectionComplete`); 10 privacy manifests and no APS entitlement remain; SHA-256 `de28a1103ade24d345ef3233f8d9b344e710ba1f256045644325d7a54277bd44`
 - [x] Build 29 App Store Connect submission `e5492fc8-656f-4797-9bcf-5cc096fc69ab` finished successfully and is processing as the live-model-family and reasoning/speed TestFlight checkpoint
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
+- [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Secure Tailscale pairing succeeded on a physical iPhone and Mac
 - [x] Build 14 physically discovered eight Mac sessions and loaded a real session with steering authorized
 - [x] A harmless Build 14 prompt reached the desktop session, returned the exact requested Devin reply, and dismissed the keyboard
@@ -61,7 +62,7 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed on Node 24.18.0, now pinned consistently for development, CI, rollback, and the checksum-verified Connector runtime |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 53 suites / 420 tests with handle detection enabled on pinned Node 24.18.0; no analytics or crash-reporting SDK runtime is loaded by the test environment |
+| Jest | passed 53 suites / 422 tests with handle detection enabled on pinned Node 24.18.0; no analytics or crash-reporting SDK runtime is loaded by the test environment |
 | Production iOS export | Build 29 passed local signed export; 19.8 MB IPA, 1,737 bundled modules, 100 assets |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |

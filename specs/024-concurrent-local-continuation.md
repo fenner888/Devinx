@@ -26,6 +26,11 @@ The macOS Connector may read `~/.local/share/devin/cli/sessions.db` only when al
 
 The query follows only `sessions.main_chain_id` through `message_nodes.parent_node_id`. It selects only `user` and `assistant` roles and only their text `content`. It never selects or returns system messages, thinking, tool calls/results, images, message IDs, paths, cogs, metadata, prompts, shell history, rendered HTML, alternate branches, or unknown fields.
 
+The historical `sessions.model` field is presentation metadata, not a condition for reading an
+otherwise valid transcript. Devin currently persists an empty model marker for some valid sessions.
+The Connector treats that exact empty value as “model unavailable,” omits the model label, and still
+returns the minimized history. Any other malformed model value continues to fail closed.
+
 History remains bounded to the newest 200 text messages, 100 KiB per message, 160 KiB total, and 10,000 traversed main-chain nodes. Any clipping, incompatible record, missing ancestor, or traversal limit marks the response truncated. A schema mismatch fails closed to ACP or unavailable history; it never guesses at a new private schema.
 
 ## Live continuation boundary

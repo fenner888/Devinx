@@ -75,6 +75,24 @@ type RecentSession =
   | { kind: 'cloud'; session: SessionResponse; updatedAt: number }
   | { kind: 'computer'; session: ComputerSessionListItem; updatedAt: number };
 
+function localOptionsFailureCopy(error: unknown): { title: string; message: string } {
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+  if (code === 'permission_denied' || code === 'authorization_failed' || code === 'not_paired') {
+    return {
+      title: 'Connector permission required',
+      message: 'Open DevinX Connector on your Mac and enable Create new sessions for this iPhone.',
+    };
+  }
+  return {
+    title: 'Mac options unavailable',
+    message:
+      'DevinX Connector could not load workspaces and models. Confirm Connector and Devin for Terminal are ready, then try again.',
+  };
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { name, tokens } = useTheme();
@@ -273,10 +291,8 @@ export default function HomeScreen() {
       return;
     }
     if (!localOptions.data) {
-      Alert.alert(
-        'Connector permission required',
-        'Open DevinX Connector on your Mac and enable Create new sessions for this iPhone.',
-      );
+      const failure = localOptionsFailureCopy(localOptions.error);
+      Alert.alert(failure.title, failure.message);
       return;
     }
     if (kind === 'workspace') {
@@ -721,7 +737,7 @@ export default function HomeScreen() {
           </View>
           {isComputerDestination && localOptions.error && (
             <Text className="px-2 pt-2 text-failed text-text12">
-              Open DevinX Connector and allow this iPhone to create sessions.
+              {localOptionsFailureCopy(localOptions.error).message}
             </Text>
           )}
           {composerError && (
