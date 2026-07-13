@@ -135,7 +135,7 @@ export const dark: ThemeTokens = {
   surface2: c('31 31 31', '#1F1F1F'),
   surface2Wax: c('31 31 31 / .94', '#1F1F1FF0'),
   surface2Transparent: c('255 255 255 / .05', '#FFFFFF0D'),
-  composerSurface: c('31 31 31 / .86', '#1F1F1FDB'),
+  composerSurface: c('31 31 31 / .72', '#1F1F1FB8'),
   scrim: c('0 0 0 / .32', '#00000052'),
   surfaceAccentNeutral: c('249 249 249', '#F9F9F9'),
 
@@ -201,7 +201,7 @@ export const light: ThemeTokens = {
   surface2: c('255 255 255', '#FFFFFF'),
   surface2Wax: c('255 255 255 / .94', '#FFFFFFF0'),
   surface2Transparent: c('255 255 255', '#FFFFFF'),
-  composerSurface: c('255 255 255 / .9', '#FFFFFFE6'),
+  composerSurface: c('255 255 255 / .84', '#FFFFFFD6'),
   scrim: c('0 0 0 / .12', '#0000001F'),
   surfaceAccentNeutral: c('54 54 54', '#363636'),
 

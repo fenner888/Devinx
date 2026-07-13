@@ -149,6 +149,7 @@ export default function ComputerSessionDetailScreen() {
   const insets = useSafeAreaInsets();
   const { computers } = useConnections();
   const [companionActive, setCompanionActive] = useState(false);
+  const [composerHeight, setComposerHeight] = useState(0);
   const [draft, setDraft] = useState('');
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [steeringActive, setSteeringActive] = useState(continuationPending);
@@ -173,6 +174,7 @@ export default function ComputerSessionDetailScreen() {
   );
   const prompt = usePromptComputerSession(bridgeId, sessionId);
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
+  const composerOverlayHeight = canPrompt && mayReadContent ? Math.max(composerHeight, 160) : 0;
   const localOptions = useComputerCreateOptions(bridgeId, canPrompt && Boolean(computer));
   const localModels = useMemo(() => localOptions.data?.models ?? [], [localOptions.data?.models]);
   const modelFamilies = useMemo(() => groupComputerModels(localModels), [localModels]);
@@ -408,7 +410,8 @@ export default function ComputerSessionDetailScreen() {
           <ScrollView
             ref={historyRef}
             className="flex-1"
-            contentContainerClassName="px-5 pt-5 pb-[160px]"
+            contentContainerClassName="px-5 pt-5"
+            contentContainerStyle={{ paddingBottom: composerOverlayHeight + 128 }}
             testID="computer-session-history"
             onScroll={handleHistoryScroll}
             scrollEventThrottle={100}
@@ -463,7 +466,8 @@ export default function ComputerSessionDetailScreen() {
           {query.data && (
             <View
               pointerEvents="none"
-              className="absolute inset-x-0 bottom-0 px-4 pb-1"
+              className="absolute inset-x-0 px-4 pb-1"
+              style={{ bottom: composerOverlayHeight }}
               testID="computer-session-companion-dock"
             >
               <DevinCompanion
@@ -480,8 +484,9 @@ export default function ComputerSessionDetailScreen() {
         </View>
         {canPrompt && mayReadContent && query.data && (
           <View
-            className="px-4 pt-2"
+            className="absolute inset-x-0 bottom-0 px-4 pt-2"
             style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
+            onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
             testID="computer-session-composer-shell"
           >
             {prompt.error && (

@@ -32,7 +32,7 @@ the toggle. Light theme follows system preference.
 | `--bg-elevated`      | `31 31 31`              | `255 255 255`           | `#1F1F1F`  | `#FFFFFF`   | `surface2`           |
 | `--bg-elevated-wax`  | `31 31 31 / .94`        | `255 255 255 / .94`     | `#1F1F1FF0`| `#FFFFFFF0` | `surface2Wax`        |
 | `--bg-elevated-transparent` | `255 255 255 / .05` | `255 255 255`        | `#FFFFFF0D`| `#FFFFFF`   | `surface2Transparent`|
-| DevinX floating composer | `31 31 31 / .86` | `255 255 255 / .90` | `#1F1F1FDB` | `#FFFFFFE6` | `composerSurface` |
+| DevinX floating composer | `31 31 31 / .72` | `255 255 255 / .84` | `#1F1F1FB8` | `#FFFFFFD6` | `composerSurface` |
 | `--bg-scrim`         | `0 0 0 / .32`           | `0 0 0 / .12`           | `#00000052`| `#0000001F` | `scrim`              |
 | `--bg-accent-neutral`| `249 249 249`           | `54 54 54`              | `#F9F9F9`  | `#363636`   | `surfaceAccentNeutral`|
 

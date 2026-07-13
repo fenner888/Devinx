@@ -132,10 +132,11 @@ describe('Computer session detail', () => {
     expect(companionDock.props.className).toContain('absolute');
     expect(companionDock.props.className).not.toContain('bg-canvas');
     expect(companionDock.props.pointerEvents).toBe('none');
-    expect(screen.getByTestId('computer-session-history').props.contentContainerClassName).toContain(
-      'pb-[160px]',
-    );
+    expect(
+      screen.getByTestId('computer-session-history').props.contentContainerStyle.paddingBottom,
+    ).toBe(288);
     const composerShell = screen.getByTestId('computer-session-composer-shell');
+    expect(composerShell.props.className).toContain('absolute');
     expect(composerShell.props.className).not.toContain('bg-canvas');
     const composer = screen.getByTestId('computer-session-composer');
     expect(composer.props.className).toContain('rounded-card');

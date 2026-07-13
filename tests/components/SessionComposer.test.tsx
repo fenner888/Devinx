@@ -131,10 +131,11 @@ describe('active session composer', () => {
     expect(companionDock.props.className).toContain('absolute');
     expect(companionDock.props.className).not.toContain('bg-canvas');
     expect(companionDock.props.pointerEvents).toBe('none');
-    expect(getByTestId('cloud-session-timeline').props.contentContainerClassName).toContain(
-      'pb-[152px]',
+    expect(getByTestId('cloud-session-timeline').props.contentContainerStyle.paddingBottom).toBe(
+      272,
     );
     const composerShell = getByTestId('cloud-session-composer-shell');
+    expect(composerShell.props.className).toContain('absolute');
     expect(composerShell.props.className).not.toContain('bg-canvas');
     const composer = getByTestId('cloud-session-composer');
     expect(composer.props.className).toContain('rounded-card');

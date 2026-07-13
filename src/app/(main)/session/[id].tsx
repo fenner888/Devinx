@@ -102,6 +102,7 @@ export default function SessionDetailScreen() {
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [companionActive, setCompanionActive] = useState(false);
+  const [composerHeight, setComposerHeight] = useState(0);
 
   const validId = id && isValidSessionId(id) ? id : undefined;
   const { data: session, isLoading, error, refetch } = useSession(validId);
@@ -215,6 +216,7 @@ export default function SessionDetailScreen() {
   // (sleeping) session automatically resumes it (per the Devin API), so the
   // composer must show there too — only truly ended sessions hide it.
   const canSend = session.status !== 'exit' && session.status !== 'error';
+  const composerOverlayHeight = canSend ? Math.max(composerHeight, 152) : 0;
   const sessionRepositoryName =
     sessionRepository?.split('/').filter(Boolean).pop() ?? 'Repository unavailable';
 
@@ -385,6 +387,7 @@ export default function SessionDetailScreen() {
               pendingText={pendingText}
               isSending={sendMessage.isPending}
               isWorking={isWorking}
+              bottomClearance={composerOverlayHeight + (keyboardVisible ? 88 : 120)}
             />
           )}
           {tab === 'worklog' && <WorklogTab session={session} />}
@@ -395,7 +398,8 @@ export default function SessionDetailScreen() {
           {tab === 'timeline' && (
             <View
               pointerEvents="none"
-              className="absolute inset-x-0 bottom-0 px-4 pb-1"
+              className="absolute inset-x-0 px-4 pb-1"
+              style={{ bottom: composerOverlayHeight }}
               testID="cloud-session-companion-dock"
             >
               <DevinCompanion
@@ -415,8 +419,9 @@ export default function SessionDetailScreen() {
             It floats above the home indicator instead of becoming a bottom shelf. */}
         {canSend && (
           <View
-            className="px-4 pt-2"
+            className="absolute inset-x-0 bottom-0 px-4 pt-2"
             style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
+            onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
             testID="cloud-session-composer-shell"
           >
             {(messageAttachments.length > 0 || uploadingAttachmentName) && (
@@ -831,12 +836,14 @@ function TimelineTab({
   pendingText,
   isSending,
   isWorking,
+  bottomClearance,
 }: {
   messages: SessionMessage[];
   isLoading: boolean;
   pendingText: string | null;
   isSending: boolean;
   isWorking: boolean;
+  bottomClearance: number;
 }) {
   const listRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
@@ -875,7 +882,8 @@ function TimelineTab({
     <ScrollView
       ref={listRef}
       className="flex-1 px-4"
-      contentContainerClassName="pt-3 pb-[152px]"
+      contentContainerClassName="pt-3"
+      contentContainerStyle={{ paddingBottom: bottomClearance }}
       testID="cloud-session-timeline"
       onScroll={handleScroll}
       scrollEventThrottle={100}
