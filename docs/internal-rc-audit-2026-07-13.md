@@ -33,6 +33,11 @@ in `docs/authorization-matrix.md`.
   and floor light sit beneath Devin, the black field fades into the true-black canvas, and no
   shipping preview route remains. Light mode uses a quiet semantic-token halo rather than a black
   image block.
+- A deterministic geometry audit covered 320×568, 390×844, and 430×932 phone viewports plus
+  768×1024, 1024×1366, and 1366×1024 tablet viewports. The stage remains 280–620 points wide and
+  197–244 points tall, horizontal crop never exceeds 7.8 points, and the supplied floor light stays
+  12.0–25.6 points above the stage bottom. This proves bounded crop geometry but does not replace
+  physical theme, Dynamic Type, or tablet review.
 - Exact Node `24.18.0` CI passed on the corrected source: lint, strict TypeScript, 73 Jest suites /
   525 tests, app and Connector builds, and the high/critical dependency gate. The existing 21
   moderate transitive findings remain reviewed and unchanged.
