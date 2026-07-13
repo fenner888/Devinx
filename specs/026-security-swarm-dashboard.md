@@ -1,6 +1,10 @@
 # Security Swarm Dashboard
 
-Status: approved implementation direction; native monitoring and remediation in progress
+Status: deferred from the public v1 application on July 13, 2026
+
+The sections below preserve the reviewed enterprise implementation contract for a
+future supported release; they do not authorize a route or navigation entry in the
+public app.
 
 ## Objective
 
@@ -26,11 +30,14 @@ The Security screen contains:
 4. A **Findings** section with severity filters, expandable evidence/recommendation content, and remediation actions.
 5. Permission, empty, loading, partial-error, refresh, and mutation feedback states.
 
-Security is always discoverable from the primary navigation and Settings. Enterprise
-code-scan permission controls the data and actions shown after navigation; it must not
-control whether the destination itself exists. Accounts without that permission reach
-the native explanation and access-required state instead of having Security silently
-removed from the product.
+The native dashboard is not exposed in the public v1 application. Devin's supported
+code-scan API is enterprise-scoped, while Pro, Max, and Teams users may have Security
+inside Devin's web product without a supported organization-level API or general user
+OAuth flow. An external web handoff does not satisfy DevinX's in-app product requirement,
+and private web endpoints, browser cookies, or undocumented Desktop/CLI state must not be
+used to bypass that boundary. Reintroducing Security requires a supported API and auth
+path that works for the intended public account tiers, followed by a fresh security and
+physical-device review.
 
 The screen uses existing theme tokens and normal application surfaces. It does not use raw colors, browser-shaped tables, or a collection of oversized floating cards.
 

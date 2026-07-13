@@ -68,6 +68,7 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (44)` was built locally from clean commit `04333fc` after replacing the opaque mismatched splash art with transparent theme-specific wordmarks and making Security permanently discoverable from primary navigation and Settings
 - [x] Build 44 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, app privacy artifact, and compiled launch assets passed (`com.fenner888.devinx`, `0.1.0 (44)`, `NSFileProtectionComplete`); the native asset catalog contains an RGBA light wordmark on `#FCFCFC` and an RGBA dark wordmark on true black; SHA-256 `245c3aaddc9088982ee906c150ce46ca33e7378878be48f07b8ca3740bcd382a`
 - [x] Build 44 App Store Connect submission `9d049b18-51de-4467-9c6c-0234343a567c` finished successfully and is processing as the corrected launch-branding and Security-discoverability checkpoint
+- [x] Post-Build 44 product review confirmed that Devin's supported code-scan API is enterprise-only even when Pro, Max, or Teams users can access Security in Devin's web product; because an external login/handoff does not meet the in-app requirement, Security is removed from the public DevinX v1 route and navigation rather than presented as a misleading or broken option
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -132,15 +133,11 @@ The results below must be refreshed after release-document changes and before a 
 - [ ] Re-pair, revoke on Mac, and confirm the phone loses access
 - [ ] Exercise Cloud-only, Computer-only, and Cloud + Computer after cold launch
 - [ ] Check light/dark appearance, reduced motion, VoiceOver labels, Dynamic Type, and camera/scanner layout on the physical phone
-- [ ] With an enterprise code-scan service user, confirm Security shows 30-day metrics, groups findings by Security Swarm scan, filters severities, and opens an existing remediation session without exposing raw scan identifiers
-- [ ] Launch one low-risk finding remediation from Security, confirm exactly one Devin session is created, and confirm a repeated launch returns the safe already-started state
-- [ ] Confirm **Start in Devin** is clearly presented as an external handoff until Cognition publishes a supported create-scan API
 - [ ] Re-open the QR pairing scanner in both themes and confirm the camera is immediately visible without scrolling, neither full-screen nor narrow, Cancel remains reachable, and backgrounding stops capture
 - [ ] In Build 43, test dictation from both Home and an existing Cloud or Computer session: start, mixed typing and speech, stop, cancel, `Organize prompt`, send, permission denial/recovery, interruption, AirPods routing, VoiceOver, and Reduce Motion
 - [ ] In Build 43, confirm recording has one visible stop control, the mic remains beside Send, partial/final transcript text is preserved, and no passive companion status bubble appears after completion
 - [ ] In Build 43, confirm the companion sits immediately above the composer and visibly reflects waiting, thinking/working, success, blocked, and error states without covering history or controls
 - [ ] In Build 44, cold-launch once in light mode and once in dark mode; confirm the transparent DevinX wordmark has no rectangular background or color flash before Home appears
-- [ ] In Build 44, open the primary menu and Settings; confirm Security is present in both, opens the native dashboard, and shows the access-required state rather than disappearing when the account lacks enterprise code-scan permission
 
 ## External release gates
 

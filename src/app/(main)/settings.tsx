@@ -331,13 +331,6 @@ export default function SettingsScreen() {
                 tint: 'bg-tint-blue',
                 color: tokens.brandText.hex,
               },
-              {
-                icon: 'shield-outline',
-                label: 'Security',
-                route: '/(main)/security',
-                tint: 'bg-tint-red',
-                color: tokens.failed.hex,
-              },
             ] as const
           ).map(({ icon, label, route, tint, color }, i, arr) => (
             <Pressable

@@ -37,7 +37,6 @@ export function NavMenu({
     { icon: 'chatbubbles-outline', label: 'Sessions', route: '/(main)/sessions' },
     { icon: 'time-outline', label: 'Automations', route: '/(main)/automations' },
     { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review' },
-    { icon: 'shield-outline', label: 'Security', route: '/(main)/security' },
   ];
 
   function go(route: Href) {

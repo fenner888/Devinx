@@ -16,7 +16,7 @@ import { NavMenu } from '../../src/components/NavMenu';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
 
 describe('NavMenu', () => {
-  it('always exposes Security and routes to the native access-aware screen', () => {
+  it('does not expose the enterprise-only Security API as a public app destination', () => {
     const onClose = jest.fn();
     const screen = render(
       <ThemeProvider>
@@ -24,9 +24,10 @@ describe('NavMenu', () => {
       </ThemeProvider>,
     );
 
-    fireEvent.press(screen.getByLabelText('Security'));
+    expect(screen.queryByLabelText('Security')).toBeNull();
+    fireEvent.press(screen.getByLabelText('New session'));
 
     expect(onClose).toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith('/(main)/security');
+    expect(mockPush).toHaveBeenCalledWith('/(main)/compose');
   });
 });
