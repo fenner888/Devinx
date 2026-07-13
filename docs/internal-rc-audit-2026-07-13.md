@@ -42,8 +42,10 @@ in `docs/authorization-matrix.md`.
   metadata, entitlement, disclosure, production update/runtime, packaged-artwork, and 10-manifest
   privacy inspection.
 - EAS submission `b53ef440-ed63-496d-b33f-9781aa3af02a` successfully uploaded Build 58 to App Store
-  Connect for internal TestFlight. Apple processing and physical acceptance remain external; no App
-  Review or public release action was taken.
+  Connect for internal TestFlight. App Store Connect completed processing and shows Build 58 as
+  **Ready to Submit** in the one-tester **Team (Expo)** internal group with one invitation and no
+  installs recorded. Physical acceptance remains external; no App Review or public release action
+  was taken.
 
 ## Internal candidate produced
 
