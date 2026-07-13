@@ -5,6 +5,9 @@ sanitized sessions, repositories, and prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.
 
+Before testing, open TestFlight and update DevinX from Build 49 to Build 50. App Store Connect
+reports Build 50 as `Testing` in the one-tester **Team (Expo)** internal group.
+
 ## Launch, navigation, and appearance
 
 - Cold-launch once in light mode and once in dark mode. Confirm the transparent DevinX wordmark

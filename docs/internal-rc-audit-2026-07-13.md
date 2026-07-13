@@ -17,6 +17,10 @@ in `docs/authorization-matrix.md`.
 - EAS submission `d48480a2-af66-4625-b5dd-c3512a17b20c` finished successfully and was submitted
   to Apple on July 13, 2026 at 9:39 AM for internal TestFlight. No App Review or public release was
   submitted.
+- App Store Connect completed processing and reports binary state `Validated`, non-exempt
+  encryption `No`, `get-task-allow=false`, `beta-reports-active=true`, and internal status
+  `Testing` in **Team (Expo)**. The group has one internal tester; that tester's device still showed
+  Build 49 installed when this checkpoint was recorded.
 
 ## Product surface verification
 
