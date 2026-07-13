@@ -89,6 +89,10 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] Build 50 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, microphone disclosure, and all privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (50)`, `NSFileProtectionComplete`); `get-task-allow=false`, no APS entitlement is present, and all 10 privacy manifests declare zero collected-data types, no tracking, and no tracking domains; SHA-256 `59b658906a35182d88f7fa11a03f08e75dedc87edcae43ef7eee46dc5a04d3d5`
 - [x] Build 50 EAS submission `d48480a2-af66-4625-b5dd-c3512a17b20c` finished successfully and was submitted to Apple for internal TestFlight on July 13, 2026 at 9:39 AM; no App Review or public release action was taken
 - [x] App Store Connect finished processing Build 50: Apple reports binary state `Validated`, non-exempt encryption `No`, `get-task-allow=false`, `beta-reports-active=true`, and internal status `Testing` in the one-tester **Team (Expo)** group; the tester device still reported Build 49 installed at this checkpoint
+- [x] Physical Build 50 testing found the Cloud composer could disappear behind the keyboard because the absolute overlay was outside the flex child resized by `KeyboardAvoidingView`; fix `791a338` moves both Cloud and Computer composers inside their keyboard-resized viewport and adds ancestor-chain regression tests
+- [x] iOS `0.1.0 (54)` was built locally from clean commit `791a338` with exact Node `24.18.0` and Xcode `26.6`; Build 51 was reserved by an aborted wrong-Node attempt, Builds 52 and 53 exposed the drifted Command Line Tools developer path, and Build 54 succeeded after explicitly selecting full Xcode
+- [x] Build 54 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, microphone disclosure, and all privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (54)`, `NSFileProtectionComplete`); `get-task-allow=false`, no APS entitlement is present, and all 10 privacy manifests declare zero collected-data types, no tracking, and no tracking domains; SHA-256 `10e083be13e33cceeb23019ba3cf98479bc1c7c238f0fce2a4384c2140073f72`
+- [x] Build 54 EAS submission `eb7b3713-9c6f-4fb7-848e-64d77a2c6a7e` finished successfully and uploaded the binary to Apple for internal TestFlight on July 13, 2026 at 11:06 AM; App Store Connect reports processing `Complete` and internal status `Testing` in the one-tester **Team (Expo)** group, with no App Review or public release action taken
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -115,12 +119,12 @@ The results below must be refreshed after release-document changes and before a 
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
 | Jest | passed 66 suites / 497 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, exact-origin Security Work, active companion travel, and floating-composer clearance coverage; the removed suites covered an enterprise Code Scan client that is no longer shipped |
-| Production iOS export | Build 50 passed local signed export and independent IPA inspection; 20,684,064-byte IPA with SHA-256 `59b658906a35182d88f7fa11a03f08e75dedc87edcae43ef7eee46dc5a04d3d5`; Apple reports binary state `Validated` and internal status `Testing` |
+| Production iOS export | Build 54 passed local signed export and independent IPA inspection; 20,689,288-byte IPA with SHA-256 `10e083be13e33cceeb23019ba3cf98479bc1c7c238f0fce2a4384c2140073f72`; EAS submission succeeded, Apple processing is `Complete`, and internal status is `Testing` |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 50 has 10 manifests declaring no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 54 has 10 manifests declaring no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters`; the dormant notifier and unsupported enterprise Code Scan client/schemas/tests were removed |
@@ -130,7 +134,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-Use internal TestFlight Build 50. It contains `d90fbb7` and the final floating-composer correction.
+Use internal TestFlight Build 54. It contains `d90fbb7` plus keyboard-viewport fix `791a338`.
 
 - [x] In Build 35, switching Home from Cloud to Computer changed Recent from Cloud sessions to sessions from the selected Mac, switching back restored Cloud recents, and View all retained the combined cross-origin Sessions screen
 - [x] In Build 35, the destination and workspace sheets remained compact, bounded, explicitly dismissible, and free of raw paths or excessive empty space
@@ -161,7 +165,7 @@ Use internal TestFlight Build 50. It contains `d90fbb7` and the final floating-c
 - [ ] Confirm the companion sits immediately above the composer and visibly reflects waiting, thinking/working, success, blocked, and error states without covering history or controls
 - [ ] Cold-launch once in light mode and once in dark mode; confirm the transparent DevinX wordmark has no rectangular background or color flash before Home appears
 - [ ] Confirm no Devin web login or external Security handoff is offered
-- [ ] In Build 50, confirm **Security Work** is native and never opens Devin web; verify only top-level sessions with canonical origin `code_scan` appear, open a coordinator and returned child agents, and confirm ordinary API/tagged reviews remain absent with no unsupported scan-create control
+- [ ] In Build 54, confirm **Security Work** is native and never opens Devin web; verify only top-level sessions with canonical origin `code_scan` appear, open a coordinator and returned child agents, and confirm ordinary API/tagged reviews remain absent with no unsupported scan-create control
 - [ ] Scroll long Cloud and Computer responses behind Devin and the floating composer; confirm the history is visibly present behind the translucent surface and every final response line can scroll above both overlays without a black bar, reserved blank row, clipping, or intercepted scrolling/taps
 
 ## External release gates

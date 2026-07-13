@@ -7,20 +7,23 @@ in `docs/authorization-matrix.md`.
 
 ## Internal candidate produced
 
-- iOS `0.1.0 (50)` was archived from clean commit `09ab73c` with Node `24.18.0`.
-- IPA SHA-256: `59b658906a35182d88f7fa11a03f08e75dedc87edcae43ef7eee46dc5a04d3d5`.
+- Physical Build 50 testing exposed a keyboard-layout regression: the absolute composer was a
+  sibling of the flex child resized by `KeyboardAvoidingView`, so the keyboard could cover the
+  composer while the timeline scrolled into its reserved tail clearance.
+- Cloud and Computer session layouts now keep the floating composer inside the keyboard-resized
+  viewport. Ancestor-chain regression tests prove both composer shells remain inside that viewport.
+- iOS `0.1.0 (54)` was archived from clean fix commit `791a338` with Node `24.18.0` and Xcode
+  `26.6` selected explicitly.
+- IPA SHA-256: `10e083be13e33cceeb23019ba3cf98479bc1c7c238f0fce2a4384c2140073f72`.
 - Strict code-sign verification passed with `get-task-allow=false`, no APS entitlement,
   `NSFileProtectionComplete`, exempt encryption set to false, the exact on-device microphone
   disclosure, production update channel, and runtime `0.1.0`.
 - All 10 packaged privacy manifests declare zero collected-data types, no tracking, and no
   tracking domains. No Sentry or notification artifact is packaged.
-- EAS submission `d48480a2-af66-4625-b5dd-c3512a17b20c` finished successfully and was submitted
-  to Apple on July 13, 2026 at 9:39 AM for internal TestFlight. No App Review or public release was
-  submitted.
-- App Store Connect completed processing and reports binary state `Validated`, non-exempt
-  encryption `No`, `get-task-allow=false`, `beta-reports-active=true`, and internal status
-  `Testing` in **Team (Expo)**. The group has one internal tester; that tester's device still showed
-  Build 49 installed when this checkpoint was recorded.
+- EAS submission `eb7b3713-9c6f-4fb7-848e-64d77a2c6a7e` finished successfully and uploaded Build
+  54 to Apple on July 13, 2026 at 11:06 AM for internal TestFlight. App Store Connect reports upload
+  processing `Complete` and internal status `Testing` in the one-tester **Team (Expo)** group. No
+  App Review or public release was submitted.
 
 ## Product surface verification
 
@@ -141,9 +144,9 @@ misrepresented as fixed.
   fill. Their shells and companion tracks remain transparent, and timeline clearance keeps the
   final message line above both pointer-free overlays.
 
-## Physical checkpoint for Build 50
+## Physical checkpoint for Build 54
 
-Use exact internal TestFlight Build 50 and sanitized sessions. Confirm:
+Use exact internal TestFlight Build 54 and sanitized sessions. Confirm:
 
 1. Home plus Cloud and Computer session creation, all destination-specific pickers, attachments,
    archive/terminate, device removal/revocation, and all three connection modes after cold launch.
@@ -152,7 +155,8 @@ Use exact internal TestFlight Build 50 and sanitized sessions. Confirm:
 3. Light/dark launch, long-history scrolling behind the transparent companion, no clipped content,
    conversation content visibly behind the floating translucent Cloud and Computer composers,
    complete final-line clearance above both overlays, keyboard clearance, scanner sizing, and no
-   raw Mac path or ACP identifier. Build 50 contains composer correction `d90fbb7`.
+   raw Mac path or ACP identifier. Build 54 contains the floating-composer correction plus
+   keyboard-viewport fix `791a338`.
 4. Cold-launch, 200-row scrolling, one-hour foreground battery, and seven-day TestFlight stability
    using `docs/physical-performance-checklist.md`.
 

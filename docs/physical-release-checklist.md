@@ -1,12 +1,13 @@
 # Final internal TestFlight physical checklist
 
-Use exact internal TestFlight Build 50, which contains composer correction `d90fbb7`, and only
+Use exact internal TestFlight Build 54, which contains composer correction `d90fbb7` plus
+keyboard-viewport fix `791a338`, and only
 sanitized sessions, repositories, and prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.
 
-Before testing, open TestFlight and update DevinX from Build 49 to Build 50. App Store Connect
-reports Build 50 as `Testing` in the one-tester **Team (Expo)** internal group.
+Before testing, open TestFlight and update DevinX to Build 54. App Store Connect reports processing
+`Complete` and internal status `Testing` in the one-tester **Team (Expo)** group.
 
 ## Launch, navigation, and appearance
 
@@ -68,8 +69,9 @@ reports Build 50 as `Testing` in the one-tester **Team (Expo)** internal group.
   state.
 - Confirm passive status text is absent when no task is active; when active, any task/status text
   remains attached to the companion and never blocks history or controls.
-- Open the keyboard in both session types, send, and confirm it dismisses while composer controls
-  remain above the safe area.
+- Open the keyboard in both session types. Confirm the composer stays visibly above the keyboard,
+  the existing conversation does not disappear into blank clearance, and sending dismisses the
+  keyboard while composer controls remain above the safe area.
 
 ## Dictation and Organize prompt
 
