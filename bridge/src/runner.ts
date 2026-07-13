@@ -94,7 +94,12 @@ export interface BridgeListenerLifecycle {
 export interface AcpSessionLifecycle extends SessionDiscoveryAdapter {
   start(): Promise<void>;
   stop(): Promise<void>;
-  createContinuation?(cwd: string, context: string, text: string, modelId?: string): Promise<string>;
+  createContinuation?(
+    cwd: string,
+    context: string,
+    text: string,
+    modelId?: string,
+  ): Promise<string>;
   isSessionCreateSupported?(): boolean;
   listModelCatalog?(): Promise<AcpModelCatalog>;
   createSession?(cwd: string, modelId: string | null, text: string): Promise<string>;
@@ -151,8 +156,7 @@ function continuationContext(messages: AcpHistoryMessage[], truncated: boolean):
     '# Prior Devin conversation',
     '',
     'This is a read-only transcript supplied to continue the conversation in a new session.',
-  ]
-    .join('\n');
+  ].join('\n');
   let bytes = Buffer.byteLength(base, 'utf8');
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -243,8 +247,8 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   isSessionCreateSupported(): boolean {
     return Boolean(
       this.current.isSessionCreateSupported?.() &&
-        this.current.createSession &&
-        this.history?.listCreateOptions,
+      this.current.createSession &&
+      this.history?.listCreateOptions,
     );
   }
 
@@ -618,6 +622,11 @@ export class DesktopBridgeRunner {
     if (results.some((result) => result.status === 'rejected')) {
       throw new Error('Desktop Bridge did not shut down cleanly');
     }
+  }
+
+  async resetPersistentState(): Promise<void> {
+    await this.stop();
+    await this.dependencies.secretStore.delete();
   }
 
   private async stopAfterFailure(): Promise<void> {

@@ -40,6 +40,7 @@ export const connectorCommandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ version: z.literal(CONNECTOR_IPC_VERSION), type: z.literal('shutdown') }).strict(),
+  z.object({ version: z.literal(CONNECTOR_IPC_VERSION), type: z.literal('reset') }).strict(),
 ]);
 
 const connectorErrorCodeSchema = z.enum([
@@ -47,6 +48,7 @@ const connectorErrorCodeSchema = z.enum([
   'command_invalid',
   'pairing_expired',
   'pairing_failed',
+  'uninstall_failed',
   'tailscale_unavailable',
   'unsupported_platform',
 ]);
@@ -58,6 +60,12 @@ export const connectorEventSchema = z.discriminatedUnion('type', [
       type: z.literal('pairing_offer'),
       payload: z.string().min(1).max(4_096),
       expiresAt: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      version: z.literal(CONNECTOR_IPC_VERSION),
+      type: z.literal('reset_complete'),
     })
     .strict(),
   z

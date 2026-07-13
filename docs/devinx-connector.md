@@ -29,6 +29,19 @@ Generated artifacts are ignored under `artifacts/connector/` so Expo OTA exports
 
 The local development build is ad-hoc signed. It is suitable for development and real-device validation on the build Mac, but it is not a public release. Public artifacts require a Developer ID signature, hardened runtime verification, notarization, stapling, provenance, and clean-machine Gatekeeper validation.
 
+## Update and uninstall
+
+The macOS v1 update path is an explicit signed-DMG replacement: quit DevinX Connector, open the
+newer official signed DMG, and replace the existing app in Applications. The stable Developer ID
+identity preserves the Connector's Keychain access across legitimate replacements. DevinX does not
+silently download or execute Connector updates.
+
+To remove the Connector, choose **Uninstall DevinX Connector** in the native app and confirm. The
+Connector stops its private listener before deleting its own Keychain identity and paired-iPhone
+permissions, unregisters launch at login, moves itself to Trash, and quits. Reinstalling requires a
+fresh QR pairing. If macOS cannot move a read-only or managed app bundle, the app reports that local
+state was removed and instructs the user to move the bundle to Trash manually.
+
 ## Developer ID release workflow
 
 Store notarization credentials interactively in Keychain; never put an Apple password, private key, or API key in the repository or command history:

@@ -16,7 +16,7 @@ in `docs/authorization-matrix.md`.
   Connector builds, and the high/critical dependency gate. The existing 21 moderate transitive
   findings remain reviewed and unchanged.
 - The private macOS Connector rebuilt and verified with bundled Node `24.18.0`; ad-hoc DMG SHA-256
-  is `d8caff7e4cf09a9088fd83cc57f83106bfa2c04f479b56b104b2fbe773c6c104`. No Developer ID
+  is `dc9fa4854d550186d56a974b79d27da5ca43d8ebbb0e7b723ef5177e51f221c2`. No Developer ID
   Application identity or `devinx-notary` Keychain profile is installed, so public signing,
   notarization, stapling, and Gatekeeper acceptance remain external gates.
 - iOS `0.1.0 (57)` was archived from clean source `43bd171` with Node `24.18.0` and Xcode `26.6`.
@@ -147,15 +147,21 @@ misrepresented as fixed.
 
 - The macOS app, embedded runtime, Keychain helper, and DMG rebuild successfully.
 - Strict nested code-sign verification, read-only DMG mounting, exact Applications link, clean-copy
-  installation, executable bits, entitlement allowlist, bundled Node `v24.18.0`, source-map absence,
-  and adjacent checksum verification pass. The current ad-hoc DMG SHA-256 is
-  `d8caff7e4cf09a9088fd83cc57f83106bfa2c04f479b56b104b2fbe773c6c104`.
+  installation, deliberate replacement mechanics, temporary app removal, executable bits,
+  entitlement allowlist, bundled Node `v24.18.0`, source-map absence, and adjacent checksum
+  verification pass. The current ad-hoc DMG SHA-256 is
+  `dc9fa4854d550186d56a974b79d27da5ca43d8ebbb0e7b723ef5177e51f221c2`.
+- The confirmed native uninstall path stops the listener before deleting the Connector's protected
+  Keychain identity and paired-device registry, unregisters launch at login, and asks macOS to move
+  the application to Trash. Strict IPC, state-deletion, sanitized-failure, and native-build checks
+  pass; current CI is 73 suites / 525 tests.
 - The current artifact is intentionally ad-hoc signed. Gatekeeper rejects it, as expected, because
   the available Keychain contains Apple Development and iPhone Distribution identities but no
   **Developer ID Application** identity.
 - The notarization workflow fails closed when `DEVINX_CODESIGN_IDENTITY` and notary credentials are
-  absent. Public signing/notarization/stapling, clean-account install/update/uninstall, and artifact
-  publication remain external gates. No public Connector artifact is authorized by this audit.
+  absent. Public signing/notarization/stapling, clean-account login-start/signed-replacement/
+  confirmed-uninstall testing, and artifact publication remain external gates. No public Connector
+  artifact is authorized by this audit.
 
 ## Consolidated visual pass
 

@@ -9,6 +9,12 @@ The checkpoint was repeated after Build 55 with the repository's pinned Node `24
 `notarytool` confirmed that the `devinx-notary` Keychain profile does not exist. No signing,
 notarization, stapling, upload, or public artifact publication was attempted.
 
+The native confirmed-uninstall path is now implemented and tested at the IPC/runner boundary: it
+stops the listener, deletes the Connector's protected Keychain record, unregisters launch at login,
+and asks macOS to move the application to Trash. The artifact verifier also exercises isolated
+clean-copy, replacement-install, and temporary app-removal mechanics. A real clean-account click
+through and stable-identity replacement remain part of the final Developer ID artifact checkpoint.
+
 Apple requires a Developer ID Application certificate, hardened runtime, secure timestamp, valid signatures, and notarization for directly distributed modern macOS software. See Apple's [Developer ID certificate instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/) and [notarization requirements](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 
 ## Account-holder action

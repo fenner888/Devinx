@@ -213,6 +213,17 @@ export class ConnectorController {
           await this.stop();
           return;
         }
+        if (command.type === 'reset') {
+          try {
+            await runner.resetPersistentState();
+            this.write({ version: CONNECTOR_IPC_VERSION, type: 'reset_complete' });
+          } catch {
+            this.write({ version: CONNECTOR_IPC_VERSION, type: 'error', code: 'uninstall_failed' });
+          } finally {
+            this.stopping = true;
+          }
+          return;
+        }
         if (command.type === 'regenerate') {
           this.presentedReviewId = null;
           this.offerExpiresAt = runner.showPairingOffer();

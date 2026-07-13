@@ -112,6 +112,18 @@ the internal group.
 - Disconnect/wipe app data, cold-launch, and confirm Keychain credentials, paired computers, caches,
   drafts, templates, and remembered session context are gone.
 
+## macOS Connector lifecycle
+
+- Use the final Developer ID-signed/notarized Connector on a clean non-admin macOS account. Confirm
+  first launch, QR pairing, explicit launch-at-login enablement, logout/login startup, and repair
+  after stopping Tailscale or Devin for Terminal.
+- Quit the Connector, replace it with the newer official signed DMG, and confirm its stable identity
+  preserves approved device state without a new Keychain prompt or silent permission expansion.
+- Perform uninstall last: confirm the destructive warning, then verify the listener stops, launch at
+  login is removed, the app moves to Trash, and the old iPhone grant no longer reaches the Mac.
+  Reinstall and confirm fresh QR pairing is required. Never run this step against the only copy of a
+  production credential or before other Connector checks are recorded.
+
 ## Performance and stability
 
 Complete `docs/physical-performance-checklist.md` against this same build: five cold launches per

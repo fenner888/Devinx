@@ -167,11 +167,7 @@ describe('Desktop Bridge development runner', () => {
     ).resolves.toBeUndefined();
     expect(replacementList).toHaveBeenCalledTimes(2);
     expect(replacementLoad).toHaveBeenCalledWith('session-kept');
-    expect(replacementPrompt).toHaveBeenCalledWith(
-      'session-kept',
-      'Continue.',
-      'swe-1.7-high',
-    );
+    expect(replacementPrompt).toHaveBeenCalledWith('session-kept', 'Continue.', 'swe-1.7-high');
 
     await expect(adapter.loadSession('session-missing')).rejects.toThrow(
       'not available in the current ACP process',
@@ -363,6 +359,40 @@ describe('Desktop Bridge development runner', () => {
 
     await runner.stop();
     expect(listenerStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops the listener before deleting all Connector identity and device state', async () => {
+    const secretStore = new MemorySecretStore();
+    const listenerStop = jest.fn<Promise<void>, []>().mockResolvedValue();
+    const runner = new DesktopBridgeRunner(
+      { advertisedHost: '192.168.1.141' },
+      {
+        secretStore,
+        tlsIdentityGenerator: new OpenSslTlsIdentityGenerator({ validityDays: 1 }),
+        qrRenderer: { render: jest.fn() },
+        createListener: (options) => {
+          const identity = tlsIdentityFromPem(options.tlsCertificatePem, options.tlsPrivateKeyPem);
+          return {
+            start: async () => ({
+              host: '192.168.1.141',
+              port: 45_831,
+              certificateFingerprint: identity.certificateFingerprint,
+            }),
+            stop: listenerStop,
+          };
+        },
+        createAcpClient: () => {
+          throw new Error('ACP should not be created without an explicit CLI path');
+        },
+      },
+    );
+
+    await runner.start();
+    expect(secretStore.value).not.toBeNull();
+    await runner.resetPersistentState();
+
+    expect(listenerStop).toHaveBeenCalledTimes(1);
+    expect(secretStore.value).toBeNull();
   });
 
   it('binds a proxied bridge to loopback while advertising its Tailscale address', async () => {

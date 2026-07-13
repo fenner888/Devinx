@@ -40,6 +40,7 @@ private enum ConnectorStatus: Equatable {
     case ready
     case awaitingApproval
     case paired
+    case uninstalling
     case failed(String)
 
     var label: String {
@@ -48,6 +49,7 @@ private enum ConnectorStatus: Equatable {
         case .ready: return "Ready to connect"
         case .awaitingApproval: return "Review this iPhone"
         case .paired: return "iPhone connected"
+        case .uninstalling: return "Removing securely…"
         case .failed: return "Needs attention"
         }
     }
@@ -58,6 +60,7 @@ private enum ConnectorStatus: Equatable {
         case .ready: return "checkmark.circle.fill"
         case .awaitingApproval: return "iphone.and.arrow.forward"
         case .paired: return "checkmark.shield.fill"
+        case .uninstalling: return "trash.fill"
         case .failed: return "exclamationmark.triangle.fill"
         }
     }
@@ -77,11 +80,13 @@ private final class ConnectorModel: ObservableObject {
     @Published var launchAtLogin = false
     @Published var pairingDiagnostic: String?
     @Published var devices: [ConnectorDevice] = []
+    @Published var showingUninstallConfirmation = false
 
     private var process: Process?
     private var inputPipe: Pipe?
     private var outputBuffer = Data()
     private let maximumBufferedBytes = 65_536
+    private var uninstalling = false
 
     init() {
         refreshLaunchAtLogin()
@@ -132,6 +137,7 @@ private final class ConnectorModel: ObservableObject {
                 guard self.process === terminated else { return }
                 self.process = nil
                 self.inputPipe = nil
+                if self.uninstalling { return }
                 if case .failed = self.status { return }
                 self.status = .failed(terminated.terminationStatus == 0
                     ? "The connector stopped."
@@ -214,6 +220,13 @@ private final class ConnectorModel: ObservableObject {
         }
     }
 
+    func uninstall() {
+        guard !uninstalling else { return }
+        uninstalling = true
+        status = .uninstalling
+        send(["version": ipcVersion, "type": "reset"])
+    }
+
     private func refreshLaunchAtLogin() {
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
@@ -292,6 +305,8 @@ private final class ConnectorModel: ObservableObject {
             pendingDeviceName = nil
             allowSessionContent = false
             status = .paired
+        case "reset_complete":
+            finishUninstall()
         case "devices":
             devices = event.devices ?? []
         case "error":
@@ -301,11 +316,38 @@ private final class ConnectorModel: ObservableObject {
             case "command_invalid": message = "The connector received an invalid local command."
             case "tailscale_unavailable": message = "Connect this Mac to Tailscale, then try again."
             case "unsupported_platform": message = "This connector build does not support this Mac."
+            case "uninstall_failed": message = "The connector could not remove its protected local data."
             default: message = "The secure connector could not complete that action."
             }
+            if event.code == "uninstall_failed" { uninstalling = false }
             status = .failed(message)
         default:
             status = .failed("The connector needs to be updated.")
+        }
+    }
+
+    private func finishUninstall() {
+        do {
+            if SMAppService.mainApp.status == .enabled {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            uninstalling = false
+            status = .failed("Launch at login could not be removed. Try uninstalling again.")
+            return
+        }
+
+        NSWorkspace.shared.recycle([Bundle.main.bundleURL]) { _, error in
+            Task { @MainActor in
+                if error != nil {
+                    self.uninstalling = false
+                    self.status = .failed(
+                        "Protected data was removed, but the app could not be moved to Trash. Quit and move it there manually."
+                    )
+                    return
+                }
+                NSApplication.shared.terminate(nil)
+            }
         }
     }
 
@@ -508,6 +550,22 @@ private struct ConnectorView: View {
                 ))
                 .toggleStyle(.switch)
 
+                Button("Uninstall DevinX Connector", role: .destructive) {
+                    model.showingUninstallConfirmation = true
+                }
+                .disabled(model.status == .uninstalling)
+                .alert(
+                    "Uninstall DevinX Connector?",
+                    isPresented: $model.showingUninstallConfirmation
+                ) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Uninstall", role: .destructive) { model.uninstall() }
+                } message: {
+                    Text(
+                        "This removes the app, disables launch at login, and deletes this Mac’s Connector identity and paired-iPhone permissions. Pairing must be completed again after reinstalling."
+                    )
+                }
+
                 Text("DevinX is an independent client and is not affiliated with Cognition AI.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -522,7 +580,7 @@ private struct ConnectorView: View {
         case .failed: return .red
         case .awaitingApproval: return .orange
         case .ready, .paired: return .green
-        case .starting: return .secondary
+        case .starting, .uninstalling: return .secondary
         }
     }
 }

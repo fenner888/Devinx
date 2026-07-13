@@ -1,6 +1,6 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: macOS implementation and automated packaging validation complete; physical release checkpoint and Developer ID notarization remain. Windows and Linux are required roadmap targets.
+Status: macOS implementation, confirmed protected-state uninstall, and automated packaging/replacement validation complete; physical release checkpoint and Developer ID notarization remain. Windows and Linux are required roadmap targets.
 
 ## Product decision
 
@@ -81,7 +81,9 @@ When a QR identifies a computer already paired on the iPhone, DevinX may update 
 - Native signed and notarized connector application.
 - Per-user login item; never a root daemon.
 - Local QR and approval UI.
-- Signed update and complete uninstall path.
+- Deliberate signed-DMG replacement updates. v1 does not run a silent network updater.
+- Confirmed native uninstall that stops the listener, deletes only DevinX Connector Keychain state,
+  unregisters launch at login, and moves the app to Trash.
 
 ### Windows — required follow-up
 

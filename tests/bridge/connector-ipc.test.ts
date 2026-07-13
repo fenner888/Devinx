@@ -1,6 +1,7 @@
 import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { PassThrough } from 'node:stream';
 
 import {
   CONNECTOR_IPC_VERSION,
@@ -17,6 +18,29 @@ import {
   selectPreferredConnectorAddress,
 } from '../../bridge/src/connector-platform';
 import { connectorStartupErrorCode } from '../../bridge/src/connector-cli';
+import { ConnectorController } from '../../bridge/src/connector-controller';
+import type { ConnectorPlatformAdapter } from '../../bridge/src/connector-platform';
+import type { DesktopBridgeRunner } from '../../bridge/src/runner';
+
+class EmptySecretStore {
+  async get(): Promise<string | null> {
+    return null;
+  }
+
+  async set(): Promise<void> {}
+
+  async delete(): Promise<void> {}
+}
+
+function controllerPlatform(): ConnectorPlatformAdapter {
+  return {
+    id: 'macos',
+    createSecretStore: () => new EmptySecretStore(),
+    discoverPrivateAddresses: () => ['100.90.80.70'],
+    discoverDevinCli: async () => null,
+    discoverDevinSessionDb: async () => null,
+  };
+}
 
 describe('DevinX Connector platform and IPC boundary', () => {
   it('requires an active Tailscale address without a LAN fallback', () => {
@@ -139,6 +163,9 @@ describe('DevinX Connector platform and IPC boundary', () => {
         }),
       ),
     ).toMatchObject({ type: 'revoke_device' });
+    expect(
+      parseConnectorCommand(JSON.stringify({ version: CONNECTOR_IPC_VERSION, type: 'reset' })),
+    ).toEqual({ version: CONNECTOR_IPC_VERSION, type: 'reset' });
 
     const line = encodeConnectorEvent({
       version: CONNECTOR_IPC_VERSION,
@@ -194,11 +221,93 @@ describe('DevinX Connector platform and IPC boundary', () => {
         status: 200,
       }),
     ).toMatchObject({ route: 'protected_request', status: 200 });
+    expect(
+      connectorEventSchema.parse({
+        version: CONNECTOR_IPC_VERSION,
+        type: 'reset_complete',
+      }),
+    ).toEqual({ version: CONNECTOR_IPC_VERSION, type: 'reset_complete' });
   });
 
   it('fails closed for connector platform adapters that are not implemented yet', () => {
     expect(createConnectorPlatformAdapter('darwin').id).toBe('macos');
     expect(() => createConnectorPlatformAdapter('win32')).toThrow('Windows');
     expect(() => createConnectorPlatformAdapter('linux')).toThrow('Linux');
+  });
+
+  it('stops the active controller and confirms protected-state removal before uninstall', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const chunks: Buffer[] = [];
+    output.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+    const resetPersistentState = jest.fn<Promise<void>, []>().mockResolvedValue();
+    const runner = {
+      start: async () => ({
+        endpoint: 'http://100.90.80.70:45831/',
+        pairingOfferExpiresAt: Date.now() + 60_000,
+        sessionDiscoveryEnabled: false,
+        transportKind: 'tailscale_vpn' as const,
+      }),
+      pendingReviews: () => [],
+      showPairingOffer: () => Date.now() + 60_000,
+      recoverSessionDiscovery: async () => false,
+      pairedDevices: () => [],
+      resetPersistentState,
+      stop: async () => {},
+    } as unknown as DesktopBridgeRunner;
+    const controller = new ConnectorController({
+      input,
+      output,
+      platform: controllerPlatform(),
+      pollIntervalMs: 1,
+      createRunner: () => runner,
+    });
+
+    const running = controller.run();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    input.write(`${JSON.stringify({ version: CONNECTOR_IPC_VERSION, type: 'reset' })}\n`);
+    await running;
+
+    expect(resetPersistentState).toHaveBeenCalledTimes(1);
+    expect(Buffer.concat(chunks).toString('utf8')).toContain('"type":"reset_complete"');
+  });
+
+  it('fails closed when protected Connector state cannot be removed', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const chunks: Buffer[] = [];
+    output.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+    const runner = {
+      start: async () => ({
+        endpoint: 'http://100.90.80.70:45831/',
+        pairingOfferExpiresAt: Date.now() + 60_000,
+        sessionDiscoveryEnabled: false,
+        transportKind: 'tailscale_vpn' as const,
+      }),
+      pendingReviews: () => [],
+      showPairingOffer: () => Date.now() + 60_000,
+      recoverSessionDiscovery: async () => false,
+      pairedDevices: () => [],
+      resetPersistentState: async () => {
+        throw new Error('private Keychain detail');
+      },
+      stop: async () => {},
+    } as unknown as DesktopBridgeRunner;
+    const controller = new ConnectorController({
+      input,
+      output,
+      platform: controllerPlatform(),
+      pollIntervalMs: 1,
+      createRunner: () => runner,
+    });
+
+    const running = controller.run();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    input.write(`${JSON.stringify({ version: CONNECTOR_IPC_VERSION, type: 'reset' })}\n`);
+    await running;
+
+    const encoded = Buffer.concat(chunks).toString('utf8');
+    expect(encoded).toContain('"code":"uninstall_failed"');
+    expect(encoded).not.toContain('private Keychain detail');
   });
 });

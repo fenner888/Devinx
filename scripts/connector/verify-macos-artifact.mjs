@@ -151,7 +151,10 @@ try {
   const mountedApp = resolve(mountPoint, appName);
   requirePath(mountedApp, 'mounted Connector app');
   const applicationsLink = resolve(mountPoint, 'Applications');
-  if (!lstatSync(applicationsLink).isSymbolicLink() || readlinkSync(applicationsLink) !== '/Applications') {
+  if (
+    !lstatSync(applicationsLink).isSymbolicLink() ||
+    readlinkSync(applicationsLink) !== '/Applications'
+  ) {
     throw new Error('DMG Applications link is invalid');
   }
 
@@ -160,6 +163,8 @@ try {
   if (sourceApp.signatureKind !== installed.signatureKind) {
     throw new Error('Installed Connector signature kind changed during copy');
   }
+  const installedBundleIdentifier = plistValue(installedApp, 'CFBundleIdentifier');
+  const installedVersion = plistValue(installedApp, 'CFBundleShortVersionString');
 
   const gatekeeper = result('/usr/sbin/spctl', [
     '--assess',
@@ -178,6 +183,21 @@ try {
     throw new Error('Ad-hoc Connector unexpectedly passed Gatekeeper assessment');
   }
 
+  // v1 updates are deliberate signed-DMG replacements, not a silent network
+  // updater. Exercise that filesystem path without touching the real
+  // /Applications directory or the user's Keychain-backed Connector state.
+  rmSync(installedApp, { recursive: true, force: true });
+  cpSync(mountedApp, installedApp, { recursive: true, preserveTimestamps: true });
+  const replacement = validateApp(installedApp);
+  if (
+    replacement.signatureKind !== installed.signatureKind ||
+    plistValue(installedApp, 'CFBundleIdentifier') !== installedBundleIdentifier
+  ) {
+    throw new Error('Replacement install changed the Connector identity');
+  }
+  rmSync(installedApp, { recursive: true, force: true });
+  if (existsSync(installedApp)) throw new Error('Temporary Connector uninstall did not remove app');
+
   writeFileSync(
     auditPath,
     `${JSON.stringify(
@@ -187,9 +207,11 @@ try {
         sha256: actualChecksum,
         signatureKind: sourceApp.signatureKind,
         nodeVersion: sourceApp.nodeVersion,
-        bundleIdentifier: plistValue(installedApp, 'CFBundleIdentifier'),
-        version: plistValue(installedApp, 'CFBundleShortVersionString'),
+        bundleIdentifier: installedBundleIdentifier,
+        version: installedVersion,
         cleanInstallCopyVerified: true,
+        replacementInstallVerified: true,
+        temporaryAppRemovalVerified: true,
         gatekeeperExpectedForSignature: true,
         verifiedAt: new Date().toISOString(),
       },
