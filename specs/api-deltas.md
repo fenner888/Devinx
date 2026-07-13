@@ -157,10 +157,10 @@ the newly launched `session_id`.
 Findings contain both `orchestrator_session_id` and `session_id`, but ordinary
 session responses do not contain scan severity, evidence, recommendation, or
 resolution state. No public create-scan endpoint is documented. **Action:** the
-public app provides native **Security Work** from supported organization sessions:
-verified top-level platform Code Scan roots and exact DevinX review tags, parent-child agent grouping, normal work logs,
-and an explicitly read-only review launched through the validated session-create
-endpoint. It does not use an external handoff or label session data as Code Scan
+public app provides native **Security Work** only for top-level organization sessions whose
+canonical origin is exactly `code_scan`, plus their returned child agents and normal work logs.
+Titles, prompts, categories, and client tags never qualify an ordinary session, and no scan-create
+control is exposed. It does not use an external handoff or label session data as Code Scan
 findings. Enterprise metrics/findings/remediation remain a future enhancement
 when the authenticated account has a documented supported grant. See
 `/specs/026-security-swarm-dashboard.md`.

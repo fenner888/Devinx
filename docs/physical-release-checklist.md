@@ -11,6 +11,8 @@ customer content.
   has no rectangular background or color flash.
 - Open every primary navigation and Settings row. Confirm Security Work is native and that no
   private Devin Web login, unsupported Code Scan dashboard, or dead route appears.
+- Confirm Security Work shows only sessions whose root origin is `code_scan`; ordinary API sessions
+  remain absent even when their title, prompt, category, or tags mention security.
 - Check Home, Sessions, Cloud session, Computer session, Usage, Repositories & Wiki, Knowledge,
   Playbooks, Automations, Review, Analytics, Secrets, Privacy, connection management, and scanner
   in both themes.

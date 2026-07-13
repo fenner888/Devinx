@@ -134,12 +134,29 @@ describe('active session composer', () => {
     expect(getByTestId('cloud-session-timeline').props.contentContainerClassName).toContain(
       'pb-[152px]',
     );
-    expect(getByTestId('cloud-session-composer-shell')).toBeTruthy();
-    expect(getByTestId('cloud-session-composer').props.className).toContain('rounded-card');
+    const composerShell = getByTestId('cloud-session-composer-shell');
+    expect(composerShell.props.className).not.toContain('bg-canvas');
+    const composer = getByTestId('cloud-session-composer');
+    expect(composer.props.className).toContain('rounded-card');
+    expect(composer.props.className).not.toContain('bg-surface1');
+    expect(composer.props.style.backgroundColor).toBeTruthy();
     expect(getByLabelText('Cloud session message').props.textAlignVertical).toBe('top');
     expect(getByLabelText('Cloud session message').props.className).toContain('min-h-[44px]');
     await waitFor(() => expect(getByLabelText('Repository: fenner888/Devinx')).toBeTruthy());
     expect(getByLabelText('Session mode: Fast')).toBeTruthy();
+  });
+
+  it('does not duplicate the sleeping status beside the composer', async () => {
+    mockSession.status = 'suspended';
+    mockSession.status_detail = 'sleeping';
+    const { getByLabelText, queryByText } = render(
+      <ThemeProvider>
+        <SessionDetailScreen />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => expect(getByLabelText('Repository: fenner888/Devinx')).toBeTruthy());
+    expect(queryByText('Sleeping — sending a message will wake Devin.')).toBeNull();
   });
 
   it('uploads an image and sends it with the follow-up message', async () => {

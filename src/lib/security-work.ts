@@ -1,13 +1,5 @@
 import type { SessionResponse } from '@api/devin/types';
 
-export const SECURITY_WORK_TAG = 'devinx-security-work';
-export const SECURITY_REVIEW_TAG = 'security-review';
-
-const SECURITY_TAGS = new Set([
-  SECURITY_WORK_TAG,
-  SECURITY_REVIEW_TAG,
-]);
-
 export interface SecurityWorkGroup {
   root: SessionResponse;
   workers: SessionResponse[];
@@ -15,24 +7,16 @@ export interface SecurityWorkGroup {
 }
 
 /**
- * Devin's platform-generated Code Scan coordinators currently arrive as
- * top-level `code_scan` sessions titled "Security scan …". Origin alone is
- * insufficient: manually prompted security sessions can also carry the
- * compatibility origin without representing a real platform scan.
+ * Devin's platform-generated Code Scan coordinators arrive as top-level
+ * `code_scan` sessions. The server-provided origin is the canonical boundary;
+ * titles, prompts, categories, and client tags are never substitutes.
  */
 export function isVerifiedCodeScanRoot(session: SessionResponse): boolean {
-  return (
-    session.origin === 'code_scan' &&
-    session.parent_session_id === null &&
-    session.title?.trim().toLowerCase().startsWith('security scan ') === true
-  );
+  return session.origin === 'code_scan' && session.parent_session_id === null;
 }
 
 export function isSecurityWorkSession(session: SessionResponse): boolean {
-  return (
-    isVerifiedCodeScanRoot(session) ||
-    session.tags.some((tag) => SECURITY_TAGS.has(tag.trim().toLowerCase()))
-  );
+  return isVerifiedCodeScanRoot(session);
 }
 
 /**
@@ -86,26 +70,4 @@ export function groupSecurityWork(sessions: readonly SessionResponse[]): Securit
       workers: group.workers.sort((left, right) => right.updated_at - left.updated_at),
     }))
     .sort((left, right) => right.updatedAt - left.updatedAt);
-}
-
-export function securityReviewPrompt(repositoryPath: string, focus?: string): string {
-  const printableRepository = Array.from(repositoryPath, (character) => {
-    const codePoint = character.codePointAt(0) ?? 0;
-    return codePoint < 32 || codePoint === 127 ? ' ' : character;
-  }).join('');
-  const boundedRepository = printableRepository
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 512);
-  const boundedFocus = focus?.trim().slice(0, 1_000);
-  return [
-    `Perform a read-only security review of the repository ${JSON.stringify(boundedRepository)}.`,
-    'Coordinate parallel child sessions where useful so independent checks can run concurrently.',
-    'Cover authentication and authorization, cross-tenant and IDOR risks, input validation, secrets and sensitive logging, dependency risk, data handling, and unsafe defaults.',
-    'Do not modify code, rotate credentials, install dependencies, or open a pull request during this review.',
-    'Return a prioritized report with evidence, affected files, severity, exploitability, and a proposed remediation plan. Clearly distinguish confirmed findings from hypotheses.',
-    boundedFocus ? `Additional focus from the user: ${boundedFocus}` : undefined,
-  ]
-    .filter((line): line is string => Boolean(line))
-    .join('\n\n');
 }

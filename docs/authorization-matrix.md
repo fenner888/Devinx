@@ -1,6 +1,6 @@
 # Authorization matrix
 
-Reviewed against the active Phase 4A implementation on July 13, 2026. This matrix covers the user-controlled Connector HTTP boundary, public session-based Security Work, documented organization resources, and the deferred Devin Code Scan enhancement. Devin Cloud authorization remains enforced server-side by the Devin API and the user's credential scopes.
+Reviewed against the active Phase 4A implementation on July 13, 2026. This matrix covers the user-controlled Connector HTTP boundary, genuine Code Scan session discovery, documented organization resources, and the deferred Devin Code Scan findings enhancement. Devin Cloud authorization remains enforced server-side by the Devin API and the user's credential scopes.
 
 | Method | Required device grant | Input validation | Resource binding | Unauthorized result | Rate limit class |
 |---|---|---|---|---|---|
@@ -17,9 +17,8 @@ Reviewed against the active Phase 4A implementation on July 13, 2026. This matri
 | Method | Required Devin permission | Input validation | Resource binding | Unauthorized presentation | Retry policy |
 |---|---|---|---|---|---|
 | `GET /v3/organizations/{org_id}/sessions` | `ViewOrgSessions` | bounded cursor pagination; every item parses through the session Zod schema | organization is derived only from the authenticated provider | normal generic session error; no cached or cross-org metadata is invented | deterministic auth/permission failures never retry |
-| `POST /v3/organizations/{org_id}/sessions` | `UseDevinSessions` plus the provider's supported create grant | fixed read-only work order; one validated returned repository; optional focus capped at 1,000 characters; complete request parsed by `sessionCreateRequestSchema` | organization and user attribution come only from the authenticated provider; repository comes from that provider's repository list | generic create failure; ambiguous network result uses the existing identity-bound reconciliation path | never blindly retries a potentially successful create |
 
-Verified scan-root and exact DevinX-tag filtering plus parent-child grouping control presentation only. Category alone and origin alone are intentionally insufficient. Opening a coordinator or worker still calls the normal authorized Session Detail APIs. A client cannot gain access to a session merely by constructing a URL or applying a security tag.
+Only top-level sessions whose canonical origin is exactly `code_scan` become Security Work roots. Titles, prompts, categories, and tags do not qualify an ordinary session. Parent-child grouping controls presentation only. Opening a coordinator or worker still calls the normal authorized Session Detail APIs. The supported Sessions API cannot create a `code_scan`, so this screen exposes no scan-creation mutation.
 
 ## Documented organization-resource boundary
 
@@ -43,7 +42,7 @@ All Cloud errors are converted through `userFacingError` before display. The API
 | `GET /v3/enterprise/code-scans/metrics` | `ViewAccountCodeScans` | integer UTC range, ordered and capped at 100 days; response parses through Zod | enterprise scope is derived by Devin from the service-user credential | generic enterprise-access state; no metric values rendered | deterministic auth/permission failures never retry |
 | `POST /v3/enterprise/organizations/{org_id}/code-scans/{scan_id}/findings/{finding_id}/remediate` | `UseAccountCodeScans` | bounded non-empty scan/finding IDs; response requires matching finding/session identifiers | organization comes only from the authenticated provider; Devin reauthorizes the scan and finding | generic failure, with a safe already-started state for conflict | never automatically retried |
 
-There is no documented create-scan method. DevinX does not guess one and does not use an external web handoff, private endpoint, browser cookie, or Connector scrape. The public route uses only ordinary session data and never labels it as scan findings. The phone never logs session prompts, repository names, finding content, evidence snippets, scan IDs, or remediation session IDs.
+There is no documented create-scan method. DevinX does not guess one and does not use an external web handoff, private endpoint, browser cookie, or Connector scrape. The public route displays only genuine `code_scan` sessions but never labels their normal session logs as structured scan findings. The phone never logs session prompts, repository names, finding content, evidence snippets, scan IDs, or remediation session IDs.
 
 ## Request gates
 

@@ -480,7 +480,7 @@ export default function ComputerSessionDetailScreen() {
         </View>
         {canPrompt && mayReadContent && query.data && (
           <View
-            className="bg-canvas px-4 pt-2"
+            className="px-4 pt-2"
             style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
             testID="computer-session-composer-shell"
           >
@@ -490,7 +490,8 @@ export default function ComputerSessionDetailScreen() {
               </Text>
             )}
             <View
-              className="rounded-card border border-border bg-surface1 px-3 pt-2 pb-2"
+              className="rounded-card border border-border px-3 pt-2 pb-2"
+              style={{ backgroundColor: tokens.composerSurface.hex }}
               testID="computer-session-composer"
             >
               <TextInput

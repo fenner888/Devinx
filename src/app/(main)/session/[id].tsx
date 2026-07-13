@@ -415,15 +415,10 @@ export default function SessionDetailScreen() {
             It floats above the home indicator instead of becoming a bottom shelf. */}
         {canSend && (
           <View
-            className="bg-canvas px-4 pt-2"
+            className="px-4 pt-2"
             style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
             testID="cloud-session-composer-shell"
           >
-            {session.status === 'suspended' && (
-              <Text className="text-text-low text-text12 px-1 pb-1.5">
-                Sleeping — sending a message will wake Devin.
-              </Text>
-            )}
             {(messageAttachments.length > 0 || uploadingAttachmentName) && (
               <View className="flex-row flex-wrap px-1 pb-2">
                 {uploadingAttachmentName && (
@@ -466,7 +461,8 @@ export default function SessionDetailScreen() {
               </View>
             )}
             <View
-              className="rounded-card border border-border bg-surface1 px-3 pt-2 pb-2"
+              className="rounded-card border border-border px-3 pt-2 pb-2"
+              style={{ backgroundColor: tokens.composerSurface.hex }}
               testID="cloud-session-composer"
             >
               <TextInput

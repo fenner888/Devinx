@@ -19,8 +19,9 @@ sharing the same visual language.
 
 ## Existing-session composers
 
-- Cloud and Computer session composers use an elevated `surface1` composer with
-  the same radius, border, prompt spacing, and send-button placement.
+- Cloud and Computer session composers use the translucent semantic
+  `composerSurface` token with the same radius, border, prompt spacing, and
+  send-button placement. The surrounding safe-area shell stays transparent.
 - The composer supports a comfortable two-to-three-line draft and grows only to
   a bounded maximum height.
 - The prompt occupies the upper portion of the surface. Existing actions occupy
@@ -30,8 +31,9 @@ sharing the same visual language.
 - The surface has horizontal margins and visible breathing room above the iOS
   home indicator. Do not place it inside a contrasting full-width shelf or pin
   its border directly to the bottom edge.
-- Sleeping, upload, and failure notices remain immediately above or below the
-  composer without covering it.
+- Upload and failure notices remain immediately above or below the composer
+  without covering it. Do not duplicate the canonical header status with a
+  passive `Sleeping` helper beside the composer.
 - Keyboard avoidance, keyboard dismissal on send, draft preservation, reduced
   motion, and the response-feed companion behavior remain unchanged.
 

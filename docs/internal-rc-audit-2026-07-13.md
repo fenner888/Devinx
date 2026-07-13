@@ -30,7 +30,7 @@ in `docs/authorization-matrix.md`.
 | Session creation | separate Cloud and Computer destinations, repositories versus opaque workspaces, live local model catalog and variants | service-user attribution is not human-account impersonation; unsupported ACP controls stay hidden | Cloud/local creation, model catalog, repository/workspace, handoff, and composer suites |
 | Session lifecycle | message, refresh, archive, terminate, local load/continuation, and capability-gated ownership handoff | local close/resume/delete/fork are not claimed when ACP does not advertise them | endpoint, local history, ownership, refresh, archive/terminate, and dispatcher suites |
 | Connections & devices | Cloud, Computer, and combined modes; Tailscale pairing; per-device read/send/create grants; revoke/remove/wipe | same-Wi-Fi removed from v1; no credentials enter React state or browser storage | pairing, pinned transport, replay, rate-limit, permission, persistence, revoke, and wipe suites |
-| Security Work | documented session-based read-only security review workflow and exact tagged-session grouping | not the enterprise Code Scan dashboard; no private scan route, service-account impersonation, or Web login handoff | Security Work grouping, prompt, screen, session-boundary, and generic-error tests |
+| Security Work | read-only discovery of genuine top-level `code_scan` sessions and their returned child agents | no ordinary-session simulation, private scan route, service-account impersonation, Web login handoff, findings dashboard, or scan-create claim | exact-origin grouping, false-positive rejection, screen, session-boundary, and generic-error tests |
 
 ## Security and privacy gates
 
@@ -60,7 +60,7 @@ Validated with Node 24 on July 13, 2026:
 - lockfile dry-run install succeeds;
 - lint passes with zero warnings;
 - strict TypeScript passes for the app and Connector;
-- 68 Jest suites / 503 tests pass with open-handle detection;
+- 68 Jest suites / 502 tests pass with open-handle detection;
 - Connector TypeScript and Keychain helper build successfully;
 - `npm audit --audit-level=high` passes with 0 high and 0 critical findings.
 

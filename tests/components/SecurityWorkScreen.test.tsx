@@ -1,18 +1,15 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import type { SessionResponse } from '../../src/api/devin/types';
 import SecurityWorkScreen from '../../src/app/(main)/security-work';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
-const mockReplace = jest.fn();
-const mockCreate = jest.fn();
-const mockRememberRepository = jest.fn(async (_sessionId: string, _repository: string) => undefined);
 let mockMode: 'cloud' | 'computer' | 'both' = 'cloud';
 let mockSessions: SessionResponse[] = [];
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush, replace: mockReplace }),
+  useRouter: () => ({ back: mockBack, push: mockPush }),
 }));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -34,37 +31,10 @@ jest.mock('../../src/api/devin/queries', () => ({
     error: null,
     refetch: jest.fn(async () => undefined),
   }),
-  useRepositories: () => ({
-    data: [
-      {
-        provider_repository_id: 'repo-1',
-        git_connection_id: 'git-1',
-        git_connection_host: 'github.com',
-        repo_name: 'DevinX',
-        repo_path: 'fenner888/DevinX',
-        repo_description: null,
-        repo_language: 'TypeScript',
-        last_updated_at: null,
-      },
-    ],
-    isLoading: false,
-    error: null,
-  }),
-  useCreateSession: () => ({
-    mutateAsync: mockCreate,
-    isPending: false,
-  }),
 }));
 
 jest.mock('../../src/lib/haptics', () => ({
-  hapticError: jest.fn(),
   hapticLight: jest.fn(),
-  hapticSuccess: jest.fn(),
-}));
-
-jest.mock('../../src/lib/session-repository', () => ({
-  rememberSessionRepository: (sessionId: string, repository: string) =>
-    mockRememberRepository(sessionId, repository),
 }));
 
 function session(overrides: Partial<SessionResponse> = {}): SessionResponse {
@@ -96,7 +66,6 @@ describe('Security Work screen', () => {
     jest.clearAllMocks();
     mockMode = 'cloud';
     mockSessions = [];
-    mockCreate.mockResolvedValue(session({ session_id: 'created-review' }));
   });
 
   it('shows and opens supported security sessions and their child agents', () => {
@@ -112,6 +81,7 @@ describe('Security Work screen', () => {
         session_id: 'generic-security-session',
         category: 'code_quality_and_security',
         origin: 'api',
+        tags: ['devinx-security-work', 'security-review'],
         title: 'Review pooled security schemes',
       }),
     ];
@@ -130,35 +100,16 @@ describe('Security Work screen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(main)/session/security-child');
   });
 
-  it('starts a read-only tagged review for a selected validated repository', async () => {
+  it('does not expose an ordinary-session control that claims to create a Code Scan', () => {
     const screen = render(
       <ThemeProvider>
         <SecurityWorkScreen />
       </ThemeProvider>,
     );
 
-    fireEvent.press(screen.getByLabelText('Start security review'));
-    fireEvent.press(screen.getByLabelText('Review DevinX'));
-    fireEvent.changeText(screen.getByLabelText('Security review focus'), 'Check tenant isolation');
-    fireEvent.press(screen.getByLabelText('Start read-only security review'));
-
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        devin_mode: 'normal',
-        repos: ['fenner888/DevinX'],
-        tags: ['devinx-security-work', 'security-review'],
-        title: 'Security review: DevinX',
-      }),
-    );
-    const request = mockCreate.mock.calls[0]?.[0] as { prompt: string };
-    expect(request.prompt).toContain('read-only security review');
-    expect(request.prompt).toContain('Check tenant isolation');
-    expect(request.prompt).toContain('Do not modify code');
-    await waitFor(() => {
-      expect(mockRememberRepository).toHaveBeenCalledWith('created-review', 'fenner888/DevinX');
-      expect(mockReplace).toHaveBeenCalledWith('/(main)/session/created-review');
-    });
+    expect(screen.getByText('Genuine Code Scans only')).toBeTruthy();
+    expect(screen.queryByLabelText('Start security review')).toBeNull();
+    expect(screen.queryByText('New review')).toBeNull();
   });
 
   it('does not offer Cloud security review controls in computer-only mode', () => {

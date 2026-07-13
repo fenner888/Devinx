@@ -308,7 +308,7 @@ devinx/
 
 ### 7.3 Session Detail
 - Header: title (editable if API allows), status chip, ACU spend, created/updated times, origin badge (API/Slack/web).
-- **Timeline tab:** chronological messages (cursor-paginated, infinite scroll upward), Devin vs user styling, markdown rendering, code blocks with copy, attachment tiles (download via attachments endpoint). Composer at bottom: sending a message auto-resumes a suspended session — surface that: "Session is sleeping — sending will wake it."
+- **Timeline tab:** chronological messages (cursor-paginated, infinite scroll upward), Devin vs user styling, markdown rendering, code blocks with copy, attachment tiles (download via attachments endpoint). Sending a message auto-resumes a suspended session. The canonical header status communicates that the session is sleeping; do not repeat a passive wake helper beside the composer.
 - **Output tab:** PR list (deep-link to GitHub app/web + Devin Review link if present), structured output viewer (pretty JSON + copy + share), session insights (trigger on-demand generation, render results).
 - Actions menu: Archive, Terminate, Generate insights, Manage tags, Share (public session URL only if session is not unlisted — warn before sharing).
 
@@ -502,7 +502,7 @@ One session per phase. Each session: reads `/specs/000-build-spec.md` + its phas
 
 **Session 2 — Session Board complete** — filters, sections, blocked-first treatment (§7.4 list half), context menus, pins, pull-to-refresh, adaptive polling, offline cache + staleness banner, empty/error/unauth states.
 
-**Session 3 — Session Detail + Steering** — timeline with cursor pagination, markdown/code rendering, composer with wake-warning, attachments download, Output tab (PRs, structured output, insights), archive/terminate flows.
+**Session 3 — Session Detail + Steering** — timeline with cursor pagination, markdown/code rendering, compact translucent composer, attachments download, Output tab (PRs, structured output, insights), archive/terminate flows.
 
 **Session 4 — Composer + Usage + Settings** — §7.5 full composer with attachments upload and session-secret hygiene, §7.6 consumption views with permission-gating, §7.7 settings incl. privacy explainer.
 

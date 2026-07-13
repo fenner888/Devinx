@@ -106,7 +106,7 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | exact direct dependency pins and lockfile dry-run passed on bundled Node 24; the repository and release CI remain pinned to Node 24.18.0 |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 68 suites / 503 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, Security Work, and active companion-travel coverage |
+| Jest | passed 68 suites / 502 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, Security Work, and active companion-travel coverage |
 | Production iOS export | Build 47 passed local signed export; 19.7 MB IPA. The next candidate must be inspected independently before upload |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
@@ -151,7 +151,7 @@ The results below must be refreshed after release-document changes and before a 
 - [ ] In Build 43, confirm the companion sits immediately above the composer and visibly reflects waiting, thinking/working, success, blocked, and error states without covering history or controls
 - [ ] In Build 45, cold-launch once in light mode and once in dark mode; confirm the transparent DevinX wordmark has no rectangular background or color flash before Home appears
 - [ ] In Build 45, confirm Security is absent from both primary navigation and Settings and that no Devin web login or external handoff is offered
-- [ ] In Build 46, confirm **Security Work** is native and never opens Devin web; create one disposable read-only review, verify it appears immediately, open its coordinator and any returned child agents, and confirm ordinary sessions are not mislabeled as scan findings
+- [ ] In the next candidate, confirm **Security Work** is native and never opens Devin web; verify only top-level sessions with canonical origin `code_scan` appear, open a coordinator and returned child agents, and confirm ordinary API/tagged reviews remain absent with no unsupported scan-create control
 - [ ] In Build 46, scroll long Cloud and Computer responses behind Devin and confirm the pet remains directly above the composer without a black bar, reserved blank row, clipped text, or intercepted scrolling/taps
 
 ## External release gates

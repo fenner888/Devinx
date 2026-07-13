@@ -1,15 +1,14 @@
 # Security Work and Enterprise Code Scans
 
-Status: session-based Security Work and genuine scan discovery implemented; mobile Code Scan
-creation deferred pending a supported user-principal create route
+Status: genuine Code Scan session discovery implemented; mobile Code Scan creation deferred
+pending a supported user-principal create route
 
 ## Objective
 
-Provide a useful, completely in-app security workflow without pretending that ordinary Devin
-sessions are platform Code Scans. **Security Work** groups verified platform-generated Code Scan
-roots and reviews explicitly started by DevinX with their child agents, exposes their existing work
-logs and PR/status state, and launches a read-only security review through the supported
-organization session API.
+Provide a useful, completely in-app view without pretending that ordinary Devin sessions are
+platform Code Scans. **Security Work** groups only platform-generated sessions whose canonical
+origin is `code_scan` with their returned child agents, then exposes their existing work logs and
+PR/status state.
 
 The product must never redirect users to a second Devin login, consume browser cookies, call a
 private web endpoint, or label inferred session data as an official Code Scan finding.
@@ -34,8 +33,8 @@ DevinX v1 authenticates Cloud requests with a service-user key, optionally using
 mobile app therefore must not submit the natural-language scan command through `ServiceUserAuth`
 and claim an official Code Scan. PATs would authenticate as the human user, but they remain closed
 beta and the public API still documents no create-scan endpoint. Until Devin exposes a supported
-user-principal create route, genuine scan creation remains a Web capability; DevinX may discover
-verified scan sessions and separately launch its clearly labeled read-only review.
+user-principal create route, DevinX may discover genuine scan sessions but may not create or
+simulate one.
 
 ## Supported public workflow
 
@@ -49,25 +48,18 @@ The organization Sessions API exposes the fields DevinX needs:
 
 Security Work therefore:
 
-1. Includes only top-level sessions whose origin is `code_scan` and whose platform-generated title
-   begins `Security scan `, plus sessions carrying the exact `devinx-security-work` or
-   `security-review` tag applied by DevinX. Category alone, origin alone, fuzzy title matches, and
-   generic `security` or `code-scan` tags are insufficient because they produce false positives.
+1. Includes only top-level sessions whose canonical origin is exactly `code_scan`. Titles,
+   categories, natural-language prompts, and client-applied tags are never substitutes for the
+   server-provided origin.
 2. Recursively includes returned child sessions beneath a matching coordinator, even before a
    child receives its own category or tag.
 3. Opens coordinator and worker logs through the existing native Session Detail route, preserving
    its authorization, polling, steering, redaction, and message validation behavior.
-4. Starts an explicitly read-only security review against one user-selected Cloud repository.
-   The fixed work order asks Devin to coordinate child sessions where useful and report confirmed
-   findings separately from hypotheses. It forbids edits, credential rotation, dependency
-   installation, PR creation, and other mutations during the first pass.
-5. Tags launched sessions with `devinx-security-work` and `security-review`, so the review appears
-   immediately while server-side categorization is still pending.
 
-The native layout uses normal application surfaces: a concise explanation, **New review** action,
-review groups with live canonical status, agent count and PR count, and expandable child-agent rows.
-Every row opens a native session. Empty, loading, error, refresh, repository-empty, and creation
-failure states remain explicit.
+The native layout uses normal application surfaces: a concise explanation, verified scan groups
+with live canonical status, agent count and PR count, and expandable child-agent rows. Every row
+opens a native session. Empty, loading, error, and refresh states remain explicit. There is no
+**New review** action because the supported Sessions API cannot create origin `code_scan`.
 
 ## Enterprise enhancement boundary
 
@@ -91,14 +83,6 @@ remain fully useful without that enhancement.
 ## Security gates
 
 - Every API response continues through the existing Zod boundary.
-- The review launch is an explicit user-initiated write through `useCreateSession`; it is never
-  background-triggered or automatically retried after an ambiguous result.
-- The repository comes only from the validated Devin repository response; the screen never accepts
-  an arbitrary repository path.
-- Optional focus text is capped at 1,000 characters before it enters the fixed work order, and the
-  complete outbound request is parsed by `sessionCreateRequestSchema` before dispatch.
-- The first-pass prompt is read-only. It does not install packages, change files, rotate credentials,
-  open PRs, or perform remediation.
 - Session IDs, titles, repositories, logs, findings, and prompts are never logged or sent to
   analytics/crash diagnostics.
 - A missing Code Scan permission exposes no enterprise resource details.
@@ -109,16 +93,15 @@ remain fully useful without that enhancement.
 
 ## Validation
 
-- Unit tests cover verified scan-root classification, exact DevinX tags, false-positive avoidance,
-  parent/child closure, grouping, ordering, cycles/missing children, focus bounds, and the read-only
-  prompt contract.
-- Component tests cover navigation discoverability, empty/list/expanded-agent states, repository
-  selection, validated creation payload, create failure, and computer-only behavior.
+- Unit tests cover exact `code_scan` root classification, false-positive avoidance, parent/child
+  closure, grouping, ordering, and cycles/missing children.
+- Component tests cover navigation discoverability, empty/list/expanded-agent states, rejection of
+  tagged ordinary sessions, absence of scan-creation controls, and computer-only behavior.
 - Existing Session Detail tests continue to cover authorized logs and steering.
 - Run lint, strict TypeScript, all unit/component tests, dependency audit, secret scan, and the
   authorization matrix before release.
-- Physical QA covers light/dark appearance, VoiceOver, Dynamic Type, refresh, creating a disposable
-  read-only review, opening coordinator/child logs, and companion movement after navigation.
+- Physical QA covers light/dark appearance, VoiceOver, Dynamic Type, refresh, opening genuine
+  coordinator/child logs, and companion movement after navigation.
 
 ## Scan-camera release gate
 
