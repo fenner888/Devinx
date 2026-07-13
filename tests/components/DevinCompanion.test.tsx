@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, within } from '@testing-library/react-native';
 import { AccessibilityInfo, Animated, AppState, type AppStateStatus } from 'react-native';
 import { DevinCompanion } from '../../src/components/pets/DevinCompanion';
 import { DEVIN_FRAME_SETS } from '../../src/pets/devin/assets';
@@ -193,6 +193,29 @@ describe('DevinCompanion', () => {
     expect(getByTestId('devin-companion-frame').props.source).toBe(
       DEVIN_FRAME_SETS.jumping[0],
     );
+  });
+
+  it('keeps a compact task caption attached to the traveling companion', async () => {
+    const { getByTestId, getByText, rerender } = render(
+      <DevinCompanion
+        state="working"
+        size={104}
+        message="Editing the authentication middleware"
+        travel
+        travelTrack
+      />,
+    );
+    await resolveMotionPreference();
+
+    expect(getByTestId('devin-companion-task-caption')).toBeTruthy();
+    expect(
+      within(getByTestId('devin-companion-traveler')).getByText(
+        'Editing the authentication middleware',
+      ),
+    ).toBeTruthy();
+
+    rerender(<DevinCompanion state="waiting" size={104} travelTrack />);
+    expect(getByText('Waiting for your reply')).toBeTruthy();
   });
 
   it('suppresses the message in compact mode', async () => {

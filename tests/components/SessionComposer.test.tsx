@@ -132,7 +132,7 @@ describe('active session composer', () => {
     expect(companionDock.props.className).not.toContain('bg-canvas');
     expect(companionDock.props.pointerEvents).toBe('none');
     expect(getByTestId('cloud-session-timeline').props.contentContainerClassName).toContain(
-      'pb-[124px]',
+      'pb-[152px]',
     );
     expect(getByTestId('cloud-session-composer-shell')).toBeTruthy();
     expect(getByTestId('cloud-session-composer').props.className).toContain('rounded-card');

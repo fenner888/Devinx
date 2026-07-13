@@ -12,7 +12,7 @@ Integrate the generated Devin pet as a restrained, in-app React Native companion
 - Do not add a dependency or change auth, secrets, Secure Store, API clients, or endpoint schemas.
 - Use existing theme tokens and exact status vocabulary from `statusLabels`.
 - Keep the presentation calm and engineering-grade: no hearts, sparkles, or constant speech. Horizontal travel is reserved for active session work and stops when Devin is waiting, sleeping, finished, or in an error state.
-- Do not show a persistent companion message for passive idle, sleeping, or waiting states. A subtle message may appear only for active work, a meaningful completion or failure, or an actionable state that needs the user's attention.
+- In Session Detail, show one persistent, compact task/status caption attached to the companion. It travels with Devin and describes the current activity or passive state without becoming a centered banner.
 
 ## Source assets
 
@@ -82,7 +82,7 @@ Behavior:
 - Make the stable outer container accessible; animated frame images are not separate accessibility elements.
 - Remain non-interactive and allow touches to reach the surrounding UI.
 - `compact={false}` uses the requested size and may show a subtle status message.
-- Omit the status bubble entirely when `message` is absent; never synthesize generic filler such as "Waiting for your next message."
+- Outside Session Detail's travel track, omit the status caption when `message` is absent. Inside the travel track, use a short state-derived fallback such as "Waiting for your reply" so the caption remains attached to Devin throughout the session; never render a detached centered banner.
 - `compact={true}` uses the requested smaller presentation and suppresses the message.
 
 ## Placement
@@ -93,7 +93,7 @@ Make Devin the centered visual anchor between a compact readiness card and the f
 
 ### Session Detail
 
-Place a compact companion in a dedicated transparent track immediately above the session composer. The track is a stable, pointer-transparent foreground overlay at the bottom of the timeline viewport, so the conversation scrolls behind it and it consumes no opaque layout row. It must not add special trailing clearance, push messages above itself, live inside the composer, intercept touches, cover controls, or paint a background. Session Detail intentionally uses a much smaller companion than Home so timeline content remains primary. Keep its transparent track mounted throughout the session. An optimistic send or any canonical active-work state begins walking immediately at Devin's current position without jumping to another edge. The semantic activity state and message may still distinguish thinking, editing, testing, reading, executing, or responding, but every active state uses the direction-specific walking frames until work settles. When work ends, stop movement at the current position and transition directly to waiting, success, error, sleeping, or another canonical animation. Passive waiting and sleeping states remain visually quiet without a companion message bubble; reserve visible copy for active, terminal, or actionable events. Sending immediately dismisses the keyboard so the timeline, track, and composer remain visible. Use the exhaustive canonical status mapping and canonical status label for accessibility. Do not duplicate the existing header status with visible companion copy.
+Place a compact companion in a dedicated transparent track immediately above the session composer. The track is a stable, pointer-transparent foreground overlay at the bottom of the timeline viewport, so the conversation scrolls behind it and it consumes no opaque layout row. It must not push messages into a visible shelf, live inside the composer, intercept touches, cover controls, or paint a background. The scroll content must include enough transparent tail clearance for every response line to scroll fully above the companion and its caption. Session Detail intentionally uses a much smaller companion than Home so timeline content remains primary. Keep its transparent track mounted throughout the session. Render the current activity as a small caption directly above the sprite inside the same animated wrapper; the caption moves and stops with Devin instead of remaining centered in the viewport. An optimistic send or any canonical active-work state begins walking immediately at Devin's current position without jumping to another edge. The semantic activity state and caption may distinguish thinking, editing, testing, reading, executing, responding, waiting, or completion, but every active state uses the direction-specific walking frames until work settles. When work ends, stop movement at the current position and transition directly to waiting, success, error, sleeping, or another canonical animation while retaining the short attached caption. Sending immediately dismisses the keyboard so the timeline, track, and composer remain visible. Use the exhaustive canonical status mapping and canonical status label for accessibility. Keep captions task-focused and do not duplicate long header copy.
 
 ## Tests and validation
 

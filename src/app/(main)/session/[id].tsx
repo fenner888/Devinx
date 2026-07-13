@@ -877,7 +877,7 @@ function TimelineTab({
     <ScrollView
       ref={listRef}
       className="flex-1 px-4"
-      contentContainerClassName="pt-3 pb-[124px]"
+      contentContainerClassName="pt-3 pb-[152px]"
       testID="cloud-session-timeline"
       onScroll={handleScroll}
       scrollEventThrottle={100}

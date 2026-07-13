@@ -19,11 +19,38 @@ const COMPACT_MAX_SIZE = 48;
 const TRAVEL_FRAMES_PER_SECOND = 8;
 const TRAVEL_BODY_WIDTHS_PER_SECOND = 0.5;
 const TURN_PAUSE_MS = 120;
+const TRAVEL_CAPTION_HEIGHT = 40;
 const styles = StyleSheet.create({
   touchThrough: { pointerEvents: 'none' },
   travelFrame: { bottom: 0, left: 0, position: 'absolute' },
   travelTrack: { overflow: 'hidden', width: '100%' },
 });
+
+function fallbackCaptionForState(state: DevinCompanionProps['state']): string {
+  switch (state) {
+    case 'thinking':
+      return 'Thinking through the task';
+    case 'working':
+    case 'focused':
+      return 'Working on your task';
+    case 'success':
+    case 'celebrating':
+      return 'Task complete';
+    case 'blocked':
+      return 'Waiting for your reply';
+    case 'warning':
+    case 'error':
+      return 'Needs your attention';
+    case 'reminding':
+      return 'Reminder';
+    case 'sleeping':
+      return 'Sleeping';
+    case 'idle':
+      return 'Ready';
+    case 'waiting':
+      return 'Waiting for your reply';
+  }
+}
 
 export function DevinCompanion({
   state,
@@ -58,6 +85,7 @@ export function DevinCompanion({
   const frames = travel
     ? DEVIN_FRAME_SETS[travelDirection === 'right' ? 'running-right' : 'running-left']
     : animation.frames;
+  const travelCaption = compact ? undefined : visibleMessage ?? fallbackCaptionForState(state);
 
   useEffect(() => {
     let mounted = true;
@@ -198,26 +226,36 @@ export function DevinCompanion({
       <View
         style={styles.touchThrough}
         accessible
-        accessibilityLabel={accessibilityLabel ?? `Devin companion, ${state}`}
+        accessibilityLabel={accessibilityLabel ?? travelCaption ?? `Devin companion, ${state}`}
       >
-        {visibleMessage && (
-          <View className="mb-1 self-center rounded-full border border-border-subtle bg-surface1 px-3 py-1.5">
-            <Text className="max-w-72 text-center text-text-mid text-text12" numberOfLines={2}>
-              {visibleMessage}
-            </Text>
-          </View>
-        )}
         <View
           testID="devin-companion-track"
-          style={[{ height: displaySize }, styles.travelTrack]}
+          style={[{ height: displaySize + TRAVEL_CAPTION_HEIGHT }, styles.travelTrack]}
           onLayout={handleTrackLayout}
         >
           <Animated.View
+            testID="devin-companion-traveler"
             style={[
               styles.travelFrame,
-              { height: displaySize, width: displaySize, transform: [{ translateX: travelX }] },
+              {
+                height: displaySize + TRAVEL_CAPTION_HEIGHT,
+                width: displaySize,
+                transform: [{ translateX: travelX }],
+              },
             ]}
           >
+            {travelCaption && (
+              <View
+                testID="devin-companion-task-caption"
+                className="h-10 w-full items-center justify-end pb-1"
+              >
+                <View className="max-w-full rounded-chip border border-border-subtle bg-surface1 px-1.5 py-1">
+                  <Text className="text-center text-text-mid text-text11" numberOfLines={2}>
+                    {travelCaption}
+                  </Text>
+                </View>
+              </View>
+            )}
             {frame}
           </Animated.View>
         </View>

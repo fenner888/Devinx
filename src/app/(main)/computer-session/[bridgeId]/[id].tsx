@@ -408,7 +408,7 @@ export default function ComputerSessionDetailScreen() {
           <ScrollView
             ref={historyRef}
             className="flex-1"
-            contentContainerClassName="px-5 pt-5 pb-[132px]"
+            contentContainerClassName="px-5 pt-5 pb-[160px]"
             testID="computer-session-history"
             onScroll={handleHistoryScroll}
             scrollEventThrottle={100}

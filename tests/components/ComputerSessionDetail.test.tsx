@@ -132,7 +132,7 @@ describe('Computer session detail', () => {
     expect(companionDock.props.className).not.toContain('bg-canvas');
     expect(companionDock.props.pointerEvents).toBe('none');
     expect(screen.getByTestId('computer-session-history').props.contentContainerClassName).toContain(
-      'pb-[132px]',
+      'pb-[160px]',
     );
     expect(screen.getByTestId('computer-session-composer-shell')).toBeTruthy();
     expect(screen.getByTestId('computer-session-composer').props.className).toContain(
