@@ -7,15 +7,16 @@ in `docs/authorization-matrix.md`.
 
 ## Internal candidate produced
 
-- iOS `0.1.0 (49)` was archived from clean commit `d615f7d` with Node `24.18.0`.
-- IPA SHA-256: `018d946db1ec5415c0770f80e128f24d4c29575f167870ba396cddf9b7c5adf2`.
+- iOS `0.1.0 (50)` was archived from clean commit `09ab73c` with Node `24.18.0`.
+- IPA SHA-256: `59b658906a35182d88f7fa11a03f08e75dedc87edcae43ef7eee46dc5a04d3d5`.
 - Strict code-sign verification passed with `get-task-allow=false`, no APS entitlement,
   `NSFileProtectionComplete`, exempt encryption set to false, the exact on-device microphone
   disclosure, production update channel, and runtime `0.1.0`.
 - All 10 packaged privacy manifests declare zero collected-data types, no tracking, and no
   tracking domains. No Sentry or notification artifact is packaged.
-- EAS submission `a7a4b438-860a-4048-88b2-ad7dc15dd2c8` was accepted by Apple and is processing
-  in App Store Connect for internal TestFlight. No App Review or public release was submitted.
+- EAS submission `d48480a2-af66-4625-b5dd-c3512a17b20c` finished successfully and was submitted
+  to Apple on July 13, 2026 at 9:39 AM for internal TestFlight. No App Review or public release was
+  submitted.
 
 ## Product surface verification
 
@@ -32,7 +33,7 @@ in `docs/authorization-matrix.md`.
 | Connections & devices | Cloud, Computer, and combined modes; Tailscale pairing; per-device read/send/create grants; revoke/remove/wipe | same-Wi-Fi removed from v1; no credentials enter React state or browser storage | pairing, pinned transport, replay, rate-limit, permission, persistence, revoke, and wipe suites |
 | Security Work | read-only discovery of genuine top-level `code_scan` sessions and their returned child agents | no ordinary-session simulation, private scan route, service-account impersonation, Web login handoff, findings dashboard, or scan-create claim | exact-origin grouping, false-positive rejection, screen, session-boundary, and generic-error tests |
 
-The dormant enterprise findings/metrics/remediation client was removed before the next candidate.
+The dormant enterprise findings/metrics/remediation client was removed before Build 50.
 Those routes are not compiled into v1, so ordinary Pro/Max credentials cannot accidentally probe
 an enterprise boundary. Security Work remains session-only and exact-origin.
 
@@ -136,9 +137,9 @@ misrepresented as fixed.
   fill. Their shells and companion tracks remain transparent, and timeline clearance keeps the
   final message line above both pointer-free overlays.
 
-## Physical checkpoint after the next internal upload
+## Physical checkpoint for Build 50
 
-Use the exact next TestFlight candidate and sanitized sessions. Confirm:
+Use exact internal TestFlight Build 50 and sanitized sessions. Confirm:
 
 1. Home plus Cloud and Computer session creation, all destination-specific pickers, attachments,
    archive/terminate, device removal/revocation, and all three connection modes after cold launch.
@@ -147,8 +148,7 @@ Use the exact next TestFlight candidate and sanitized sessions. Confirm:
 3. Light/dark launch, long-history scrolling behind the transparent companion, no clipped content,
    conversation content visibly behind the floating translucent Cloud and Computer composers,
    complete final-line clearance above both overlays, keyboard clearance, scanner sizing, and no
-   raw Mac path or ACP identifier. This checkpoint must use a candidate containing `d90fbb7`;
-   Build 49 predates that correction.
+   raw Mac path or ACP identifier. Build 50 contains composer correction `d90fbb7`.
 4. Cold-launch, 200-row scrolling, one-hour foreground battery, and seven-day TestFlight stability
    using `docs/physical-performance-checklist.md`.
 

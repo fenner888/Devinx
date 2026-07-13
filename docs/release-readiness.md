@@ -84,7 +84,10 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (49)` was built locally from clean commit `d615f7d` with Security Work restricted to genuine top-level `code_scan` sessions, the unsupported ordinary-session review creator removed, translucent Cloud and Computer composer surfaces, and the duplicate passive sleeping helper removed; the archive used the exact pinned Node `24.18.0` runtime
 - [x] Build 49 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, microphone disclosure, and all privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (49)`, `NSFileProtectionComplete`); `get-task-allow=false`, no APS entitlement is present, and all 10 privacy manifests declare zero collected-data types, no tracking, and no tracking domains; SHA-256 `018d946db1ec5415c0770f80e128f24d4c29575f167870ba396cddf9b7c5adf2`
 - [x] Build 49 App Store Connect submission `a7a4b438-860a-4048-88b2-ad7dc15dd2c8` was accepted by Apple and is processing as the superseding internal TestFlight release candidate; no App Review or public release action was taken
-- [x] Post-Build-49 composer correction `d90fbb7` converts both Cloud and Computer session composers into measured floating overlays, keeps conversation content visibly behind the more translucent semantic surface, and preserves enough transparent tail clearance for the final response to scroll above Devin and the composer; automated CI passes, but this correction is not present in Build 49 and must be included in the next consolidated internal candidate
+- [x] Post-Build-49 composer correction `d90fbb7` converts both Cloud and Computer session composers into measured floating overlays, keeps conversation content visibly behind the more translucent semantic surface, and preserves enough transparent tail clearance for the final response to scroll above Devin and the composer; automated CI passes and Build 50 includes the correction
+- [x] iOS `0.1.0 (50)` was built locally from clean commit `09ab73c` with the floating-composer correction, unsupported dormant enterprise Code Scan paths removed, the release CI/runtime pin aligned to Node `24.18.0`, and deterministic Connector artifact verification
+- [x] Build 50 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, microphone disclosure, and all privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (50)`, `NSFileProtectionComplete`); `get-task-allow=false`, no APS entitlement is present, and all 10 privacy manifests declare zero collected-data types, no tracking, and no tracking domains; SHA-256 `59b658906a35182d88f7fa11a03f08e75dedc87edcae43ef7eee46dc5a04d3d5`
+- [x] Build 50 EAS submission `d48480a2-af66-4625-b5dd-c3512a17b20c` finished successfully and was submitted to Apple for internal TestFlight on July 13, 2026 at 9:39 AM; no App Review or public release action was taken
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -111,12 +114,12 @@ The results below must be refreshed after release-document changes and before a 
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
 | Jest | passed 66 suites / 497 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, exact-origin Security Work, active companion travel, and floating-composer clearance coverage; the removed suites covered an enterprise Code Scan client that is no longer shipped |
-| Production iOS export | Build 49 passed local signed export; 19.7 MB IPA. The next candidate containing `d90fbb7` must be inspected independently before upload |
+| Production iOS export | Build 50 passed local signed export and independent IPA inspection; 20,684,064-byte IPA with SHA-256 `59b658906a35182d88f7fa11a03f08e75dedc87edcae43ef7eee46dc5a04d3d5` |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 49 has 10 manifests declaring no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 50 has 10 manifests declaring no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters`; the dormant notifier and unsupported enterprise Code Scan client/schemas/tests were removed |
@@ -126,8 +129,7 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-Use the next consolidated internal candidate containing `d90fbb7`; Build 49 does not contain the
-final floating-composer correction.
+Use internal TestFlight Build 50. It contains `d90fbb7` and the final floating-composer correction.
 
 - [x] In Build 35, switching Home from Cloud to Computer changed Recent from Cloud sessions to sessions from the selected Mac, switching back restored Cloud recents, and View all retained the combined cross-origin Sessions screen
 - [x] In Build 35, the destination and workspace sheets remained compact, bounded, explicitly dismissible, and free of raw paths or excessive empty space
@@ -158,7 +160,7 @@ final floating-composer correction.
 - [ ] Confirm the companion sits immediately above the composer and visibly reflects waiting, thinking/working, success, blocked, and error states without covering history or controls
 - [ ] Cold-launch once in light mode and once in dark mode; confirm the transparent DevinX wordmark has no rectangular background or color flash before Home appears
 - [ ] Confirm no Devin web login or external Security handoff is offered
-- [ ] In the next candidate, confirm **Security Work** is native and never opens Devin web; verify only top-level sessions with canonical origin `code_scan` appear, open a coordinator and returned child agents, and confirm ordinary API/tagged reviews remain absent with no unsupported scan-create control
+- [ ] In Build 50, confirm **Security Work** is native and never opens Devin web; verify only top-level sessions with canonical origin `code_scan` appear, open a coordinator and returned child agents, and confirm ordinary API/tagged reviews remain absent with no unsupported scan-create control
 - [ ] Scroll long Cloud and Computer responses behind Devin and the floating composer; confirm the history is visibly present behind the translucent surface and every final response line can scroll above both overlays without a black bar, reserved blank row, clipping, or intercepted scrolling/taps
 
 ## External release gates

@@ -1,7 +1,7 @@
 # Final internal TestFlight physical checklist
 
-Use the exact next internal TestFlight candidate containing composer correction `d90fbb7` and only
-sanitized sessions, repositories, and prompts. Build 49 predates the final floating-composer fix.
+Use exact internal TestFlight Build 50, which contains composer correction `d90fbb7`, and only
+sanitized sessions, repositories, and prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.
 
