@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Text, View } from 'react-native';
+import { Image, View } from 'react-native';
 
 import { modelFamilyMarkKind } from '@lib/model-family-mark';
 import { useTheme } from '@theme/index';
+import { MODEL_FAMILY_MARK_ASSETS } from './modelFamilyMarkAssets';
 
 interface ModelFamilyMarkProps {
   name: string | null | undefined;
@@ -10,103 +11,45 @@ interface ModelFamilyMarkProps {
 }
 
 export function ModelFamilyMark({ name, size = 24 }: ModelFamilyMarkProps) {
-  const { tokens } = useTheme();
+  const { name: themeName, tokens } = useTheme();
   const kind = modelFamilyMarkKind(name);
   const iconSize = Math.max(16, Math.round(size * 0.82));
+  const asset = MODEL_FAMILY_MARK_ASSETS[kind];
 
   let mark: React.ReactNode;
-  switch (kind) {
-    case 'adaptive':
-      mark = <Ionicons name="git-branch-outline" size={iconSize} color={tokens.merged.hex} />;
-      break;
-    case 'claude':
-      mark = (
-        <Text
-          style={{ color: tokens.blocked.hex, fontSize: iconSize + 2, lineHeight: iconSize + 3 }}
-          className="font-semibold"
-        >
-          ✳
-        </Text>
-      );
-      break;
-    case 'glm':
-      mark = (
-        <Text
-          style={{
-            color: tokens.textHiStrong.hex,
-            fontSize: iconSize + 2,
-            lineHeight: iconSize + 3,
-          }}
-          className="font-bold"
-        >
-          Z
-        </Text>
-      );
-      break;
-    case 'swe': {
-      const dot = Math.max(4, Math.round(size * 0.22));
-      mark = (
-        <View
-          className="flex-row flex-wrap items-center justify-center"
-          style={{ width: iconSize, height: iconSize }}
-        >
-          <View
-            className="m-px rounded-sm"
-            style={{
-              width: dot,
-              height: dot,
-              backgroundColor: tokens.brandText.hex,
-            }}
-          />
-          <View
-            className="m-px rounded-sm"
-            style={{
-              width: dot,
-              height: dot,
-              backgroundColor: tokens.running.hex,
-            }}
-          />
-          <View
-            className="m-px rounded-sm"
-            style={{
-              width: dot,
-              height: dot,
-              backgroundColor: tokens.finished.hex,
-            }}
-          />
-          <View
-            className="m-px rounded-sm"
-            style={{
-              width: dot,
-              height: dot,
-              backgroundColor: tokens.brand.hex,
-            }}
-          />
-        </View>
-      );
-      break;
+  if (asset) {
+    const imageSize = Math.max(14, Math.round(size * asset.scale));
+    const needsContrastTile = asset.contrastTile === themeName;
+    mark = (
+      <View
+        className="items-center justify-center rounded-full"
+        style={
+          needsContrastTile
+            ? {
+                width: size,
+                height: size,
+                backgroundColor: tokens.textHiStrong.hex,
+              }
+            : undefined
+        }
+      >
+        <Image
+          source={asset.source}
+          resizeMode="contain"
+          style={{ width: imageSize, height: imageSize }}
+          accessible={false}
+          testID={`model-family-mark-image-${kind}`}
+        />
+      </View>
+    );
+  } else {
+    switch (kind) {
+      case 'adaptive':
+        mark = <Ionicons name="git-branch-outline" size={iconSize} color={tokens.merged.hex} />;
+        break;
+      default:
+        mark = <Ionicons name="hardware-chip-outline" size={iconSize} color={tokens.textMid.hex} />;
     }
-    case 'gpt':
-      mark = <Ionicons name="aperture-outline" size={iconSize} color={tokens.finished.hex} />;
-      break;
-    case 'gemini':
-      mark = <Ionicons name="sparkles" size={iconSize} color={tokens.merged.hex} />;
-      break;
-    case 'deepseek':
-      mark = <Ionicons name="water-outline" size={iconSize} color={tokens.brandText.hex} />;
-      break;
-    case 'grok':
-      mark = (
-        <Text
-          style={{ color: tokens.textHiStrong.hex, fontSize: iconSize, lineHeight: iconSize + 2 }}
-          className="font-semibold"
-        >
-          X
-        </Text>
-      );
-      break;
-    default:
-      mark = <Ionicons name="hardware-chip-outline" size={iconSize} color={tokens.textMid.hex} />;
   }
 
   return (

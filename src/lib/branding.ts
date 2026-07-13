@@ -2,9 +2,9 @@
  * Branding constants — single source of truth for all name/scheme strings.
  * Spec §1.4: a rename is a one-line change here.
  *
- * Do NOT import Cognition's logo, Devin's logomark, or their mascot anywhere
- * (spec §1.4 hard line). Extracted design tokens (colors/type) are aesthetic
- * alignment; logos are trademark use.
+ * Do NOT use Cognition's logo, Devin's logomark, or their mascot as DevinX
+ * branding (spec §1.4 hard line). The narrow model-picker exception permits a
+ * verified provider/model mark solely to identify a live catalog model.
  */
 
 export const branding = {
