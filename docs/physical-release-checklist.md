@@ -1,12 +1,13 @@
 # Final internal TestFlight physical checklist
 
-Use internal TestFlight Build 60. It supersedes Build 59 for final acceptance and contains composer
+Use internal TestFlight Build 61. It supersedes Build 60 for final acceptance and contains composer
 correction `d90fbb7`, keyboard-viewport fix
 `791a338`, the supported Settings/MCP/Wiki capability boundary recorded in release-source commit
 `4825409`, final Cloud/Computer model-contract enforcement `3162a33`, truthful session activity
 `0907d2b`, the owner-supplied Home companion artwork correction `e21c8c9`, and explicit session
-keyboard dismissal `af05c98`. Release-source commit `b024f0f` adds the current Devin-style local
-model family marks without changing the live ACP model IDs.
+keyboard dismissal `af05c98`. Release-source commit `b0c7dcc` adds verified bundled model-family
+marks without changing live Cloud or ACP model IDs, and `b0aad7e` simplifies the Home readiness
+header without changing connection behavior.
 Use only sanitized sessions, repositories, and prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.

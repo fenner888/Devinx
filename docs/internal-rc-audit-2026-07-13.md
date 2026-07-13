@@ -5,6 +5,25 @@ Review nor a public Connector release. The authenticated product inventory and s
 decisions are in `specs/033-cloud-local-settings-parity.md`; route-level authorization evidence is
 in `docs/authorization-matrix.md`.
 
+## Build 61 verified model marks and Home readiness header
+
+- Commits `b0c7dcc` and `b0aad7e` replace approximate model-family symbols with verified bundled
+  first-party marks and simplify the Home readiness header. Adaptive remains a code-native Devin
+  treatment. These changes are presentational and do not create, rename, or remap a Cloud or ACP
+  model identifier.
+- Release CI passed lint, strict TypeScript, 75 Jest suites / 546 tests, app and Connector builds,
+  and the high/critical dependency gate. No dependency was added; the existing 21 reviewed moderate
+  transitive findings remain unchanged.
+- The Expo Free-plan cloud quota rejected the remote iOS job after assigning Build 61, so the same
+  production profile was exported locally with Xcode `26.6` from clean source `b0aad7e`. The signed
+  20,916,184-byte IPA has SHA-256
+  `46b89e22511c060a25e53c8f418c54317d4516c4186216581a2456379fe67357` and passed strict signing,
+  metadata, entitlement, production update/runtime, exact permission-disclosure, and 10-manifest
+  privacy inspection. It declares no collected-data category, tracking domain, or APS entitlement.
+- EAS submission `f9208553-222d-4dc1-b3ca-8e726df1d376` successfully uploaded this exact IPA to App
+  Store Connect for internal TestFlight. Apple is processing the upload. No App Review or public
+  release action was taken.
+
 ## Build 60 local-model family marks
 
 - Commit `b024f0f` aligns both Computer model pickers and their selected composer controls with
