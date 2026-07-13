@@ -400,7 +400,7 @@ export default function SessionDetailScreen() {
               size={keyboardVisible ? 72 : 104}
               message={companionActivity.message}
               active={companionActive}
-              travel={isWorking && companionActivity.travel}
+              travel={companionActivity.travel}
               travelTrack
               accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
             />

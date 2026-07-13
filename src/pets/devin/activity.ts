@@ -78,7 +78,10 @@ export function activityForCloudSession(
   return {
     state: workingState,
     message: reason ?? 'Working on your task',
-    travel: workingState === 'thinking',
+    // Every canonical active-work state walks. The semantic pose still drives
+    // the message/accessibility state, while the travel track supplies the
+    // directional walking frames until Devin reaches a passive/terminal state.
+    travel: true,
   };
 }
 
@@ -89,14 +92,14 @@ export function activityForComputerSession(
   if (activity?.active) {
     const message = cleanActivityText(activity.label) ?? 'Working through Devin on your Mac';
     if (activity.kind === 'editing') {
-      return { state: 'working', message, travel: false };
+      return { state: 'working', message, travel: true };
     }
     if (
       activity.kind === 'executing' ||
       activity.kind === 'reading' ||
       activity.kind === 'responding'
     ) {
-      return { state: 'focused', message, travel: false };
+      return { state: 'focused', message, travel: true };
     }
     return { state: 'thinking', message, travel: true };
   }
