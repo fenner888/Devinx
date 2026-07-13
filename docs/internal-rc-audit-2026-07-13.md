@@ -32,6 +32,10 @@ in `docs/authorization-matrix.md`.
 | Connections & devices | Cloud, Computer, and combined modes; Tailscale pairing; per-device read/send/create grants; revoke/remove/wipe | same-Wi-Fi removed from v1; no credentials enter React state or browser storage | pairing, pinned transport, replay, rate-limit, permission, persistence, revoke, and wipe suites |
 | Security Work | read-only discovery of genuine top-level `code_scan` sessions and their returned child agents | no ordinary-session simulation, private scan route, service-account impersonation, Web login handoff, findings dashboard, or scan-create claim | exact-origin grouping, false-positive rejection, screen, session-boundary, and generic-error tests |
 
+The dormant enterprise findings/metrics/remediation client was removed before the next candidate.
+Those routes are not compiled into v1, so ordinary Pro/Max credentials cannot accidentally probe
+an enterprise boundary. Security Work remains session-only and exact-origin.
+
 ## Security and privacy gates
 
 - Protected Connector routes remain server-authorized per device. Invalid or unauthorized
@@ -60,9 +64,14 @@ Validated with Node 24 on July 13, 2026:
 - lockfile dry-run install succeeds;
 - lint passes with zero warnings;
 - strict TypeScript passes for the app and Connector;
-- 68 Jest suites / 502 tests pass with open-handle detection;
+- 66 Jest suites / 496 tests pass with open-handle detection;
 - Connector TypeScript and Keychain helper build successfully;
 - `npm audit --audit-level=high` passes with 0 high and 0 critical findings.
+- CI now reads the exact Node version from `.nvmrc`, matching the package engine and local release
+  workflow instead of carrying a second runtime pin.
+- The only dependency install scripts are exact `esbuild@0.28.1` and `fsevents@2.3.3`; both package
+  names, versions, repositories, publication histories, and registry download histories were
+  verified before they were allowlisted. A clean lockfile install succeeds with those two entries.
 
 The explicit moderate review reports 21 affected dependency nodes from three underlying advisory
 areas:
@@ -97,7 +106,10 @@ misrepresented as fixed.
 ## Connector distribution checkpoint
 
 - The macOS app, embedded runtime, Keychain helper, and DMG rebuild successfully.
-- Strict nested code-sign verification and DMG verification pass; the adjacent SHA-256 file verifies.
+- Strict nested code-sign verification, read-only DMG mounting, exact Applications link, clean-copy
+  installation, executable bits, entitlement allowlist, bundled Node `v24.18.0`, source-map absence,
+  and adjacent checksum verification pass. The current ad-hoc DMG SHA-256 is
+  `5fc913c50766f828346ecedce8099193384cbcb9fbb65518ec7537abb2bbaf18`.
 - The current artifact is intentionally ad-hoc signed. Gatekeeper rejects it, as expected, because
   the available Keychain contains Apple Development and iPhone Distribution identities but no
   **Developer ID Application** identity.
@@ -120,6 +132,9 @@ misrepresented as fixed.
 - Authenticated data states cannot be truthfully pixel-approved from an unauthenticated simulator.
   Build 47 provides the most recent physical visual baseline; the expanded product screens and
   destructive/editing states remain listed in the next-build physical checkpoint below.
+- Cloud and Computer session composers now use the existing 8% semantic tint as their floating
+  fill. Their shells and companion tracks remain transparent, and timeline clearance keeps the
+  final message line above both pointer-free overlays.
 
 ## Physical checkpoint after the next internal upload
 

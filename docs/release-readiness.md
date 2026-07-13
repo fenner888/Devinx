@@ -110,7 +110,7 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | exact direct dependency pins and lockfile dry-run passed on bundled Node 24; the repository and release CI remain pinned to Node 24.18.0 |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 68 suites / 502 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, Security Work, active companion travel, and floating-composer clearance coverage |
+| Jest | passed 66 suites / 496 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, exact-origin Security Work, active companion travel, and floating-composer clearance coverage; the removed suites covered an enterprise Code Scan client that is no longer shipped |
 | Production iOS export | Build 49 passed local signed export; 19.7 MB IPA. The next candidate containing `d90fbb7` must be inspected independently before upload |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
@@ -119,9 +119,9 @@ The results below must be refreshed after release-document changes and before a 
 | App privacy artifact | Build 49 has 10 manifests declaring no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
-| Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
+| Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters`; the dormant notifier and unsupported enterprise Code Scan client/schemas/tests were removed |
 | Connector app build/signature | passed July 13 rebuild and strict nested code-sign verification with the intentional ad-hoc development signature |
-| Connector DMG/checksum | passed `hdiutil verify` and adjacent SHA-256 verification; current private arm64 DMG hash is `e88d1dc984afe349cb2807869e633eaa26d6e2c23c785e96db5a2ed9f5068cf8` |
+| Connector DMG/checksum | passed adjacent checksum, `hdiutil verify`, read-only mount, exact Applications link, clean-copy install, strict nested signatures, entitlement allowlist, source-map absence, and bundled Node `v24.18.0`; current private arm64 DMG hash is `5fc913c50766f828346ecedce8099193384cbcb9fbb65518ec7537abb2bbaf18` |
 | Developer ID/notarization workflow | prepared and fail-closed; checksum-verifies then minimally re-signs Node without debug/dynamic-loader entitlements, rejects development identities, notarizes/staples app before rebuilding and notarizing DMG |
 
 ## Required physical checkpoint

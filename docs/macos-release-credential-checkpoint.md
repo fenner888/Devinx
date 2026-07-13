@@ -1,8 +1,8 @@
 # macOS release credential checkpoint
 
-Last checked: July 11, 2026
+Last checked: July 13, 2026
 
-The Connector's automated notarization workflow is ready, but this Mac does not yet hold a **Developer ID Application** identity. Keychain currently exposes an Apple Development identity and an iPhone Distribution identity; neither is valid for distributing a Mac app outside the Mac App Store. The fail-closed preflight correctly stops before any signing or upload.
+The Connector's automated notarization workflow is ready, but this Mac does not yet hold a **Developer ID Application** identity. Keychain currently exposes an Apple Development identity and an iPhone Distribution identity; neither is valid for distributing a Mac app outside the Mac App Store. The July 13 fail-closed preflight stopped at `DEVINX_CODESIGN_IDENTITY is required` before any signing or upload.
 
 Apple requires a Developer ID Application certificate, hardened runtime, secure timestamp, valid signatures, and notarization for directly distributed modern macOS software. See Apple's [Developer ID certificate instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/) and [notarization requirements](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 
