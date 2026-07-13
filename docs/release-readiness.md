@@ -1,6 +1,6 @@
 # Release readiness
 
-Last updated: July 12, 2026
+Last updated: July 13, 2026
 
 This is the source of truth for the current release checkpoint. A passing internal build is not permission to submit App Review or publish artifacts.
 
@@ -75,6 +75,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (46)` was built locally from clean commit `4b72c22` with native session-based **Security Work**, corrected Cloud and Computer companion travel, and pointer-transparent foreground companion overlays that reserve no dock or shelf
 - [x] Build 46 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and app privacy artifact passed (`com.fenner888.devinx`, `0.1.0 (46)`, `NSFileProtectionComplete`); `get-task-allow=false`, tracking is disabled, zero collected-data types are declared, native Security Work is packaged, and the obsolete passive waiting label and external Security handoff are absent; SHA-256 `415486384a08e8bba3127fd739161360370939afce3c51843c311f9a18e668de`
 - [x] Build 46 App Store Connect submission `c25b0805-1e3d-4a66-b54d-4804f4cf80fe` finished successfully and is processing as the native Security Work and transparent session-companion TestFlight checkpoint
+- [x] iOS `0.1.0 (47)` was built locally from clean commit `3c4ebda` after removing passive companion captions while preserving active task/status animation
+- [x] Build 47 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, microphone disclosure, and privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (47)`, `NSFileProtectionComplete`); `get-task-allow=false`, 10 privacy manifests declare no tracking or collected-data types, and no reporting/notification artifact remains; SHA-256 `05263dda0878cf1f2518a05fc519305994852c4fa7bf289cebd5092c2b71ba0d`
+- [x] Build 47 was uploaded to internal TestFlight and physically reviewed as the passive-caption cleanup checkpoint; it is superseded by the parity/security release-candidate work recorded in `docs/internal-rc-audit-2026-07-13.md`
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -97,21 +100,21 @@ The results below must be refreshed after release-document changes and before a 
 
 | Gate | Current result |
 |---|---|
-| Lockfile install | passed on Node 24.18.0, now pinned consistently for development, CI, rollback, and the checksum-verified Connector runtime |
+| Lockfile install | exact direct dependency pins and lockfile dry-run passed on bundled Node 24; the repository and release CI remain pinned to Node 24.18.0 |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 64 suites / 478 tests with handle detection enabled, including session-based Security Work and active companion-travel coverage; no analytics or crash-reporting SDK runtime is loaded by the test environment |
-| Production iOS export | Build 46 passed local signed export; 20.7 MB IPA |
+| Jest | passed 68 suites / 503 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, Security Work, and active companion-travel coverage |
+| Production iOS export | Build 47 passed local signed export; 19.7 MB IPA. The next candidate must be inspected independently before upload |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 46 declares no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 47 has 10 manifests declaring no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
-| Connector app build/signature | passed build and strict code-sign verification with ad-hoc development signature |
-| Connector DMG/checksum | passed after minimal-runtime-entitlement and Keychain-identity preservation changes; the generated arm64 DMG matches its adjacent `.sha256` file |
+| Connector app build/signature | passed July 13 rebuild and strict nested code-sign verification with the intentional ad-hoc development signature |
+| Connector DMG/checksum | passed `hdiutil verify` and adjacent SHA-256 verification; current private arm64 DMG hash is `e88d1dc984afe349cb2807869e633eaa26d6e2c23c785e96db5a2ed9f5068cf8` |
 | Developer ID/notarization workflow | prepared and fail-closed; checksum-verifies then minimally re-signs Node without debug/dynamic-loader entitlements, rejects development identities, notarizes/staples app before rebuilding and notarizing DMG |
 
 ## Required physical checkpoint
