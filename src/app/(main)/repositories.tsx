@@ -1,5 +1,13 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -120,10 +128,24 @@ export default function RepositoriesScreen() {
             {filtered.map((repository, index) => {
               const status = repositoryIndexPresentation(repository);
               return (
-                <View
+                <Pressable
                   key={`${repository.git_connection_id}:${repository.provider_repository_id}`}
                   className={`flex-row items-center px-4 py-3 ${index < filtered.length - 1 ? 'border-b border-border-subtle' : ''}`}
+                  onPress={
+                    status.indexed
+                      ? () =>
+                          router.push({
+                            pathname: '/(main)/wiki',
+                            params: { repo: repository.repo_path },
+                          })
+                      : undefined
+                  }
+                  disabled={!status.indexed}
+                  accessibilityRole={status.indexed ? 'button' : undefined}
                   accessibilityLabel={`${repository.repo_path}, ${status.label}${status.detail ? `, ${status.detail}` : ''}`}
+                  accessibilityHint={
+                    status.indexed ? 'Opens repository documentation and Ask Devin' : undefined
+                  }
                 >
                   <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
                     <Ionicons name="folder-outline" size={15} color={tokens.brandText.hex} />
@@ -137,12 +159,30 @@ export default function RepositoriesScreen() {
                         'Repository available'}
                     </Text>
                   </View>
-                  <View className={status.indexed ? 'bg-tint-green rounded-chip px-2 py-1' : 'bg-tint-secondary rounded-chip px-2 py-1'}>
-                    <Text className={status.indexed ? 'text-finished text-text11' : 'text-text-mid text-text11'}>
+                  <View
+                    className={
+                      status.indexed
+                        ? 'bg-tint-green rounded-chip px-2 py-1'
+                        : 'bg-tint-secondary rounded-chip px-2 py-1'
+                    }
+                  >
+                    <Text
+                      className={
+                        status.indexed ? 'text-finished text-text11' : 'text-text-mid text-text11'
+                      }
+                    >
                       {status.label}
                     </Text>
                   </View>
-                </View>
+                  {status.indexed && (
+                    <Ionicons
+                      name="chevron-forward"
+                      size={15}
+                      color={tokens.textLow.hex}
+                      className="ml-2"
+                    />
+                  )}
+                </Pressable>
               );
             })}
           </View>

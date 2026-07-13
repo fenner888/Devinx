@@ -29,7 +29,7 @@ import {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { provider } = useAuth();
+  const { provider, isAuthenticated } = useAuth();
   const {
     mode: connectionMode,
     hasCloudConnection,
@@ -146,7 +146,7 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <Pressable
-            className="flex-row items-center px-4 py-3"
+            className="flex-row items-center px-4 py-3 border-b border-border-subtle"
             onPress={() => router.push('/(main)/computer')}
             accessibilityRole="button"
             accessibilityLabel="Add or pair a Mac"
@@ -168,6 +168,23 @@ export default function SettingsScreen() {
             </View>
             <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
           </Pressable>
+          {isAuthenticated && (
+            <Pressable
+              className="flex-row items-center px-4 py-3"
+              onPress={() => router.push('/(main)/connections')}
+              accessibilityRole="button"
+              accessibilityLabel="View organization integrations and MCP servers"
+            >
+              <Ionicons name="extension-puzzle-outline" size={17} color={tokens.brandText.hex} />
+              <View className="flex-1 ml-3">
+                <Text className="text-text-hi text-text14">Integrations & MCP</Text>
+                <Text className="text-text-low text-text12 mt-0.5">
+                  Installed and available organization capabilities
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+            </Pressable>
+          )}
           {connectionError && (
             <View className="bg-tint-red px-4 py-3 border-t border-border-subtle">
               <Text className="text-failed text-text12">{connectionError}</Text>
@@ -324,6 +341,13 @@ export default function SettingsScreen() {
         <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
           {(
             [
+              {
+                icon: 'time-outline',
+                label: 'Automations',
+                route: '/(main)/automations',
+                tint: 'bg-tint-blue',
+                color: tokens.brandText.hex,
+              },
               {
                 icon: 'git-pull-request-outline',
                 label: 'Review',

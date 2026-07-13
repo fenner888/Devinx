@@ -8,6 +8,9 @@ export default function MainGroup() {
       <Stack.Screen name="automations" />
       <Stack.Screen name="security-work" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="connections" />
+      <Stack.Screen name="repositories" />
+      <Stack.Screen name="wiki" />
       <Stack.Screen name="computer" />
       <Stack.Screen name="session/[id]" />
       <Stack.Screen name="computer-session/[bridgeId]/[id]" />
