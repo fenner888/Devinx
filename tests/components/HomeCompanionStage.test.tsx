@@ -9,7 +9,7 @@ describe('HomeCompanionStage', () => {
     act(() => setThemeOverride(null));
   });
 
-  it('keeps the approved dark atmosphere decorative and confined to the companion area', () => {
+  it('keeps the supplied dark space background decorative and confined to the companion area', () => {
     setThemeOverride('dark');
     const screen = render(
       <ThemeProvider>
@@ -20,12 +20,12 @@ describe('HomeCompanionStage', () => {
     );
 
     expect(screen.getByTestId('home-companion-stage').props.style).toEqual({ height: 224 });
-    expect(
-      screen.getAllByTestId('home-companion-stage-star', { includeHiddenElements: true }),
-    ).toHaveLength(10);
-    expect(
-      screen.getAllByTestId('home-companion-stage-orbit', { includeHiddenElements: true }),
-    ).toHaveLength(2);
+    const image = screen.getByTestId('home-companion-stage-image', {
+      includeHiddenElements: true,
+    });
+    expect(image.props.resizeMode).toBe('cover');
+    expect(image.props.style.top).toBeLessThanOrEqual(0);
+    expect(image.props.style.width).toBeGreaterThanOrEqual(350);
     expect(screen.getByTestId('companion-content')).toBeTruthy();
 
     const backdrop = screen.getByTestId('home-companion-stage-backdrop', {
@@ -36,7 +36,7 @@ describe('HomeCompanionStage', () => {
     expect(backdrop.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
-  it('uses the quiet light treatment without rendering the dark star field', () => {
+  it('uses a quiet light halo without rendering a black image block', () => {
     setThemeOverride('light');
     const screen = render(
       <ThemeProvider>
@@ -47,10 +47,10 @@ describe('HomeCompanionStage', () => {
     );
 
     expect(
-      screen.queryAllByTestId('home-companion-stage-star', { includeHiddenElements: true }),
-    ).toHaveLength(0);
+      screen.queryByTestId('home-companion-stage-image', { includeHiddenElements: true }),
+    ).toBeNull();
     expect(
-      screen.getByTestId('home-companion-stage-horizon', { includeHiddenElements: true }),
+      screen.getByTestId('home-companion-stage-light-halo', { includeHiddenElements: true }),
     ).toBeTruthy();
   });
 });

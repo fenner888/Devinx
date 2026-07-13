@@ -1,25 +1,12 @@
 import type { ReactNode } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Image, useWindowDimensions, View } from 'react-native';
 
+import HOME_COMPANION_STAGE from '../../../assets/pets/devin/home-companion-stage.jpg';
 import { useTheme } from '@theme/index';
 
-const STAR_POINTS = [
-  { x: 0.08, y: 0.17, size: 2, opacity: 0.42 },
-  { x: 0.16, y: 0.34, size: 1, opacity: 0.62 },
-  { x: 0.24, y: 0.12, size: 1, opacity: 0.4 },
-  { x: 0.33, y: 0.27, size: 2, opacity: 0.28 },
-  { x: 0.43, y: 0.08, size: 1, opacity: 0.48 },
-  { x: 0.56, y: 0.19, size: 1, opacity: 0.36 },
-  { x: 0.67, y: 0.1, size: 2, opacity: 0.28 },
-  { x: 0.76, y: 0.31, size: 1, opacity: 0.52 },
-  { x: 0.86, y: 0.16, size: 2, opacity: 0.36 },
-  { x: 0.93, y: 0.38, size: 1, opacity: 0.46 },
-] as const;
-
-const ORBIT_RINGS = [
-  { scale: 1, opacity: 0.56 },
-  { scale: 0.76, opacity: 0.34 },
-] as const;
+const BACKGROUND_WIDTH = 1280;
+const BACKGROUND_HEIGHT = 853;
+const FLOOR_RING_Y = 760;
 
 export function HomeCompanionStage({
   companionSize,
@@ -32,9 +19,11 @@ export function HomeCompanionStage({
   const { name, tokens } = useTheme();
   const stageWidth = Math.min(Math.max(width - 40, 280), 620);
   const stageHeight = companionSize + 24;
-  const horizonWidth = stageWidth * 1.18;
-  const horizonHeight = Math.max(92, companionSize * 0.48);
-  const ringWidth = Math.min(companionSize * 1.08, stageWidth * 0.72);
+  const backgroundScale = Math.max(stageWidth / BACKGROUND_WIDTH, stageHeight / BACKGROUND_HEIGHT);
+  const backgroundWidth = BACKGROUND_WIDTH * backgroundScale;
+  const backgroundHeight = BACKGROUND_HEIGHT * backgroundScale;
+  const backgroundLeft = (stageWidth - backgroundWidth) / 2;
+  const backgroundTop = Math.min(0, stageHeight - 12 - FLOOR_RING_Y * backgroundScale);
 
   return (
     <View
@@ -51,57 +40,30 @@ export function HomeCompanionStage({
         style={{ width: stageWidth, height: stageHeight }}
         testID="home-companion-stage-backdrop"
       >
-        {name === 'dark' &&
-          STAR_POINTS.map((star, index) => (
-            <View
-              key={index}
-              className="absolute rounded-full"
-              style={{
-                left: Math.round(stageWidth * star.x),
-                top: Math.round(stageHeight * star.y),
-                width: star.size,
-                height: star.size,
-                opacity: star.opacity,
-                backgroundColor: tokens.companionStageStar.hex,
-              }}
-              testID="home-companion-stage-star"
-            />
-          ))}
-
-        <View
-          className="absolute rounded-full"
-          style={{
-            bottom: -Math.round(horizonHeight * 0.05),
-            width: horizonWidth * 0.72,
-            height: horizonHeight * 0.72,
-            backgroundColor: tokens.companionStageGlow.hex,
-          }}
-        />
-        <View
-          className="absolute rounded-full border"
-          style={{
-            bottom: -Math.round(horizonHeight * 0.28),
-            width: horizonWidth,
-            height: horizonHeight,
-            borderColor: tokens.companionStageLine.hex,
-            backgroundColor: tokens.companionStageSurface.hex,
-          }}
-          testID="home-companion-stage-horizon"
-        />
-        {ORBIT_RINGS.map((orbit) => (
-          <View
-            key={orbit.scale}
-            className="absolute rounded-full border"
+        {name === 'dark' ? (
+          <Image
+            source={HOME_COMPANION_STAGE}
+            resizeMode="cover"
+            className="absolute"
             style={{
-              bottom: 7 + Math.round((1 - orbit.scale) * 10),
-              width: ringWidth * orbit.scale,
-              height: Math.max(18, ringWidth * 0.14 * orbit.scale),
-              borderColor: tokens.companionStageLine.hex,
-              opacity: orbit.opacity,
+              left: backgroundLeft,
+              top: backgroundTop,
+              width: backgroundWidth,
+              height: backgroundHeight,
             }}
-            testID="home-companion-stage-orbit"
+            testID="home-companion-stage-image"
           />
-        ))}
+        ) : (
+          <View
+            className="absolute bottom-1 rounded-full"
+            style={{
+              width: Math.min(companionSize * 1.2, stageWidth * 0.7),
+              height: Math.max(22, companionSize * 0.14),
+              backgroundColor: tokens.companionStageGlow.hex,
+            }}
+            testID="home-companion-stage-light-halo"
+          />
+        )}
       </View>
 
       <View
