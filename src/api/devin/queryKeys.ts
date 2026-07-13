@@ -22,6 +22,4 @@ export const queryKeys = {
   sessionConsumption: (id: string) => ['sessionConsumption', id] as const,
   repoIndexing: ['repoIndexing'] as const,
   prReview: (url: string) => ['prReview', url] as const,
-  codeScanFindings: ['codeScanFindings'] as const,
-  codeScanMetrics: ['codeScanMetrics'] as const,
 } as const;

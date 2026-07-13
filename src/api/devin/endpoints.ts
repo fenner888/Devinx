@@ -5,7 +5,6 @@
  */
 
 import type { AuthProvider } from '@auth/AuthProvider';
-import { ApiSchemaError } from '@auth/AuthProvider';
 import { apiRequest } from './client';
 import { paths } from './types';
 import {
@@ -32,11 +31,6 @@ import {
   scheduleResponseSchema,
   scheduleListResponseSchema,
   prReviewResponseSchema,
-  codeScanFindingListResponseSchema,
-  codeScanMetricsSchema,
-  codeScanMetricsRangeSchema,
-  remediateFindingRequestSchema,
-  remediateFindingResponseSchema,
   knowledgeNoteCreateRequestSchema,
   knowledgeNoteUpdateRequestSchema,
   knowledgeNoteResponseSchema,
@@ -74,10 +68,6 @@ import type {
   ScheduleCreateRequest,
   ScheduleUpdateRequest,
   PrReviewResponse,
-  CodeScanFinding,
-  CodeScanMetrics,
-  CodeScanMetricsRange,
-  RemediateFindingResponse,
   KnowledgeNoteCreateRequest,
   KnowledgeNoteUpdateRequest,
   PlaybookCreateRequest,
@@ -548,62 +538,6 @@ export async function getPrReview(auth: AuthProvider, prUrl: string): Promise<Pr
     query: { pr_url: prUrl },
     schema: prReviewResponseSchema,
   });
-}
-
-// ---------------------------------------------------------------------------
-// Code scans (Devin Security — enterprise-scoped)
-// ---------------------------------------------------------------------------
-
-export async function listCodeScanFindings(auth: AuthProvider): Promise<CodeScanFinding[]> {
-  const items: CodeScanFinding[] = [];
-  let cursor: string | null = null;
-  for (let page = 0; page < 5; page++) {
-    const data: { items: CodeScanFinding[]; end_cursor?: string | null; has_next_page?: boolean } =
-      await apiRequest(auth, paths.codeScanFindings(), {
-        method: 'GET',
-        query: { first: 100, after: cursor },
-        schema: codeScanFindingListResponseSchema,
-      });
-    items.push(...data.items);
-    if (!data.has_next_page || !data.end_cursor) break;
-    cursor = data.end_cursor;
-  }
-  return items;
-}
-
-export async function getCodeScanMetrics(
-  auth: AuthProvider,
-  input: CodeScanMetricsRange,
-): Promise<CodeScanMetrics> {
-  const range = codeScanMetricsRangeSchema.parse(input);
-  return apiRequest<CodeScanMetrics>(auth, paths.codeScanMetrics(), {
-    method: 'GET',
-    query: { time_after: range.timeAfter, time_before: range.timeBefore },
-    schema: codeScanMetricsSchema,
-  });
-}
-
-export async function remediateFinding(
-  auth: AuthProvider,
-  scanId: string,
-  findingId: string,
-): Promise<RemediateFindingResponse> {
-  const input = remediateFindingRequestSchema.parse({ scanId, findingId });
-  const orgPath = await auth.orgPath();
-  const orgId = orgPath.replace('/v3/organizations/', '');
-  const response = await apiRequest<RemediateFindingResponse>(
-    auth,
-    paths.codeScanRemediate(orgId, input.scanId, input.findingId),
-    { method: 'POST', schema: remediateFindingResponseSchema },
-  );
-  if (response.finding_id !== input.findingId) {
-    throw new ApiSchemaError(
-      'Remediation response did not match the requested finding',
-      'code-scan-remediation',
-      [],
-    );
-  }
-  return response;
 }
 
 // ---------------------------------------------------------------------------

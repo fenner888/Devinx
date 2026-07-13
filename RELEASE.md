@@ -66,13 +66,13 @@ eas submit --profile production --platform ios
 
 Building is authorized as part of development. App Review submission and public release require explicit approval.
 
-## Sentry
+## Crash reporting
 
-Sentry is optional. When `EXPO_PUBLIC_SENTRY_DSN` is absent, initialization is a no-op. When enabled, verify the scrubber with the automated tests and send a synthetic event containing no real credentials or user content.
+No crash-reporting SDK or destination is bundled in the current release. Adding one requires a new specification, dependency review, transcript/session-content scrubber review, privacy-manifest inspection, and updated App Store privacy answers before another release candidate is built.
 
 ## Push notifications
 
-Push notifications require a user-operated notifier because the Devin API does not provide background push events. `scripts/notifier/index.mjs` polls sessions and sends Expo notifications. Keep all API keys and push tokens in environment/secrets management; never commit them or place them in client bundles.
+Push notifications are not implemented in v1. The app does not request notification permission, register an Expo push token, or ship a notifier service. Any Phase-2 notifier requires its own reviewed specification, server-side authorization and validation, least-privilege credentials, revocation and retention controls, dependency review, privacy disclosures, and App Store label update before implementation.
 
 ## App Store metadata draft
 
@@ -100,7 +100,7 @@ Push notifications require a user-operated notifier because the Devin API does n
 
 - User Content: used only for app functionality; sent to the selected Devin API or explicitly paired computer
 - Identifiers: organization/account identifiers and a paired-device identifier used for app functionality
-- Diagnostics: crash data only when Sentry is configured
+- Diagnostics: none collected by DevinX in the current release
 - Tracking: no
 - Data sale: no
 
@@ -111,6 +111,6 @@ Push notifications require a user-operated notifier because the Devin API does n
 
 The final privacy labels must be checked against the exact production configuration in App Store Connect.
 
-## Intentionally web-only
+## Intentionally web-owned or deferred
 
-Ask mode, DeepWiki, model/agent selection, plan/quota bars, and enterprise administration have no supported public API and remain web-only.
+Personal profile and integration settings, billing/invoices, self-serve quota and balance controls, organization defaults, repository-index mutations, snapshot/environment mutation, Skills & Rules management, member administration, and API-key provisioning remain outside DevinX. The precise supported and deferred boundaries are maintained in `specs/033-cloud-local-settings-parity.md`; do not infer support from a visible Devin Web control.

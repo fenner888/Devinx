@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const repositoryRoot = resolve(__dirname, '..', '..');
@@ -39,6 +39,10 @@ describe('release privacy configuration', () => {
 
     expect(packageJson.dependencies).not.toHaveProperty('expo-notifications');
     expect(rootLayout).not.toMatch(/expo-notifications|getPushToken|requestNotificationPermissions/);
+    expect(existsSync(resolve(repositoryRoot, 'scripts/notifier/index.mjs'))).toBe(false);
+    expect(readFileSync(resolve(repositoryRoot, 'RELEASE.md'), 'utf8')).toContain(
+      'does not request notification permission, register an Expo push token, or ship a notifier service',
+    );
   });
 
   it('does not bundle a dormant crash-reporting SDK', () => {
@@ -49,6 +53,28 @@ describe('release privacy configuration', () => {
 
     expect(packageJson.dependencies).not.toHaveProperty('@sentry/react-native');
     expect(appJson).not.toContain('@sentry/react-native');
+    expect(readFileSync(resolve(repositoryRoot, 'RELEASE.md'), 'utf8')).not.toContain(
+      'Sentry is optional',
+    );
+  });
+
+  it('keeps CI on the exact repository Node runtime', () => {
+    const workflow = readFileSync(resolve(repositoryRoot, '.github/workflows/ci.yml'), 'utf8');
+    const nodeVersion = readFileSync(resolve(repositoryRoot, '.nvmrc'), 'utf8').trim();
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repositoryRoot, 'package.json'), 'utf8'),
+    ) as { engines?: { node?: string } };
+
+    expect(workflow).toContain("node-version-file: '.nvmrc'");
+    expect(packageJson.engines?.node).toBe(nodeVersion);
+  });
+
+  it('does not compile unsupported enterprise Code Scan routes into the v1 client', () => {
+    const apiFiles = ['types.ts', 'schemas.ts', 'endpoints.ts', 'queries.ts']
+      .map((file) => readFileSync(resolve(repositoryRoot, 'src/api/devin', file), 'utf8'))
+      .join('\n');
+
+    expect(apiFiles).not.toMatch(/\/v3\/enterprise\/code-scans|codeScanFindings|codeScanMetrics/);
   });
 
   it('describes the current Tailscale and app-delivery paths', () => {

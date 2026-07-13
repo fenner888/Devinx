@@ -1,6 +1,7 @@
 # 033 — Cloud, Web, and local settings parity
 
-Status: authenticated inventory and supported parity implementation complete; release matrix pending
+Status: authenticated inventory, supported parity implementation, and release matrix complete;
+physical TestFlight validation remains pending
 
 ## Objective
 

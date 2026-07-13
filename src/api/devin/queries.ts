@@ -34,9 +34,6 @@ import {
   deleteSchedule,
   triggerPrReview,
   getPrReview,
-  listCodeScanFindings,
-  getCodeScanMetrics,
-  remediateFinding,
   createKnowledgeNote,
   updateKnowledgeNote,
   deleteKnowledgeNote,
@@ -630,66 +627,6 @@ export function useTriggerPrReview() {
     },
     onSuccess: (_data, prUrl) =>
       queryClient.invalidateQueries({ queryKey: queryKeys.prReview(prUrl) }),
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Code scans (Devin Security — enterprise-scoped)
-// ---------------------------------------------------------------------------
-
-export function useCodeScanFindings() {
-  const { provider, isAuthenticated } = useAuth();
-  return useQuery({
-    queryKey: queryKeys.codeScanFindings,
-    queryFn: async () => {
-      if (!provider) throw new Error('Not authenticated');
-      return listCodeScanFindings(provider);
-    },
-    enabled: isAuthenticated && !!provider,
-    staleTime: 5 * 60_000,
-    // This query doubles as the enterprise-access probe for the Security nav
-    // item. For org-level keys it always 403s — without these flags the
-    // failed probe refires on every home mount/focus. Pull-to-refresh on the
-    // Security screen still refetches manually.
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    retry: shouldRetryQuery,
-  });
-}
-
-export function useCodeScanMetrics() {
-  const { provider, isAuthenticated } = useAuth();
-  return useQuery({
-    queryKey: queryKeys.codeScanMetrics,
-    queryFn: async () => {
-      if (!provider) throw new Error('Not authenticated');
-      const timeBefore = Math.floor(Date.now() / 1000);
-      return getCodeScanMetrics(provider, {
-        timeAfter: timeBefore - 30 * 24 * 60 * 60,
-        timeBefore,
-      });
-    },
-    enabled: isAuthenticated && !!provider,
-    staleTime: 5 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    retry: shouldRetryQuery,
-  });
-}
-
-export function useRemediateFinding() {
-  const queryClient = useQueryClient();
-  const { provider } = useAuth();
-  return useMutation({
-    mutationFn: async (params: { scanId: string; findingId: string }) => {
-      if (!provider) throw new Error('Not authenticated');
-      return remediateFinding(provider, params.scanId, params.findingId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.codeScanFindings });
-      queryClient.invalidateQueries({ queryKey: queryKeys.codeScanMetrics });
-      queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
-    },
   });
 }
 

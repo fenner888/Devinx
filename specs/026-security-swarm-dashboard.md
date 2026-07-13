@@ -76,9 +76,10 @@ do not provide. All three endpoints require enterprise code-scan permissions. Th
 public create-scan endpoint.
 
 Consequently, public Security Work is not a severity dashboard and cannot claim scan completeness.
-Real metrics, findings, evidence, and remediation may be layered onto the same screen only when the
-current authenticated provider has a documented supported code-scan grant. The public route must
-remain fully useful without that enhancement.
+The enterprise findings, metrics, and remediation routes are not compiled into the v1 mobile API
+client. Adding them requires a separate approved specification, an authenticated-provider grant
+verified against a non-production enterprise account, and a fresh authorization/privacy review.
+The current release remains fully useful without that enhancement and cannot probe those routes.
 
 ## Security gates
 

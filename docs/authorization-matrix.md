@@ -1,6 +1,6 @@
 # Authorization matrix
 
-Reviewed against the active Phase 4A implementation on July 13, 2026. This matrix covers the user-controlled Connector HTTP boundary, genuine Code Scan session discovery, documented organization resources, and the deferred Devin Code Scan findings enhancement. Devin Cloud authorization remains enforced server-side by the Devin API and the user's credential scopes.
+Reviewed against the active Phase 4A implementation on July 13, 2026. This matrix covers the user-controlled Connector HTTP boundary, genuine Code Scan session discovery, and documented organization resources. Devin Cloud authorization remains enforced server-side by the Devin API and the user's credential scopes.
 
 | Method | Required device grant | Input validation | Resource binding | Unauthorized result | Rate limit class |
 |---|---|---|---|---|---|
@@ -34,15 +34,14 @@ The current Devin documentation uses inconsistent names for the organization Kno
 
 All Cloud errors are converted through `userFacingError` before display. The API client may retain a bounded response detail in memory for programmatic diagnosis, but raw response bodies, schema paths, repository identifiers, prompts, and session content are never rendered as error copy or sent to diagnostics.
 
-## Deferred Devin Code Scan enterprise boundary
+## Excluded Devin Code Scan enterprise boundary
 
-| Method | Required Devin permission | Input validation | Resource binding | Unauthorized presentation | Retry policy |
-|---|---|---|---|---|---|
-| `GET /v3/enterprise/code-scans/findings` | `ViewAccountCodeScans` | bounded cursor pagination; response items parse through the documented Zod schema | enterprise scope is derived by Devin from the service-user credential | generic enterprise-access state; no finding metadata rendered | deterministic auth/permission failures never retry |
-| `GET /v3/enterprise/code-scans/metrics` | `ViewAccountCodeScans` | integer UTC range, ordered and capped at 100 days; response parses through Zod | enterprise scope is derived by Devin from the service-user credential | generic enterprise-access state; no metric values rendered | deterministic auth/permission failures never retry |
-| `POST /v3/enterprise/organizations/{org_id}/code-scans/{scan_id}/findings/{finding_id}/remediate` | `UseAccountCodeScans` | bounded non-empty scan/finding IDs; response requires matching finding/session identifiers | organization comes only from the authenticated provider; Devin reauthorizes the scan and finding | generic failure, with a safe already-started state for conflict | never automatically retried |
-
-There is no documented create-scan method. DevinX does not guess one and does not use an external web handoff, private endpoint, browser cookie, or Connector scrape. The public route displays only genuine `code_scan` sessions but never labels their normal session logs as structured scan findings. The phone never logs session prompts, repository names, finding content, evidence snippets, scan IDs, or remediation session IDs.
+The documented enterprise findings, metrics, and remediation endpoints are not implemented or
+compiled into the v1 client. There is no documented create-scan method. DevinX does not probe or
+guess any of those routes and does not use an external web handoff, private endpoint, browser
+cookie, service-account impersonation, or Connector scrape. The public route displays only genuine
+`code_scan` sessions but never labels their normal session logs as structured scan findings. A
+future enterprise integration requires a separate specification and authorization-matrix review.
 
 ## Request gates
 

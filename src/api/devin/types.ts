@@ -466,11 +466,6 @@ export const paths = {
   schedule: (orgId: OrgId, scheduleId: string) =>
     `/v3/organizations/${orgId}/schedules/${scheduleId}`,
   prReviews: (orgId: OrgId) => `/v3/organizations/${orgId}/pr-reviews`,
-  /** Enterprise-level (requires enterprise code-scan permissions). */
-  codeScanFindings: () => `/v3/enterprise/code-scans/findings`,
-  codeScanMetrics: () => `/v3/enterprise/code-scans/metrics`,
-  codeScanRemediate: (orgId: OrgId, scanId: string, findingId: string) =>
-    `/v3/enterprise/organizations/${orgId}/code-scans/${scanId}/findings/${findingId}/remediate`,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -543,71 +538,6 @@ export interface PrReviewResponse {
   pr_number: number;
   commit_sha: string;
   created_at: string;
-}
-
-// ---------------------------------------------------------------------------
-// Code scans (Devin Security — enterprise-scoped)
-// ---------------------------------------------------------------------------
-
-export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
-export type FindingStatus = 'open' | 'dismissed' | 'resolved';
-
-export interface CodeScanReferenceSnippet {
-  file_path: string;
-  start_line: number;
-  end_line: number;
-  commentary: string;
-  code?: string | null;
-}
-
-export interface CodeScanFinding {
-  finding_id: string;
-  scan_id: string;
-  title: string | null;
-  description: string | null;
-  recommendation: string | null;
-  note: string | null;
-  code_owners: string[];
-  reference_snippets: CodeScanReferenceSnippet[];
-  severity: FindingSeverity;
-  status: FindingStatus;
-  category: string | null;
-  repo_name: string;
-  pr_url: string | null;
-  /** Remediation session, when one has been launched. */
-  session_id: string | null;
-  orchestrator_session_id: string | null;
-  created_at: number;
-}
-
-export interface CodeScanMetrics {
-  scans_count: number;
-  repos_scanned_count: number;
-  prs_created_count: number;
-  prs_open_count: number;
-  prs_merged_count: number;
-  prs_closed_count: number;
-  avg_pr_time_to_merge_seconds: number | null;
-  avg_pr_open_duration_seconds: number | null;
-  open_critical_findings_count: number;
-  open_high_findings_count: number;
-  open_medium_findings_count: number;
-  open_low_findings_count: number;
-}
-
-export interface CodeScanMetricsRange {
-  timeAfter: number;
-  timeBefore: number;
-}
-
-export interface RemediateFindingRequest {
-  scanId: string;
-  findingId: string;
-}
-
-export interface RemediateFindingResponse {
-  finding_id: string;
-  session_id: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -75,7 +75,6 @@ jest.mock('@api/devin/queries', () => ({
     error: mockRepositoriesError,
     refetch: mockRefetchRepositories,
   })),
-  useCodeScanFindings: jest.fn(() => ({ data: [] })),
   useUploadAttachment: jest.fn(() => ({ isPending: false, mutateAsync: mockUploadAttachment })),
 }));
 
