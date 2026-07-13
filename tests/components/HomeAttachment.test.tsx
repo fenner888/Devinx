@@ -150,7 +150,8 @@ describe('home attachment control', () => {
       </ThemeProvider>,
     );
 
-    expect(getByText('Devin is ready to build')).toBeTruthy();
+    expect(getByText('Ready')).toBeTruthy();
+    expect(getByText('Cloud connected')).toBeTruthy();
     expect(getByText('What should Devin build?')).toBeTruthy();
     expect(getByLabelText('Session prompt').props.className).toContain('min-h-[84px]');
     expect(
@@ -194,6 +195,7 @@ describe('home attachment control', () => {
 
     expect(screen.getByText('What should Devin build?')).toBeTruthy();
     expect(screen.getByPlaceholderText(/Ask Devin on your Mac/)).toBeTruthy();
+    expect(screen.getByText('Studio Mac paired')).toBeTruthy();
     expect(screen.getAllByText('Studio Mac').length).toBeGreaterThan(0);
     expect(screen.getAllByText('DevinX').length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('Execution mode')).toBeNull();
@@ -303,6 +305,7 @@ describe('home attachment control', () => {
         <HomeScreen />
       </ThemeProvider>,
     );
+    expect(screen.getByText('Cloud connected • Studio Mac paired')).toBeTruthy();
 
     expect(screen.getByText('Cloud recent session')).toBeTruthy();
     expect(screen.queryByText('Studio Mac recent session')).toBeNull();

@@ -226,6 +226,19 @@ export default function HomeScreen() {
     : createSession.isPending || localCreationPending
       ? 'working'
       : 'idle';
+  const homeIsReady =
+    (!usesCloud || hasCloudConnection) && (!usesComputer || Boolean(computer));
+  const homeStatusLabel = homeIsReady ? 'Ready' : 'Connection needed';
+  const homeConnectionSummary = [
+    usesCloud ? (hasCloudConnection ? 'Cloud connected' : 'Cloud unavailable') : null,
+    usesComputer
+      ? computer
+        ? `${computer.computerName} paired`
+        : 'No computer paired'
+      : null,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(' • ');
   const isComputerDestination = destination === 'computer';
   const canChooseDestination = connectionMode === 'both' || computers.length > 1;
   const selectedWorkspace = localOptions.data?.workspaces.find(
@@ -523,23 +536,22 @@ export default function HomeScreen() {
           contentContainerClassName="flex-grow px-5 pt-4 pb-10"
           keyboardShouldPersistTaps="handled"
         >
-          {/* Readiness context is informational, not a misleading tap target. */}
-          <View className="rounded-cardLg border border-border-subtle bg-surface1 px-4 py-3">
-            <View className="flex-row items-start">
-              <View className="mt-1.5 mr-3 h-2 w-2 rounded-full bg-brand" />
-              <View className="flex-1">
-                <Text className="text-text-hi text-text15 font-medium">
-                  Devin is ready to build
-                </Text>
-                <Text className="mt-1 text-text-mid text-text13">
-                  {connectionMode === 'computer'
-                    ? 'Monitor sessions running through your paired Mac.'
-                    : connectionMode === 'both'
-                      ? 'Cloud and paired-Mac sessions appear together.'
-                      : 'Ask anything. Devin runs in the cloud.'}
-                </Text>
-              </View>
+          {/* Compact connection context belongs to the stage, not a second card. */}
+          <View
+            className="items-center pt-1 pb-2"
+            accessible
+            accessibilityLabel={`${homeStatusLabel}. ${homeConnectionSummary}`}
+            testID="home-connection-status"
+          >
+            <View className="flex-row items-center" accessible={false}>
+              <View
+                className={`mr-2 h-2 w-2 rounded-full ${homeIsReady ? 'bg-finished' : 'bg-blocked'}`}
+              />
+              <Text className="text-text-hi text-text16 font-semibold">{homeStatusLabel}</Text>
             </View>
+            <Text className="mt-1 text-center text-text-mid text-text13" accessible={false}>
+              {homeConnectionSummary}
+            </Text>
           </View>
 
           {/* Devin is the home-screen visual anchor, not a floating overlay. */}
