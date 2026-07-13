@@ -6,9 +6,10 @@ enhancement deferred pending supported authorization
 ## Objective
 
 Provide a useful, completely in-app security workflow without pretending that ordinary Devin
-sessions contain enterprise Code Scan findings. **Security Work** groups security-category
-coordinator sessions and their child agents, exposes their existing work logs and PR/status state,
-and launches a read-only security review through the supported organization session API.
+sessions are platform Code Scans. **Security Work** groups verified platform-generated Code Scan
+roots and reviews explicitly started by DevinX with their child agents, exposes their existing work
+logs and PR/status state, and launches a read-only security review through the supported
+organization session API.
 
 The product must never redirect users to a second Devin login, consume browser cookies, call a
 private web endpoint, or label inferred session data as an official Code Scan finding.
@@ -25,8 +26,10 @@ The organization Sessions API exposes the fields DevinX needs:
 
 Security Work therefore:
 
-1. Includes sessions whose category is `code_quality_and_security` or legacy `security`, whose
-   origin is `code_scan`, or whose exact normalized tag is one of the reviewed security tags.
+1. Includes only top-level sessions whose origin is `code_scan` and whose platform-generated title
+   begins `Security scan `, plus sessions carrying the exact `devinx-security-work` or
+   `security-review` tag applied by DevinX. Category alone, origin alone, fuzzy title matches, and
+   generic `security` or `code-scan` tags are insufficient because they produce false positives.
 2. Recursively includes returned child sessions beneath a matching coordinator, even before a
    child receives its own category or tag.
 3. Opens coordinator and worker logs through the existing native Session Detail route, preserving
@@ -83,8 +86,9 @@ remain fully useful without that enhancement.
 
 ## Validation
 
-- Unit tests cover exact classification, false-positive avoidance, parent/child closure, grouping,
-  ordering, cycles/missing children, focus bounds, and the read-only prompt contract.
+- Unit tests cover verified scan-root classification, exact DevinX tags, false-positive avoidance,
+  parent/child closure, grouping, ordering, cycles/missing children, focus bounds, and the read-only
+  prompt contract.
 - Component tests cover navigation discoverability, empty/list/expanded-agent states, repository
   selection, validated creation payload, create failure, and computer-only behavior.
 - Existing Session Detail tests continue to cover authorized logs and steering.

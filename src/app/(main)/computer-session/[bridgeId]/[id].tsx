@@ -408,7 +408,7 @@ export default function ComputerSessionDetailScreen() {
           <ScrollView
             ref={historyRef}
             className="flex-1"
-            contentContainerClassName="px-5 pt-5 pb-12"
+            contentContainerClassName="px-5 pt-5 pb-[132px]"
             testID="computer-session-history"
             onScroll={handleHistoryScroll}
             scrollEventThrottle={100}
@@ -490,12 +490,12 @@ export default function ComputerSessionDetailScreen() {
               </Text>
             )}
             <View
-              className="rounded-card border border-border bg-surface1 px-3 pt-3 pb-2"
+              className="rounded-card border border-border bg-surface1 px-3 pt-2 pb-2"
               testID="computer-session-composer"
             >
               <TextInput
                 ref={voice.inputRef}
-                className="min-h-[56px] max-h-28 px-1 text-text-hi text-text14"
+                className="min-h-[44px] max-h-24 px-1 text-text-hi text-text14"
                 value={draft}
                 onChangeText={(value) => setDraft(value.slice(0, 100_000))}
                 placeholder="Send a message to this Devin session…"

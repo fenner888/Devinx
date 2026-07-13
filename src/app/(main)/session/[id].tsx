@@ -464,12 +464,12 @@ export default function SessionDetailScreen() {
               </View>
             )}
             <View
-              className="rounded-card border border-border bg-surface1 px-3 pt-3 pb-2"
+              className="rounded-card border border-border bg-surface1 px-3 pt-2 pb-2"
               testID="cloud-session-composer"
             >
               <TextInput
                 ref={voice.inputRef}
-                className="min-h-[56px] max-h-28 px-1 text-text-hi text-text14"
+                className="min-h-[44px] max-h-24 px-1 text-text-hi text-text14"
                 value={messageText}
                 onChangeText={setMessageText}
                 placeholder="Ask Devin to build features, fix bugs, or work on your code"
@@ -877,7 +877,7 @@ function TimelineTab({
     <ScrollView
       ref={listRef}
       className="flex-1 px-4"
-      contentContainerClassName="py-3"
+      contentContainerClassName="pt-3 pb-[124px]"
       testID="cloud-session-timeline"
       onScroll={handleScroll}
       scrollEventThrottle={100}

@@ -70,12 +70,12 @@ jest.mock('../../src/lib/session-repository', () => ({
 function session(overrides: Partial<SessionResponse> = {}): SessionResponse {
   return {
     acus_consumed: 0,
-    category: 'code_quality_and_security',
+    category: null,
     child_session_ids: null,
     created_at: 1,
     is_archived: false,
     org_id: 'org-1',
-    origin: 'api',
+    origin: 'code_scan',
     parent_session_id: null,
     playbook_id: null,
     pull_requests: [],
@@ -84,7 +84,7 @@ function session(overrides: Partial<SessionResponse> = {}): SessionResponse {
     status: 'running',
     status_detail: 'working',
     tags: [],
-    title: 'Security review: DevinX',
+    title: 'Security scan fenner888/DevinX',
     updated_at: 20,
     url: 'https://app.devin.ai/sessions/security-root',
     ...overrides,
@@ -108,6 +108,12 @@ describe('Security Work screen', () => {
         parent_session_id: 'security-root',
         title: 'Audit authorization',
       }),
+      session({
+        session_id: 'generic-security-session',
+        category: 'code_quality_and_security',
+        origin: 'api',
+        title: 'Review pooled security schemes',
+      }),
     ];
     const screen = render(
       <ThemeProvider>
@@ -117,6 +123,7 @@ describe('Security Work screen', () => {
 
     expect(screen.getByText('Security Work')).toBeTruthy();
     expect(screen.getByText('2 agent sessions')).toBeTruthy();
+    expect(screen.queryByText('Review pooled security schemes')).toBeNull();
     fireEvent.press(screen.getByLabelText('Show child agents'));
     expect(screen.getByText('Audit authorization')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Open child agent Audit authorization'));

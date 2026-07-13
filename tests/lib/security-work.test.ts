@@ -2,6 +2,7 @@ import type { SessionResponse } from '../../src/api/devin/types';
 import {
   groupSecurityWork,
   isSecurityWorkSession,
+  isVerifiedCodeScanRoot,
   securityReviewPrompt,
 } from '../../src/lib/security-work';
 
@@ -30,11 +31,27 @@ function session(overrides: Partial<SessionResponse> = {}): SessionResponse {
 }
 
 describe('Security Work session model', () => {
-  it('uses supported categories, origin, and exact tags without fuzzy title matching', () => {
-    expect(isSecurityWorkSession(session({ category: 'code_quality_and_security' }))).toBe(true);
-    expect(isSecurityWorkSession(session({ category: 'security' }))).toBe(true);
-    expect(isSecurityWorkSession(session({ origin: 'code_scan' }))).toBe(true);
+  it('uses verified platform scan roots and exact DevinX tags without broad security matches', () => {
+    const verifiedScan = session({
+      origin: 'code_scan',
+      title: 'Security scan fenner888/Push',
+    });
+
+    expect(isVerifiedCodeScanRoot(verifiedScan)).toBe(true);
+    expect(isSecurityWorkSession(verifiedScan)).toBe(true);
     expect(isSecurityWorkSession(session({ tags: ['DevinX-Security-Work'] }))).toBe(true);
+    expect(isSecurityWorkSession(session({ tags: ['security-review'] }))).toBe(true);
+    expect(isSecurityWorkSession(session({ category: 'code_quality_and_security' }))).toBe(false);
+    expect(isSecurityWorkSession(session({ category: 'security' }))).toBe(false);
+    expect(isSecurityWorkSession(session({ origin: 'code_scan' }))).toBe(false);
+    expect(
+      isSecurityWorkSession(
+        session({ origin: 'code_scan', title: 'Perform security scan on fenner888/Push' }),
+      ),
+    ).toBe(false);
+    expect(
+      isSecurityWorkSession(session({ origin: 'api', title: 'Security scan fenner888/Push' })),
+    ).toBe(false);
     expect(isSecurityWorkSession(session({ title: 'Fix security settings' }))).toBe(false);
     expect(isSecurityWorkSession(session({ tags: ['security-adjacent'] }))).toBe(false);
   });
@@ -42,7 +59,8 @@ describe('Security Work session model', () => {
   it('groups uncategorized child agents beneath a security coordinator', () => {
     const root = session({
       session_id: 'root',
-      category: 'code_quality_and_security',
+      origin: 'code_scan',
+      title: 'Security scan fenner888/Push',
       child_session_ids: ['child-a', 'child-b'],
       updated_at: 10,
     });
@@ -71,7 +89,7 @@ describe('Security Work session model', () => {
     const worker = session({
       session_id: 'worker',
       parent_session_id: 'unavailable-parent',
-      origin: 'code_scan',
+      tags: ['devinx-security-work'],
     });
 
     expect(groupSecurityWork([worker])).toEqual([{ root: worker, workers: [], updatedAt: 1 }]);

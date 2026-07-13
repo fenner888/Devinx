@@ -19,7 +19,7 @@ Reviewed against the active Phase 4A implementation on July 13, 2026. This matri
 | `GET /v3/organizations/{org_id}/sessions` | `ViewOrgSessions` | bounded cursor pagination; every item parses through the session Zod schema | organization is derived only from the authenticated provider | normal generic session error; no cached or cross-org metadata is invented | deterministic auth/permission failures never retry |
 | `POST /v3/organizations/{org_id}/sessions` | `UseDevinSessions` plus the provider's supported create grant | fixed read-only work order; one validated returned repository; optional focus capped at 1,000 characters; complete request parsed by `sessionCreateRequestSchema` | organization and user attribution come only from the authenticated provider; repository comes from that provider's repository list | generic create failure; ambiguous network result uses the existing identity-bound reconciliation path | never blindly retries a potentially successful create |
 
-Category/origin/tag filtering and parent-child grouping control presentation only. Opening a coordinator or worker still calls the normal authorized Session Detail APIs. A client cannot gain access to a session merely by constructing a URL or applying a security tag.
+Verified scan-root and exact DevinX-tag filtering plus parent-child grouping control presentation only. Category alone and origin alone are intentionally insufficient. Opening a coordinator or worker still calls the normal authorized Session Detail APIs. A client cannot gain access to a session merely by constructing a URL or applying a security tag.
 
 ## Deferred Devin Code Scan enterprise boundary
 

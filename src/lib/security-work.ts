@@ -3,13 +3,9 @@ import type { SessionResponse } from '@api/devin/types';
 export const SECURITY_WORK_TAG = 'devinx-security-work';
 export const SECURITY_REVIEW_TAG = 'security-review';
 
-const SECURITY_CATEGORIES = new Set(['code_quality_and_security', 'security']);
 const SECURITY_TAGS = new Set([
   SECURITY_WORK_TAG,
   SECURITY_REVIEW_TAG,
-  'code-scan',
-  'code_scan',
-  'security',
 ]);
 
 export interface SecurityWorkGroup {
@@ -18,10 +14,23 @@ export interface SecurityWorkGroup {
   updatedAt: number;
 }
 
+/**
+ * Devin's platform-generated Code Scan coordinators currently arrive as
+ * top-level `code_scan` sessions titled "Security scan …". Origin alone is
+ * insufficient: manually prompted security sessions can also carry the
+ * compatibility origin without representing a real platform scan.
+ */
+export function isVerifiedCodeScanRoot(session: SessionResponse): boolean {
+  return (
+    session.origin === 'code_scan' &&
+    session.parent_session_id === null &&
+    session.title?.trim().toLowerCase().startsWith('security scan ') === true
+  );
+}
+
 export function isSecurityWorkSession(session: SessionResponse): boolean {
   return (
-    (session.category !== null && SECURITY_CATEGORIES.has(session.category)) ||
-    session.origin === 'code_scan' ||
+    isVerifiedCodeScanRoot(session) ||
     session.tags.some((tag) => SECURITY_TAGS.has(tag.trim().toLowerCase()))
   );
 }

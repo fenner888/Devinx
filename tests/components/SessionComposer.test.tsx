@@ -131,10 +131,13 @@ describe('active session composer', () => {
     expect(companionDock.props.className).toContain('absolute');
     expect(companionDock.props.className).not.toContain('bg-canvas');
     expect(companionDock.props.pointerEvents).toBe('none');
-    expect(getByTestId('cloud-session-timeline').props.contentContainerStyle).toBeUndefined();
+    expect(getByTestId('cloud-session-timeline').props.contentContainerClassName).toContain(
+      'pb-[124px]',
+    );
     expect(getByTestId('cloud-session-composer-shell')).toBeTruthy();
     expect(getByTestId('cloud-session-composer').props.className).toContain('rounded-card');
     expect(getByLabelText('Cloud session message').props.textAlignVertical).toBe('top');
+    expect(getByLabelText('Cloud session message').props.className).toContain('min-h-[44px]');
     await waitFor(() => expect(getByLabelText('Repository: fenner888/Devinx')).toBeTruthy());
     expect(getByLabelText('Session mode: Fast')).toBeTruthy();
   });

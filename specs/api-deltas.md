@@ -158,7 +158,7 @@ Findings contain both `orchestrator_session_id` and `session_id`, but ordinary
 session responses do not contain scan severity, evidence, recommendation, or
 resolution state. No public create-scan endpoint is documented. **Action:** the
 public app provides native **Security Work** from supported organization sessions:
-security categories/origins/tags, parent-child agent grouping, normal work logs,
+verified top-level platform Code Scan roots and exact DevinX review tags, parent-child agent grouping, normal work logs,
 and an explicitly read-only review launched through the validated session-create
 endpoint. It does not use an external handoff or label session data as Code Scan
 findings. Enterprise metrics/findings/remediation remain a future enhancement

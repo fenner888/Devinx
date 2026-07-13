@@ -131,12 +131,17 @@ describe('Computer session detail', () => {
     expect(companionDock.props.className).toContain('absolute');
     expect(companionDock.props.className).not.toContain('bg-canvas');
     expect(companionDock.props.pointerEvents).toBe('none');
-    expect(screen.getByTestId('computer-session-history').props.contentContainerStyle).toBeUndefined();
+    expect(screen.getByTestId('computer-session-history').props.contentContainerClassName).toContain(
+      'pb-[132px]',
+    );
     expect(screen.getByTestId('computer-session-composer-shell')).toBeTruthy();
     expect(screen.getByTestId('computer-session-composer').props.className).toContain(
       'rounded-card',
     );
     expect(screen.getByLabelText('Computer session message').props.textAlignVertical).toBe('top');
+    expect(screen.getByLabelText('Computer session message').props.className).toContain(
+      'min-h-[44px]',
+    );
     expect(screen.getByLabelText('Model: SWE-1.7')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Reasoning and speed: High'));
     fireEvent.press(screen.getByLabelText('Use Medium for SWE-1.7'));

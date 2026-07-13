@@ -126,10 +126,10 @@ export default function SecurityWorkScreen() {
       </View>
 
       <View className="mx-5 mb-3 rounded-card border border-border-subtle bg-surface1 px-4 py-3">
-        <Text className="text-text-hi text-text14 font-medium">Security reviews you can inspect and steer</Text>
+        <Text className="text-text-hi text-text14 font-medium">Verified scans and DevinX reviews</Text>
         <Text className="mt-1 text-text-mid text-text12">
-          DevinX groups supported security-category sessions with their child agents. This is
-          session work, not the enterprise Code Scan findings dashboard.
+          Only platform Code Scan roots and reviews started here are shown. Their child agents stay
+          grouped beneath the correct session.
         </Text>
       </View>
 
@@ -154,7 +154,7 @@ export default function SecurityWorkScreen() {
           <EmptyState
             icon="shield"
             title="No security work yet"
-            message="Start a review here, or run a security-category session in Devin."
+            message="Start a review here, or run a Code Scan in Devin."
           />
         </View>
       ) : (
