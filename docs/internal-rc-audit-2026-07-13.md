@@ -24,8 +24,10 @@ in `docs/authorization-matrix.md`.
   `2a5785cfde425e455e4a150de7b6c8a900fe24eb8f6d1aa9d4db8af1b4997188` and passed strict signing,
   metadata, entitlement, disclosure, production update/runtime, and 10-manifest privacy inspection.
 - EAS submission `b61fdf5a-9a0d-47e4-8c93-2a390780b271` uploaded Build 57 to App Store Connect for
-  internal TestFlight. This is a visual-acceptance candidate, not a frozen UI or public release;
-  physical acceptance and explicit owner freeze remain required.
+  internal TestFlight. App Store Connect completed processing and shows Build 57 as **Ready to
+  Submit** in the one-tester **Team (Expo)** internal group, with one install recorded. This is a
+  visual-acceptance candidate, not a frozen UI or public release; physical acceptance and explicit
+  owner freeze remain required.
 
 ## Internal candidate produced
 
