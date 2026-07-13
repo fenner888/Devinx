@@ -10,6 +10,8 @@ import {
   listSessions,
   getSessionConsumption,
   listRepositories,
+  listKnowledge,
+  listKnowledgeFolders,
   listConsumptionCycles,
   listDevinAcuLimits,
   getCodeScanMetrics,
@@ -247,6 +249,69 @@ describe('endpoints — path building & response shaping', () => {
     expect(new URL(mockFetch.mock.calls[1]?.[0] as string).searchParams.get('after')).toBe(
       'repository-page-2',
     );
+  });
+
+  it('listKnowledge follows continuation cursors and returns complete history', async () => {
+    const note = {
+      note_id: 'note-1',
+      name: 'Release rules',
+      body: 'Run all release gates.',
+      trigger: 'Before release',
+      folder_id: null,
+    };
+    mockFetch
+      .mockResolvedValueOnce(
+        ok({ items: [note], end_cursor: 'knowledge-page-2', has_next_page: true }),
+      )
+      .mockResolvedValueOnce(
+        ok({
+          items: [{ ...note, note_id: 'note-2', name: 'Security rules' }],
+          end_cursor: null,
+          has_next_page: false,
+        }),
+      );
+
+    await expect(listKnowledge(mockAuth)).resolves.toHaveLength(2);
+    expect(new URL(mockFetch.mock.calls[1]?.[0] as string).searchParams.get('after')).toBe(
+      'knowledge-page-2',
+    );
+  });
+
+  it('listKnowledge rejects a repeated cursor instead of returning partial notes', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        ok({ items: [], end_cursor: 'repeat-knowledge', has_next_page: true }),
+      )
+      .mockResolvedValueOnce(
+        ok({ items: [], end_cursor: 'repeat-knowledge', has_next_page: true }),
+      );
+
+    await expect(listKnowledge(mockAuth)).rejects.toThrow(
+      'Knowledge pagination returned an invalid cursor',
+    );
+  });
+
+  it('listKnowledgeFolders validates the organization folder tree', async () => {
+    mockFetch.mockResolvedValue(
+      ok({
+        folders: [
+          {
+            folder_id: 'folder-1',
+            name: 'Engineering',
+            note_count: 2,
+            parent_folder_id: null,
+            path: 'Engineering',
+          },
+        ],
+        root_note_count: 3,
+      }),
+    );
+
+    await expect(listKnowledgeFolders(mockAuth)).resolves.toMatchObject({
+      root_note_count: 3,
+      folders: [{ folder_id: 'folder-1', note_count: 2 }],
+    });
+    expect(new URL(lastUrl()).pathname).toBe('/v3/organizations/org-abc/knowledge/folders');
   });
 
   it('listRepositories rejects repeated continuation cursors instead of returning a partial list', async () => {

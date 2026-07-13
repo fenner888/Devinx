@@ -22,6 +22,7 @@ import { usePlaybooks, useCreatePlaybook, useUpdatePlaybook, useDeletePlaybook }
 import { EmptyState, ErrorState } from '@components/Skeletons';
 import { hapticSuccess, hapticError, hapticWarning } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
+import { normalizePlaybookMacro, validatePlaybookMacro } from '@lib/playbook-macro';
 import { useTheme } from '@theme/index';
 import type { PlaybookResponse } from '@api/devin/types';
 
@@ -29,6 +30,7 @@ interface EditorState {
   playbookId: string | null; // null = create
   title: string;
   body: string;
+  macro: string;
 }
 
 export default function PlaybooksScreen() {
@@ -54,12 +56,18 @@ export default function PlaybooksScreen() {
   }, [playbooks, search]);
 
   const saving = createPlaybook.isPending || updatePlaybook.isPending;
-  const canSave = !!editor && editor.title.trim() && editor.body.trim() && !saving;
+  const macroError = editor ? validatePlaybookMacro(editor.macro) : null;
+  const canSave =
+    !!editor && editor.title.trim() && editor.body.trim() && !macroError && !saving;
 
   function handleSave() {
     if (!editor || !canSave) return;
     setEditorError(null);
-    const body = { title: editor.title.trim(), body: editor.body.trim() };
+    const body = {
+      title: editor.title.trim(),
+      body: editor.body.trim(),
+      macro: normalizePlaybookMacro(editor.macro),
+    };
     const opts = {
       onSuccess: () => {
         hapticSuccess();
@@ -107,7 +115,7 @@ export default function PlaybooksScreen() {
           className="flex-row items-center bg-brand rounded-button px-3 py-2"
           onPress={() => {
             setEditorError(null);
-            setEditor({ playbookId: null, title: '', body: '' });
+            setEditor({ playbookId: null, title: '', body: '', macro: '' });
           }}
           accessibilityRole="button"
           accessibilityLabel="Create playbook"
@@ -169,7 +177,12 @@ export default function PlaybooksScreen() {
               className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-3 mb-3"
               onPress={() => {
                 setEditorError(null);
-                setEditor({ playbookId: pb.playbook_id, title: pb.title, body: pb.body });
+                setEditor({
+                  playbookId: pb.playbook_id,
+                  title: pb.title,
+                  body: pb.body,
+                  macro: pb.macro ?? '',
+                });
               }}
               accessibilityRole="button"
               accessibilityLabel={`Edit ${pb.title}`}
@@ -226,6 +239,23 @@ export default function PlaybooksScreen() {
                   placeholderTextColor={tokens.textLow.hex}
                   maxLength={200}
                 />
+                <Text className="text-text-low text-text12 font-medium uppercase mb-1">
+                  Command macro (optional)
+                </Text>
+                <TextInput
+                  className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi font-mono mb-1"
+                  value={editor?.macro ?? ''}
+                  onChangeText={(v) => setEditor((e) => (e ? { ...e, macro: v } : e))}
+                  placeholder="!release-check"
+                  placeholderTextColor={tokens.textLow.hex}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={100}
+                  accessibilityLabel="Playbook command macro"
+                />
+                <Text className={`text-text12 mb-3 ${macroError ? 'text-failed' : 'text-text-low'}`}>
+                  {macroError ?? 'Type this command in a prompt to use the playbook.'}
+                </Text>
                 <Text className="text-text-low text-text12 font-medium uppercase mb-1">Instructions</Text>
                 <TextInput
                   className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-3 min-h-36"

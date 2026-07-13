@@ -20,6 +20,7 @@ import {
   sessionInsightsResponseSchema,
   playbookListResponseSchema,
   knowledgeNoteListResponseSchema,
+  knowledgeFolderTreeSchema,
   secretListResponseSchema,
   attachmentResponseSchema,
   consumptionResponseSchema,
@@ -56,6 +57,7 @@ import type {
   SessionTagsUpdateRequest,
   PlaybookResponse,
   KnowledgeNoteResponse,
+  KnowledgeFolderTree,
   SecretResponse,
   AttachmentResponse,
   DailyConsumptionResponse,
@@ -291,17 +293,35 @@ export async function listPlaybooks(auth: AuthProvider): Promise<PlaybookRespons
 }
 
 export async function listKnowledge(auth: AuthProvider): Promise<KnowledgeNoteResponse[]> {
-  const orgPath = await auth.orgPath();
-  const orgId = orgPath.replace('/v3/organizations/', '');
-  const data = await apiRequest<{
-    items: KnowledgeNoteResponse[];
-    end_cursor: Cursor | null;
-    has_next_page: boolean;
-  }>(auth, paths.knowledge(orgId), {
+  const items: KnowledgeNoteResponse[] = [];
+  const seenCursors = new Set<string>();
+  let cursor: Cursor | null = null;
+  for (let page = 0; page < 10; page++) {
+    const data: {
+      items: KnowledgeNoteResponse[];
+      end_cursor: Cursor | null;
+      has_next_page: boolean;
+    } = await apiRequest(auth, paths.knowledge(await orgIdOf(auth)), {
+      method: 'GET',
+      query: { first: 100, after: cursor },
+      schema: knowledgeNoteListResponseSchema,
+    });
+    items.push(...data.items);
+    if (!data.has_next_page) return items;
+    if (!data.end_cursor || seenCursors.has(data.end_cursor)) {
+      throw new Error('Knowledge pagination returned an invalid cursor');
+    }
+    seenCursors.add(data.end_cursor);
+    cursor = data.end_cursor;
+  }
+  throw new Error('Knowledge list exceeds the supported pagination limit');
+}
+
+export async function listKnowledgeFolders(auth: AuthProvider): Promise<KnowledgeFolderTree> {
+  return apiRequest<KnowledgeFolderTree>(auth, paths.knowledgeFolders(await orgIdOf(auth)), {
     method: 'GET',
-    schema: knowledgeNoteListResponseSchema,
+    schema: knowledgeFolderTreeSchema,
   });
-  return data.items;
 }
 
 export async function listSecrets(auth: AuthProvider): Promise<SecretResponse[]> {

@@ -18,7 +18,13 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useKnowledge, useCreateKnowledgeNote, useUpdateKnowledgeNote, useDeleteKnowledgeNote } from '@api/devin/queries';
+import {
+  useKnowledge,
+  useKnowledgeFolders,
+  useCreateKnowledgeNote,
+  useUpdateKnowledgeNote,
+  useDeleteKnowledgeNote,
+} from '@api/devin/queries';
 import { EmptyState, ErrorState } from '@components/Skeletons';
 import { hapticSuccess, hapticError, hapticWarning, hapticLight } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
@@ -30,6 +36,7 @@ interface EditorState {
   name: string;
   trigger: string;
   body: string;
+  folderId: string | null;
 }
 
 export default function KnowledgeScreen() {
@@ -37,40 +44,61 @@ export default function KnowledgeScreen() {
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
   const { data: notes, isLoading, error, refetch, isRefetching } = useKnowledge();
+  const folders = useKnowledgeFolders();
   const createNote = useCreateKnowledgeNote();
   const updateNote = useUpdateKnowledgeNote();
   const deleteNote = useDeleteKnowledgeNote();
 
   const [search, setSearch] = useState('');
+  const [selectedFolder, setSelectedFolder] = useState<'all' | 'root' | string>('all');
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     if (!notes) return [];
     const q = search.trim().toLowerCase();
-    if (!q) return notes;
-    return notes.filter(
-      (n) => n.name.toLowerCase().includes(q) || n.trigger.toLowerCase().includes(q),
-    );
-  }, [notes, search]);
+    return notes.filter((note) => {
+      const matchesFolder =
+        selectedFolder === 'all' ||
+        (selectedFolder === 'root' ? !note.folder_id : note.folder_id === selectedFolder);
+      const matchesSearch =
+        !q ||
+        note.name.toLowerCase().includes(q) ||
+        note.trigger.toLowerCase().includes(q) ||
+        note.body.toLowerCase().includes(q) ||
+        (note.folder_path ?? '').toLowerCase().includes(q);
+      return matchesFolder && matchesSearch;
+    });
+  }, [notes, search, selectedFolder]);
 
   const saving = createNote.isPending || updateNote.isPending;
   const canSave = !!editor && editor.name.trim() && editor.trigger.trim() && editor.body.trim() && !saving;
 
   function openCreate() {
     setEditorError(null);
-    setEditor({ noteId: null, name: '', trigger: '', body: '' });
+    setEditor({ noteId: null, name: '', trigger: '', body: '', folderId: null });
   }
 
   function openEdit(note: KnowledgeNoteResponse) {
     setEditorError(null);
-    setEditor({ noteId: note.note_id, name: note.name, trigger: note.trigger, body: note.body });
+    setEditor({
+      noteId: note.note_id,
+      name: note.name,
+      trigger: note.trigger,
+      body: note.body,
+      folderId: note.folder_id ?? null,
+    });
   }
 
   function handleSave() {
     if (!editor || !canSave) return;
     setEditorError(null);
-    const body = { name: editor.name.trim(), trigger: editor.trigger.trim(), body: editor.body.trim() };
+    const body = {
+      name: editor.name.trim(),
+      trigger: editor.trigger.trim(),
+      body: editor.body.trim(),
+      folder_id: editor.folderId,
+    };
     const opts = {
       onSuccess: () => {
         hapticSuccess();
@@ -153,6 +181,41 @@ export default function KnowledgeScreen() {
         </View>
       </View>
 
+      {folders.data && (
+        <View className="mb-3">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="px-4"
+          >
+            {[
+              { id: 'all', label: `All ${notes?.length ?? 0}` },
+              { id: 'root', label: `Root ${folders.data.root_note_count}` },
+              ...folders.data.folders.map((folder) => ({
+                id: folder.folder_id,
+                label: `${folder.path || folder.name} ${folder.note_count}`,
+              })),
+            ].map((folder) => {
+              const selected = selectedFolder === folder.id;
+              return (
+                <Pressable
+                  key={folder.id}
+                  className={`rounded-chip px-3 py-2 mr-2 ${selected ? 'bg-brand' : 'bg-tint-secondary'}`}
+                  onPress={() => setSelectedFolder(folder.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`Show ${folder.label}`}
+                >
+                  <Text className={selected ? 'text-text-always-white text-text12' : 'text-text-mid text-text12'}>
+                    {folder.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       {isLoading && (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={tokens.brand.hex} />
@@ -191,7 +254,7 @@ export default function KnowledgeScreen() {
                 <View className="flex-1 mr-3">
                   <Text className="text-text-hi text-text14 font-medium" numberOfLines={1}>{n.name}</Text>
                   <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>
-                    Trigger: {n.trigger}
+                    {n.folder_path ? `${n.folder_path} · ` : ''}Trigger: {n.trigger}
                   </Text>
                 </View>
                 <Pressable
@@ -261,6 +324,44 @@ export default function KnowledgeScreen() {
                 <Text className="text-text-low text-text12 mb-3">
                   Describes when Devin should recall this note.
                 </Text>
+                {folders.data && (
+                  <>
+                    <Text className="text-text-low text-text12 font-medium uppercase mb-1">Folder</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      className="mb-3"
+                    >
+                      {[
+                        { id: null, label: 'Root' },
+                        ...folders.data.folders.map((folder) => ({
+                          id: folder.folder_id,
+                          label: folder.path || folder.name,
+                        })),
+                      ].map((folder) => {
+                        const selected = editor?.folderId === folder.id;
+                        return (
+                          <Pressable
+                            key={folder.id ?? 'root'}
+                            className={`rounded-chip px-3 py-2 mr-2 ${selected ? 'bg-brand' : 'bg-surface1'}`}
+                            onPress={() =>
+                              setEditor((current) =>
+                                current ? { ...current, folderId: folder.id } : current,
+                              )
+                            }
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected }}
+                            accessibilityLabel={`Use knowledge folder ${folder.label}`}
+                          >
+                            <Text className={selected ? 'text-text-always-white text-text12' : 'text-text-mid text-text12'}>
+                              {folder.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </>
+                )}
                 <Text className="text-text-low text-text12 font-medium uppercase mb-1">Content</Text>
                 <TextInput
                   className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-3 min-h-28"

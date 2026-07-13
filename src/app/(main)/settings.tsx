@@ -369,6 +369,13 @@ export default function SettingsScreen() {
                 color: tokens.merged.hex,
               },
               {
+                icon: 'folder-open-outline',
+                label: 'Repositories & Wiki',
+                route: '/(main)/repositories',
+                tint: 'bg-tint-blue',
+                color: tokens.brandText.hex,
+              },
+              {
                 icon: 'book-outline',
                 label: 'Playbooks',
                 route: '/(main)/playbooks',

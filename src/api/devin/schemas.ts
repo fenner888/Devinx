@@ -419,6 +419,23 @@ export const knowledgeNoteResponseSchema = z
 
 export const knowledgeNoteListResponseSchema = paginatedResponseSchema(knowledgeNoteResponseSchema);
 
+export const knowledgeFolderSummarySchema = z
+  .object({
+    folder_id: z.string(),
+    name: z.string(),
+    note_count: z.number().int().nonnegative(),
+    parent_folder_id: z.string().nullable(),
+    path: z.string(),
+  })
+  .passthrough();
+
+export const knowledgeFolderTreeSchema = z
+  .object({
+    folders: z.array(knowledgeFolderSummarySchema),
+    root_note_count: z.number().int().nonnegative(),
+  })
+  .passthrough();
+
 // The real SecretResponse has no org_id; keep metadata optional.
 export const secretResponseSchema = z
   .object({
@@ -539,8 +556,14 @@ export const scheduleResponseSchema = z
     schedule_type: z.enum(['recurring', 'one_time']).catch('recurring'),
     frequency: z.string().nullable().optional(),
     scheduled_at: z.string().nullable().optional(),
+    // The docs currently mention an advanced agent in prose while the request/response
+    // enum tables omit it. Preserve unknown read values without offering unsupported writes.
     agent: z.string().optional(),
-    notify_on: z.string().optional(),
+    notify_on: z.enum(['always', 'failure', 'never']).optional(),
+    playbook: z
+      .object({ playbook_id: z.string(), title: z.string() })
+      .nullable()
+      .optional(),
     consecutive_failures: z.number().optional(),
     last_executed_at: z.string().nullable().optional(),
     last_error_message: z.string().nullable().optional(),
@@ -751,6 +774,24 @@ export const activeUsersResponseSchema = z.union([
 // Repositories (v3beta1)
 // ---------------------------------------------------------------------------
 
+const repositoryIndexJobSchema = z
+  .object({
+    branch_name: z.string(),
+    commit: z.string(),
+    created_at: z.union([z.number(), z.string()]),
+    job_id: z.string(),
+  })
+  .passthrough();
+
+const repositoryIndexingStatusSchema = z
+  .object({
+    indexing_enabled: z.boolean().optional().default(false),
+    latest_completed_search_index_job: repositoryIndexJobSchema.nullable().optional(),
+    latest_completed_wiki_index_job: repositoryIndexJobSchema.nullable().optional(),
+    latest_indexes: z.array(repositoryIndexJobSchema).optional().default([]),
+  })
+  .passthrough();
+
 export const repositoryResponseSchema = z
   .object({
     provider_repository_id: z.string(),
@@ -761,9 +802,7 @@ export const repositoryResponseSchema = z
     repo_description: z.string().nullable().optional(),
     repo_language: z.string().nullable().optional(),
     last_updated_at: z.union([z.string(), z.number()]).nullable().optional(),
-    // Contract types this as an object (RepoIndexingStatusResponse) | null,
-    // not a string — accept anything so indexed repos aren't dropped.
-    indexing_status: z.unknown().optional(),
+    indexing_status: repositoryIndexingStatusSchema.nullable().optional(),
   })
   .passthrough();
 

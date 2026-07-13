@@ -1,6 +1,6 @@
 # 033 — Cloud, Web, and local settings parity
 
-Status: authenticated inventory complete; supported parity implementation in progress
+Status: authenticated inventory and supported parity implementation complete; release matrix pending
 
 ## Objective
 
@@ -9,7 +9,7 @@ documented, permissioned interface. A visible Web setting is not, by itself, an 
 DevinX must not consume browser cookies, call private Web endpoints, infer undocumented request
 schemas, or make a service user impersonate the signed-in human account.
 
-The authenticated inventory was performed on July 13, 2026 against a Pro organization. It covered
+The authenticated inventory was performed on July 12, 2026 against a Pro organization. It covered
 Personal Preferences and Connections; organization General, Connections, Plans, Invoices, and
 Usage; product settings for Devin, Review, DeepWiki, Schedules, and Devin Desktop; resources for
 Knowledge, Environment, Playbooks, Skills & Rules, and Secrets; and administration for
@@ -54,7 +54,7 @@ because a similarly named Web control exists.
 ## Local computer inventory
 
 The installed Devin CLI reports version `3000.1.27 (0d4bf12e)`. A value-free ACP negotiation on
-July 13, 2026 advertised:
+July 12, 2026 advertised:
 
 - `sessionCapabilities.list`;
 - `loadSession`;
@@ -71,12 +71,17 @@ be invoked indirectly from the phone.
 
 ## Implementation sequence
 
-1. Move repository discovery and indexing reads to the documented stable v3 paths, keeping bounded
-   cursor pagination, identity deduplication, Zod parsing, and explicit partial-result failure.
-2. Add Repositories & Wiki as a permission-gated, read-only native settings screen.
+1. Keep repository discovery and indexing reads on the documented `v3beta1` organization paths,
+   with bounded cursor pagination, identity deduplication, Zod parsing, and explicit partial-result
+   failure. Do not relabel the beta contract as stable v3.
+2. Add Repositories & Wiki as a permission-gated, read-only native settings screen using the
+   indexing status already returned by the documented repository list.
 3. Add Knowledge folder schemas, endpoint, query, grouping, filter, and editor selection.
 4. Add validated Playbook macro editing without changing structured-output schemas.
 5. Complete the documented Schedule editor options and retain explicit destructive confirmation.
+   The current documentation mentions an `advanced` agent in prose but omits it from the request
+   enum table. DevinX displays unknown read values but offers only the unambiguous documented write
+   values (`devin` and `data_analyst`) until Cognition resolves that contract discrepancy.
 6. Run the full Cloud-resource and authorization matrix with missing-permission fixtures before any
    TestFlight build.
 

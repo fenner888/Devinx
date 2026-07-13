@@ -17,6 +17,7 @@ import {
   createSession,
   listPlaybooks,
   listKnowledge,
+  listKnowledgeFolders,
   listSecrets,
   archiveSession,
   terminateSession,
@@ -313,6 +314,21 @@ export function useKnowledge() {
     },
     enabled: isAuthenticated && !!provider,
     staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+export function useKnowledgeFolders() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.knowledgeFolders,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listKnowledgeFolders(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
     retry: shouldRetryQuery,
   });
@@ -689,7 +705,10 @@ export function useCreateKnowledgeNote() {
       if (!provider) throw new Error('Not authenticated');
       return createKnowledgeNote(provider, body);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge });
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeFolders });
+    },
   });
 }
 
@@ -701,7 +720,10 @@ export function useUpdateKnowledgeNote() {
       if (!provider) throw new Error('Not authenticated');
       return updateKnowledgeNote(provider, params.noteId, params.body);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge });
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeFolders });
+    },
   });
 }
 
@@ -713,7 +735,10 @@ export function useDeleteKnowledgeNote() {
       if (!provider) throw new Error('Not authenticated');
       await deleteKnowledgeNote(provider, noteId);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge });
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeFolders });
+    },
   });
 }
 

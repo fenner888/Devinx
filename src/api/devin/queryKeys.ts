@@ -9,6 +9,7 @@ export const queryKeys = {
   messageFollowUp: (id: string) => ['messageFollowUp', id] as const,
   playbooks: ['playbooks'] as const,
   knowledge: ['knowledge'] as const,
+  knowledgeFolders: ['knowledgeFolders'] as const,
   secrets: ['secrets'] as const,
   consumption: ['consumption'] as const,
   billingLimits: ['billingLimits'] as const,

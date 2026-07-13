@@ -432,6 +432,7 @@ export const paths = {
     `/v3/organizations/${orgId}/sessions/${devinId}/insights`,
   playbooks: (orgId: OrgId) => `/v3/organizations/${orgId}/playbooks`,
   knowledge: (orgId: OrgId) => `/v3/organizations/${orgId}/knowledge/notes`,
+  knowledgeFolders: (orgId: OrgId) => `/v3/organizations/${orgId}/knowledge/folders`,
   secrets: (orgId: OrgId) => `/v3/organizations/${orgId}/secrets`,
   /** Enterprise-level (requires ViewAccountMembership). */
   membersEnterprise: (orgId: OrgId) => `/v3/enterprise/organizations/${orgId}/members/users`,
@@ -477,6 +478,8 @@ export const paths = {
 // ---------------------------------------------------------------------------
 
 export type ScheduleType = 'recurring' | 'one_time';
+export type ScheduleNotifyOn = 'always' | 'failure' | 'never';
+export type ScheduleAgent = 'devin' | 'data_analyst';
 
 export interface ScheduleResponse {
   /** Schedule ID (prefix: sched-). */
@@ -489,8 +492,10 @@ export interface ScheduleResponse {
   frequency: string | null;
   /** ISO 8601 datetime (one-time schedules). */
   scheduled_at: string | null;
+  /** Read path remains forward-compatible with agent values not yet accepted by the write schema. */
   agent?: string;
-  notify_on?: string;
+  notify_on?: ScheduleNotifyOn;
+  playbook?: { playbook_id: string; title: string } | null;
   consecutive_failures?: number;
   last_executed_at?: string | null;
   last_error_message?: string | null;
@@ -507,8 +512,9 @@ export interface ScheduleCreateRequest {
   scheduled_at?: string | null;
   tags?: string[];
   playbook_id?: string | null;
+  notify_on?: ScheduleNotifyOn;
   /** Which agent runs the schedule (the API supports both). */
-  agent?: 'devin' | 'data_analyst';
+  agent?: ScheduleAgent;
 }
 
 export interface ScheduleUpdateRequest {
@@ -517,6 +523,11 @@ export interface ScheduleUpdateRequest {
   enabled?: boolean;
   frequency?: string | null;
   scheduled_at?: string | null;
+  schedule_type?: ScheduleType;
+  tags?: string[] | null;
+  playbook_id?: string | null;
+  notify_on?: ScheduleNotifyOn;
+  agent?: ScheduleAgent | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -612,6 +623,19 @@ export interface KnowledgeNoteCreateRequest {
   pinned_repo?: string | null;
 }
 
+export interface KnowledgeFolderSummary {
+  folder_id: string;
+  name: string;
+  note_count: number;
+  parent_folder_id: string | null;
+  path: string;
+}
+
+export interface KnowledgeFolderTree {
+  folders: KnowledgeFolderSummary[];
+  root_note_count: number;
+}
+
 export type KnowledgeNoteUpdateRequest = Partial<KnowledgeNoteCreateRequest>;
 
 export interface PlaybookCreateRequest {
@@ -680,7 +704,21 @@ export interface RepositoryResponse {
   repo_description: string | null;
   repo_language: string | null;
   last_updated_at: string | number | null;
-  indexing_status?: unknown;
+  indexing_status?: RepositoryIndexingStatus | null;
+}
+
+export interface RepositoryIndexJob {
+  branch_name: string;
+  commit: string;
+  created_at: number | string;
+  job_id: string;
+}
+
+export interface RepositoryIndexingStatus {
+  indexing_enabled: boolean;
+  latest_completed_search_index_job?: RepositoryIndexJob | null;
+  latest_completed_wiki_index_job?: RepositoryIndexJob | null;
+  latest_indexes?: RepositoryIndexJob[];
 }
 
 // ---------------------------------------------------------------------------
