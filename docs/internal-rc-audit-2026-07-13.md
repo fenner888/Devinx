@@ -5,6 +5,25 @@ Review nor a public Connector release. The authenticated product inventory and s
 decisions are in `specs/033-cloud-local-settings-parity.md`; route-level authorization evidence is
 in `docs/authorization-matrix.md`.
 
+## Build 60 local-model family marks
+
+- Commit `b024f0f` aligns both Computer model pickers and their selected composer controls with
+  Devin's current family-symbol hierarchy. Adaptive/Fusion, Claude, GLM, SWE, GPT, Gemini,
+  DeepSeek, and Grok receive bounded code-native marks; unknown live ACP families retain a neutral
+  fallback. These marks are presentational only and never create, rename, or remap an ACP model ID.
+- Exact Node `24.18.0` CI passed on the corrected source: lint, strict TypeScript, 74 Jest suites /
+  539 tests, app and Connector builds, and the high/critical dependency gate. No dependency was
+  added; the existing 21 reviewed moderate transitive findings remain unchanged.
+- iOS `0.1.0 (60)` was archived from clean source `b024f0f` with Node `24.18.0` and Xcode `26.6`.
+  The 20,823,523-byte IPA has SHA-256
+  `c5f2a25e2d0bb8a90025c72db969f8b5036801a355568c7cbafcc4d910d07945` and passed strict signing,
+  metadata, entitlement, production update/runtime, permission-disclosure, and 10-manifest privacy
+  inspection. It declares zero collected-data categories, tracking domains, or tracking-enabled
+  manifests.
+- EAS submission `cc0323eb-ad75-443e-9fb5-3dbd2e959807` successfully uploaded this exact IPA to App
+  Store Connect for internal TestFlight. Apple is processing the upload. No App Review or public
+  release action was taken.
+
 ## Build 59 keyboard-dismissal correction
 
 - Physical Build 58 review found that an open software keyboard could not be explicitly dismissed

@@ -1,7 +1,7 @@
 # 030 — Composer picker visual system
 
-Status: implemented, automated-test validated, and uploaded in iOS Build 33 as
-the UI-freeze checkpoint; physical visual and interaction verification remain
+Status: implemented, automated-test validated, and extended in iOS Build 60 with Devin-aligned
+local-model family marks; physical visual and interaction verification remain
 
 ## Intent
 
