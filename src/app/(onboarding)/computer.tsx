@@ -3,8 +3,10 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -105,12 +107,17 @@ export default function ComputerConnectionScreen() {
   const [removingBridgeId, setRemovingBridgeId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     mountedRef.current = true;
+    const keyboardSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
     return () => {
       mountedRef.current = false;
       abortRef.current?.abort();
+      keyboardSubscription.remove();
     };
   }, []);
 
@@ -279,10 +286,18 @@ export default function ComputerConnectionScreen() {
         </View>
       </Modal>
 
-      <ScrollView
-        contentContainerClassName="px-6 py-8 flex-grow"
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        testID="computer-connection-keyboard-viewport"
       >
+        <ScrollView
+          ref={scrollRef}
+          contentContainerClassName="px-6 py-8 flex-grow"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardShouldPersistTaps="handled"
+          testID="computer-connection-scroll"
+        >
         <Pressable
           className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center mb-6"
           onPress={goBack}
@@ -403,11 +418,14 @@ export default function ComputerConnectionScreen() {
                 className="bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
                 value={computerName}
                 onChangeText={setComputerName}
+                onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
+                onSubmitEditing={Keyboard.dismiss}
                 placeholder="My Mac"
                 placeholderTextColor={tokens.textLow.hex}
                 maxLength={80}
                 autoCapitalize="words"
                 autoCorrect={false}
+                returnKeyType="done"
                 accessibilityLabel="Paired Mac name"
               />
             </View>
@@ -460,7 +478,8 @@ export default function ComputerConnectionScreen() {
             </Text>
           </Pressable>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

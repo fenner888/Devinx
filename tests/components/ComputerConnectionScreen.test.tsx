@@ -116,6 +116,19 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByLabelText('Scan DevinX Connector pairing code')).toBeTruthy();
   });
 
+  it('keeps the Mac name reachable above the keyboard and supports dismissal', () => {
+    const screen = render(<ComputerConnectionScreen />);
+
+    expect(screen.getByTestId('computer-connection-keyboard-viewport')).toBeTruthy();
+    expect(screen.getByTestId('computer-connection-scroll').props.keyboardDismissMode).toBe(
+      'interactive',
+    );
+    expect(screen.getByTestId('computer-connection-scroll').props.keyboardShouldPersistTaps).toBe(
+      'handled',
+    );
+    expect(screen.getByLabelText('Paired Mac name').props.returnKeyType).toBe('done');
+  });
+
   it('requests first-use permission and sends a scanned payload directly to pairing', async () => {
     mockGetPermission.mockResolvedValueOnce('notDetermined');
     const screen = render(<ComputerConnectionScreen />);

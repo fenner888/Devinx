@@ -23,6 +23,9 @@ the internal group.
   has no rectangular background or color flash.
 - Open every primary navigation and supported Settings row. Confirm Security Work is native and that no
   private Devin Web login, unsupported Code Scan dashboard, or dead route appears.
+- On **Connect your Mac**, focus **Name this Mac** on a small iPhone. Confirm the field and Scan
+  button can scroll above the keyboard, the typed name remains visible, dragging and Done dismiss the
+  keyboard, and neither path clears the name.
 - Open **Connections & MCP** in Cloud or Cloud + Computer mode. Confirm the read-only Integrations
   and MCP catalogs load or show an honest permission state, contain no Install/Configure/OAuth
   action, and are absent in Computer-only mode.

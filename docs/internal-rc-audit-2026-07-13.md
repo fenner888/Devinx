@@ -27,9 +27,13 @@ in `docs/authorization-matrix.md`.
   companion, could preserve a stale phase, and consumed conversation space. Build 61 is superseded
   for final UI acceptance by the owner-approved single active **Devin working** companion caption;
   Cloud and Computer timelines render no activity trail.
-- The corrected source passes lint, strict TypeScript, and 74 Jest suites / 544 tests. The removed
+- The corrected source passes lint, strict TypeScript, and 74 Jest suites / 545 tests. The removed
   component suite covered only the rejected activity-trail UI; active Cloud and Computer companion
   state, travel, caption, and passive-caption suppression remain covered.
+- The same physical review found **Name this Mac** and the pairing controls could remain behind the
+  software keyboard. Computer Connection now uses a keyboard-adjusted scroll viewport, brings the
+  field into view on focus and after keyboard presentation, supports interactive dismissal and Done,
+  and preserves the entered name. Focused component tests, strict TypeScript, and lint pass.
 
 ## Build 60 local-model family marks
 

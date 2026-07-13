@@ -33,7 +33,7 @@ Public IP addresses, public DNS listeners, Cloudflare Tunnel, relay services, au
 
 ## Mobile experience
 
-Computer Connection presents one clearly labeled Tailscale setup path. The instructions explain that both devices must be on the same tailnet and link to the official iOS setup guide. The Connector and mobile Settings identify the stored connection as `Tailscale` without exposing the endpoint. There is no transport selector or automatic LAN fallback.
+Computer Connection presents one clearly labeled Tailscale setup path. The instructions explain that both devices must be on the same tailnet and link to the official iOS setup guide. The Connector and mobile Settings identify the stored connection as `Tailscale` without exposing the endpoint. There is no transport selector or automatic LAN fallback. The full setup screen remains keyboard-safe on small iPhones: focusing **Name this Mac** scrolls the field and pairing controls into the keyboard-adjusted viewport, dragging dismisses the keyboard interactively, and the Done key dismisses it without clearing the name.
 
 No reusable password, Tailscale authentication token, tailnet identity, endpoint, transport mode, TLS fingerprint, bridge key, device key, or raw session identifier is placed in React state or ordinary app storage. The existing Keychain credential continues to hold the private connection details.
 
