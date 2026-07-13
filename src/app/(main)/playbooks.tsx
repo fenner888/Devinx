@@ -23,6 +23,7 @@ import { EmptyState, ErrorState } from '@components/Skeletons';
 import { hapticSuccess, hapticError, hapticWarning } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
 import { normalizePlaybookMacro, validatePlaybookMacro } from '@lib/playbook-macro';
+import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 import type { PlaybookResponse } from '@api/devin/types';
 
@@ -75,7 +76,7 @@ export default function PlaybooksScreen() {
       },
       onError: (e: Error) => {
         hapticError();
-        setEditorError(e.message);
+        setEditorError(userFacingError(e, 'Could not save this playbook.'));
       },
     };
     if (editor.playbookId) {
@@ -152,7 +153,11 @@ export default function PlaybooksScreen() {
       )}
 
       {error && !playbooks && (
-        <ErrorState title="Could not load playbooks" message={error.message} onRetry={() => refetch()} />
+        <ErrorState
+          title="Could not load playbooks"
+          message={userFacingError(error, 'Playbooks are unavailable right now.')}
+          onRetry={() => refetch()}
+        />
       )}
 
       {!isLoading && playbooks && filtered.length === 0 && (

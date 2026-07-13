@@ -45,6 +45,7 @@ import {
 import { connectionModeUsesCloud, connectionModeUsesComputer } from '@lib/connections';
 import type { SessionResponse } from '@api/devin/types';
 import { useAppPreferences } from '@store/preferences';
+import { userFacingError } from '@lib/user-facing-error';
 
 type ContextAction = 'open' | 'pin' | 'share_link' | 'archive' | 'terminate';
 
@@ -169,7 +170,7 @@ export default function SessionsScreen() {
             setContextSession(null);
             archiveMutation.mutate(s.session_id, {
               onError: (e) =>
-                setActionNote(`Could not archive "${s.title || 'session'}": ${e.message}`),
+                setActionNote(userFacingError(e, `Could not archive "${s.title || 'session'}".`)),
             });
           },
           () => setContextSession(null),
@@ -189,7 +190,7 @@ export default function SessionsScreen() {
             setContextSession(null);
             terminateMutation.mutate(s.session_id, {
               onError: (e) =>
-                setActionNote(`Could not terminate "${s.title || 'session'}": ${e.message}`),
+                setActionNote(userFacingError(e, `Could not terminate "${s.title || 'session'}".`)),
             });
           },
           () => setContextSession(null),
@@ -272,7 +273,7 @@ export default function SessionsScreen() {
       {!isLoading && usesCloud && !usesComputer && cloudQuery.error && sections.length === 0 && (
         <ErrorState
           title="Could not load sessions"
-          message={cloudQuery.error.message}
+          message={userFacingError(cloudQuery.error, 'Sessions are unavailable right now.')}
           onRetry={refreshAll}
         />
       )}

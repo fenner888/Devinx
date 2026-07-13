@@ -23,6 +23,7 @@ import { useSecrets, useCreateSecret, useDeleteSecret } from '@api/devin/queries
 import { EmptyState, ErrorState } from '@components/Skeletons';
 import { hapticSuccess, hapticError, hapticWarning } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
+import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 import type { SecretResponse, SecretType } from '@api/devin/types';
 
@@ -75,7 +76,7 @@ export default function SecretsScreen() {
         },
         onError: (e) => {
           hapticError();
-          setCreateError(e.message);
+          setCreateError(userFacingError(e, 'Could not create this secret.'));
         },
       },
     );
@@ -148,7 +149,11 @@ export default function SecretsScreen() {
       )}
 
       {error && !secrets && (
-        <ErrorState title="Could not load secrets" message={error.message} onRetry={() => refetch()} />
+        <ErrorState
+          title="Could not load secrets"
+          message={userFacingError(error, 'Secrets are unavailable right now.')}
+          onRetry={() => refetch()}
+        />
       )}
 
       {!isLoading && secrets && filtered.length === 0 && (

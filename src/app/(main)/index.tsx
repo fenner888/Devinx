@@ -53,6 +53,7 @@ import { useConnections } from '@auth/ConnectionContext';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
 import { connectionModeUsesComputer } from '@lib/connections';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
+import { userFacingError } from '@lib/user-facing-error';
 import {
   familyForModelId,
   groupComputerModels,
@@ -308,7 +309,7 @@ export default function HomeScreen() {
       ]);
     } catch (error) {
       hapticError();
-      const message = error instanceof Error ? error.message : 'Could not upload attachment.';
+      const message = userFacingError(error, 'Could not upload this attachment.');
       setComposerError(message);
       Alert.alert('Upload failed', message);
     } finally {
@@ -457,7 +458,7 @@ export default function HomeScreen() {
         },
         onError: (e) => {
           hapticError();
-          setComposerError(e instanceof Error ? e.message : 'Could not create session.');
+          setComposerError(userFacingError(e, 'Could not create this session.'));
         },
       },
     );

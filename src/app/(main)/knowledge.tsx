@@ -28,6 +28,7 @@ import {
 import { EmptyState, ErrorState } from '@components/Skeletons';
 import { hapticSuccess, hapticError, hapticWarning, hapticLight } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
+import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 import type { KnowledgeNoteResponse } from '@api/devin/types';
 
@@ -106,7 +107,7 @@ export default function KnowledgeScreen() {
       },
       onError: (e: Error) => {
         hapticError();
-        setEditorError(e.message);
+        setEditorError(userFacingError(e, 'Could not save this knowledge note.'));
       },
     };
     if (editor.noteId) {
@@ -223,7 +224,11 @@ export default function KnowledgeScreen() {
       )}
 
       {error && !notes && (
-        <ErrorState title="Could not load knowledge" message={error.message} onRetry={() => refetch()} />
+        <ErrorState
+          title="Could not load knowledge"
+          message={userFacingError(error, 'Knowledge is unavailable right now.')}
+          onRetry={() => refetch()}
+        />
       )}
 
       {!isLoading && notes && filtered.length === 0 && (

@@ -134,7 +134,10 @@ export function useVoiceComposer({
     let mounted = true;
     AccessibilityInfo.isReduceMotionEnabled()
       .then((enabled) => {
-        if (mounted) setReduceMotion(enabled);
+        // The state already defaults to false, so avoid an unnecessary async
+        // render on the common path (and keep first-paint composer layout
+        // stable). The change listener below handles later preference changes.
+        if (mounted && enabled) setReduceMotion(true);
       })
       .catch(() => {});
     const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);

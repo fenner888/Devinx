@@ -41,11 +41,17 @@ jest.mock('expo-audio', () => ({
 import { Image } from 'react-native';
 import { useAudioPlayer } from 'expo-audio';
 import { fireEvent, render } from '@testing-library/react-native';
-import { DevinMarkdown } from '../../src/components/DevinMarkdown';
+import { DevinMarkdown, safeMarkdownSource } from '../../src/components/DevinMarkdown';
 import { InlineImage, isVideoUrl, isAudioUrl, isImageUrl } from '../../src/components/InlineMedia';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
 
 describe('DevinMarkdown', () => {
+  it('bounds exceptionally long remote markdown before parsing', () => {
+    const source = '"'.repeat(160_000);
+    const safe = safeMarkdownSource(source);
+    expect(safe.length).toBeLessThan(50_000);
+    expect(safe).toContain('shortened on this screen for safety');
+  });
   it('renders markdown content (code, list) without crashing', () => {
     const md = '# Title\n\nSome **bold** text.\n\n- item one\n- item two\n\n`inline code`';
     const { getByText } = render(

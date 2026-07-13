@@ -26,6 +26,7 @@ import {
   securityReviewPrompt,
 } from '@lib/security-work';
 import { rememberSessionRepository } from '@lib/session-repository';
+import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 
 const MAXIMUM_FOCUS_LENGTH = 1_000;
@@ -89,7 +90,7 @@ export default function SecurityWorkScreen() {
       router.replace(`/(main)/session/${session.session_id}`);
     } catch (error) {
       hapticError();
-      setCreateError(error instanceof Error ? error.message : 'The security review could not start.');
+      setCreateError(userFacingError(error, 'The security review could not start.'));
     }
   }
 
@@ -146,7 +147,7 @@ export default function SecurityWorkScreen() {
       ) : sessions.error && groups.length === 0 ? (
         <ErrorState
           title="Could not load security work"
-          message={sessions.error.message}
+          message={userFacingError(sessions.error, 'Security Work is unavailable right now.')}
           onRetry={() => sessions.refetch()}
         />
       ) : groups.length === 0 ? (

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { useBillingLimits, useDailyConsumption, useOrgMetrics, type OrgMetricsBundle } from '@api/devin/queries';
 import { ApiError } from '@api/devin/client';
+import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 import type { ConsumptionCycle, DailyConsumptionResponse, DevinAcuLimit } from '@api/devin/types';
 
@@ -152,7 +153,9 @@ export default function UsageScreen() {
       {metrics.error && !isPermissionError && !bundle && (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-failed text-text14 mb-2">Could not load usage data</Text>
-          <Text className="text-text-mid text-text13 text-center mb-4">{metrics.error.message}</Text>
+          <Text className="text-text-mid text-text13 text-center mb-4">
+            {userFacingError(metrics.error, 'Usage data is unavailable right now.')}
+          </Text>
           <Pressable
             className="bg-tint-secondary rounded-button px-buttonPrimaryX py-buttonPrimaryY"
             onPress={() => metrics.refetch()}

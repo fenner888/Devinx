@@ -29,6 +29,7 @@ import { ErrorState, EmptyState } from '@components/Skeletons';
 import { hapticLight, hapticSuccess, hapticError, hapticWarning } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
 import { normalizeScheduleTags, validateScheduleTiming } from '@lib/schedule-validation';
+import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 import type {
   ScheduleAgent,
@@ -100,7 +101,7 @@ export default function AutomationsScreen() {
         },
         onError: (e) => {
           hapticError();
-          setCreateError(e instanceof Error ? e.message : 'Could not create schedule.');
+          setCreateError(userFacingError(e, 'Could not create this automation.'));
         },
       },
     );
@@ -120,7 +121,12 @@ export default function AutomationsScreen() {
         onSettled: () => setPendingId(null),
         onError: (e) => {
           hapticError();
-          setActionError(`Could not ${target ? 'enable' : 'disable'} "${schedule.name}": ${e.message}`);
+          setActionError(
+            userFacingError(
+              e,
+              `Could not ${target ? 'enable' : 'disable'} "${schedule.name}".`,
+            ),
+          );
         },
       },
     );
@@ -139,7 +145,7 @@ export default function AutomationsScreen() {
         deleteSchedule.mutate(schedule.schedule_id, {
           onError: (e) => {
             hapticError();
-            setActionError(`Could not delete "${schedule.name}": ${e.message}`);
+            setActionError(userFacingError(e, `Could not delete "${schedule.name}".`));
           },
         }),
     );
@@ -179,7 +185,7 @@ export default function AutomationsScreen() {
       {error && !schedules && (
         <ErrorState
           title="Could not load automations"
-          message={error.message}
+          message={userFacingError(error, 'Automations are unavailable right now.')}
           onRetry={() => refetch()}
         />
       )}

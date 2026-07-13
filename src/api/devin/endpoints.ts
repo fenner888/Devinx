@@ -38,10 +38,15 @@ import {
   remediateFindingRequestSchema,
   remediateFindingResponseSchema,
   knowledgeNoteCreateRequestSchema,
+  knowledgeNoteUpdateRequestSchema,
   knowledgeNoteResponseSchema,
   playbookCreateRequestSchema,
+  playbookUpdateRequestSchema,
   playbookResponseSchema,
   secretCreateRequestSchema,
+  resourceIdSchema,
+  scheduleCreateRequestSchema,
+  scheduleUpdateRequestSchema,
   secretResponseSchema,
   sessionMetricsSchema,
   prMetricsSchema,
@@ -482,11 +487,12 @@ export async function createSchedule(
   auth: AuthProvider,
   body: ScheduleCreateRequest,
 ): Promise<ScheduleResponse> {
+  const input = scheduleCreateRequestSchema.parse(body);
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   const raw = await apiRequest<Record<string, unknown>>(auth, paths.schedules(orgId), {
     method: 'POST',
-    body,
+    body: input,
     schema: scheduleResponseSchema,
   });
   return normalizeSchedule(raw);
@@ -497,11 +503,13 @@ export async function updateSchedule(
   scheduleId: string,
   body: ScheduleUpdateRequest,
 ): Promise<ScheduleResponse> {
+  const safeScheduleId = resourceIdSchema.parse(scheduleId);
+  const input = scheduleUpdateRequestSchema.parse(body);
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  const raw = await apiRequest<Record<string, unknown>>(auth, paths.schedule(orgId, scheduleId), {
+  const raw = await apiRequest<Record<string, unknown>>(auth, paths.schedule(orgId, safeScheduleId), {
     method: 'PATCH',
-    body,
+    body: input,
     schema: scheduleResponseSchema,
   });
   return normalizeSchedule(raw);
@@ -510,7 +518,9 @@ export async function updateSchedule(
 export async function deleteSchedule(auth: AuthProvider, scheduleId: string): Promise<void> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  await apiRequest(auth, paths.schedule(orgId, scheduleId), { method: 'DELETE' });
+  await apiRequest(auth, paths.schedule(orgId, resourceIdSchema.parse(scheduleId)), {
+    method: 'DELETE',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -608,10 +618,10 @@ export async function createKnowledgeNote(
   auth: AuthProvider,
   body: KnowledgeNoteCreateRequest,
 ): Promise<KnowledgeNoteResponse> {
-  knowledgeNoteCreateRequestSchema.parse(body);
+  const input = knowledgeNoteCreateRequestSchema.parse(body);
   return apiRequest<KnowledgeNoteResponse>(auth, paths.knowledge(await orgIdOf(auth)), {
     method: 'POST',
-    body,
+    body: input,
     schema: knowledgeNoteResponseSchema,
   });
 }
@@ -621,25 +631,28 @@ export async function updateKnowledgeNote(
   noteId: string,
   body: KnowledgeNoteUpdateRequest,
 ): Promise<KnowledgeNoteResponse> {
-  return apiRequest<KnowledgeNoteResponse>(auth, paths.knowledgeNote(await orgIdOf(auth), noteId), {
+  const input = knowledgeNoteUpdateRequestSchema.parse(body);
+  return apiRequest<KnowledgeNoteResponse>(auth, paths.knowledgeNote(await orgIdOf(auth), resourceIdSchema.parse(noteId)), {
     method: 'PUT',
-    body,
+    body: input,
     schema: knowledgeNoteResponseSchema,
   });
 }
 
 export async function deleteKnowledgeNote(auth: AuthProvider, noteId: string): Promise<void> {
-  await apiRequest(auth, paths.knowledgeNote(await orgIdOf(auth), noteId), { method: 'DELETE' });
+  await apiRequest(auth, paths.knowledgeNote(await orgIdOf(auth), resourceIdSchema.parse(noteId)), {
+    method: 'DELETE',
+  });
 }
 
 export async function createPlaybook(
   auth: AuthProvider,
   body: PlaybookCreateRequest,
 ): Promise<PlaybookResponse> {
-  playbookCreateRequestSchema.parse(body);
+  const input = playbookCreateRequestSchema.parse(body);
   return apiRequest<PlaybookResponse>(auth, paths.playbooks(await orgIdOf(auth)), {
     method: 'POST',
-    body,
+    body: input,
     schema: playbookResponseSchema,
   });
 }
@@ -649,31 +662,36 @@ export async function updatePlaybook(
   playbookId: string,
   body: PlaybookUpdateRequest,
 ): Promise<PlaybookResponse> {
-  return apiRequest<PlaybookResponse>(auth, paths.playbook(await orgIdOf(auth), playbookId), {
+  const input = playbookUpdateRequestSchema.parse(body);
+  return apiRequest<PlaybookResponse>(auth, paths.playbook(await orgIdOf(auth), resourceIdSchema.parse(playbookId)), {
     method: 'PUT',
-    body,
+    body: input,
     schema: playbookResponseSchema,
   });
 }
 
 export async function deletePlaybook(auth: AuthProvider, playbookId: string): Promise<void> {
-  await apiRequest(auth, paths.playbook(await orgIdOf(auth), playbookId), { method: 'DELETE' });
+  await apiRequest(auth, paths.playbook(await orgIdOf(auth), resourceIdSchema.parse(playbookId)), {
+    method: 'DELETE',
+  });
 }
 
 export async function createSecret(
   auth: AuthProvider,
   body: SecretCreateRequest,
 ): Promise<SecretResponse> {
-  secretCreateRequestSchema.parse(body);
+  const input = secretCreateRequestSchema.parse(body);
   return apiRequest<SecretResponse>(auth, paths.secrets(await orgIdOf(auth)), {
     method: 'POST',
-    body,
+    body: input,
     schema: secretResponseSchema,
   });
 }
 
 export async function deleteSecret(auth: AuthProvider, secretId: string): Promise<void> {
-  await apiRequest(auth, paths.secret(await orgIdOf(auth), secretId), { method: 'DELETE' });
+  await apiRequest(auth, paths.secret(await orgIdOf(auth), resourceIdSchema.parse(secretId)), {
+    method: 'DELETE',
+  });
 }
 
 // ---------------------------------------------------------------------------

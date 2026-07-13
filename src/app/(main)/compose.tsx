@@ -44,6 +44,7 @@ import { useTheme } from '@theme/index';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
 import { COMPOSE_DRAFT_KEY } from '@lib/localUserData';
 import { useAppPreferences } from '@store/preferences';
+import { userFacingError } from '@lib/user-facing-error';
 
 const MAX_PROMPT = 10000;
 const MAX_TITLE = 200;
@@ -195,7 +196,7 @@ export default function ComposeScreen() {
         },
       ]);
     } catch (e) {
-      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Unknown error');
+      Alert.alert('Upload failed', userFacingError(e, 'Could not upload this attachment.'));
     }
   }
 
@@ -229,7 +230,7 @@ export default function ComposeScreen() {
       setDraft(emptyDraft);
       router.replace(`/(main)/session/${session.session_id}`);
     } catch (e) {
-      Alert.alert('Could not create session', e instanceof Error ? e.message : 'Unknown error');
+      Alert.alert('Could not create session', userFacingError(e, 'Could not create this session.'));
     }
   }
 

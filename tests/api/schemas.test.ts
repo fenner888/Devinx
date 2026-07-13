@@ -21,6 +21,12 @@ import {
   sessionCreateRequestSchema,
   repositoryResponseSchema,
   knowledgeFolderTreeSchema,
+  knowledgeNoteCreateRequestSchema,
+  knowledgeNoteUpdateRequestSchema,
+  playbookCreateRequestSchema,
+  scheduleCreateRequestSchema,
+  scheduleUpdateRequestSchema,
+  secretCreateRequestSchema,
 } from '../../src/api/devin/schemas';
 
 const sessionFixture = {
@@ -360,5 +366,41 @@ describe('API schema boundary validation (§8.3)', () => {
 
   it('rejects a session create request without a prompt', () => {
     expect(() => sessionCreateRequestSchema.parse({ tags: ['x'] })).toThrow();
+  });
+
+  it('strictly validates resource writes and rejects empty updates', () => {
+    expect(() =>
+      knowledgeNoteCreateRequestSchema.parse({
+        name: 'Rules',
+        trigger: 'Always',
+        body: 'Use strict TypeScript.',
+        unexpected: true,
+      }),
+    ).toThrow();
+    expect(() => knowledgeNoteUpdateRequestSchema.parse({})).toThrow();
+    expect(() => playbookCreateRequestSchema.parse({ title: 'Bad', body: 'x', macro: 'bad' })).toThrow();
+    expect(() =>
+      secretCreateRequestSchema.parse({ type: 'key-value', key: 'TOKEN', value: '' }),
+    ).toThrow();
+  });
+
+  it('requires schedule timing fields and rejects unsupported write agents', () => {
+    expect(() =>
+      scheduleCreateRequestSchema.parse({
+        name: 'Recurring',
+        prompt: 'Check dependencies.',
+        schedule_type: 'recurring',
+      }),
+    ).toThrow();
+    expect(() =>
+      scheduleCreateRequestSchema.parse({
+        name: 'Advanced',
+        prompt: 'Check dependencies.',
+        schedule_type: 'recurring',
+        frequency: '0 9 * * *',
+        agent: 'advanced',
+      }),
+    ).toThrow();
+    expect(() => scheduleUpdateRequestSchema.parse({})).toThrow();
   });
 });

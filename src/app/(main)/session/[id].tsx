@@ -62,6 +62,8 @@ import {
 } from '@components/VoiceInput';
 import { getSessionMode, getSessionRepository } from '@lib/session-repository';
 import { activityForCloudSession } from '@/pets/devin/activity';
+import { ApiError } from '@api/devin/client';
+import { userFacingError } from '@lib/user-facing-error';
 
 type Tab = 'timeline' | 'worklog' | 'changes' | 'insights';
 
@@ -588,7 +590,7 @@ export default function SessionDetailScreen() {
                       onSuccess: () => setShowTagEditor(false),
                       onError: (e) => {
                         hapticError();
-                        setTagError(e instanceof Error ? e.message : 'Could not save tags.');
+                        setTagError(userFacingError(e, 'Could not save tags.'));
                       },
                     });
                   } else {
@@ -675,12 +677,12 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
   // treat that the same as "not generated yet".
   if (error || !insights || !insights.analysis) {
     // A 404 means "not generated yet"; anything else is a real error.
-    const isRealError = !!error && !/404|not found/i.test(error.message);
+    const isRealError = !!error && !(error instanceof ApiError && error.code === 'not_found');
     return (
       <View className="flex-1 items-center justify-center px-6">
         <Text className="text-text-mid text-text14 text-center mb-4">
           {isRealError
-            ? `Could not load insights: ${error.message}`
+            ? userFacingError(error, 'Could not load insights.')
             : 'No insights generated for this session yet.'}
         </Text>
         {isRealError ? (

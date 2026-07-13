@@ -1,6 +1,6 @@
 # Authorization matrix
 
-Reviewed against the active Phase 4A implementation on July 13, 2026. This matrix covers the user-controlled Connector HTTP boundary, public session-based Security Work, and the deferred Devin Code Scan enhancement. Devin Cloud authorization remains enforced server-side by the Devin API and the user's credential scopes.
+Reviewed against the active Phase 4A implementation on July 13, 2026. This matrix covers the user-controlled Connector HTTP boundary, public session-based Security Work, documented organization resources, and the deferred Devin Code Scan enhancement. Devin Cloud authorization remains enforced server-side by the Devin API and the user's credential scopes.
 
 | Method | Required device grant | Input validation | Resource binding | Unauthorized result | Rate limit class |
 |---|---|---|---|---|---|
@@ -20,6 +20,20 @@ Reviewed against the active Phase 4A implementation on July 13, 2026. This matri
 | `POST /v3/organizations/{org_id}/sessions` | `UseDevinSessions` plus the provider's supported create grant | fixed read-only work order; one validated returned repository; optional focus capped at 1,000 characters; complete request parsed by `sessionCreateRequestSchema` | organization and user attribution come only from the authenticated provider; repository comes from that provider's repository list | generic create failure; ambiguous network result uses the existing identity-bound reconciliation path | never blindly retries a potentially successful create |
 
 Verified scan-root and exact DevinX-tag filtering plus parent-child grouping control presentation only. Category alone and origin alone are intentionally insufficient. Opening a coordinator or worker still calls the normal authorized Session Detail APIs. A client cannot gain access to a session merely by constructing a URL or applying a security tag.
+
+## Documented organization-resource boundary
+
+| Resource operations | Required Devin permission | Input/response validation | Resource binding | Unauthorized presentation |
+|---|---|---|---|---|
+| Repositories and index status: read only | `Read` at organization level | bounded 100-item pages, repeated/missing cursor rejection, 1,000-item limit, identity deduplication, nested indexing Zod schema | organization comes only from `AuthProvider.orgPath()`; no index mutation exists in the screen | generic unavailable state; no repository metadata rendered |
+| Knowledge: list/folders/create/update/delete | Knowledge management grant for the organization | bounded 100-item pages, repeated/missing cursor rejection, 1,000-item limit, note/folder Zod schemas, required non-empty editor fields | organization comes only from the provider; note and folder IDs come only from parsed responses | generic unavailable/save failure; server response bodies are never rendered |
+| Playbooks: list/create/update/delete | `ManageOrgPlaybooks` or inherited equivalent | paginated response Zod schema; non-empty title/body; macro is null or `^![A-Za-z0-9_-]+$` | organization comes only from the provider; playbook IDs come only from parsed responses | generic unavailable/save failure; no resource-existence detail |
+| Schedules: list/create/update/delete | `ManageOrgSchedules` | response Zod schema; recurring cron shape or future ISO one-time timestamp; bounded names/prompts; fixed notification and agent write enums | organization comes only from the provider; schedule/playbook IDs come only from parsed responses | generic unavailable/action failure; no raw API detail |
+| Secrets: list/create/delete | `ManageOrgSecrets` | metadata response Zod schema; write-only create payload | organization comes only from the provider; secret values never return or enter client cache | generic unavailable/action failure; no secret value or server body |
+
+The current Devin documentation uses inconsistent names for the organization Knowledge and Playbook grants on individual pages versus the RBAC overview. DevinX does not infer a broader role from those labels: the authenticated Devin API remains authoritative and the UI fails closed on permission denial. Schedule documentation also mentions an `advanced` agent in prose while omitting it from the request enum; DevinX displays unknown read values but writes only the unambiguous `devin` and `data_analyst` values.
+
+All Cloud errors are converted through `userFacingError` before display. The API client may retain a bounded response detail in memory for programmatic diagnosis, but raw response bodies, schema paths, repository identifiers, prompts, and session content are never rendered as error copy or sent to diagnostics.
 
 ## Deferred Devin Code Scan enterprise boundary
 

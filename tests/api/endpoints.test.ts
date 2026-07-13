@@ -12,6 +12,10 @@ import {
   listRepositories,
   listKnowledge,
   listKnowledgeFolders,
+  createSchedule,
+  createPlaybook,
+  createKnowledgeNote,
+  deleteSecret,
   listConsumptionCycles,
   listDevinAcuLimits,
   getCodeScanMetrics,
@@ -312,6 +316,90 @@ describe('endpoints — path building & response shaping', () => {
       folders: [{ folder_id: 'folder-1', note_count: 2 }],
     });
     expect(new URL(lastUrl()).pathname).toBe('/v3/organizations/org-abc/knowledge/folders');
+  });
+
+  it('createKnowledgeNote keeps folder selection organization-scoped', async () => {
+    mockFetch.mockResolvedValue(
+      ok({
+        note_id: 'note-1',
+        name: 'Release rules',
+        body: 'Run every gate.',
+        trigger: 'Before release',
+        folder_id: 'folder-1',
+      }),
+    );
+
+    await createKnowledgeNote(mockAuth, {
+      name: 'Release rules',
+      body: 'Run every gate.',
+      trigger: 'Before release',
+      folder_id: 'folder-1',
+    });
+
+    expect(lastBody()).toEqual(expect.objectContaining({ folder_id: 'folder-1' }));
+    expect(new URL(lastUrl()).pathname).toBe('/v3/organizations/org-abc/knowledge/notes');
+  });
+
+  it('createPlaybook forwards the validated command macro', async () => {
+    mockFetch.mockResolvedValue(
+      ok({
+        playbook_id: 'playbook-1',
+        title: 'Release',
+        body: 'Run every gate.',
+        macro: '!release-check',
+      }),
+    );
+
+    await createPlaybook(mockAuth, {
+      title: 'Release',
+      body: 'Run every gate.',
+      macro: '!release-check',
+    });
+
+    expect(lastBody()).toEqual(expect.objectContaining({ macro: '!release-check' }));
+  });
+
+  it('createSchedule preserves one-time, notification, playbook, and tag options', async () => {
+    mockFetch.mockResolvedValue(
+      ok({
+        scheduled_session_id: 'sched-1',
+        name: 'One-time review',
+        prompt: 'Review the release.',
+        enabled: true,
+        schedule_type: 'one_time',
+        frequency: null,
+        scheduled_at: '2026-07-14T13:00:00Z',
+        notify_on: 'failure',
+        tags: ['release'],
+      }),
+    );
+
+    await createSchedule(mockAuth, {
+      name: 'One-time review',
+      prompt: 'Review the release.',
+      schedule_type: 'one_time',
+      frequency: null,
+      scheduled_at: '2026-07-14T13:00:00Z',
+      notify_on: 'failure',
+      playbook_id: 'playbook-1',
+      tags: ['release'],
+      agent: 'devin',
+    });
+
+    expect(lastBody()).toEqual(
+      expect.objectContaining({
+        schedule_type: 'one_time',
+        frequency: null,
+        notify_on: 'failure',
+        playbook_id: 'playbook-1',
+        tags: ['release'],
+      }),
+    );
+  });
+
+  it('rejects a path-like resource ID before making a request', async () => {
+    await expect(deleteSecret(mockAuth, '../other-org-secret')).rejects.toThrow();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('listRepositories rejects repeated continuation cursors instead of returning a partial list', async () => {

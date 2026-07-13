@@ -3,7 +3,7 @@
  * lists, headings, links) with theme-token styling, instead of plain text.
  */
 import { Text, Linking, Platform } from 'react-native';
-import Markdown from 'react-native-markdown-display';
+import Markdown, { MarkdownIt } from 'react-native-markdown-display';
 import { useTheme } from '@theme/index';
 import {
   InlineImage,
@@ -15,6 +15,15 @@ import {
 } from '@components/InlineMedia';
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
+const MAX_MARKDOWN_CHARACTERS = 48_000;
+const MARKDOWN_PARSER = MarkdownIt({ typographer: false });
+const TRUNCATION_NOTICE = '\n\n_Response shortened on this screen for safety._';
+
+export function safeMarkdownSource(source: string): string {
+  return source.length <= MAX_MARKDOWN_CHARACTERS
+    ? source
+    : `${source.slice(0, MAX_MARKDOWN_CHARACTERS)}${TRUNCATION_NOTICE}`;
+}
 
 type MdNode = {
   key: string;
@@ -147,6 +156,7 @@ export function DevinMarkdown({ children }: { children: string }) {
 
   return (
     <Markdown
+      markdownit={MARKDOWN_PARSER}
       style={styles}
       rules={MEDIA_RULES}
       onLinkPress={(url) => {
@@ -154,7 +164,7 @@ export function DevinMarkdown({ children }: { children: string }) {
         return false;
       }}
     >
-      {children}
+      {safeMarkdownSource(children)}
     </Markdown>
   );
 }

@@ -687,32 +687,77 @@ export const remediateFindingResponseSchema = z
 
 export const knowledgeNoteCreateRequestSchema = z
   .object({
-    name: z.string().min(1),
-    body: z.string().min(1),
-    trigger: z.string().min(1),
-    folder_id: z.string().nullable().optional(),
+    name: z.string().trim().min(1).max(200),
+    body: z.string().trim().min(1).max(100_000),
+    trigger: z.string().trim().min(1).max(5_000),
+    folder_id: z.string().min(1).max(256).nullable().optional(),
     is_enabled: z.boolean().optional(),
-    pinned_repo: z.string().nullable().optional(),
+    pinned_repo: z.string().min(1).max(1_024).nullable().optional(),
   })
-  .passthrough();
+  .strict();
+
+export const knowledgeNoteUpdateRequestSchema = knowledgeNoteCreateRequestSchema
+  .partial()
+  .refine((body) => Object.keys(body).length > 0, { message: 'update is empty' });
 
 export const playbookCreateRequestSchema = z
   .object({
-    title: z.string().min(1),
-    body: z.string().min(1),
-    macro: z.string().nullable().optional(),
+    title: z.string().trim().min(1).max(200),
+    body: z.string().trim().min(1).max(100_000),
+    macro: z.string().regex(/^![A-Za-z0-9_-]+$/).max(100).nullable().optional(),
   })
-  .passthrough();
+  .strict();
+
+export const playbookUpdateRequestSchema = playbookCreateRequestSchema
+  .partial()
+  .refine((body) => Object.keys(body).length > 0, { message: 'update is empty' });
 
 export const secretCreateRequestSchema = z
   .object({
     type: secretTypeSchema,
-    key: z.string().min(1).max(256),
-    value: z.string().min(1),
-    note: z.string().nullable().optional(),
+    key: z.string().trim().min(1).max(256),
+    value: z.string().min(1).max(100_000),
+    note: z.string().max(2_000).nullable().optional(),
     is_sensitive: z.boolean().optional(),
   })
-  .passthrough();
+  .strict();
+
+export const resourceIdSchema = z.string().min(1).max(256).regex(/^[A-Za-z0-9._:-]+$/);
+
+const scheduleWriteFieldsSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    prompt: z.string().trim().min(1).max(10_000).optional(),
+    enabled: z.boolean().optional(),
+    schedule_type: z.enum(['recurring', 'one_time']).optional(),
+    frequency: z.string().trim().min(1).max(256).nullable().optional(),
+    scheduled_at: z.string().datetime({ offset: true }).nullable().optional(),
+    tags: z.array(z.string().trim().min(1).max(100)).max(50).nullable().optional(),
+    playbook_id: resourceIdSchema.nullable().optional(),
+    notify_on: z.enum(['always', 'failure', 'never']).optional(),
+    agent: z.enum(['devin', 'data_analyst']).nullable().optional(),
+  })
+  .strict();
+
+export const scheduleCreateRequestSchema = scheduleWriteFieldsSchema
+  .extend({
+    name: z.string().trim().min(1).max(100),
+    prompt: z.string().trim().min(1).max(10_000),
+  })
+  .superRefine((body, context) => {
+    const type = body.schedule_type ?? 'recurring';
+    if (type === 'recurring' && !body.frequency) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'frequency is required' });
+    }
+    if (type === 'one_time' && !body.scheduled_at) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'scheduled_at is required' });
+    }
+  });
+
+export const scheduleUpdateRequestSchema = scheduleWriteFieldsSchema.refine(
+  (body) => Object.keys(body).length > 0,
+  { message: 'update is empty' },
+);
 
 // ---------------------------------------------------------------------------
 // Org metrics (Analytics)
