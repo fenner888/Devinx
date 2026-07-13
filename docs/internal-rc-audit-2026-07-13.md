@@ -11,24 +11,26 @@ in `docs/authorization-matrix.md`.
   MCP integration catalog and indexed-repository Wiki, binds Wiki deep links to repositories
   returned by the authenticated Cloud connection, removes the unsupported repository-indexing
   mutation and private billing handoff, and aligns privacy/listing evidence. It is the functional
-  baseline for consolidated internal Build 55.
+  baseline for consolidated internal Build 55. Commit `3162a33` then corrects the final model
+  contract: Cloud exposes and submits only the documented `normal`/`fast` modes, while Computer
+  sends the exact live ACP model (including Adaptive) and requires configuration confirmation
+  before dispatching the initial prompt. Build 56 supersedes Build 55 for physical testing.
 - Physical Build 50 testing exposed a keyboard-layout regression: the absolute composer was a
   sibling of the flex child resized by `KeyboardAvoidingView`, so the keyboard could cover the
   composer while the timeline scrolled into its reserved tail clearance.
 - Cloud and Computer session layouts now keep the floating composer inside the keyboard-resized
   viewport. Ancestor-chain regression tests prove both composer shells remain inside that viewport.
-- iOS `0.1.0 (55)` was archived from clean release-source commit `4825409` with Node `24.18.0`
+- iOS `0.1.0 (56)` was archived from clean release-source commit `3162a33` with Node `24.18.0`
   and Xcode `26.6` selected explicitly.
-- IPA SHA-256: `f41f3c931aaeb32e21f472d7040ca26abe3c9f4599fd6b13f8d7f422c152bfde`.
+- IPA SHA-256: `fdb46ebadb07715756d7136af34aca13615fdef3da5ebfbd9269f0fea5fdb8d6`.
 - Strict code-sign verification passed with `get-task-allow=false`, no APS entitlement,
   `NSFileProtectionComplete`, exempt encryption set to false, the exact on-device microphone
   disclosure, production update channel, and runtime `0.1.0`.
 - All 10 packaged privacy manifests declare zero collected-data types, no tracking, and no
   tracking domains. No Sentry or notification artifact is packaged.
-- EAS submission `be1a1dc4-c74b-47f4-b0f7-14e857842e23` finished successfully and uploaded Build
-  55 to Apple on July 13, 2026 at 1:12 PM EDT for internal TestFlight. App Store Connect shows
-  `0.1.0 (55)` as `Testing` in the one-tester **Team (Expo)** internal group. No App Review or public
-  release was submitted.
+- EAS submission `f0de572c-7599-40de-9ef9-d13ee6f0d4da` finished successfully and uploaded Build
+  56 to Apple on July 13, 2026 for internal TestFlight. Apple processing remains external at this
+  checkpoint. No App Review or public release was submitted.
 
 ## Product surface verification
 
@@ -150,9 +152,9 @@ misrepresented as fixed.
   fill. Their shells and companion tracks remain transparent, and timeline clearance keeps the
   final message line above both pointer-free overlays.
 
-## Physical checkpoint for Build 55
+## Physical checkpoint for Build 56
 
-Use exact internal TestFlight Build 55 with sanitized sessions. Confirm:
+Use exact internal TestFlight Build 56 with sanitized sessions. Confirm:
 
 1. Home plus Cloud and Computer session creation, all destination-specific pickers, attachments,
    archive/terminate, device removal/revocation, and all three connection modes after cold launch.
@@ -161,8 +163,9 @@ Use exact internal TestFlight Build 55 with sanitized sessions. Confirm:
 3. Light/dark launch, long-history scrolling behind the transparent companion, no clipped content,
    conversation content visibly behind the floating translucent Cloud and Computer composers,
    complete final-line clearance above both overlays, keyboard clearance, scanner sizing, and no
-   raw Mac path or ACP identifier. Build 55 contains the floating-composer correction,
-   keyboard-viewport fix `791a338`, and supported capability-boundary work from `4825409`.
+   raw Mac path or ACP identifier. Build 56 contains the floating-composer correction,
+   keyboard-viewport fix `791a338`, supported capability-boundary work from `4825409`, and final
+   model-contract enforcement from `3162a33`.
 4. Cold-launch, 200-row scrolling, one-hour foreground battery, and seven-day TestFlight stability
    using `docs/physical-performance-checklist.md`.
 
