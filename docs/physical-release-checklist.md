@@ -1,7 +1,7 @@
 # Final internal TestFlight physical checklist
 
-Use internal TestFlight Build 49 (`0.1.0 (49)`) and only sanitized sessions, repositories, and
-prompts.
+Use the exact next internal TestFlight candidate containing composer correction `d90fbb7` and only
+sanitized sessions, repositories, and prompts. Build 49 predates the final floating-composer fix.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.
 
@@ -57,8 +57,9 @@ customer content.
 ## Composer and companion
 
 - With short and long Cloud and Computer histories, scroll content behind Devin. Confirm the pet
-  stays immediately above the composer as a transparent pointer-free overlay and never creates a
-  black bar, blank dock, clipped text, or intercepted tap/scroll.
+  stays immediately above the composer as a transparent pointer-free overlay. Confirm conversation
+  content is visibly present behind the translucent floating composer and its final line can scroll
+  completely above both overlays without a black bar, blank dock, clipping, or intercepted tap/scroll.
 - Send a new Cloud session and a new Computer session. Confirm Devin transitions promptly into the
   active walking/working animation, travels without gliding, then stops smoothly at the terminal
   state.

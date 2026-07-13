@@ -130,7 +130,10 @@ Use the exact next TestFlight candidate and sanitized sessions. Confirm:
 2. Dictation in Home, Cloud, and Computer composers: mixed typing, Stop, Cancel, Organize prompt,
    permission denial/recovery, interruption, AirPods, VoiceOver, Dynamic Type, and Reduce Motion.
 3. Light/dark launch, long-history scrolling behind the transparent companion, no clipped content,
-   keyboard clearance, scanner sizing, and no raw Mac path or ACP identifier.
+   conversation content visibly behind the floating translucent Cloud and Computer composers,
+   complete final-line clearance above both overlays, keyboard clearance, scanner sizing, and no
+   raw Mac path or ACP identifier. This checkpoint must use a candidate containing `d90fbb7`;
+   Build 49 predates that correction.
 4. Cold-launch, 200-row scrolling, one-hour foreground battery, and seven-day TestFlight stability
    using `docs/physical-performance-checklist.md`.
 

@@ -84,6 +84,7 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (49)` was built locally from clean commit `d615f7d` with Security Work restricted to genuine top-level `code_scan` sessions, the unsupported ordinary-session review creator removed, translucent Cloud and Computer composer surfaces, and the duplicate passive sleeping helper removed; the archive used the exact pinned Node `24.18.0` runtime
 - [x] Build 49 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, microphone disclosure, and all privacy artifacts passed (`com.fenner888.devinx`, `0.1.0 (49)`, `NSFileProtectionComplete`); `get-task-allow=false`, no APS entitlement is present, and all 10 privacy manifests declare zero collected-data types, no tracking, and no tracking domains; SHA-256 `018d946db1ec5415c0770f80e128f24d4c29575f167870ba396cddf9b7c5adf2`
 - [x] Build 49 App Store Connect submission `a7a4b438-860a-4048-88b2-ad7dc15dd2c8` was accepted by Apple and is processing as the superseding internal TestFlight release candidate; no App Review or public release action was taken
+- [x] Post-Build-49 composer correction `d90fbb7` converts both Cloud and Computer session composers into measured floating overlays, keeps conversation content visibly behind the more translucent semantic surface, and preserves enough transparent tail clearance for the final response to scroll above Devin and the composer; automated CI passes, but this correction is not present in Build 49 and must be included in the next consolidated internal candidate
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -109,13 +110,13 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | exact direct dependency pins and lockfile dry-run passed on bundled Node 24; the repository and release CI remain pinned to Node 24.18.0 |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 68 suites / 502 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, Security Work, and active companion-travel coverage |
-| Production iOS export | Build 47 passed local signed export; 19.7 MB IPA. The next candidate must be inspected independently before upload |
+| Jest | passed 68 suites / 502 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, Security Work, active companion travel, and floating-composer clearance coverage |
+| Production iOS export | Build 49 passed local signed export; 19.7 MB IPA. The next candidate containing `d90fbb7` must be inspected independently before upload |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 47 has 10 manifests declaring no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 49 has 10 manifests declaring no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -125,6 +126,9 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
+Use the next consolidated internal candidate containing `d90fbb7`; Build 49 does not contain the
+final floating-composer correction.
+
 - [x] In Build 35, switching Home from Cloud to Computer changed Recent from Cloud sessions to sessions from the selected Mac, switching back restored Cloud recents, and View all retained the combined cross-origin Sessions screen
 - [x] In Build 35, the destination and workspace sheets remained compact, bounded, explicitly dismissible, and free of raw paths or excessive empty space
 - [x] In Build 35, Cloud repositories remained distinct from Computer workspaces and the complete bounded repository picker behaved correctly
@@ -132,7 +136,7 @@ The results below must be refreshed after release-document changes and before a 
 - [x] In Build 35, Home and session composers retained the approved compact/elevated multiline layouts and keyboard clearance
 - [x] In Build 35, Cloud and Computer exposed their distinct pickers and the Computer model menu exposed the live Recommended, Recent, searchable All Models catalog
 - [x] In Build 35, local session creation and exact model/variant selection behaved correctly
-- [ ] In Build 36, confirm Devin remains in the transparent track immediately above both Cloud and Computer session composers with short and long histories, while the keyboard is open, and during start/walk/stop transitions
+- [ ] Confirm Devin remains in the transparent track immediately above both Cloud and Computer session composers with short and long histories, while the keyboard is open, and during start/walk/stop transitions
 - [x] After the phone-created turn finishes, open that session in Devin Desktop; then send a later phone turn and confirm ownership can alternate without a permanent unavailable state
 - [x] Enable `Create new sessions` for the iPhone in Connector and create a harmless Computer session with an approved workspace and selected model
 - [x] Confirm the selected model appears on the new local session and the initial prompt receives a reply
@@ -149,13 +153,13 @@ The results below must be refreshed after release-document changes and before a 
 - [ ] Exercise Cloud-only, Computer-only, and Cloud + Computer after cold launch
 - [ ] Check light/dark appearance, reduced motion, VoiceOver labels, Dynamic Type, and camera/scanner layout on the physical phone
 - [ ] Re-open the QR pairing scanner in both themes and confirm the camera is immediately visible without scrolling, neither full-screen nor narrow, Cancel remains reachable, and backgrounding stops capture
-- [ ] In Build 43, test dictation from both Home and an existing Cloud or Computer session: start, mixed typing and speech, stop, cancel, `Organize prompt`, send, permission denial/recovery, interruption, AirPods routing, VoiceOver, and Reduce Motion
-- [ ] In Build 43, confirm recording has one visible stop control, the mic remains beside Send, partial/final transcript text is preserved, and no passive companion status bubble appears after completion
-- [ ] In Build 43, confirm the companion sits immediately above the composer and visibly reflects waiting, thinking/working, success, blocked, and error states without covering history or controls
-- [ ] In Build 45, cold-launch once in light mode and once in dark mode; confirm the transparent DevinX wordmark has no rectangular background or color flash before Home appears
-- [ ] In Build 45, confirm Security is absent from both primary navigation and Settings and that no Devin web login or external handoff is offered
+- [ ] Test dictation from both Home and an existing Cloud or Computer session: start, mixed typing and speech, stop, cancel, `Organize prompt`, send, permission denial/recovery, interruption, AirPods routing, VoiceOver, and Reduce Motion
+- [ ] Confirm recording has one visible stop control, the mic remains beside Send, partial/final transcript text is preserved, and no passive companion status bubble appears after completion
+- [ ] Confirm the companion sits immediately above the composer and visibly reflects waiting, thinking/working, success, blocked, and error states without covering history or controls
+- [ ] Cold-launch once in light mode and once in dark mode; confirm the transparent DevinX wordmark has no rectangular background or color flash before Home appears
+- [ ] Confirm no Devin web login or external Security handoff is offered
 - [ ] In the next candidate, confirm **Security Work** is native and never opens Devin web; verify only top-level sessions with canonical origin `code_scan` appear, open a coordinator and returned child agents, and confirm ordinary API/tagged reviews remain absent with no unsupported scan-create control
-- [ ] In Build 46, scroll long Cloud and Computer responses behind Devin and confirm the pet remains directly above the composer without a black bar, reserved blank row, clipped text, or intercepted scrolling/taps
+- [ ] Scroll long Cloud and Computer responses behind Devin and the floating composer; confirm the history is visibly present behind the translucent surface and every final response line can scroll above both overlays without a black bar, reserved blank row, clipping, or intercepted scrolling/taps
 
 ## External release gates
 
