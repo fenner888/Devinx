@@ -58,7 +58,7 @@ export function activityForCloudSession(
   isSending: boolean,
 ): DevinSessionActivity {
   if (isSending) {
-    return { state: 'thinking', message: 'Reading your message', travel: true };
+    return { state: 'thinking', message: 'Devin working', travel: true };
   }
 
   const state = devinStateForStatusKey(statusKey);
@@ -77,9 +77,9 @@ export function activityForCloudSession(
   const workingState = reason ? stateForWorkingReason(reason) : 'working';
   return {
     state: workingState,
-    message: reason ?? 'Working on your task',
+    message: 'Devin working',
     // Every canonical active-work state walks. The semantic pose still drives
-    // the message/accessibility state, while the travel track supplies the
+    // the animation/accessibility state, while the travel track supplies the
     // directional walking frames until Devin reaches a passive/terminal state.
     travel: true,
   };
@@ -90,7 +90,7 @@ export function activityForComputerSession(
   steeringActive: boolean,
 ): DevinSessionActivity {
   if (activity?.active) {
-    const message = cleanActivityText(activity.label) ?? 'Working through Devin on your Mac';
+    const message = 'Devin working';
     if (activity.kind === 'editing') {
       return { state: 'working', message, travel: true };
     }
@@ -104,7 +104,7 @@ export function activityForComputerSession(
     return { state: 'thinking', message, travel: true };
   }
   if (steeringActive) {
-    return { state: 'thinking', message: 'Working through Devin on your Mac', travel: true };
+    return { state: 'thinking', message: 'Devin working', travel: true };
   }
   return { state: 'waiting', travel: false };
 }

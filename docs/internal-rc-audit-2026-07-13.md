@@ -23,6 +23,13 @@ in `docs/authorization-matrix.md`.
 - EAS submission `f9208553-222d-4dc1-b3ca-8e726df1d376` successfully uploaded this exact IPA to App
   Store Connect for internal TestFlight. Apple is processing the upload. No App Review or public
   release action was taken.
+- Physical review rejected the accumulated session activity trail because it duplicated the
+  companion, could preserve a stale phase, and consumed conversation space. Build 61 is superseded
+  for final UI acceptance by the owner-approved single active **Devin working** companion caption;
+  Cloud and Computer timelines render no activity trail.
+- The corrected source passes lint, strict TypeScript, and 74 Jest suites / 544 tests. The removed
+  component suite covered only the rejected activity-trail UI; active Cloud and Computer companion
+  state, travel, caption, and passive-caption suppression remain covered.
 
 ## Build 60 local-model family marks
 

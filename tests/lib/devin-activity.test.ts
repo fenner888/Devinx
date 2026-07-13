@@ -36,13 +36,13 @@ describe('Devin live activity', () => {
         'working',
         false,
       ),
-    ).toEqual({ state: 'working', message: 'Editing src/session.ts', travel: true });
+    ).toEqual({ state: 'working', message: 'Devin working', travel: true });
   });
 
   it('shows optimistic message reading before cloud status polling catches up', () => {
     expect(activityForCloudSession(session(), 'working', true)).toEqual({
       state: 'thinking',
-      message: 'Reading your message',
+      message: 'Devin working',
       travel: true,
     });
   });
@@ -53,7 +53,7 @@ describe('Devin live activity', () => {
         { active: true, kind: 'executing', label: 'Running npm test', updatedAt: 3 },
         true,
       ),
-    ).toEqual({ state: 'focused', message: 'Running npm test', travel: true });
+    ).toEqual({ state: 'focused', message: 'Devin working', travel: true });
   });
 
   it('shows connector activity even when the phone did not initiate the prompt', () => {
@@ -62,7 +62,7 @@ describe('Devin live activity', () => {
         { active: true, kind: 'editing', label: 'Editing app.tsx', updatedAt: 4 },
         false,
       ),
-    ).toEqual({ state: 'working', message: 'Editing app.tsx', travel: true });
+    ).toEqual({ state: 'working', message: 'Devin working', travel: true });
   });
 
   it('does not show a passive message bubble while an inactive computer session waits', () => {

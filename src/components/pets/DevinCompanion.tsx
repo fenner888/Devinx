@@ -32,7 +32,7 @@ function fallbackCaptionForState(state: DevinCompanionProps['state']): string | 
       return 'Thinking through the task';
     case 'working':
     case 'focused':
-      return 'Working on your task';
+      return 'Devin working';
     case 'success':
     case 'celebrating':
       return 'Task complete';

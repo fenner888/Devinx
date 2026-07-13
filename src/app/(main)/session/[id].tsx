@@ -55,7 +55,6 @@ import { useTheme } from '@theme/index';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
 import { DevinCompanion } from '@components/pets';
-import { LiveActivityTrail } from '@components/sessions/LiveActivityTrail';
 import { KeyboardDismissButton } from '@components/KeyboardDismissButton';
 import {
   VoiceComposerStatus,
@@ -391,8 +390,6 @@ export default function SessionDetailScreen() {
               pendingText={pendingText}
               isSending={sendMessage.isPending}
               isWorking={isWorking}
-              activityLabel={companionActivity.message}
-              activityResetKey={validId}
               bottomClearance={composerOverlayHeight + (keyboardVisible ? 88 : 120)}
             />
           )}
@@ -845,8 +842,6 @@ function TimelineTab({
   pendingText,
   isSending,
   isWorking,
-  activityLabel,
-  activityResetKey,
   bottomClearance,
 }: {
   messages: SessionMessage[];
@@ -854,8 +849,6 @@ function TimelineTab({
   pendingText: string | null;
   isSending: boolean;
   isWorking: boolean;
-  activityLabel?: string;
-  activityResetKey: string;
   bottomClearance: number;
 }) {
   const listRef = useRef<ScrollView>(null);
@@ -920,11 +913,6 @@ function TimelineTab({
           </Text>
         </View>
       )}
-      <LiveActivityTrail
-        active={isWorking}
-        label={activityLabel}
-        resetKey={activityResetKey}
-      />
     </ScrollView>
   );
 }

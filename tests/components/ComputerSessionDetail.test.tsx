@@ -180,10 +180,14 @@ describe('Computer session detail', () => {
       expect.any(Object),
     );
     expect(screen.getByText('Continue the task.')).toBeTruthy();
-    expect(screen.getByText('Working through Devin on your Mac')).toBeTruthy();
-    expect(screen.getByTestId('session-live-activity')).toBeTruthy();
+    expect(screen.queryByTestId('session-live-activity')).toBeNull();
     expect(mockCompanionProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({ state: 'thinking', travel: true, travelTrack: true }),
+      expect.objectContaining({
+        message: 'Devin working',
+        state: 'thinking',
+        travel: true,
+        travelTrack: true,
+      }),
     );
   });
 

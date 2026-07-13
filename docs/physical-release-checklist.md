@@ -1,7 +1,8 @@
 # Final internal TestFlight physical checklist
 
-Use internal TestFlight Build 61. It supersedes Build 60 for final acceptance and contains composer
-correction `d90fbb7`, keyboard-viewport fix
+Build 61 exposed a rejected accumulated activity trail and is superseded for final acceptance. Use
+the next internal TestFlight build containing the single active **Devin working** companion caption
+and no timeline activity block. It must preserve composer correction `d90fbb7`, keyboard-viewport fix
 `791a338`, the supported Settings/MCP/Wiki capability boundary recorded in release-source commit
 `4825409`, final Cloud/Computer model-contract enforcement `3162a33`, truthful session activity
 `0907d2b`, the owner-supplied Home companion artwork correction `e21c8c9`, and explicit session

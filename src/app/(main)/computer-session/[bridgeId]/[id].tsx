@@ -31,7 +31,6 @@ import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
 import { ComputerModelPickerSheets } from '@components/sessions/ComputerModelPickerSheets';
 import { ModelFamilyMark } from '@components/sessions/ModelFamilyMark';
-import { LiveActivityTrail } from '@components/sessions/LiveActivityTrail';
 import { KeyboardDismissButton } from '@components/KeyboardDismissButton';
 import {
   VoiceComposerStatus,
@@ -471,11 +470,6 @@ export default function ComputerSessionDetailScreen() {
                 <Text className="mt-1 text-text-low text-text11">Sending…</Text>
               </View>
             )}
-            <LiveActivityTrail
-              active={steeringActive}
-              label={companionActivity.message}
-              resetKey={`${bridgeId}:${sessionId}`}
-            />
           </ScrollView>
         )}
           {query.data && (
