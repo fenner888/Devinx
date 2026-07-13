@@ -27,8 +27,6 @@ let mockComputerCreateOptions:
   | undefined = { workspaces: [], models: [] };
 let mockComputerCreateOptionsError: Error | null = null;
 let mockComputerCreateOptionsLoading = false;
-let mockCloudCreationPending = false;
-let mockComputerCreationPending = false;
 let mockCloudSessions: Array<Record<string, unknown>> = [];
 let mockRepositoriesError: Error | null = null;
 let mockComputerBoard: {
@@ -58,10 +56,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 jest.mock('@api/devin/queries', () => ({
   useSessions: jest.fn(() => ({ data: mockCloudSessions })),
-  useCreateSession: jest.fn(() => ({
-    isPending: mockCloudCreationPending,
-    mutate: mockCreateSession,
-  })),
+  useCreateSession: jest.fn(() => ({ isPending: false, mutate: mockCreateSession })),
   usePlaybooks: jest.fn(() => ({ data: [] })),
   useRepositories: jest.fn(() => ({
     data: [
@@ -92,7 +87,7 @@ jest.mock('@api/bridge/queries', () => ({
     error: mockComputerCreateOptionsError,
   }),
   useCreateComputerSession: () => ({
-    isPending: mockComputerCreationPending,
+    isPending: false,
     mutate: mockCreateComputerSession,
   }),
 }));
@@ -143,8 +138,6 @@ describe('home attachment control', () => {
     mockComputerCreateOptions = { workspaces: [], models: [] };
     mockComputerCreateOptionsError = null;
     mockComputerCreateOptionsLoading = false;
-    mockCloudCreationPending = false;
-    mockComputerCreationPending = false;
     mockCloudSessions = [];
     mockRepositoriesError = null;
     mockComputerBoard = { sessions: [], computers: [] };
@@ -167,54 +160,6 @@ describe('home attachment control', () => {
       { size?: number; state?: string } | undefined;
     expect(props?.state).toBe('idle');
     expect(props?.size).toBeGreaterThanOrEqual(164);
-  });
-
-  it('walks on Home while a Cloud session is being created', () => {
-    mockCloudCreationPending = true;
-
-    render(
-      <ThemeProvider>
-        <HomeScreen />
-      </ThemeProvider>,
-    );
-
-    expect(mockDevinCompanion).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        state: 'working',
-        travel: true,
-        travelOrigin: 'center',
-        travelTrack: true,
-      }),
-    );
-  });
-
-  it('walks on Home while a Computer session is being created', () => {
-    mockConnection = {
-      mode: 'computer',
-      hasCloudConnection: false,
-      usesCloud: false,
-      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
-    };
-    mockComputerCreateOptions = {
-      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
-      models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
-    };
-    mockComputerCreationPending = true;
-
-    render(
-      <ThemeProvider>
-        <HomeScreen />
-      </ThemeProvider>,
-    );
-
-    expect(mockDevinCompanion).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        state: 'working',
-        travel: true,
-        travelOrigin: 'center',
-        travelTrack: true,
-      }),
-    );
   });
 
   it('shows paired-Mac sessions without presenting the Cloud composer as active', () => {

@@ -540,9 +540,6 @@ export default function HomeScreen() {
               state={companionState}
               size={companionSize}
               active={companionActive}
-              travel={composerPending}
-              travelTrack
-              travelOrigin="center"
               accessibilityLabel={`Devin companion, ${companionState}`}
             />
           </View>

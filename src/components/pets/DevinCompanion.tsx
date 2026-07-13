@@ -34,7 +34,6 @@ export function DevinCompanion({
   active = true,
   travel = false,
   travelTrack = false,
-  travelOrigin = 'right',
   accessibilityLabel,
 }: DevinCompanionProps) {
   // Start still until the platform preference resolves so Reduce Motion never
@@ -145,12 +144,9 @@ export function DevinCompanion({
 
       if (!trackPositionInitializedRef.current) {
         trackPositionInitializedRef.current = true;
-        const initialPosition = travelOrigin === 'center' ? distance / 2 : distance;
-        const initialDirection = travelOrigin === 'center' ? 'right' : 'left';
-        const initialDestination = initialDirection === 'right' ? distance : 0;
-        travelX.setValue(initialPosition);
-        face(initialDirection);
-        if (isTraveling) crossTrack(initialDestination, initialPosition);
+        travelX.setValue(distance);
+        face('left');
+        if (isTraveling) crossTrack(0, distance);
         return;
       }
 
@@ -178,7 +174,7 @@ export function DevinCompanion({
       if (turnTimeout) clearTimeout(turnTimeout);
       travelX.stopAnimation();
     };
-  }, [displaySize, isTraveling, trackWidth, travelOrigin, travelX]);
+  }, [displaySize, isTraveling, trackWidth, travelX]);
 
   function handleTrackLayout(event: LayoutChangeEvent) {
     setTrackWidth(event.nativeEvent.layout.width);

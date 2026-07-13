@@ -32,6 +32,5 @@ export type DevinCompanionProps = {
   active?: boolean;
   travel?: boolean;
   travelTrack?: boolean;
-  travelOrigin?: 'center' | 'right';
   accessibilityLabel?: string;
 };

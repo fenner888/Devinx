@@ -195,32 +195,6 @@ describe('DevinCompanion', () => {
     );
   });
 
-  it('starts a Home travel track from its centered resting position', async () => {
-    const timingSpy = jest.spyOn(Animated, 'timing');
-    const { getByTestId, rerender } = render(
-      <DevinCompanion state="idle" size={72} travelTrack travelOrigin="center" />,
-    );
-    await resolveMotionPreference();
-
-    fireEvent(getByTestId('devin-companion-track'), 'layout', {
-      nativeEvent: { layout: { height: 72, width: 320, x: 0, y: 0 } },
-    });
-    rerender(
-      <DevinCompanion
-        state="working"
-        size={72}
-        travel
-        travelTrack
-        travelOrigin="center"
-      />,
-    );
-
-    expect(timingSpy).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ toValue: 248, useNativeDriver: true }),
-    );
-  });
-
   it('suppresses the message in compact mode', async () => {
     const { queryByText } = render(
       <DevinCompanion state="waiting" compact message="Waiting for response" />,
