@@ -32,7 +32,6 @@ import {
   useSessions,
   useCreateSession,
   usePlaybooks,
-  useCodeScanFindings,
   useUploadAttachment,
   useRepositories,
 } from '@api/devin/queries';
@@ -131,8 +130,6 @@ export default function HomeScreen() {
     error: repositoriesError,
     refetch: refetchRepositories,
   } = useRepositories();
-  const { data: scanFindings } = useCodeScanFindings();
-
   const [prompt, setPrompt] = useState('');
   const [selectedPlaybook, setSelectedPlaybook] = useState<string | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
@@ -505,7 +502,6 @@ export default function HomeScreen() {
       <NavMenu
         visible={showMenu}
         onClose={() => setShowMenu(false)}
-        showSecurity={!!scanFindings}
       />
 
       <OfflineBanner />

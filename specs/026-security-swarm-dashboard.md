@@ -26,6 +26,12 @@ The Security screen contains:
 4. A **Findings** section with severity filters, expandable evidence/recommendation content, and remediation actions.
 5. Permission, empty, loading, partial-error, refresh, and mutation feedback states.
 
+Security is always discoverable from the primary navigation and Settings. Enterprise
+code-scan permission controls the data and actions shown after navigation; it must not
+control whether the destination itself exists. Accounts without that permission reach
+the native explanation and access-required state instead of having Security silently
+removed from the product.
+
 The screen uses existing theme tokens and normal application surfaces. It does not use raw colors, browser-shaped tables, or a collection of oversized floating cards.
 
 ## Security gates

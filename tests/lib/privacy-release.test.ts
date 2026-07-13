@@ -4,6 +4,33 @@ import { resolve } from 'node:path';
 const repositoryRoot = resolve(__dirname, '..', '..');
 
 describe('release privacy configuration', () => {
+  it('uses transparent, theme-matched launch branding', () => {
+    const appJson = JSON.parse(
+      readFileSync(resolve(repositoryRoot, 'app.json'), 'utf8'),
+    ) as {
+      expo: {
+        plugins: Array<string | [string, Record<string, unknown>]>;
+      };
+    };
+    const splashPlugin = appJson.expo.plugins.find(
+      (plugin): plugin is [string, Record<string, unknown>] =>
+        Array.isArray(plugin) && plugin[0] === 'expo-splash-screen',
+    );
+
+    expect(splashPlugin?.[1]).toMatchObject({
+      image: './assets/wordmark-light.png',
+      backgroundColor: '#FCFCFC',
+      dark: {
+        image: './assets/wordmark.png',
+        backgroundColor: '#000000',
+      },
+    });
+    const darkWordmark = readFileSync(resolve(repositoryRoot, 'assets/wordmark.png'));
+    const lightWordmark = readFileSync(resolve(repositoryRoot, 'assets/wordmark-light.png'));
+    expect(darkWordmark[25]).toBe(6); // PNG RGBA, not an embedded rectangular background.
+    expect(lightWordmark[25]).toBe(6);
+  });
+
   it('does not register for unused remote push notifications', () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(repositoryRoot, 'package.json'), 'utf8'),

@@ -47,12 +47,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash-icon.png",
+          "image": "./assets/wordmark-light.png",
           "imageWidth": 180,
           "resizeMode": "contain",
-          "backgroundColor": "#141414",
+          "backgroundColor": "#FCFCFC",
           "dark": {
-            "backgroundColor": "#141414"
+            "image": "./assets/wordmark.png",
+            "backgroundColor": "#000000"
           }
         }
       ],

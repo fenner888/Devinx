@@ -13,7 +13,7 @@ import { useAuth } from '@auth/AuthContext';
 import { useConnections } from '@auth/ConnectionContext';
 import { computerTransportLabel } from '@auth/pairedComputers';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCodeScanFindings, useSelf } from '@api/devin/queries';
+import { useSelf } from '@api/devin/queries';
 import { purgeCache } from '@cache/index';
 import { branding } from '@lib/branding';
 import { connectionModeOptions } from '@lib/connections';
@@ -39,7 +39,6 @@ export default function SettingsScreen() {
     disconnectAll,
   } = useConnections();
   const queryClient = useQueryClient();
-  const { data: scanFindings } = useCodeScanFindings();
   const { data: self } = useSelf();
   const { tokens } = useTheme();
   const currentPref = useThemePreference();
@@ -332,17 +331,13 @@ export default function SettingsScreen() {
                 tint: 'bg-tint-blue',
                 color: tokens.brandText.hex,
               },
-              ...(scanFindings
-                ? [
-                    {
-                      icon: 'shield-outline',
-                      label: 'Security',
-                      route: '/(main)/security',
-                      tint: 'bg-tint-red',
-                      color: tokens.failed.hex,
-                    } as const,
-                  ]
-                : []),
+              {
+                icon: 'shield-outline',
+                label: 'Security',
+                route: '/(main)/security',
+                tint: 'bg-tint-red',
+                color: tokens.failed.hex,
+              },
             ] as const
           ).map(({ icon, label, route, tint, color }, i, arr) => (
             <Pressable
