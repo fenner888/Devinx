@@ -65,6 +65,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (43)` was built locally from clean commit `f9f7778` with the consolidated on-device dictation/Scribe UI, corrected companion activity and placement, passive-status cleanup, and native Security Swarm dashboard
 - [x] Build 43 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and app privacy artifact passed (`com.fenner888.devinx`, `0.1.0 (43)`, `NSFileProtectionComplete`); `get-task-allow=false`, app tracking is disabled, and the app declares zero collected-data types; SHA-256 `d7940d888ed30c8706801c1a503ae0bf0e9076495ac46b3290d5758bbfb556ed`
 - [x] Build 43 App Store Connect submission `0d122464-12c7-486b-9cbc-bd7ca8d0babb` finished successfully and is processing as the consolidated voice, companion, and Security Swarm TestFlight checkpoint
+- [x] iOS `0.1.0 (44)` was built locally from clean commit `04333fc` after replacing the opaque mismatched splash art with transparent theme-specific wordmarks and making Security permanently discoverable from primary navigation and Settings
+- [x] Build 44 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, app privacy artifact, and compiled launch assets passed (`com.fenner888.devinx`, `0.1.0 (44)`, `NSFileProtectionComplete`); the native asset catalog contains an RGBA light wordmark on `#FCFCFC` and an RGBA dark wordmark on true black; SHA-256 `245c3aaddc9088982ee906c150ce46ca33e7378878be48f07b8ca3740bcd382a`
+- [x] Build 44 App Store Connect submission `9d049b18-51de-4467-9c6c-0234343a567c` finished successfully and is processing as the corrected launch-branding and Security-discoverability checkpoint
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -90,13 +93,13 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | passed on Node 24.18.0, now pinned consistently for development, CI, rollback, and the checksum-verified Connector runtime |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 62 suites / 468 tests with handle detection enabled; no analytics or crash-reporting SDK runtime is loaded by the test environment |
-| Production iOS export | Build 43 passed local signed export; 20 MB IPA, 1,747 bundled modules, 100 assets |
+| Jest | passed 63 suites / 472 tests with handle detection enabled; no analytics or crash-reporting SDK runtime is loaded by the test environment |
+| Production iOS export | Build 44 passed local signed export; 20 MB IPA |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 43 contains 10 privacy manifests; the app manifest declares no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 44 declares no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -136,6 +139,8 @@ The results below must be refreshed after release-document changes and before a 
 - [ ] In Build 43, test dictation from both Home and an existing Cloud or Computer session: start, mixed typing and speech, stop, cancel, `Organize prompt`, send, permission denial/recovery, interruption, AirPods routing, VoiceOver, and Reduce Motion
 - [ ] In Build 43, confirm recording has one visible stop control, the mic remains beside Send, partial/final transcript text is preserved, and no passive companion status bubble appears after completion
 - [ ] In Build 43, confirm the companion sits immediately above the composer and visibly reflects waiting, thinking/working, success, blocked, and error states without covering history or controls
+- [ ] In Build 44, cold-launch once in light mode and once in dark mode; confirm the transparent DevinX wordmark has no rectangular background or color flash before Home appears
+- [ ] In Build 44, open the primary menu and Settings; confirm Security is present in both, opens the native dashboard, and shows the access-required state rather than disappearing when the account lacks enterprise code-scan permission
 
 ## External release gates
 
