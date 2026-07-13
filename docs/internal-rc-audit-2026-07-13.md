@@ -25,9 +25,9 @@ in `docs/authorization-matrix.md`.
   disclosure, production update channel, and runtime `0.1.0`.
 - All 10 packaged privacy manifests declare zero collected-data types, no tracking, and no
   tracking domains. No Sentry or notification artifact is packaged.
-- EAS submission `be1a1dc4-c74b-47f4-b0f7-14e857842e23` is queued for an available submitter for
-  internal TestFlight. Apple receipt and processing are not yet claimed. No App Review or public
-  release was submitted.
+- EAS submission `be1a1dc4-c74b-47f4-b0f7-14e857842e23` finished successfully and uploaded Build
+  55 to Apple on July 13, 2026 at 1:12 PM EDT for internal TestFlight. Apple accepted the upload and
+  is processing it. No App Review or public release was submitted.
 
 ## Product surface verification
 
