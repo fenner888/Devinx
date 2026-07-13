@@ -51,6 +51,13 @@ describe('design tokens (§5.0 extraction)', () => {
     expect(dark.brand.hex).not.toBe('#3B82F6');
   });
 
+  it('keeps the Home companion stage on semantic blue theme tokens', () => {
+    expect(dark.companionStageSurface.hex).toBe('#04102B');
+    expect(dark.companionStageLine.hex).toBe('#49B0FFB8');
+    expect(light.companionStageSurface.hex).toBe('#E6EFFF');
+    expect(light.companionStageLine.hex).toBe('#317CFF6B');
+  });
+
   it('dark finished is the extracted #00EC7E, not the fallback #22C55E', () => {
     expect(dark.finished.hex).toBe('#00EC7E');
   });

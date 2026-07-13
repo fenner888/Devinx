@@ -39,7 +39,7 @@ import { OfflineBanner } from '@components/OfflineBanner';
 import { NavMenu } from '@components/NavMenu';
 import { ModeSettings } from '@components/ModeSettings';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
-import { DevinCompanion } from '@components/pets';
+import { DevinCompanion, HomeCompanionStage } from '@components/pets';
 import {
   VoiceComposerStatus,
   VoiceMicButton,
@@ -539,14 +539,14 @@ export default function HomeScreen() {
           </View>
 
           {/* Devin is the home-screen visual anchor, not a floating overlay. */}
-          <View className="items-center justify-center py-3">
+          <HomeCompanionStage companionSize={companionSize}>
             <DevinCompanion
               state={companionState}
               size={companionSize}
               active={companionActive}
               accessibilityLabel={`Devin companion, ${companionState}`}
             />
-          </View>
+          </HomeCompanionStage>
 
           {/* One clean composer surface; no additional card around it. */}
           <Text className="mb-3 text-text-hi text-text17 font-medium">

@@ -109,6 +109,7 @@ jest.mock('@components/ModeSettings', () => ({
 
 jest.mock('@components/pets', () => ({
   DevinCompanion: (props: unknown) => mockDevinCompanion(props),
+  HomeCompanionStage: ({ children }: { children: unknown }) => children,
 }));
 
 jest.mock('expo-image-picker', () => ({
