@@ -1,9 +1,10 @@
 # Final internal TestFlight physical checklist
 
-Use internal TestFlight Build 58. It contains composer correction `d90fbb7`, keyboard-viewport fix
+Use internal TestFlight Build 59. It contains composer correction `d90fbb7`, keyboard-viewport fix
 `791a338`, the supported Settings/MCP/Wiki capability boundary recorded in release-source commit
 `4825409`, final Cloud/Computer model-contract enforcement `3162a33`, truthful session activity
-`0907d2b`, and the owner-supplied Home companion artwork correction `e21c8c9`.
+`0907d2b`, the owner-supplied Home companion artwork correction `e21c8c9`, and explicit session
+keyboard dismissal `af05c98`.
 Use only sanitized sessions, repositories, and prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.
@@ -32,6 +33,9 @@ the internal group.
   destination/repository/workspace/model pickers, mic/stop/cancel, Send, scanner, and Devin status.
 - Enable Reduce Motion and confirm the companion and voice level display become non-traveling or
   static while text/status still communicates state.
+- In both a Cloud session and Computer session, focus a non-empty draft, tap **Hide keyboard**, and
+  confirm the keyboard closes without clearing the draft. Reopen it, drag the timeline downward,
+  and confirm interactive dismissal also preserves the draft.
 
 ## Cloud products and session lifecycle
 

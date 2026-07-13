@@ -5,6 +5,25 @@ Review nor a public Connector release. The authenticated product inventory and s
 decisions are in `specs/033-cloud-local-settings-parity.md`; route-level authorization evidence is
 in `docs/authorization-matrix.md`.
 
+## Build 59 keyboard-dismissal correction
+
+- Physical Build 58 review found that an open software keyboard could not be explicitly dismissed
+  from either session composer. Build 58 is therefore superseded for final physical acceptance.
+- Commit `af05c98` adds one shared 44-point, VoiceOver-labeled **Hide keyboard** action to both
+  Cloud and Computer session composers. It also enables interactive/on-drag timeline dismissal and
+  preserves the unsent draft through either path.
+- Exact Node `24.18.0` CI passed on the corrected source: lint, strict TypeScript, 73 Jest suites /
+  527 tests, app and Connector builds, and the high/critical dependency gate. The existing 21
+  reviewed moderate transitive findings remain unchanged.
+- iOS `0.1.0 (59)` was archived from clean source `af05c98` with Node `24.18.0` and Xcode `26.6`.
+  The 20,820,947-byte IPA has SHA-256
+  `431eece00cbe7ccd879860bc7d05c77e3e8d715ce9e5e41f225e80d26f982f25` and passed strict signing,
+  metadata, entitlement, disclosure, production update/runtime, packaged-artwork, and 10-manifest
+  privacy inspection.
+- EAS submission `ddd55014-8952-401a-a00e-1d52982e13bb` successfully uploaded this exact IPA to App
+  Store Connect for internal TestFlight. Apple processing is external at this checkpoint. No App
+  Review or public release action was taken.
+
 ## Post-Build-56 visual-acceptance candidates
 
 - Release source `43bd171` preserves the supported Build 56 product boundary and adds two reviewed
