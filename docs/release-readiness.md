@@ -72,8 +72,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] iOS `0.1.0 (45)` was built locally from clean commit `e7917db` with the unsupported public Security route, navigation entry, and Settings entry removed while retaining the corrected theme-matched launch branding
 - [x] Build 45 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, app privacy artifact, and compiled launch assets passed (`com.fenner888.devinx`, `0.1.0 (45)`, `NSFileProtectionComplete`); `get-task-allow=false`, tracking is disabled, zero collected-data types are declared, and the packaged app contains no Security Swarm product UI; SHA-256 `43eaa3578c1ff38a0e2fa9f3b03f6c2cdec8a48ec4d1f813569be42de6131a67`
 - [x] Build 45 App Store Connect submission `f52215b8-b785-4d01-9d0e-68b26a4c0577` finished successfully and is processing as the corrected public-product checkpoint with no Security web-login detour
-- [x] Post-Build 45 development replaces the unsupported Code Scan dashboard with native session-based **Security Work**: reviewed security categories/origins/tags, parent-child agent grouping, native work-log navigation, and a validated read-only review launcher; this work has not yet been included in an iOS build
-- [x] Post-Build 45 Cloud and Computer session companion tracks are pointer-transparent foreground overlays immediately above their composers; timelines scroll behind Devin and no companion dock paints or reserves an opaque shelf
+- [x] iOS `0.1.0 (46)` was built locally from clean commit `4b72c22` with native session-based **Security Work**, corrected Cloud and Computer companion travel, and pointer-transparent foreground companion overlays that reserve no dock or shelf
+- [x] Build 46 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, and app privacy artifact passed (`com.fenner888.devinx`, `0.1.0 (46)`, `NSFileProtectionComplete`); `get-task-allow=false`, tracking is disabled, zero collected-data types are declared, native Security Work is packaged, and the obsolete passive waiting label and external Security handoff are absent; SHA-256 `415486384a08e8bba3127fd739161360370939afce3c51843c311f9a18e668de`
+- [x] Build 46 App Store Connect submission `c25b0805-1e3d-4a66-b54d-4804f4cf80fe` finished successfully and is processing as the native Security Work and transparent session-companion TestFlight checkpoint
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -100,12 +101,12 @@ The results below must be refreshed after release-document changes and before a 
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
 | Jest | passed 64 suites / 478 tests with handle detection enabled, including session-based Security Work and active companion-travel coverage; no analytics or crash-reporting SDK runtime is loaded by the test environment |
-| Production iOS export | Build 45 passed local signed export; 20 MB IPA |
+| Production iOS export | Build 46 passed local signed export; 20.7 MB IPA |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
 | Secret/key scan | passed the tracked-file API-key and secret-variable gates |
 | Authorization/IDOR matrix | reviewed in `docs/authorization-matrix.md` |
-| App privacy artifact | Build 45 declares no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
+| App privacy artifact | Build 46 declares no tracking and zero collected-data types; no APS entitlement is present; direct API/partner flows are mapped in `docs/app-privacy-review.md` |
 | Accessibility token contrast | passed WCAG AA normal-text checks for primary, secondary, and link text in both themes |
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters` |
@@ -144,8 +145,8 @@ The results below must be refreshed after release-document changes and before a 
 - [ ] In Build 43, confirm the companion sits immediately above the composer and visibly reflects waiting, thinking/working, success, blocked, and error states without covering history or controls
 - [ ] In Build 45, cold-launch once in light mode and once in dark mode; confirm the transparent DevinX wordmark has no rectangular background or color flash before Home appears
 - [ ] In Build 45, confirm Security is absent from both primary navigation and Settings and that no Devin web login or external handoff is offered
-- [ ] In the next candidate, confirm **Security Work** is native and never opens Devin web; create one disposable read-only review, verify it appears immediately, open its coordinator and any returned child agents, and confirm ordinary sessions are not mislabeled as scan findings
-- [ ] In the next candidate, scroll long Cloud and Computer responses behind Devin and confirm the pet remains directly above the composer without a black bar, reserved blank row, clipped text, or intercepted scrolling/taps
+- [ ] In Build 46, confirm **Security Work** is native and never opens Devin web; create one disposable read-only review, verify it appears immediately, open its coordinator and any returned child agents, and confirm ordinary sessions are not mislabeled as scan findings
+- [ ] In Build 46, scroll long Cloud and Computer responses behind Devin and confirm the pet remains directly above the composer without a black bar, reserved blank row, clipped text, or intercepted scrolling/taps
 
 ## External release gates
 
