@@ -16,7 +16,7 @@ in `docs/authorization-matrix.md`.
   Connector builds, and the high/critical dependency gate. The existing 21 moderate transitive
   findings remain reviewed and unchanged.
 - The private macOS Connector rebuilt and verified with bundled Node `24.18.0`; ad-hoc DMG SHA-256
-  is `dc9fa4854d550186d56a974b79d27da5ca43d8ebbb0e7b723ef5177e51f221c2`. No Developer ID
+  is `008d6976ab21222c168d0834840dc5972014f964e243f3c9a685a5b68f04d9c2`. No Developer ID
   Application identity or `devinx-notary` Keychain profile is installed, so public signing,
   notarization, stapling, and Gatekeeper acceptance remain external gates.
 - iOS `0.1.0 (57)` was archived from clean source `43bd171` with Node `24.18.0` and Xcode `26.6`.
@@ -150,7 +150,7 @@ misrepresented as fixed.
   installation, deliberate replacement mechanics, temporary app removal, executable bits,
   entitlement allowlist, bundled Node `v24.18.0`, source-map absence, and adjacent checksum
   verification pass. The current ad-hoc DMG SHA-256 is
-  `dc9fa4854d550186d56a974b79d27da5ca43d8ebbb0e7b723ef5177e51f221c2`.
+  `008d6976ab21222c168d0834840dc5972014f964e243f3c9a685a5b68f04d9c2`.
 - The confirmed native uninstall path stops the listener before deleting the Connector's protected
   Keychain identity and paired-device registry, unregisters launch at login, and asks macOS to move
   the application to Trash. Strict IPC, state-deletion, sanitized-failure, and native-build checks
