@@ -127,7 +127,11 @@ describe('Computer session detail', () => {
     const screen = render(<ComputerSessionDetailScreen />);
 
     expect(screen.getByText('Steering enabled')).toBeTruthy();
-    expect(screen.getByTestId('computer-session-companion-dock')).toBeTruthy();
+    const companionDock = screen.getByTestId('computer-session-companion-dock');
+    expect(companionDock.props.className).toContain('absolute');
+    expect(companionDock.props.className).not.toContain('bg-canvas');
+    expect(companionDock.props.pointerEvents).toBe('none');
+    expect(screen.getByTestId('computer-session-history').props.contentContainerStyle).toBeUndefined();
     expect(screen.getByTestId('computer-session-composer-shell')).toBeTruthy();
     expect(screen.getByTestId('computer-session-composer').props.className).toContain(
       'rounded-card',

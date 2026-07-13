@@ -370,7 +370,8 @@ export default function ComputerSessionDetailScreen() {
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {!validParameters || !computer || !mayReadContent ? (
+        <View className="flex-1">
+          {!validParameters || !computer || !mayReadContent ? (
           <View className="flex-1 items-center justify-center px-8">
             <Ionicons name="lock-closed-outline" size={28} color={tokens.textLow.hex} />
             <Text className="mt-4 text-center text-text-hi text-text16">
@@ -408,6 +409,7 @@ export default function ComputerSessionDetailScreen() {
             ref={historyRef}
             className="flex-1"
             contentContainerClassName="px-5 pt-5 pb-12"
+            testID="computer-session-history"
             onScroll={handleHistoryScroll}
             scrollEventThrottle={100}
             onContentSizeChange={() => {
@@ -458,19 +460,24 @@ export default function ComputerSessionDetailScreen() {
             {steeringActive && <WorkingIndicator />}
           </ScrollView>
         )}
-        {query.data && (
-          <View className="bg-canvas px-4 pb-1" testID="computer-session-companion-dock">
-            <DevinCompanion
-              state={companionActivity.state}
-              size={112}
-              message={companionActivity.message}
-              active={companionActive}
-              travel={companionActivity.travel}
-              travelTrack
-              accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
-            />
-          </View>
-        )}
+          {query.data && (
+            <View
+              pointerEvents="none"
+              className="absolute inset-x-0 bottom-0 px-4 pb-1"
+              testID="computer-session-companion-dock"
+            >
+              <DevinCompanion
+                state={companionActivity.state}
+                size={112}
+                message={companionActivity.message}
+                active={companionActive}
+                travel={companionActivity.travel}
+                travelTrack
+                accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
+              />
+            </View>
+          )}
+        </View>
         {canPrompt && mayReadContent && query.data && (
           <View
             className="bg-canvas px-4 pt-2"

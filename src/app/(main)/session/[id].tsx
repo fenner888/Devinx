@@ -388,24 +388,26 @@ export default function SessionDetailScreen() {
           {tab === 'worklog' && <WorklogTab session={session} />}
           {tab === 'changes' && <ChangesTab session={session} />}
           {tab === 'insights' && <InsightsTab sessionId={validId} />}
+          {/* Foreground-only track: conversation scrolls behind it. It has no
+              shelf/background and never consumes a layout row. */}
+          {tab === 'timeline' && (
+            <View
+              pointerEvents="none"
+              className="absolute inset-x-0 bottom-0 px-4 pb-1"
+              testID="cloud-session-companion-dock"
+            >
+              <DevinCompanion
+                state={companionActivity.state}
+                size={keyboardVisible ? 72 : 104}
+                message={companionActivity.message}
+                active={companionActive}
+                travel={companionActivity.travel}
+                travelTrack
+                accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
+              />
+            </View>
+          )}
         </View>
-
-        {/* Keep Devin immediately above the composer instead of at the end of
-            short or long scrollable histories. The transparent track remains
-            in normal layout flow and never overlays messages or controls. */}
-        {tab === 'timeline' && (
-          <View className="bg-canvas px-4 pb-1" testID="cloud-session-companion-dock">
-            <DevinCompanion
-              state={companionActivity.state}
-              size={keyboardVisible ? 72 : 104}
-              message={companionActivity.message}
-              active={companionActive}
-              travel={companionActivity.travel}
-              travelTrack
-              accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
-            />
-          </View>
-        )}
 
         {/* Message steering composer — any non-terminal session (sleeping resumes).
             It floats above the home indicator instead of becoming a bottom shelf. */}
@@ -876,6 +878,7 @@ function TimelineTab({
       ref={listRef}
       className="flex-1 px-4"
       contentContainerClassName="py-3"
+      testID="cloud-session-timeline"
       onScroll={handleScroll}
       scrollEventThrottle={100}
       onContentSizeChange={() => {

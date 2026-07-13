@@ -127,7 +127,11 @@ describe('active session composer', () => {
     );
 
     expect(getByText('Devin Cloud')).toBeTruthy();
-    expect(getByTestId('cloud-session-companion-dock')).toBeTruthy();
+    const companionDock = getByTestId('cloud-session-companion-dock');
+    expect(companionDock.props.className).toContain('absolute');
+    expect(companionDock.props.className).not.toContain('bg-canvas');
+    expect(companionDock.props.pointerEvents).toBe('none');
+    expect(getByTestId('cloud-session-timeline').props.contentContainerStyle).toBeUndefined();
     expect(getByTestId('cloud-session-composer-shell')).toBeTruthy();
     expect(getByTestId('cloud-session-composer').props.className).toContain('rounded-card');
     expect(getByLabelText('Cloud session message').props.textAlignVertical).toBe('top');

@@ -73,6 +73,7 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] Build 45 IPA signature, metadata, entitlements, production update channel/runtime, file protection, exempt-encryption declaration, app privacy artifact, and compiled launch assets passed (`com.fenner888.devinx`, `0.1.0 (45)`, `NSFileProtectionComplete`); `get-task-allow=false`, tracking is disabled, zero collected-data types are declared, and the packaged app contains no Security Swarm product UI; SHA-256 `43eaa3578c1ff38a0e2fa9f3b03f6c2cdec8a48ec4d1f813569be42de6131a67`
 - [x] Build 45 App Store Connect submission `f52215b8-b785-4d01-9d0e-68b26a4c0577` finished successfully and is processing as the corrected public-product checkpoint with no Security web-login detour
 - [x] Post-Build 45 development replaces the unsupported Code Scan dashboard with native session-based **Security Work**: reviewed security categories/origins/tags, parent-child agent grouping, native work-log navigation, and a validated read-only review launcher; this work has not yet been included in an iOS build
+- [x] Post-Build 45 Cloud and Computer session companion tracks are pointer-transparent foreground overlays immediately above their composers; timelines scroll behind Devin and no companion dock paints or reserves an opaque shelf
 - [x] The updated Connector artifact was strict-signature verified and restarted after Build 29 upload so mobile and Mac use the coordinated protocol checkpoint
 - [x] Build 29 creation-options HTTP 503 was traced to an empty optional model marker in one valid historical session; the Connector now ignores that marker for Recent models, preserves minimized history without inventing a model, and returns the real four-workspace/four-recent-model option set
 - [x] Connector session ownership handoff now uses advertised ACP `session/close` when available and otherwise immediately recycles only its own ACP child after each settled prompt; the installed Devin CLI does not yet advertise close, so the tested recycle path prevents phone-created sessions from remaining permanently unavailable in Devin Desktop
@@ -144,6 +145,7 @@ The results below must be refreshed after release-document changes and before a 
 - [ ] In Build 45, cold-launch once in light mode and once in dark mode; confirm the transparent DevinX wordmark has no rectangular background or color flash before Home appears
 - [ ] In Build 45, confirm Security is absent from both primary navigation and Settings and that no Devin web login or external handoff is offered
 - [ ] In the next candidate, confirm **Security Work** is native and never opens Devin web; create one disposable read-only review, verify it appears immediately, open its coordinator and any returned child agents, and confirm ordinary sessions are not mislabeled as scan findings
+- [ ] In the next candidate, scroll long Cloud and Computer responses behind Devin and confirm the pet remains directly above the composer without a black bar, reserved blank row, clipped text, or intercepted scrolling/taps
 
 ## External release gates
 
