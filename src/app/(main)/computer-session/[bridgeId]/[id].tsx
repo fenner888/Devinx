@@ -372,6 +372,8 @@ export default function ComputerSessionDetailScreen() {
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* Absolute overlays must live inside the flex child KAV shrinks above the keyboard. */}
+        <View className="flex-1" testID="computer-session-keyboard-viewport">
         <View className="flex-1">
           {!validParameters || !computer || !mayReadContent ? (
           <View className="flex-1 items-center justify-center px-8">
@@ -596,6 +598,7 @@ export default function ComputerSessionDetailScreen() {
             </View>
           </View>
         )}
+        </View>
       </KeyboardAvoidingView>
       <ComputerModelPickerSheets
         models={localModels}

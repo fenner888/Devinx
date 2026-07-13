@@ -379,6 +379,8 @@ export default function SessionDetailScreen() {
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* Absolute overlays must live inside the flex child KAV shrinks above the keyboard. */}
+        <View className="flex-1" testID="cloud-session-keyboard-viewport">
         <View className="flex-1">
           {tab === 'timeline' && (
             <TimelineTab
@@ -560,6 +562,7 @@ export default function SessionDetailScreen() {
             )}
           </View>
         )}
+        </View>
       </KeyboardAvoidingView>
 
       <AttachmentPickerSheet

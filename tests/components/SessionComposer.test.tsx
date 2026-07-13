@@ -137,6 +137,11 @@ describe('active session composer', () => {
     const composerShell = getByTestId('cloud-session-composer-shell');
     expect(composerShell.props.className).toContain('absolute');
     expect(composerShell.props.className).not.toContain('bg-canvas');
+    let composerAncestor = composerShell.parent;
+    while (composerAncestor && composerAncestor.props.testID !== 'cloud-session-keyboard-viewport') {
+      composerAncestor = composerAncestor.parent;
+    }
+    expect(composerAncestor?.props.testID).toBe('cloud-session-keyboard-viewport');
     const composer = getByTestId('cloud-session-composer');
     expect(composer.props.className).toContain('rounded-card');
     expect(composer.props.className).not.toContain('bg-surface1');

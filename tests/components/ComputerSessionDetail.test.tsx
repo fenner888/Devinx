@@ -138,6 +138,14 @@ describe('Computer session detail', () => {
     const composerShell = screen.getByTestId('computer-session-composer-shell');
     expect(composerShell.props.className).toContain('absolute');
     expect(composerShell.props.className).not.toContain('bg-canvas');
+    let composerAncestor = composerShell.parent;
+    while (
+      composerAncestor &&
+      composerAncestor.props.testID !== 'computer-session-keyboard-viewport'
+    ) {
+      composerAncestor = composerAncestor.parent;
+    }
+    expect(composerAncestor?.props.testID).toBe('computer-session-keyboard-viewport');
     const composer = screen.getByTestId('computer-session-composer');
     expect(composer.props.className).toContain('rounded-card');
     expect(composer.props.className).not.toContain('bg-surface1');
