@@ -121,7 +121,7 @@ The results below must be refreshed after release-document changes and before a 
 | Accessibility semantics | static TSX audit passed: every icon-only Pressable/Touchable has an explicit accessible name; visible-text controls retain derived labels |
 | Static dead-code signal | strict TypeScript passed with `--noUnusedLocals --noUnusedParameters`; the dormant notifier and unsupported enterprise Code Scan client/schemas/tests were removed |
 | Connector app build/signature | passed July 13 rebuild and strict nested code-sign verification with the intentional ad-hoc development signature |
-| Connector DMG/checksum | passed adjacent checksum, `hdiutil verify`, read-only mount, exact Applications link, clean-copy install, strict nested signatures, entitlement allowlist, source-map absence, and bundled Node `v24.18.0`; current private arm64 DMG hash is `5fc913c50766f828346ecedce8099193384cbcb9fbb65518ec7537abb2bbaf18` |
+| Connector DMG/checksum | passed adjacent checksum, `hdiutil verify`, read-only mount, exact Applications link, clean-copy install, strict nested signatures, entitlement allowlist, source-map absence, and bundled Node `v24.18.0`; current private arm64 DMG hash is `57bdb48ec2e7d6e06df021344a6925bb922855c6849974f4090ed87be2cfc159` |
 | Developer ID/notarization workflow | prepared and fail-closed; checksum-verifies then minimally re-signs Node without debug/dynamic-loader entitlements, rejects development identities, notarizes/staples app before rebuilding and notarizing DMG |
 
 ## Required physical checkpoint

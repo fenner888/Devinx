@@ -109,7 +109,7 @@ misrepresented as fixed.
 - Strict nested code-sign verification, read-only DMG mounting, exact Applications link, clean-copy
   installation, executable bits, entitlement allowlist, bundled Node `v24.18.0`, source-map absence,
   and adjacent checksum verification pass. The current ad-hoc DMG SHA-256 is
-  `5fc913c50766f828346ecedce8099193384cbcb9fbb65518ec7537abb2bbaf18`.
+  `57bdb48ec2e7d6e06df021344a6925bb922855c6849974f4090ed87be2cfc159`.
 - The current artifact is intentionally ad-hoc signed. Gatekeeper rejects it, as expected, because
   the available Keychain contains Apple Development and iPhone Distribution identities but no
   **Developer ID Application** identity.
