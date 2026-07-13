@@ -5,6 +5,24 @@ Review nor a public Connector release. The authenticated product inventory and s
 decisions are in `specs/033-cloud-local-settings-parity.md`; route-level authorization evidence is
 in `docs/authorization-matrix.md`.
 
+## Build 62 simplified companion activity and keyboard-safe Mac naming
+
+- Commits `8b2484b` and `0c81638` remove the rejected Cloud/Computer activity trail, retain only
+  the active **Devin working** companion caption, and make the Computer Connection viewport
+  keyboard-aware so **Name this Mac** and pairing controls remain reachable while preserving input.
+- Exact Node `24.18.0` release CI passed lint, strict TypeScript, 74 Jest suites / 545 tests, and the
+  high/critical dependency gate. No dependency was added; the existing 21 reviewed moderate
+  transitive findings remain unchanged.
+- iOS `0.1.0 (62)` was exported locally from clean source `0c81638` with Node `24.18.0` and Xcode
+  `26.6`. The signed 20,915,834-byte IPA has SHA-256
+  `e5bff1a0a29fdd6c88b6cce4fb24890b84c73d79ceba5719e893d83db005d353` and passed strict signing,
+  metadata, entitlement, production update/runtime, exact permission-disclosure, bundled-artwork,
+  and 10-manifest privacy inspection. It declares no collected-data category, tracking domain, or
+  APS entitlement.
+- EAS submission `4fa362d7-364c-4901-9372-7e3453d1b351` successfully uploaded this exact IPA to App
+  Store Connect for internal TestFlight. Apple is processing the upload. No App Review, public
+  Connector publication, or public release action was taken.
+
 ## Build 61 verified model marks and Home readiness header
 
 - Commits `b0c7dcc` and `b0aad7e` replace approximate model-family symbols with verified bundled
