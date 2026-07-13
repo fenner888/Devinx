@@ -5,6 +5,28 @@ Review nor a public Connector release. The authenticated product inventory and s
 decisions are in `specs/033-cloud-local-settings-parity.md`; route-level authorization evidence is
 in `docs/authorization-matrix.md`.
 
+## Post-Build-56 visual-acceptance candidate
+
+- Release source `43bd171` preserves the supported Build 56 product boundary and adds two reviewed
+  changes only: truthful live session activity from `0907d2b` and the approved token-driven Home
+  planetary companion stage. Cloud never invents tool events; Computer activity comes from the
+  protected ACP stream. The Home backdrop is decorative, pointer-free, accessibility-hidden,
+  bounded on phones/tablets, and adds no animation or dependency.
+- Exact Node `24.18.0` CI passed: lint, strict TypeScript, 73 Jest suites / 522 tests, app and
+  Connector builds, and the high/critical dependency gate. The existing 21 moderate transitive
+  findings remain reviewed and unchanged.
+- The private macOS Connector rebuilt and verified with bundled Node `24.18.0`; ad-hoc DMG SHA-256
+  is `d8caff7e4cf09a9088fd83cc57f83106bfa2c04f479b56b104b2fbe773c6c104`. No Developer ID
+  Application identity or `devinx-notary` Keychain profile is installed, so public signing,
+  notarization, stapling, and Gatekeeper acceptance remain external gates.
+- iOS `0.1.0 (57)` was archived from clean source `43bd171` with Node `24.18.0` and Xcode `26.6`.
+  The 20,700,649-byte IPA has SHA-256
+  `2a5785cfde425e455e4a150de7b6c8a900fe24eb8f6d1aa9d4db8af1b4997188` and passed strict signing,
+  metadata, entitlement, disclosure, production update/runtime, and 10-manifest privacy inspection.
+- EAS submission `b61fdf5a-9a0d-47e4-8c93-2a390780b271` uploaded Build 57 to App Store Connect for
+  internal TestFlight. This is a visual-acceptance candidate, not a frozen UI or public release;
+  physical acceptance and explicit owner freeze remain required.
+
 ## Internal candidate produced
 
 - Post-Build-54 capability-boundary commit `c1f5edc` adds the supported read-only official Devin
@@ -125,7 +147,7 @@ misrepresented as fixed.
 - Strict nested code-sign verification, read-only DMG mounting, exact Applications link, clean-copy
   installation, executable bits, entitlement allowlist, bundled Node `v24.18.0`, source-map absence,
   and adjacent checksum verification pass. The current ad-hoc DMG SHA-256 is
-  `eab6d6f852fa50eebc12e70d661afeca84fb1bf118c0a2aa3391ea09c3177c0f`.
+  `d8caff7e4cf09a9088fd83cc57f83106bfa2c04f479b56b104b2fbe773c6c104`.
 - The current artifact is intentionally ad-hoc signed. Gatekeeper rejects it, as expected, because
   the available Keychain contains Apple Development and iPhone Distribution identities but no
   **Developer ID Application** identity.
@@ -152,9 +174,9 @@ misrepresented as fixed.
   fill. Their shells and companion tracks remain transparent, and timeline clearance keeps the
   final message line above both pointer-free overlays.
 
-## Physical checkpoint for Build 56
+## Physical checkpoint for Build 57
 
-Use exact internal TestFlight Build 56 with sanitized sessions. Confirm:
+Use exact internal TestFlight Build 57 with sanitized sessions. Confirm:
 
 1. Home plus Cloud and Computer session creation, all destination-specific pickers, attachments,
    archive/terminate, device removal/revocation, and all three connection modes after cold launch.
@@ -163,9 +185,10 @@ Use exact internal TestFlight Build 56 with sanitized sessions. Confirm:
 3. Light/dark launch, long-history scrolling behind the transparent companion, no clipped content,
    conversation content visibly behind the floating translucent Cloud and Computer composers,
    complete final-line clearance above both overlays, keyboard clearance, scanner sizing, and no
-   raw Mac path or ACP identifier. Build 56 contains the floating-composer correction,
-   keyboard-viewport fix `791a338`, supported capability-boundary work from `4825409`, and final
-   model-contract enforcement from `3162a33`.
+   raw Mac path or ACP identifier. Build 57 contains the floating-composer correction,
+   keyboard-viewport fix `791a338`, supported capability-boundary work from `4825409`, final
+   model-contract enforcement from `3162a33`, truthful live activity `0907d2b`, and the approved
+   Home companion stage `43bd171`.
 4. Cold-launch, 200-row scrolling, one-hour foreground battery, and seven-day TestFlight stability
    using `docs/physical-performance-checklist.md`.
 
