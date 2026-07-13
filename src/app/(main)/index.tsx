@@ -403,7 +403,10 @@ export default function HomeScreen() {
       createComputerSession.mutate(
         {
           workspaceId: selectedWorkspaceId,
-          modelId: selectedModelId,
+          // The picker renders the live default when no override is stored. Send
+          // that exact ID so "Adaptive" is confirmed by ACP rather than being a
+          // display-only label that silently relies on an implicit default.
+          modelId: selectedModelId ?? localOptions.data?.defaultModelId ?? null,
           text: prompt.trim().slice(0, MAX_PROMPT),
         },
         {

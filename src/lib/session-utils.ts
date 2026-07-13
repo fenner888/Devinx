@@ -219,9 +219,6 @@ export function collectTags(sessions: SessionResponse[]): { tag: string; count: 
 export const MODE_OPTIONS: { key: DevinMode; label: string; description: string }[] = [
   { key: 'normal', label: 'Normal', description: 'Default Agent mode — full capability' },
   { key: 'fast', label: 'Fast', description: 'About 2× faster and 4× more expensive' },
-  { key: 'lite', label: 'Lite', description: 'Lightweight — cheapest for simple tasks' },
-  { key: 'ultra', label: 'Ultra', description: 'Most capable — for complex work' },
-  { key: 'fusion', label: 'Fusion', description: 'Fusion mode' },
 ];
 
 export function modeLabel(mode: DevinMode): string {

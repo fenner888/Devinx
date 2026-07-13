@@ -81,7 +81,8 @@ export type SessionCategory =
   | 'security'
   | 'unit_test_generation';
 
-export type DevinMode = 'normal' | 'fast' | 'lite' | 'ultra' | 'fusion';
+/** Modes accepted by the documented v3 create-session contract. */
+export type DevinMode = 'normal' | 'fast';
 
 export type SessionSize = 'xs' | 's' | 'm' | 'l' | 'xl';
 

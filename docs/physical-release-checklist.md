@@ -34,6 +34,10 @@ the internal group.
 
 ## Cloud products and session lifecycle
 
+- Confirm the Cloud mode picker exposes only Normal and Fast. Create one harmless Fast session only
+  if the test organization makes Fast available; verify the session starts successfully rather than
+  treating the picker as display-only. Do not expect Fusion from the public API: the reviewed v3
+  contract does not accept it.
 - In Cloud mode, load Usage & Limits and confirm either documented organization data or an honest
   permission/unavailable state—never a raw API response.
 - Open Repositories & Wiki; search, inspect indexing states, open one indexed repository, read its
@@ -55,7 +59,9 @@ the internal group.
 
 - In DevinX Connector, grant the test iPhone read, send, and create-session permissions.
 - Create a Computer session from the phone with an approved opaque workspace and selected live
-  model/variant. Confirm the selected model appears and the initial prompt receives one reply.
+  model/variant. When Adaptive is present in the live catalog, select it explicitly. Confirm the
+  selected exact model appears, is accepted by Devin for Terminal, and the initial prompt receives
+  one reply.
 - Open that phone-created session in Devin Desktop after the turn settles, then send a later phone
   turn and confirm ownership can alternate without a permanent unavailable state.
 - Confirm bounded local history remains chronological and no raw Mac path or raw ACP identifier is
@@ -110,3 +116,12 @@ the internal group.
 Complete `docs/physical-performance-checklist.md` against this same build: five cold launches per
 connection mode, 200-row release-mode scrolling, one-hour foreground battery, and the seven-day
 internal TestFlight stability window.
+
+## Final owner design gate
+
+- After every functional, security, privacy, Connector, performance, and stability gate above is
+  resolved, stop before App Review. Mark supplies the final design-review details.
+- Implement the approved visual changes, repeat affected theme/accessibility/composer checks, and
+  obtain Mark's explicit UI freeze approval on the resulting TestFlight build.
+- Capture App Store screenshots only after that approval. A prior internal build, passing automated
+  checks, or completed metadata is not permission to submit App Review.

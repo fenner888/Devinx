@@ -4,6 +4,7 @@
  * the auth provider + fetch and asserts path building and response shaping.
  */
 import {
+  createSession,
   getSession,
   sendMessage,
   getDailyConsumption,
@@ -90,6 +91,19 @@ beforeEach(() => {
 });
 
 describe('endpoints — path building & response shaping', () => {
+  it('submits the exact documented Cloud mode with server-side attribution', async () => {
+    mockFetch.mockResolvedValue(ok(sessionFixture));
+
+    await createSession(mockAuth, { prompt: 'Run this quickly.', devin_mode: 'fast' });
+
+    expect(lastBody()).toEqual({
+      prompt: 'Run this quickly.',
+      devin_mode: 'fast',
+      create_as_user_id: 'user-42',
+    });
+    expect(lastUrl()).toContain('/v3/organizations/org-abc/sessions');
+  });
+
   it('getSession prefixes a bare session_id with devin- in the URL path', async () => {
     mockFetch.mockResolvedValue(ok(sessionFixture));
     await getSession(mockAuth, 'abc123'); // bare id (as the API returns it)

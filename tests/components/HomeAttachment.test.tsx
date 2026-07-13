@@ -460,6 +460,39 @@ describe('home attachment control', () => {
     );
   });
 
+  it('submits Adaptive as the exact live default instead of treating it as a display-only label', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      defaultModelId: 'adaptive',
+      catalogSource: 'live',
+      models: [{ id: 'adaptive', name: 'Adaptive', recommended: true }],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByLabelText('Model: Adaptive')).toBeTruthy();
+    fireEvent.changeText(screen.getByLabelText('Session prompt'), 'Use adaptive routing');
+    fireEvent.press(screen.getByLabelText('Start session'));
+
+    expect(mockCreateComputerSession).toHaveBeenCalledWith(
+      {
+        workspaceId: `workspace_${'W'.repeat(43)}`,
+        modelId: 'adaptive',
+        text: 'Use adaptive routing',
+      },
+      expect.any(Object),
+    );
+  });
+
   it('explains unavailable local options without opening an inescapable empty sheet', () => {
     mockConnection = {
       mode: 'computer',

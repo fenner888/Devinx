@@ -364,6 +364,12 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(out.unlisted).toBe(true);
   });
 
+  it('rejects undocumented Cloud modes instead of sending a cosmetic preview value', () => {
+    expect(() =>
+      sessionCreateRequestSchema.parse({ prompt: 'Try Fusion.', devin_mode: 'fusion' }),
+    ).toThrow();
+  });
+
   it('rejects a session create request without a prompt', () => {
     expect(() => sessionCreateRequestSchema.parse({ tags: ['x'] })).toThrow();
   });

@@ -527,12 +527,12 @@ if (request.method === 'initialize') {
 } else if (request.method === 'session/set_config_option') {
   if (request.params.sessionId !== 'session-created' ||
       request.params.configId !== 'model' ||
-      request.params.value !== 'gpt-5-6-sol-medium') process.exit(22);
+      request.params.value !== 'adaptive') process.exit(22);
   globalThis.modelConfigured = true;
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
     configOptions: [{
       id: 'model', name: 'Model', category: 'model', type: 'select',
-      currentValue: 'gpt-5-6-sol-medium',
+      currentValue: 'adaptive',
       options: [
         { value: 'adaptive', name: 'Adaptive' },
         { value: 'gpt-5-6-sol-medium', name: 'GPT 5.6' }
@@ -554,7 +554,7 @@ if (request.method === 'initialize') {
     try {
       await client.start();
       await expect(
-        client.createSession('/tmp/project', 'gpt-5-6-sol-medium', 'Build it.'),
+        client.createSession('/tmp/project', 'adaptive', 'Build it.'),
       ).resolves.toBe('session-created');
     } finally {
       await new Promise((resolve) => setTimeout(resolve, 20));

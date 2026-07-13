@@ -482,9 +482,12 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 - [ ] All §10 gates green in CI
 - [ ] Disconnect verifiably wipes Keychain + SQLite + query cache
 - [ ] Rate-limit behavior tested against real API (burst + sustained)
+- [ ] Cloud mode controls expose only values accepted by the reviewed public API, and a harmless real session proves the selected supported mode reaches Devin
+- [ ] Computer model controls come only from the live ACP catalog, and a harmless real session proves the exact selected model (including Adaptive when offered) is confirmed before prompting
 - [ ] App Privacy label accurate: Data Not Collected (or "Usage Data, opt-in" if PostHog on) — this label is a marketing asset, protect it
 - [ ] Trademark disclaimer present in listing + in-app
 - [ ] TestFlight external group live; crash-free rate >99.5% over 7 days before App Store submit
+- [ ] Mark completes the final design review, supplies the requested design direction, approves the implemented changes on the release build, and explicitly freezes the UI before App Review submission
 - [ ] Screenshots: dark theme, Board with a blocked session visible (show the killer feature)
 - [ ] Rollback plan: EAS Update (OTA) for JS-level issues, <15min
 

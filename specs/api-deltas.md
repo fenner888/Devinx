@@ -40,8 +40,12 @@ Connector's approved local-workspace list.
 
 Live v3 exposes `devin_mode: 'normal' | 'fast'` (`fast` ≈ 2x faster, 4x more
 expensive). Spec §2.3/§8.5 didn't list it. **Action:** added to types +
-schemas. Composer (§7.5) can surface it in "Advanced" as a follow-on; not
-required for v1 MVP but the type is ready.
+schemas and surfaced only these two documented values in the Cloud composer.
+The Devin Web UI may expose account- or preview-specific controls such as
+Fusion, but the reviewed public v3 contract does not accept them. DevinX must
+not render or submit those values until Cognition documents a supported API
+contract for them. Computer-session model choices remain a separate live ACP
+catalog and are never inferred from this Cloud enum.
 
 ### D2. `attachment_urls` on session create AND message send
 

@@ -85,7 +85,7 @@ export const sessionCategorySchema = z.enum([
   'unit_test_generation',
 ]);
 
-export const devinModeSchema = z.enum(['normal', 'fast', 'lite', 'ultra', 'fusion']);
+export const devinModeSchema = z.enum(['normal', 'fast']);
 export const sessionSizeSchema = z.enum(['xs', 's', 'm', 'l', 'xl']);
 export const insightSeveritySchema = z.enum(['low', 'medium', 'high', 'critical']);
 export const secretTypeSchema = z.enum(['cookie', 'key-value', 'totp']);
