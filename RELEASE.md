@@ -4,11 +4,11 @@ This document separates verified release evidence from work that still requires 
 
 ## Current checkpoint
 
-- Latest submitted iOS internal checkpoint: `0.1.0 (54)` from clean commit `791a338`
-- Build 54 IPA SHA-256: `10e083be13e33cceeb23019ba3cf98479bc1c7c238f0fce2a4384c2140073f72`
-- App Store Connect submission: `eb7b3713-9c6f-4fb7-848e-64d77a2c6a7e` — finished; processing is complete and the build is in internal testing
-- Next-candidate functional baseline: `c1f5edc` (`fix: enforce supported cloud capability boundaries`); it has not yet been assigned an iOS build number
-- Build 54 and the next candidate are internal TestFlight checkpoints, not App Review submissions.
+- Current iOS internal release candidate: `0.1.0 (55)` from clean commit `4825409`
+- Build 55 IPA SHA-256: `f41f3c931aaeb32e21f472d7040ca26abe3c9f4599fd6b13f8d7f422c152bfde`
+- EAS internal-TestFlight submission: `be1a1dc4-c74b-47f4-b0f7-14e857842e23` — queued for an available submitter; Apple receipt and processing are not yet claimed
+- Build 55 contains the supported capability-boundary work from `c1f5edc` plus the refreshed release evidence in `4825409`.
+- Build 55 is an internal TestFlight checkpoint, not an App Review submission.
 - The complete historical artifact ledger and remaining physical/external gates are maintained in `docs/release-readiness.md` and `docs/internal-rc-audit-2026-07-13.md`.
 
 ## Release gates

@@ -11,24 +11,23 @@ in `docs/authorization-matrix.md`.
   MCP integration catalog and indexed-repository Wiki, binds Wiki deep links to repositories
   returned by the authenticated Cloud connection, removes the unsupported repository-indexing
   mutation and private billing handoff, and aligns privacy/listing evidence. It is the functional
-  baseline for the next consolidated internal candidate.
+  baseline for consolidated internal Build 55.
 - Physical Build 50 testing exposed a keyboard-layout regression: the absolute composer was a
   sibling of the flex child resized by `KeyboardAvoidingView`, so the keyboard could cover the
   composer while the timeline scrolled into its reserved tail clearance.
 - Cloud and Computer session layouts now keep the floating composer inside the keyboard-resized
   viewport. Ancestor-chain regression tests prove both composer shells remain inside that viewport.
-- iOS `0.1.0 (54)` was archived from clean fix commit `791a338` with Node `24.18.0` and Xcode
-  `26.6` selected explicitly.
-- IPA SHA-256: `10e083be13e33cceeb23019ba3cf98479bc1c7c238f0fce2a4384c2140073f72`.
+- iOS `0.1.0 (55)` was archived from clean release-source commit `4825409` with Node `24.18.0`
+  and Xcode `26.6` selected explicitly.
+- IPA SHA-256: `f41f3c931aaeb32e21f472d7040ca26abe3c9f4599fd6b13f8d7f422c152bfde`.
 - Strict code-sign verification passed with `get-task-allow=false`, no APS entitlement,
   `NSFileProtectionComplete`, exempt encryption set to false, the exact on-device microphone
   disclosure, production update channel, and runtime `0.1.0`.
 - All 10 packaged privacy manifests declare zero collected-data types, no tracking, and no
   tracking domains. No Sentry or notification artifact is packaged.
-- EAS submission `eb7b3713-9c6f-4fb7-848e-64d77a2c6a7e` finished successfully and uploaded Build
-  54 to Apple on July 13, 2026 at 11:06 AM for internal TestFlight. App Store Connect reports upload
-  processing `Complete` and internal status `Testing` in the one-tester **Team (Expo)** group. No
-  App Review or public release was submitted.
+- EAS submission `be1a1dc4-c74b-47f4-b0f7-14e857842e23` is queued for an available submitter for
+  internal TestFlight. Apple receipt and processing are not yet claimed. No App Review or public
+  release was submitted.
 
 ## Product surface verification
 
@@ -123,7 +122,7 @@ misrepresented as fixed.
 - Strict nested code-sign verification, read-only DMG mounting, exact Applications link, clean-copy
   installation, executable bits, entitlement allowlist, bundled Node `v24.18.0`, source-map absence,
   and adjacent checksum verification pass. The current ad-hoc DMG SHA-256 is
-  `57bdb48ec2e7d6e06df021344a6925bb922855c6849974f4090ed87be2cfc159`.
+  `eab6d6f852fa50eebc12e70d661afeca84fb1bf118c0a2aa3391ea09c3177c0f`.
 - The current artifact is intentionally ad-hoc signed. Gatekeeper rejects it, as expected, because
   the available Keychain contains Apple Development and iPhone Distribution identities but no
   **Developer ID Application** identity.
@@ -150,9 +149,10 @@ misrepresented as fixed.
   fill. Their shells and companion tracks remain transparent, and timeline clearance keeps the
   final message line above both pointer-free overlays.
 
-## Physical checkpoint for Build 54
+## Physical checkpoint for Build 55
 
-Use exact internal TestFlight Build 54 and sanitized sessions. Confirm:
+Use exact internal TestFlight Build 55 after Apple finishes processing it, with sanitized sessions.
+Confirm:
 
 1. Home plus Cloud and Computer session creation, all destination-specific pickers, attachments,
    archive/terminate, device removal/revocation, and all three connection modes after cold launch.
@@ -161,8 +161,8 @@ Use exact internal TestFlight Build 54 and sanitized sessions. Confirm:
 3. Light/dark launch, long-history scrolling behind the transparent companion, no clipped content,
    conversation content visibly behind the floating translucent Cloud and Computer composers,
    complete final-line clearance above both overlays, keyboard clearance, scanner sizing, and no
-   raw Mac path or ACP identifier. Build 54 contains the floating-composer correction plus
-   keyboard-viewport fix `791a338`.
+   raw Mac path or ACP identifier. Build 55 contains the floating-composer correction,
+   keyboard-viewport fix `791a338`, and supported capability-boundary work from `4825409`.
 4. Cold-launch, 200-row scrolling, one-hour foreground battery, and seven-day TestFlight stability
    using `docs/physical-performance-checklist.md`.
 
