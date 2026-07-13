@@ -6,7 +6,12 @@ DevinX is an independent, unofficial client for the Devin API. It is not affilia
 
 ## Data processed
 
-When you use Devin Cloud, DevinX sends the credentials, prompts, attachments, and session actions you provide directly to the Devin API at `api.devin.ai` over encrypted HTTPS. Cognition's handling of that data is governed by its terms and privacy policies.
+When you use Devin Cloud, DevinX sends the credentials, prompts, attachments, session actions, repository-Wiki questions, and integration-availability requests you provide directly to Cognition-operated Devin API or official Devin MCP endpoints over encrypted HTTPS. Cognition's handling of that data is governed by its terms and privacy policies.
+
+When you use dictation, microphone audio is transcribed on the iPhone and is never uploaded by
+DevinX. The resulting transcript becomes ordinary editable composer text and is sent only if you
+choose to send the prompt or message. **Organize prompt** is deterministic and on-device in this
+release; it does not call a cloud language model.
 
 DevinX stores the following on your device:
 
@@ -29,7 +34,7 @@ The current release does not register the iPhone for remote push notifications a
 
 When you explicitly enable Computer Connection, DevinX can connect directly to DevinX Connector running on a computer you control. Version 1 uses a private Tailscale network. Pairing requires a short-lived QR code, explicit approval on the computer, and a unique iPhone signing key. Every subsequent request is signed, authenticated, replay-protected, rate-limited, input-validated, and authorized by the computer.
 
-The default grant exposes minimized session metadata. Separate per-device permissions can allow bounded user/Devin message history and sending text to a previously discovered session. Sending is never implied by read permission and can be removed independently. The Connector does not return raw local session identifiers, full filesystem paths, other directories, agent thoughts, tool inputs or outputs, commands, local files, API credentials, or unknown ACP metadata. Tool approvals, file access, attachments, session creation, archive, termination, and arbitrary ACP actions are not supported by these grants.
+The default grant exposes minimized session metadata. Separate per-device permissions can allow bounded user/Devin message history, sending text to a previously discovered session, and creating a session from a Connector-issued opaque workspace handle with an approved live model. Reading, sending, and creating are independent and can be removed separately. The Connector does not return raw local session identifiers, full filesystem paths, other directories, agent thoughts, tool inputs or outputs, commands, local files, API credentials, or unknown ACP metadata. Tool approvals, file access, local attachments, archive, termination, and arbitrary ACP actions are not supported by these grants.
 
 Local-session responses remain only in the app's in-memory query cache and are removed during normal cache collection or when connections are wiped.
 

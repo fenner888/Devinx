@@ -26,8 +26,6 @@ import {
   consumptionCycleListResponseSchema,
   devinAcuLimitListResponseSchema,
   selfResponseSchema,
-  repositoryIndexingListSchema,
-  repositoryIndexingSchema,
   scheduleResponseSchema,
   scheduleListResponseSchema,
   prReviewResponseSchema,
@@ -80,7 +78,6 @@ import type {
   MetricsQuery,
   RepositoryResponse,
   SelfResponse,
-  RepositoryIndexing,
   Cursor,
 } from './types';
 
@@ -497,11 +494,15 @@ export async function updateSchedule(
   const input = scheduleUpdateRequestSchema.parse(body);
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  const raw = await apiRequest<Record<string, unknown>>(auth, paths.schedule(orgId, safeScheduleId), {
-    method: 'PATCH',
-    body: input,
-    schema: scheduleResponseSchema,
-  });
+  const raw = await apiRequest<Record<string, unknown>>(
+    auth,
+    paths.schedule(orgId, safeScheduleId),
+    {
+      method: 'PATCH',
+      body: input,
+      schema: scheduleResponseSchema,
+    },
+  );
   return normalizeSchedule(raw);
 }
 
@@ -566,11 +567,15 @@ export async function updateKnowledgeNote(
   body: KnowledgeNoteUpdateRequest,
 ): Promise<KnowledgeNoteResponse> {
   const input = knowledgeNoteUpdateRequestSchema.parse(body);
-  return apiRequest<KnowledgeNoteResponse>(auth, paths.knowledgeNote(await orgIdOf(auth), resourceIdSchema.parse(noteId)), {
-    method: 'PUT',
-    body: input,
-    schema: knowledgeNoteResponseSchema,
-  });
+  return apiRequest<KnowledgeNoteResponse>(
+    auth,
+    paths.knowledgeNote(await orgIdOf(auth), resourceIdSchema.parse(noteId)),
+    {
+      method: 'PUT',
+      body: input,
+      schema: knowledgeNoteResponseSchema,
+    },
+  );
 }
 
 export async function deleteKnowledgeNote(auth: AuthProvider, noteId: string): Promise<void> {
@@ -597,11 +602,15 @@ export async function updatePlaybook(
   body: PlaybookUpdateRequest,
 ): Promise<PlaybookResponse> {
   const input = playbookUpdateRequestSchema.parse(body);
-  return apiRequest<PlaybookResponse>(auth, paths.playbook(await orgIdOf(auth), resourceIdSchema.parse(playbookId)), {
-    method: 'PUT',
-    body: input,
-    schema: playbookResponseSchema,
-  });
+  return apiRequest<PlaybookResponse>(
+    auth,
+    paths.playbook(await orgIdOf(auth), resourceIdSchema.parse(playbookId)),
+    {
+      method: 'PUT',
+      body: input,
+      schema: playbookResponseSchema,
+    },
+  );
 }
 
 export async function deletePlaybook(auth: AuthProvider, playbookId: string): Promise<void> {
@@ -750,31 +759,4 @@ export async function getSessionConsumption(
     },
   );
   return data.total_acus ?? 0;
-}
-
-// ---------------------------------------------------------------------------
-// Repository indexing (v3beta1)
-// ---------------------------------------------------------------------------
-
-export async function listIndexedRepositories(auth: AuthProvider): Promise<RepositoryIndexing[]> {
-  const orgId = await orgIdOf(auth);
-  const data = await apiRequest<{ items: RepositoryIndexing[] }>(auth, paths.repoIndexing(orgId), {
-    method: 'GET',
-    query: { first: 100 },
-    schema: repositoryIndexingListSchema,
-  });
-  return data.items;
-}
-
-export async function indexRepository(
-  auth: AuthProvider,
-  repoPath: string,
-  branches?: string[],
-): Promise<RepositoryIndexing> {
-  const orgId = await orgIdOf(auth);
-  return apiRequest<RepositoryIndexing>(auth, paths.repoIndex(orgId, repoPath), {
-    method: 'PUT',
-    body: { branch_names: branches ?? [] },
-    schema: repositoryIndexingSchema,
-  });
 }

@@ -1,20 +1,24 @@
 # Final internal TestFlight physical checklist
 
-Use exact internal TestFlight Build 54, which contains composer correction `d90fbb7` plus
-keyboard-viewport fix `791a338`, and only
-sanitized sessions, repositories, and prompts.
+Use the next consolidated internal TestFlight candidate, which contains composer correction
+`d90fbb7`, keyboard-viewport fix `791a338`, and supported Settings/MCP/Wiki parity `749f26b`.
+Use only sanitized sessions, repositories, and prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.
 
-Before testing, open TestFlight and update DevinX to Build 54. App Store Connect reports processing
-`Complete` and internal status `Testing` in the one-tester **Team (Expo)** group.
+Before testing, confirm TestFlight shows the exact build number and release-source commit recorded
+in `docs/release-readiness.md`. Do not test an older installed build merely because it remains in
+the internal group.
 
 ## Launch, navigation, and appearance
 
 - Cold-launch once in light mode and once in dark mode. Confirm the transparent DevinX wordmark
   has no rectangular background or color flash.
-- Open every primary navigation and Settings row. Confirm Security Work is native and that no
+- Open every primary navigation and supported Settings row. Confirm Security Work is native and that no
   private Devin Web login, unsupported Code Scan dashboard, or dead route appears.
+- Open **Connections & MCP** in Cloud or Cloud + Computer mode. Confirm the read-only Integrations
+  and MCP catalogs load or show an honest permission state, contain no Install/Configure/OAuth
+  action, and are absent in Computer-only mode.
 - Confirm Security Work shows only sessions whose root origin is `code_scan`; ordinary API sessions
   remain absent even when their title, prompt, category, or tags mention security.
 - Check Home, Sessions, Cloud session, Computer session, Usage, Repositories & Wiki, Knowledge,
@@ -31,7 +35,9 @@ Before testing, open TestFlight and update DevinX to Build 54. App Store Connect
 
 - In Cloud mode, load Usage & Limits and confirm either documented organization data or an honest
   permission/unavailable state—never a raw API response.
-- Open Repositories & Wiki; search, inspect indexing states, and verify the screen remains read-only.
+- Open Repositories & Wiki; search, inspect indexing states, open one indexed repository, read its
+  documentation structure, load full documentation, and ask one sanitized question. Confirm no
+  Generate, Regenerate, Add repository, or indexing mutation is offered.
 - In Knowledge, filter by folder, create a disposable note in a folder, edit it, disable/enable it
   if available, then delete it after confirming the destructive action.
 - In Playbooks, create a disposable playbook with a valid `!macro`, edit it, use/search it from the

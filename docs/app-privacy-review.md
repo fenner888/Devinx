@@ -1,6 +1,6 @@
 # App privacy review
 
-Last reviewed: July 11, 2026
+Last reviewed: July 13, 2026
 
 This document maps the release-candidate source to App Store Connect privacy answers. It is engineering evidence, not a substitute for confirming the current retention practices of Cognition, Expo, Tailscale, or any future crash-reporting provider before publication.
 
@@ -8,14 +8,14 @@ Apple requires disclosures to include third-party partner collection, to describ
 
 ## Production data-flow inventory
 
-| Destination | Data | Purpose | Current release behavior |
-|---|---|---|---|
-| Cognition Devin API | Devin account credential, account/organization identifiers, prompts, session messages and metadata, selected attachments | Authentication and app functionality | Sent directly over TLS; credentials remain in Keychain on the phone and are never sent to DevinX infrastructure |
-| User-approved Mac over Tailscale | Signed device/request identifiers, opaque session handles, approved metadata, and approved message text | Optional local-computer functionality | Direct device-to-device path; no DevinX relay; local files, tool payloads, private thoughts, and Devin credentials are excluded |
-| Expo Updates | Device operating system, Expo project ID, randomized per-install update token, and normal network metadata | Deliver a compatible app update | Expo documents the random token as the mechanism for determining whether an installation requested an update; no prompts, session messages, repository names, attachments, Devin credentials, or Connector pairing secrets are included |
-| Crash reporting provider | None | Not bundled or configured | Adding any reporting SDK or destination requires a new privacy review and updated App Store answers before release |
-| Remote push provider | None | Disabled | Automatic Expo push-token registration and the unused notifications dependency were removed from the release candidate |
-| Product analytics provider | None | Disabled | No PostHog or other product-interaction SDK is enabled |
+| Destination                                | Data                                                                                                                                                                              | Purpose                               | Current release behavior                                                                                                                                                                                                                |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cognition Devin API and official Devin MCP | Devin account credential, account/organization identifiers, prompts, session messages and metadata, selected attachments, repository-Wiki questions, and integration availability | Authentication and app functionality  | Sent directly over TLS to Cognition-operated endpoints; credentials remain in Keychain on the phone and are never sent to DevinX infrastructure                                                                                         |
+| User-approved Mac over Tailscale           | Signed device/request identifiers, opaque session handles, approved metadata, and approved message text                                                                           | Optional local-computer functionality | Direct device-to-device path; no DevinX relay; local files, tool payloads, private thoughts, and Devin credentials are excluded                                                                                                         |
+| Expo Updates                               | Device operating system, Expo project ID, randomized per-install update token, and normal network metadata                                                                        | Deliver a compatible app update       | Expo documents the random token as the mechanism for determining whether an installation requested an update; no prompts, session messages, repository names, attachments, Devin credentials, or Connector pairing secrets are included |
+| Crash reporting provider                   | None                                                                                                                                                                              | Not bundled or configured             | Adding any reporting SDK or destination requires a new privacy review and updated App Store answers before release                                                                                                                      |
+| Remote push provider                       | None                                                                                                                                                                              | Disabled                              | Automatic Expo push-token registration and the unused notifications dependency were removed from the release candidate                                                                                                                  |
+| Product analytics provider                 | None                                                                                                                                                                              | Disabled                              | No PostHog or other product-interaction SDK is enabled                                                                                                                                                                                  |
 
 On-device preferences, caches, private device keys, and credentials are not App Store "collection" merely because the app processes them locally. The logout/disconnect gates verify credential and cache deletion.
 
@@ -23,12 +23,12 @@ On-device preferences, caches, private device keys, and credentials are not App 
 
 Use **Yes, data is collected** because Cognition is a third-party partner that receives and retains account-linked data needed for Devin functionality.
 
-| Apple data type | Purpose | Linked to user | Tracking |
-|---|---|---|---|
-| User ID | App Functionality | Yes | No |
-| Other User Content | App Functionality | Yes | No |
-| Photos and Videos | App Functionality, only when attached by the user | Yes | No |
-| Device ID | App Functionality (EAS Update randomized installation token) | No | No |
+| Apple data type    | Purpose                                                                                             | Linked to user | Tracking |
+| ------------------ | --------------------------------------------------------------------------------------------------- | -------------- | -------- |
+| User ID            | App Functionality                                                                                   | Yes            | No       |
+| Other User Content | App Functionality, including prompts, messages, Wiki questions, and optional structured prompt text | Yes            | No       |
+| Photos and Videos  | App Functionality, only when attached by the user                                                   | Yes            | No       |
+| Device ID          | App Functionality (EAS Update randomized installation token)                                        | No             | No       |
 
 Do not select Product Interaction, Advertising Data, Device ID for advertising, or tracking based on the current source. The EAS Update installation token belongs under Device ID for App Functionality only and is not linked to the Devin user. Do not select Crash Data while no reporting SDK or destination is present. If crash reporting, analytics, push registration, a DevinX relay, or additional attachment categories are enabled, stop and update this matrix before submission.
 

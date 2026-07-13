@@ -459,9 +459,6 @@ export const paths = {
   self: () => `/v3/self`,
   sessionConsumption: (orgId: OrgId, devinId: DevinId) =>
     `/v3/organizations/${orgId}/consumption/daily/sessions/${devinId}`,
-  repoIndexing: (orgId: OrgId) => `/v3beta1/organizations/${orgId}/repositories/indexing`,
-  repoIndex: (orgId: OrgId, repoPath: string) =>
-    `/v3beta1/organizations/${orgId}/repositories/${encodeURIComponent(repoPath)}/indexing`,
   schedules: (orgId: OrgId) => `/v3/organizations/${orgId}/schedules`,
   schedule: (orgId: OrgId, scheduleId: string) =>
     `/v3/organizations/${orgId}/schedules/${scheduleId}`,
@@ -665,15 +662,4 @@ export interface SelfResponse {
   user_id?: string;
   api_key_id?: string;
   api_key_name?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Repository indexing (v3beta1)
-// ---------------------------------------------------------------------------
-
-export interface RepositoryIndexing {
-  repository_path: string;
-  indexing_enabled: boolean;
-  branches: string[];
-  indexing_status?: unknown;
 }

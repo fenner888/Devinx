@@ -13,9 +13,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAskWikiQuestion, useWikiContents, useWikiStructure } from '@api/devin/mcpQueries';
+import { useRepositories } from '@api/devin/queries';
 import { useAuth } from '@auth/AuthContext';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { ErrorState } from '@components/Skeletons';
+import { repositoryIndexPresentation } from '@lib/repository-indexing';
 import { useTheme } from '@theme/index';
 
 function stringParam(value: string | string[] | undefined): string {
@@ -28,10 +30,16 @@ export default function WikiScreen() {
   const { isAuthenticated } = useAuth();
   const params = useLocalSearchParams<{ repo?: string | string[] }>();
   const repoName = stringParam(params.repo).trim();
-  const structure = useWikiStructure(repoName);
+  const repositories = useRepositories();
+  const repositoryIsAvailable = !!repositories.data?.some(
+    (repository) =>
+      repository.repo_path === repoName && repositoryIndexPresentation(repository).indexed,
+  );
+  const authorizedRepoName = repositoryIsAvailable ? repoName : '';
+  const structure = useWikiStructure(authorizedRepoName);
   const [showContents, setShowContents] = useState(false);
-  const contents = useWikiContents(repoName, showContents);
-  const ask = useAskWikiQuestion(repoName);
+  const contents = useWikiContents(authorizedRepoName, showContents);
+  const ask = useAskWikiQuestion(authorizedRepoName);
   const [question, setQuestion] = useState('');
 
   function submitQuestion() {
@@ -72,6 +80,16 @@ export default function WikiScreen() {
           <ErrorState
             title="Repository unavailable"
             message="Choose an indexed repository from Repositories & Wiki."
+          />
+        ) : repositories.isLoading ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color={tokens.brand.hex} />
+          </View>
+        ) : repositories.error || !repositoryIsAvailable ? (
+          <ErrorState
+            title="Repository unavailable"
+            message="Choose a repository returned by this Devin Cloud connection."
+            onRetry={() => repositories.refetch()}
           />
         ) : (
           <ScrollView

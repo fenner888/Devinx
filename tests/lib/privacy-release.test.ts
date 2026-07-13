@@ -98,8 +98,8 @@ describe('release privacy configuration', () => {
       resolve(repositoryRoot, 'docs/app-privacy-review.md'),
       'utf8',
     );
-    expect(privacyReview).toContain(
-      '| Device ID | App Functionality (EAS Update randomized installation token) | No | No |',
+    expect(privacyReview).toMatch(
+      /\|\s*Device ID\s*\|\s*App Functionality \(EAS Update randomized installation token\)\s*\|\s*No\s*\|\s*No\s*\|/,
     );
   });
 });

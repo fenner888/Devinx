@@ -1,6 +1,6 @@
 # App Store listing draft
 
-Last updated: July 11, 2026
+Last updated: July 13, 2026
 
 This is a review draft only. Do not publish it or submit App Review without explicit release approval.
 
@@ -25,6 +25,8 @@ Highlights:
 - Cloud, Computer, or combined session views with clear origins
 - Session timelines, worklog, changes, insights, and follow-up messaging
 - Repository, playbook, knowledge, attachment, and execution-mode controls
+- Read-only organization integration/MCP status and repository Wiki answers where permitted
+- On-device dictation plus an optional on-device prompt-organizing preview
 - Per-device Connector read/send permissions and revocation
 - Dark and light appearance, reduced-motion support, and VoiceOver labels
 - An in-app Devin companion that reflects session state without covering controls

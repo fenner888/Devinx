@@ -29,22 +29,17 @@ import {
   useSecrets,
   useUploadAttachment,
   useRepositories,
-  useIndexedRepositories,
-  useIndexRepository,
 } from '@api/devin/queries';
 import { ModeSettings } from '@components/ModeSettings';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
-import {
-  VoiceComposerStatus,
-  VoiceMicButton,
-  useVoiceComposer,
-} from '@components/VoiceInput';
+import { VoiceComposerStatus, VoiceMicButton, useVoiceComposer } from '@components/VoiceInput';
 import type { DevinMode } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
 import { COMPOSE_DRAFT_KEY } from '@lib/localUserData';
 import { useAppPreferences } from '@store/preferences';
 import { userFacingError } from '@lib/user-facing-error';
+import { repositoryIndexPresentation } from '@lib/repository-indexing';
 
 const MAX_PROMPT = 10000;
 const MAX_TITLE = 200;
@@ -82,8 +77,6 @@ export default function ComposeScreen() {
   const { data: knowledge } = useKnowledge();
   const { data: secrets } = useSecrets();
   const { data: repositories } = useRepositories();
-  const { data: indexedRepos } = useIndexedRepositories();
-  const indexRepo = useIndexRepository();
   const uploadAttachment = useUploadAttachment();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -549,9 +542,7 @@ export default function ComposeScreen() {
               <ScrollView>
                 {repositories.map((repo) => {
                   const selected = draft.repos.includes(repo.repo_path);
-                  const indexed = indexedRepos?.some(
-                    (r) => r.repository_path === repo.repo_path && r.indexing_enabled,
-                  );
+                  const indexStatus = repositoryIndexPresentation(repo);
                   return (
                     <Pressable
                       key={repo.provider_repository_id}
@@ -571,7 +562,7 @@ export default function ComposeScreen() {
                           >
                             {repo.repo_name}
                           </Text>
-                          {indexed && (
+                          {indexStatus.indexed && (
                             <View className="flex-row items-center ml-2">
                               <Ionicons name="sparkles" size={10} color={tokens.finished.hex} />
                               <Text className="text-finished text-text11 ml-0.5">indexed</Text>
@@ -583,16 +574,6 @@ export default function ComposeScreen() {
                           {repo.repo_language ? ` · ${repo.repo_language}` : ''}
                         </Text>
                       </View>
-                      {!indexed && (
-                        <Pressable
-                          className="rounded-chip px-2.5 py-1 bg-tint-secondary mr-2"
-                          onPress={() => indexRepo.mutate({ repoPath: repo.repo_path })}
-                          disabled={indexRepo.isPending}
-                          accessibilityLabel={`Index ${repo.repo_name}`}
-                        >
-                          <Text className="text-brand-text text-text11 font-medium">Index</Text>
-                        </Pressable>
-                      )}
                       {selected && (
                         <Ionicons name="checkmark" size={16} color={tokens.brandText.hex} />
                       )}

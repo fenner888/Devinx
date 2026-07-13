@@ -560,10 +560,7 @@ export const scheduleResponseSchema = z
     // enum tables omit it. Preserve unknown read values without offering unsupported writes.
     agent: z.string().optional(),
     notify_on: z.enum(['always', 'failure', 'never']).optional(),
-    playbook: z
-      .object({ playbook_id: z.string(), title: z.string() })
-      .nullable()
-      .optional(),
+    playbook: z.object({ playbook_id: z.string(), title: z.string() }).nullable().optional(),
     consecutive_failures: z.number().optional(),
     last_executed_at: z.string().nullable().optional(),
     last_error_message: z.string().nullable().optional(),
@@ -616,7 +613,12 @@ export const playbookCreateRequestSchema = z
   .object({
     title: z.string().trim().min(1).max(200),
     body: z.string().trim().min(1).max(100_000),
-    macro: z.string().regex(/^![A-Za-z0-9_-]+$/).max(100).nullable().optional(),
+    macro: z
+      .string()
+      .regex(/^![A-Za-z0-9_-]+$/)
+      .max(100)
+      .nullable()
+      .optional(),
   })
   .strict();
 
@@ -634,7 +636,11 @@ export const secretCreateRequestSchema = z
   })
   .strict();
 
-export const resourceIdSchema = z.string().min(1).max(256).regex(/^[A-Za-z0-9._:-]+$/);
+export const resourceIdSchema = z
+  .string()
+  .min(1)
+  .max(256)
+  .regex(/^[A-Za-z0-9._:-]+$/);
 
 const scheduleWriteFieldsSchema = z
   .object({
@@ -766,7 +772,7 @@ export const repositoryResponseSchema = z
 export const repositoryListResponseSchema = paginatedResponseSchema(repositoryResponseSchema);
 
 // ---------------------------------------------------------------------------
-// Self / identity + repository indexing
+// Self / identity
 // ---------------------------------------------------------------------------
 
 export const selfResponseSchema = z
@@ -780,14 +786,3 @@ export const selfResponseSchema = z
     api_key_name: z.string().optional(),
   })
   .passthrough();
-
-export const repositoryIndexingSchema = z
-  .object({
-    repository_path: z.string(),
-    indexing_enabled: z.boolean().optional().default(false),
-    branches: z.array(z.string()).optional().default([]),
-    indexing_status: z.unknown().optional(),
-  })
-  .passthrough();
-
-export const repositoryIndexingListSchema = paginatedResponseSchema(repositoryIndexingSchema);
