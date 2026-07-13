@@ -23,6 +23,14 @@ in `docs/authorization-matrix.md`.
 - EAS submission `cc0323eb-ad75-443e-9fb5-3dbd2e959807` successfully uploaded this exact IPA to App
   Store Connect for internal TestFlight. Apple is processing the upload. No App Review or public
   release action was taken.
+- The macOS Connector was rebuilt from documentation checkpoint `60390a5` with its checksum-verified
+  Node `v24.18.0` runtime. The private arm64 DMG has SHA-256
+  `627629f53e5dba4e60922cfe643a9f6e6bcca2c2cd74cda69e4d3c8ea35b539d`; strict nested signature,
+  read-only mount, Applications link, clean-copy, deliberate replacement, temporary removal,
+  entitlement allowlist, and source-map absence checks passed. It remains intentionally ad-hoc.
+- The notarization readiness check fails closed at the exact missing credential: Keychain has Apple
+  Development and iPhone Distribution identities but no **Developer ID Application** identity.
+  The `devinx-notary` profile is also absent, so no public Connector signing or publication occurred.
 
 ## Build 59 keyboard-dismissal correction
 
@@ -211,11 +219,11 @@ misrepresented as fixed.
   installation, deliberate replacement mechanics, temporary app removal, executable bits,
   entitlement allowlist, bundled Node `v24.18.0`, source-map absence, and adjacent checksum
   verification pass. The current ad-hoc DMG SHA-256 is
-  `008d6976ab21222c168d0834840dc5972014f964e243f3c9a685a5b68f04d9c2`.
+  `627629f53e5dba4e60922cfe643a9f6e6bcca2c2cd74cda69e4d3c8ea35b539d`.
 - The confirmed native uninstall path stops the listener before deleting the Connector's protected
   Keychain identity and paired-device registry, unregisters launch at login, and asks macOS to move
   the application to Trash. Strict IPC, state-deletion, sanitized-failure, and native-build checks
-  pass; current CI is 73 suites / 525 tests.
+  pass; current CI is 74 suites / 539 tests.
 - The current artifact is intentionally ad-hoc signed. Gatekeeper rejects it, as expected, because
   the available Keychain contains Apple Development and iPhone Distribution identities but no
   **Developer ID Application** identity.
@@ -243,9 +251,9 @@ misrepresented as fixed.
   fill. Their shells and companion tracks remain transparent, and timeline clearance keeps the
   final message line above both pointer-free overlays.
 
-## Physical checkpoint for Build 58
+## Physical checkpoint for Build 60
 
-Use exact internal TestFlight Build 58 with sanitized sessions. Confirm:
+Use exact internal TestFlight Build 60 with sanitized sessions. Confirm:
 
 1. Home plus Cloud and Computer session creation, all destination-specific pickers, attachments,
    archive/terminate, device removal/revocation, and all three connection modes after cold launch.
@@ -254,10 +262,11 @@ Use exact internal TestFlight Build 58 with sanitized sessions. Confirm:
 3. Light/dark launch, long-history scrolling behind the transparent companion, no clipped content,
    conversation content visibly behind the floating translucent Cloud and Computer composers,
    complete final-line clearance above both overlays, keyboard clearance, scanner sizing, and no
-   raw Mac path or ACP identifier. Build 58 contains the floating-composer correction,
+   raw Mac path or ACP identifier. Build 60 contains the floating-composer correction,
    keyboard-viewport fix `791a338`, supported capability-boundary work from `4825409`, final
    model-contract enforcement from `3162a33`, truthful live activity `0907d2b`, and the approved
-   owner-supplied Home companion artwork correction `e21c8c9`.
+   owner-supplied Home companion artwork correction `e21c8c9`, keyboard dismissal `af05c98`, and
+   Devin-aligned local-model family marks `b024f0f`.
 4. Cold-launch, 200-row scrolling, one-hour foreground battery, and seven-day TestFlight stability
    using `docs/physical-performance-checklist.md`.
 
