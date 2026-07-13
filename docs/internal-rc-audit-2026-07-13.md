@@ -5,7 +5,7 @@ Review nor a public Connector release. The authenticated product inventory and s
 decisions are in `specs/033-cloud-local-settings-parity.md`; route-level authorization evidence is
 in `docs/authorization-matrix.md`.
 
-## Post-Build-56 visual-acceptance candidate
+## Post-Build-56 visual-acceptance candidates
 
 - Release source `43bd171` preserves the supported Build 56 product boundary and adds two reviewed
   changes only: truthful live session activity from `0907d2b` and the approved token-driven Home
@@ -25,9 +25,25 @@ in `docs/authorization-matrix.md`.
   metadata, entitlement, disclosure, production update/runtime, and 10-manifest privacy inspection.
 - EAS submission `b61fdf5a-9a0d-47e4-8c93-2a390780b271` uploaded Build 57 to App Store Connect for
   internal TestFlight. App Store Connect completed processing and shows Build 57 as **Ready to
-  Submit** in the one-tester **Team (Expo)** internal group, with one install recorded. This is a
-  visual-acceptance candidate, not a frozen UI or public release; physical acceptance and explicit
-  owner freeze remain required.
+  Submit** in the one-tester **Team (Expo)** internal group, with one install recorded. Physical
+  review rejected its generated Home stage because the opaque geometric surface read as a hard
+  rectangular shelf. Build 57 is therefore superseded and is not a frozen UI.
+- Release source `e21c8c9` replaces the rejected generated stage with the owner-supplied 1280×853
+  space artwork. The real React Native renderer was inspected on an iPhone simulator: the horizon
+  and floor light sit beneath Devin, the black field fades into the true-black canvas, and no
+  shipping preview route remains. Light mode uses a quiet semantic-token halo rather than a black
+  image block.
+- Exact Node `24.18.0` CI passed on the corrected source: lint, strict TypeScript, 73 Jest suites /
+  525 tests, app and Connector builds, and the high/critical dependency gate. The existing 21
+  moderate transitive findings remain reviewed and unchanged.
+- iOS `0.1.0 (58)` was archived from clean source `e21c8c9` with Node `24.18.0` and Xcode `26.6`.
+  The 20,821,478-byte IPA has SHA-256
+  `34aeefe1970e5f18b9e279ada9c1cb8c31f6a2b6f10bb1218646447f558eb288` and passed strict signing,
+  metadata, entitlement, disclosure, production update/runtime, packaged-artwork, and 10-manifest
+  privacy inspection.
+- EAS submission `b53ef440-ed63-496d-b33f-9781aa3af02a` successfully uploaded Build 58 to App Store
+  Connect for internal TestFlight. Apple processing and physical acceptance remain external; no App
+  Review or public release action was taken.
 
 ## Internal candidate produced
 
@@ -182,9 +198,9 @@ misrepresented as fixed.
   fill. Their shells and companion tracks remain transparent, and timeline clearance keeps the
   final message line above both pointer-free overlays.
 
-## Physical checkpoint for Build 57
+## Physical checkpoint for Build 58
 
-Use exact internal TestFlight Build 57 with sanitized sessions. Confirm:
+Use exact internal TestFlight Build 58 with sanitized sessions. Confirm:
 
 1. Home plus Cloud and Computer session creation, all destination-specific pickers, attachments,
    archive/terminate, device removal/revocation, and all three connection modes after cold launch.
@@ -193,10 +209,10 @@ Use exact internal TestFlight Build 57 with sanitized sessions. Confirm:
 3. Light/dark launch, long-history scrolling behind the transparent companion, no clipped content,
    conversation content visibly behind the floating translucent Cloud and Computer composers,
    complete final-line clearance above both overlays, keyboard clearance, scanner sizing, and no
-   raw Mac path or ACP identifier. Build 57 contains the floating-composer correction,
+   raw Mac path or ACP identifier. Build 58 contains the floating-composer correction,
    keyboard-viewport fix `791a338`, supported capability-boundary work from `4825409`, final
    model-contract enforcement from `3162a33`, truthful live activity `0907d2b`, and the approved
-   Home companion stage `43bd171`.
+   owner-supplied Home companion artwork correction `e21c8c9`.
 4. Cold-launch, 200-row scrolling, one-hour foreground battery, and seven-day TestFlight stability
    using `docs/physical-performance-checklist.md`.
 

@@ -1,9 +1,9 @@
 # Final internal TestFlight physical checklist
 
-Use internal TestFlight Build 57. It contains composer correction `d90fbb7`, keyboard-viewport fix
+Use internal TestFlight Build 58. It contains composer correction `d90fbb7`, keyboard-viewport fix
 `791a338`, the supported Settings/MCP/Wiki capability boundary recorded in release-source commit
 `4825409`, final Cloud/Computer model-contract enforcement `3162a33`, truthful session activity
-`0907d2b`, and the approved Home companion stage `43bd171`.
+`0907d2b`, and the owner-supplied Home companion artwork correction `e21c8c9`.
 Use only sanitized sessions, repositories, and prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.
