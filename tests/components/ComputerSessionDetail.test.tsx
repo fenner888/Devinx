@@ -1,4 +1,5 @@
 import React from 'react';
+import { Keyboard } from 'react-native';
 import { fireEvent, render } from '@testing-library/react-native';
 
 const mockMutate = jest.fn();
@@ -154,6 +155,12 @@ describe('Computer session detail', () => {
     expect(screen.getByLabelText('Computer session message').props.className).toContain(
       'min-h-[44px]',
     );
+    expect(screen.getByTestId('computer-session-history').props.keyboardDismissMode).toBe(
+      'interactive',
+    );
+    expect(screen.getByTestId('computer-session-history').props.keyboardShouldPersistTaps).toBe(
+      'handled',
+    );
     expect(screen.getByLabelText('Model: SWE-1.7')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Reasoning and speed: High'));
     fireEvent.press(screen.getByLabelText('Use Medium for SWE-1.7'));
@@ -171,6 +178,21 @@ describe('Computer session detail', () => {
     expect(screen.getByTestId('session-live-activity')).toBeTruthy();
     expect(mockCompanionProps).toHaveBeenLastCalledWith(
       expect.objectContaining({ state: 'thinking', travel: true, travelTrack: true }),
+    );
+  });
+
+  it('lets the user explicitly hide the keyboard without clearing the draft', () => {
+    const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
+    const screen = render(<ComputerSessionDetailScreen />);
+    const input = screen.getByLabelText('Computer session message');
+
+    fireEvent.changeText(input, 'Keep this local draft');
+    fireEvent(input, 'focus');
+    fireEvent.press(screen.getByLabelText('Hide keyboard'));
+
+    expect(dismissKeyboard).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Computer session message').props.value).toBe(
+      'Keep this local draft',
     );
   });
 

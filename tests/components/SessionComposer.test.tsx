@@ -148,8 +148,28 @@ describe('active session composer', () => {
     expect(composer.props.style.backgroundColor).toBe('#FFFFFF14');
     expect(getByLabelText('Cloud session message').props.textAlignVertical).toBe('top');
     expect(getByLabelText('Cloud session message').props.className).toContain('min-h-[44px]');
+    expect(getByTestId('cloud-session-timeline').props.keyboardDismissMode).toBe('interactive');
+    expect(getByTestId('cloud-session-timeline').props.keyboardShouldPersistTaps).toBe('handled');
     await waitFor(() => expect(getByLabelText('Repository: fenner888/Devinx')).toBeTruthy());
     expect(getByLabelText('Session mode: Fast')).toBeTruthy();
+  });
+
+  it('lets the user explicitly hide the keyboard without clearing the draft', async () => {
+    const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
+    const screen = render(
+      <ThemeProvider>
+        <SessionDetailScreen />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText('Repository: fenner888/Devinx')).toBeTruthy());
+    const input = screen.getByLabelText('Cloud session message');
+    fireEvent.changeText(input, 'Keep this draft');
+    fireEvent(input, 'focus');
+    fireEvent.press(screen.getByLabelText('Hide keyboard'));
+
+    expect(dismissKeyboard).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Cloud session message').props.value).toBe('Keep this draft');
   });
 
   it('does not duplicate the sleeping status beside the composer', async () => {

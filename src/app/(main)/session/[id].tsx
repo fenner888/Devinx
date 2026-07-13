@@ -56,6 +56,7 @@ import { DevinMarkdown } from '@components/DevinMarkdown';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
 import { DevinCompanion } from '@components/pets';
 import { LiveActivityTrail } from '@components/sessions/LiveActivityTrail';
+import { KeyboardDismissButton } from '@components/KeyboardDismissButton';
 import {
   VoiceComposerStatus,
   VoiceMicButton,
@@ -486,6 +487,7 @@ export default function SessionDetailScreen() {
                 textAlignVertical="top"
                 accessibilityLabel="Cloud session message"
                 onSelectionChange={voice.onSelectionChange}
+                onFocus={() => setKeyboardVisible(true)}
               />
               <VoiceComposerStatus voice={voice} />
               <View
@@ -507,6 +509,7 @@ export default function SessionDetailScreen() {
                   </Pressable>
                 </View>
                 <View className="flex-row items-center gap-1">
+                  <KeyboardDismissButton visible={keyboardVisible} />
                   <VoiceMicButton voice={voice} disabled={sendMessage.isPending} />
                   <Pressable
                     className={`h-10 w-10 items-center justify-center rounded-full ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
@@ -895,6 +898,8 @@ function TimelineTab({
       contentContainerClassName="pt-3"
       contentContainerStyle={{ paddingBottom: bottomClearance }}
       testID="cloud-session-timeline"
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      keyboardShouldPersistTaps="handled"
       onScroll={handleScroll}
       scrollEventThrottle={100}
       onContentSizeChange={() => {

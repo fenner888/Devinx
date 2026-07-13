@@ -31,6 +31,7 @@ import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
 import { ComputerModelPickerSheets } from '@components/sessions/ComputerModelPickerSheets';
 import { LiveActivityTrail } from '@components/sessions/LiveActivityTrail';
+import { KeyboardDismissButton } from '@components/KeyboardDismissButton';
 import {
   VoiceComposerStatus,
   VoiceMicButton,
@@ -140,6 +141,7 @@ export default function ComputerSessionDetailScreen() {
   const insets = useSafeAreaInsets();
   const { computers } = useConnections();
   const [companionActive, setCompanionActive] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [composerHeight, setComposerHeight] = useState(0);
   const [draft, setDraft] = useState('');
   const [pendingText, setPendingText] = useState<string | null>(null);
@@ -238,6 +240,19 @@ export default function ComputerSessionDetailScreen() {
     },
     [],
   );
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   function sendPrompt() {
     const text = draft.trim();
@@ -406,6 +421,8 @@ export default function ComputerSessionDetailScreen() {
             contentContainerClassName="px-5 pt-5"
             contentContainerStyle={{ paddingBottom: composerOverlayHeight + 128 }}
             testID="computer-session-history"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            keyboardShouldPersistTaps="handled"
             onScroll={handleHistoryScroll}
             scrollEventThrottle={100}
             onContentSizeChange={() => {
@@ -508,6 +525,7 @@ export default function ComputerSessionDetailScreen() {
                 editable={!prompt.isPending && !steeringActive}
                 accessibilityLabel="Computer session message"
                 onSelectionChange={voice.onSelectionChange}
+                onFocus={() => setKeyboardVisible(true)}
               />
               <VoiceComposerStatus voice={voice} />
               <View
@@ -550,6 +568,7 @@ export default function ComputerSessionDetailScreen() {
                   )}
                 </Pressable>
                 <View className="ml-auto flex-row items-center gap-1">
+                  <KeyboardDismissButton visible={keyboardVisible} />
                   <VoiceMicButton
                     voice={voice}
                     disabled={!canPrompt || prompt.isPending || steeringActive}
