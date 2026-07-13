@@ -1,7 +1,7 @@
 # Final internal TestFlight physical checklist
 
-Use internal TestFlight Build 55 after Apple finishes processing it. It contains composer correction
-`d90fbb7`, keyboard-viewport fix `791a338`, and the supported Settings/MCP/Wiki capability boundary
+Use internal TestFlight Build 55. It contains composer correction `d90fbb7`, keyboard-viewport fix
+`791a338`, and the supported Settings/MCP/Wiki capability boundary
 recorded in release-source commit `4825409`.
 Use only sanitized sessions, repositories, and prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or

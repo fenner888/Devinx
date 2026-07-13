@@ -6,7 +6,7 @@ This document separates verified release evidence from work that still requires 
 
 - Current iOS internal release candidate: `0.1.0 (55)` from clean commit `4825409`
 - Build 55 IPA SHA-256: `f41f3c931aaeb32e21f472d7040ca26abe3c9f4599fd6b13f8d7f422c152bfde`
-- EAS internal-TestFlight submission: `be1a1dc4-c74b-47f4-b0f7-14e857842e23` — finished successfully at 1:12 PM EDT; Apple accepted the upload and is processing Build 55
+- EAS internal-TestFlight submission: `be1a1dc4-c74b-47f4-b0f7-14e857842e23` — finished successfully at 1:12 PM EDT; Apple processing is complete and Build 55 is `Testing` in the internal **Team (Expo)** group
 - Build 55 contains the supported capability-boundary work from `c1f5edc` plus the refreshed release evidence in `4825409`.
 - Build 55 is an internal TestFlight checkpoint, not an App Review submission.
 - The complete historical artifact ledger and remaining physical/external gates are maintained in `docs/release-readiness.md` and `docs/internal-rc-audit-2026-07-13.md`.

@@ -26,8 +26,9 @@ in `docs/authorization-matrix.md`.
 - All 10 packaged privacy manifests declare zero collected-data types, no tracking, and no
   tracking domains. No Sentry or notification artifact is packaged.
 - EAS submission `be1a1dc4-c74b-47f4-b0f7-14e857842e23` finished successfully and uploaded Build
-  55 to Apple on July 13, 2026 at 1:12 PM EDT for internal TestFlight. Apple accepted the upload and
-  is processing it. No App Review or public release was submitted.
+  55 to Apple on July 13, 2026 at 1:12 PM EDT for internal TestFlight. App Store Connect shows
+  `0.1.0 (55)` as `Testing` in the one-tester **Team (Expo)** internal group. No App Review or public
+  release was submitted.
 
 ## Product surface verification
 
@@ -151,8 +152,7 @@ misrepresented as fixed.
 
 ## Physical checkpoint for Build 55
 
-Use exact internal TestFlight Build 55 after Apple finishes processing it, with sanitized sessions.
-Confirm:
+Use exact internal TestFlight Build 55 with sanitized sessions. Confirm:
 
 1. Home plus Cloud and Computer session creation, all destination-specific pickers, attachments,
    archive/terminate, device removal/revocation, and all three connection modes after cold launch.
