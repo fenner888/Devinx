@@ -16,6 +16,7 @@
     "bridge:start": "npm run bridge:build && node dist/bridge/cli.js",
     "bridge:discover": "node scripts/bridge/discover-acp.mjs",
     "connector:build:macos": "node scripts/connector/build-macos.mjs",
+    "connector:verify:macos": "node scripts/connector/verify-macos-artifact.mjs",
     "connector:notarize:macos": "node scripts/connector/notarize-macos.mjs",
     "connector:notarize:check": "node scripts/connector/notarize-macos.mjs --check",
     "connector:open:macos": "npm run connector:build:macos && open 'artifacts/connector/DevinX Connector.app'",
@@ -90,5 +91,9 @@
   "overrides": {
     "@xmldom/xmldom": "0.8.13",
     "linkify-it": "5.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "fsevents@2.3.3": true
   }
 }

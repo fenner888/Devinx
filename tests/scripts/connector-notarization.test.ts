@@ -5,6 +5,12 @@ import { spawnSync } from 'node:child_process';
 const repositoryRoot = resolve(__dirname, '..', '..');
 const scriptPath = resolve(repositoryRoot, 'scripts', 'connector', 'notarize-macos.mjs');
 const buildScriptPath = resolve(repositoryRoot, 'scripts', 'connector', 'build-macos.mjs');
+const verificationScriptPath = resolve(
+  repositoryRoot,
+  'scripts',
+  'connector',
+  'verify-macos-artifact.mjs',
+);
 const nodeVersionPath = resolve(repositoryRoot, '.nvmrc');
 const packagePath = resolve(repositoryRoot, 'package.json');
 const runtimeEntitlementsPath = resolve(
@@ -81,5 +87,16 @@ describe('macOS Connector notarization policy', () => {
     expect(packageJson.engines?.node).toBe(nodeVersion);
     expect(buildSource).toContain("readFileSync(resolve(repositoryRoot, '.nvmrc')");
     expect(buildSource).not.toMatch(/const NODE_VERSION = 'v\d/);
+  });
+
+  it('verifies a clean copied artifact without launching or mutating active pairing state', () => {
+    const source = readFileSync(verificationScriptPath, 'utf8');
+    expect(source).toContain("['attach', '-readonly', '-nobrowse'");
+    expect(source).toContain("['--verify', '--deep', '--strict'");
+    expect(source).toMatch(/['"]--assess['"]/);
+    expect(source).toContain("['stapler', 'validate'");
+    expect(source).toContain('cleanInstallCopyVerified: true');
+    expect(source).not.toMatch(/\bopen\s*\(/);
+    expect(source).not.toContain("['open'");
   });
 });
