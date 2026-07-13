@@ -30,6 +30,7 @@ import { computerTransportLabel } from '@auth/pairedComputers';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
 import { ComputerModelPickerSheets } from '@components/sessions/ComputerModelPickerSheets';
+import { ModelFamilyMark } from '@components/sessions/ModelFamilyMark';
 import { LiveActivityTrail } from '@components/sessions/LiveActivityTrail';
 import { KeyboardDismissButton } from '@components/KeyboardDismissButton';
 import {
@@ -538,7 +539,7 @@ export default function ComputerSessionDetailScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`Model: ${modelLabel}`}
                 >
-                  <Ionicons name="hardware-chip-outline" size={15} color={tokens.textMid.hex} />
+                  <ModelFamilyMark name={modelLabel} size={17} />
                   <Text className="ml-1.5 max-w-24 text-text-mid text-text13" numberOfLines={1}>
                     {modelLabel}
                   </Text>

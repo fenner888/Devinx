@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { ModelFamilyMark } from '@components/sessions/ModelFamilyMark';
 import {
   groupComputerModels,
   preferredFamilyVariant,
@@ -75,8 +76,8 @@ export function ComputerModelPickerSheets({
         accessibilityRole="button"
         accessibilityLabel={`Use model family ${family.name}${badge ? `, ${badge}` : ''}`}
       >
-        <View className="w-8 items-start">
-          {selected && <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />}
+        <View className="w-10 items-start">
+          <ModelFamilyMark name={family.name} size={26} />
         </View>
         <View className="flex-1 pr-2">
           <View className="flex-row items-center">
@@ -100,6 +101,12 @@ export function ComputerModelPickerSheets({
               {family.description}
             </Text>
           )}
+        </View>
+        {family.variants.some((variant) => variant.model.supportsImages) && (
+          <Ionicons name="image-outline" size={15} color={tokens.textLow.hex} />
+        )}
+        <View className="w-8 items-end">
+          {selected && <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />}
         </View>
       </Pressable>
     );

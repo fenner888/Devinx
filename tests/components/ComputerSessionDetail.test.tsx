@@ -109,8 +109,13 @@ jest.mock('../../src/theme/index', () => ({
       textMid: { hex: '#777777' },
       textLow: { hex: '#666666' },
       textHi: { hex: '#eeeeee' },
+      textHiStrong: { hex: '#ffffff' },
       brandText: { hex: '#0088ff' },
       brand: { hex: '#0088ff' },
+      running: { hex: '#0088ff' },
+      finished: { hex: '#00dd88' },
+      blocked: { hex: '#ee8833' },
+      merged: { hex: '#9966dd' },
       textAlwaysWhite: { hex: '#ffffff' },
       tintPrimary: { hex: '#FFFFFF14' },
     },
@@ -162,6 +167,7 @@ describe('Computer session detail', () => {
       'handled',
     );
     expect(screen.getByLabelText('Model: SWE-1.7')).toBeTruthy();
+    expect(screen.getByTestId('model-family-mark-swe')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Reasoning and speed: High'));
     fireEvent.press(screen.getByLabelText('Use Medium for SWE-1.7'));
     expect(screen.getByLabelText('Reasoning and speed: Medium')).toBeTruthy();

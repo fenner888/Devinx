@@ -28,6 +28,13 @@ selection, spacing, and dismissal remain consistent.
   checkmark or check-circle.
 - Icons use a compact secondary container. Descriptions explain meaningful
   differences without repeating the title.
+- Local model rows mirror Devin Desktop's current hierarchy: a recognizable
+  family mark appears at the leading edge and the selection checkmark appears
+  at the trailing edge. Adaptive/Fusion, Claude, GLM, SWE, GPT, Gemini,
+  DeepSeek, and Grok use bounded code-native marks; unknown live ACP families
+  use a neutral chip fallback. The same mark appears in the selected-model
+  composer control. Marks are presentation only and never create, rename, or
+  remap an ACP model ID.
 - Sheets have a bounded maximum height and scroll only when their contents
   require it. They must not reserve a large empty panel below a short list.
 

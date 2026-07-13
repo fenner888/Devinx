@@ -49,6 +49,7 @@ import {
   ComputerDiscoveryNotices,
   ComputerSessionRow,
 } from '@components/sessions/ComputerSessionRow';
+import { ModelFamilyMark } from '@components/sessions/ModelFamilyMark';
 import { useConnections } from '@auth/ConnectionContext';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
 import { connectionModeUsesComputer } from '@lib/connections';
@@ -360,8 +361,8 @@ export default function HomeScreen() {
         accessibilityRole="button"
         accessibilityLabel={`Use model family ${family.name}${badgeLabel ? `, ${badgeLabel}` : ''}`}
       >
-        <View className="w-8 items-start">
-          {selected && <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />}
+        <View className="w-10 items-start">
+          <ModelFamilyMark name={family.name} size={26} />
         </View>
         <View className="flex-1 pr-2">
           <View className="flex-row items-center">
@@ -389,6 +390,9 @@ export default function HomeScreen() {
         {family.variants.some((variant) => variant.model.supportsImages) && (
           <Ionicons name="image-outline" size={15} color={tokens.textLow.hex} />
         )}
+        <View className="w-8 items-end">
+          {selected && <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />}
+        </View>
       </Pressable>
     );
   }
@@ -642,7 +646,10 @@ export default function HomeScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`Model: ${selectedFamily?.name ?? 'Default'}`}
                     >
-                      <Ionicons name="hardware-chip-outline" size={15} color={tokens.textMid.hex} />
+                      <ModelFamilyMark
+                        name={selectedFamily?.name ?? 'Default model'}
+                        size={17}
+                      />
                       <Text className="text-text-mid text-text13 ml-1.5 max-w-28" numberOfLines={1}>
                         {selectedFamily?.name ?? 'Default model'}
                       </Text>

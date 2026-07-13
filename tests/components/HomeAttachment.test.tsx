@@ -481,6 +481,7 @@ describe('home attachment control', () => {
     );
 
     expect(screen.getByLabelText('Model: Adaptive')).toBeTruthy();
+    expect(screen.getByTestId('model-family-mark-adaptive')).toBeTruthy();
     fireEvent.changeText(screen.getByLabelText('Session prompt'), 'Use adaptive routing');
     fireEvent.press(screen.getByLabelText('Start session'));
 
