@@ -64,7 +64,7 @@ Validated with Node 24 on July 13, 2026:
 - lockfile dry-run install succeeds;
 - lint passes with zero warnings;
 - strict TypeScript passes for the app and Connector;
-- 66 Jest suites / 496 tests pass with open-handle detection;
+- 66 Jest suites / 497 tests pass with open-handle detection;
 - Connector TypeScript and Keychain helper build successfully;
 - `npm audit --audit-level=high` passes with 0 high and 0 critical findings.
 - CI now reads the exact Node version from `.nvmrc`, matching the package engine and local release

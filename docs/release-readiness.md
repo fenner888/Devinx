@@ -110,7 +110,7 @@ The results below must be refreshed after release-document changes and before a 
 | Lockfile install | exact direct dependency pins and lockfile dry-run passed on bundled Node 24; the repository and release CI remain pinned to Node 24.18.0 |
 | Lint | passed, zero warnings |
 | TypeScript | passed for app and bridge |
-| Jest | passed 66 suites / 496 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, exact-origin Security Work, active companion travel, and floating-composer clearance coverage; the removed suites covered an enterprise Code Scan client that is no longer shipped |
+| Jest | passed 66 suites / 497 tests with handle detection enabled, including supported Cloud-resource parity, strict write boundaries, safe Markdown, generic errors, voice privacy, exact-origin Security Work, active companion travel, and floating-composer clearance coverage; the removed suites covered an enterprise Code Scan client that is no longer shipped |
 | Production iOS export | Build 49 passed local signed export; 19.7 MB IPA. The next candidate containing `d90fbb7` must be inspected independently before upload |
 | High/critical dependency audit | passed; 0 high, 0 critical |
 | Moderate dependency review | 21 transitive advisories after removing unused notifications: `markdown-it` has no fix; PostCSS/UUID fixes require a breaking Expo 57 migration, so no forced upgrade |
