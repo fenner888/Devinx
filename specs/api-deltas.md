@@ -145,7 +145,7 @@ vocabulary; a `deriveStatusLabel(session)` helper will be implemented in
 Session 2 to mirror the web app's state machine. The mobile app shows the
 web-app labels, never the raw enum strings.
 
-### D10a. Security Swarm exposes monitoring and remediation, not scan creation
+### D10a. Public Security Work uses sessions; scan findings remain an enterprise enhancement
 
 The documented v3 code-scan surface contains `GET /v3/enterprise/code-scans/metrics`,
 `GET /v3/enterprise/code-scans/findings`, and the organization-scoped finding
@@ -154,10 +154,16 @@ Finding reads require `ViewAccountCodeScans`; remediation requires
 `UseAccountCodeScans`. The remediation response returns both `finding_id` and
 the newly launched `session_id`.
 
-No public create-scan endpoint is documented. **Action:** DevinX provides a
-native Security Swarm metrics, scan-group, findings, and remediation dashboard,
-but hands new scan creation to Devin explicitly. It never guesses a write path.
-See `/specs/026-security-swarm-dashboard.md`.
+Findings contain both `orchestrator_session_id` and `session_id`, but ordinary
+session responses do not contain scan severity, evidence, recommendation, or
+resolution state. No public create-scan endpoint is documented. **Action:** the
+public app provides native **Security Work** from supported organization sessions:
+security categories/origins/tags, parent-child agent grouping, normal work logs,
+and an explicitly read-only review launched through the validated session-create
+endpoint. It does not use an external handoff or label session data as Code Scan
+findings. Enterprise metrics/findings/remediation remain a future enhancement
+when the authenticated account has a documented supported grant. See
+`/specs/026-security-swarm-dashboard.md`.
 
 ### D11. v1 fallback status enum (for reference)
 

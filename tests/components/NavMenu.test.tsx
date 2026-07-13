@@ -16,7 +16,7 @@ import { NavMenu } from '../../src/components/NavMenu';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
 
 describe('NavMenu', () => {
-  it('does not expose the enterprise-only Security API as a public app destination', () => {
+  it('exposes session-based Security Work without restoring the enterprise scan destination', () => {
     const onClose = jest.fn();
     const screen = render(
       <ThemeProvider>
@@ -25,9 +25,9 @@ describe('NavMenu', () => {
     );
 
     expect(screen.queryByLabelText('Security')).toBeNull();
-    fireEvent.press(screen.getByLabelText('New session'));
+    fireEvent.press(screen.getByLabelText('Security Work'));
 
     expect(onClose).toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith('/(main)/compose');
+    expect(mockPush).toHaveBeenCalledWith('/(main)/security-work');
   });
 });

@@ -36,6 +36,7 @@ export function NavMenu({
     { icon: 'add', label: 'New session', route: '/(main)/compose' },
     { icon: 'chatbubbles-outline', label: 'Sessions', route: '/(main)/sessions' },
     { icon: 'time-outline', label: 'Automations', route: '/(main)/automations' },
+    { icon: 'shield-checkmark-outline', label: 'Security Work', route: '/(main)/security-work' },
     { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review' },
   ];
 

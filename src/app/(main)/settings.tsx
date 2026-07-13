@@ -331,6 +331,13 @@ export default function SettingsScreen() {
                 tint: 'bg-tint-blue',
                 color: tokens.brandText.hex,
               },
+              {
+                icon: 'shield-checkmark-outline',
+                label: 'Security Work',
+                route: '/(main)/security-work',
+                tint: 'bg-tint-green',
+                color: tokens.finished.hex,
+              },
             ] as const
           ).map(({ icon, label, route, tint, color }, i, arr) => (
             <Pressable

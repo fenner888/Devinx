@@ -6,6 +6,7 @@ export default function MainGroup() {
       <Stack.Screen name="index" />
       <Stack.Screen name="sessions" />
       <Stack.Screen name="automations" />
+      <Stack.Screen name="security-work" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="computer" />
       <Stack.Screen name="session/[id]" />
