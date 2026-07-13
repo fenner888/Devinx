@@ -467,7 +467,7 @@ export default function SessionDetailScreen() {
             )}
             <View
               className="rounded-card border border-border px-3 pt-2 pb-2"
-              style={{ backgroundColor: tokens.composerSurface.hex }}
+              style={{ backgroundColor: tokens.tintPrimary.hex }}
               testID="cloud-session-composer"
             >
               <TextInput

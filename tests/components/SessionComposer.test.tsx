@@ -140,7 +140,7 @@ describe('active session composer', () => {
     const composer = getByTestId('cloud-session-composer');
     expect(composer.props.className).toContain('rounded-card');
     expect(composer.props.className).not.toContain('bg-surface1');
-    expect(composer.props.style.backgroundColor).toBeTruthy();
+    expect(composer.props.style.backgroundColor).toBe('#FFFFFF14');
     expect(getByLabelText('Cloud session message').props.textAlignVertical).toBe('top');
     expect(getByLabelText('Cloud session message').props.className).toContain('min-h-[44px]');
     await waitFor(() => expect(getByLabelText('Repository: fenner888/Devinx')).toBeTruthy());

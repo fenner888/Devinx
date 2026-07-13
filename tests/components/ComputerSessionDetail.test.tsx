@@ -111,7 +111,7 @@ jest.mock('../../src/theme/index', () => ({
       brandText: { hex: '#0088ff' },
       brand: { hex: '#0088ff' },
       textAlwaysWhite: { hex: '#ffffff' },
-      composerSurface: { hex: '#1f1f1fdb' },
+      tintPrimary: { hex: '#FFFFFF14' },
     },
   }),
 }));
@@ -141,7 +141,7 @@ describe('Computer session detail', () => {
     const composer = screen.getByTestId('computer-session-composer');
     expect(composer.props.className).toContain('rounded-card');
     expect(composer.props.className).not.toContain('bg-surface1');
-    expect(composer.props.style.backgroundColor).toBeTruthy();
+    expect(composer.props.style.backgroundColor).toBe('#FFFFFF14');
     expect(screen.getByLabelText('Computer session message').props.textAlignVertical).toBe('top');
     expect(screen.getByLabelText('Computer session message').props.className).toContain(
       'min-h-[44px]',
