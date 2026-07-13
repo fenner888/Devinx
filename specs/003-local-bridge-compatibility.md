@@ -1,6 +1,6 @@
 # Phase 3A — Devin CLI / ACP Compatibility Baseline
 
-Observed July 10, 2026 on macOS. This report contains only version information and capability names returned during ACP initialization. It contains no session identifiers, titles, paths, prompts, messages, credentials, auth-method details, or raw metadata.
+Observed July 10 and refreshed July 13, 2026 on macOS. This report contains only version information and capability names returned during ACP initialization. It contains no session identifiers, titles, paths, prompts, messages, credentials, auth-method details, or raw metadata.
 
 ## Tested implementation
 
@@ -10,6 +10,12 @@ Observed July 10, 2026 on macOS. This report contains only version information a
 - Reported agent implementation: `affogato 0.0.0-dev`
 - Probe: `npm run bridge:discover`
 - Machine-readable fixture: `specs/bridge-compatibility/cli-2026.8.18-acp.json`
+
+The July 13 value-free probe used Devin CLI `3000.1.27 (0d4bf12e)` and returned the same five
+capability names recorded below with no unknown capabilities. The installed CLI's versioning scheme
+has changed since the original fixture; the product continues to negotiate capabilities on every
+connection rather than treating either marketing version as a compatibility guarantee. No session
+schema or account content was requested during the refresh.
 
 Two repeated probes after the schema-mode implementation returned the capability set below. An earlier probe from the same reported CLI version also returned audio and MCP HTTP/SSE capabilities. The agent implementation can therefore vary without a CLI marketing-version change; every connection must negotiate and gate features from the live initialization response.
 
