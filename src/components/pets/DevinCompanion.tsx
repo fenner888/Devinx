@@ -250,11 +250,12 @@ export function DevinCompanion({
                 testID="devin-companion-task-caption"
                 className="h-10 w-full items-center justify-end pb-1"
               >
-                <View className="max-w-full rounded-chip border border-border-subtle bg-surface1 px-1.5 py-1">
-                  <Text className="text-center text-text-mid text-text11" numberOfLines={2}>
-                    {travelCaption}
-                  </Text>
-                </View>
+                <Text
+                  className="max-w-full px-1 text-center text-text-mid text-text11"
+                  numberOfLines={2}
+                >
+                  {travelCaption}
+                </Text>
               </View>
             )}
             {frame}
@@ -272,7 +273,7 @@ export function DevinCompanion({
       accessibilityLabel={accessibilityLabel ?? visibleMessage ?? `Devin companion, ${state}`}
     >
       {visibleMessage && (
-        <View className="mr-2 max-w-56 rounded-chip border border-border-subtle bg-surface1 px-3 py-1.5">
+        <View className="mr-2 max-w-56 px-1 py-1">
           <Text className="text-text-mid text-text12">{visibleMessage}</Text>
         </View>
       )}

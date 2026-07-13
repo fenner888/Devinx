@@ -30,6 +30,7 @@ import { computerTransportLabel } from '@auth/pairedComputers';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
 import { ComputerModelPickerSheets } from '@components/sessions/ComputerModelPickerSheets';
+import { LiveActivityTrail } from '@components/sessions/LiveActivityTrail';
 import {
   VoiceComposerStatus,
   VoiceMicButton,
@@ -121,16 +122,6 @@ function HistoryMessage({ message }: { message: ComputerLoadedSession['messages'
     <View className="mb-5">
       <DevinMarkdown>{message.text}</DevinMarkdown>
       <Text className="mt-1.5 text-text-low text-text11">Devin</Text>
-    </View>
-  );
-}
-
-function WorkingIndicator() {
-  const { tokens } = useTheme();
-  return (
-    <View className="mb-4 flex-row items-center">
-      <ActivityIndicator size="small" color={tokens.brandText.hex} />
-      <Text className="ml-2 text-text-mid text-text13">Devin is working…</Text>
     </View>
   );
 }
@@ -462,7 +453,11 @@ export default function ComputerSessionDetailScreen() {
                 <Text className="mt-1 text-text-low text-text11">Sending…</Text>
               </View>
             )}
-            {steeringActive && <WorkingIndicator />}
+            <LiveActivityTrail
+              active={steeringActive}
+              label={companionActivity.message}
+              resetKey={`${bridgeId}:${sessionId}`}
+            />
           </ScrollView>
         )}
           {query.data && (

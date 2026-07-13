@@ -213,6 +213,8 @@ describe('DevinCompanion', () => {
         'Editing the authentication middleware',
       ),
     ).toBeTruthy();
+    expect(getByTestId('devin-companion-task-caption').props.className).not.toContain('bg-');
+    expect(getByTestId('devin-companion-task-caption').props.className).not.toContain('border');
 
     rerender(<DevinCompanion state="waiting" size={104} travelTrack />);
     expect(getByTestId('devin-companion-track').props.style[0]).toEqual({ height: 104 });
