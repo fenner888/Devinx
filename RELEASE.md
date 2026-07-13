@@ -4,12 +4,12 @@ This document separates verified release evidence from work that still requires 
 
 ## Current checkpoint
 
-- Connector feature baseline: `128269b` (`feat: add secure DevinX Connector steering`); release-audit changes follow it on the same branch
-- iOS internal checkpoint: `0.1.0 (14)`
-- EAS build: `c6106cba-7fdb-455c-b3ef-d073bf9fda81` — finished from commit `f5390b9`
-- App Store Connect submission: `f4f2159a-e5b9-4052-ad17-90d13bec0973` — finished with no error
-- Build 14 is an internal TestFlight checkpoint, not an App Review submission.
-- Build 14 contains the current per-computer self-disconnect, release-hardening, and accessibility changes.
+- Latest submitted iOS internal checkpoint: `0.1.0 (54)` from clean commit `791a338`
+- Build 54 IPA SHA-256: `10e083be13e33cceeb23019ba3cf98479bc1c7c238f0fce2a4384c2140073f72`
+- App Store Connect submission: `eb7b3713-9c6f-4fb7-848e-64d77a2c6a7e` — finished; processing is complete and the build is in internal testing
+- Next-candidate functional baseline: `c1f5edc` (`fix: enforce supported cloud capability boundaries`); it has not yet been assigned an iOS build number
+- Build 54 and the next candidate are internal TestFlight checkpoints, not App Review submissions.
+- The complete historical artifact ledger and remaining physical/external gates are maintained in `docs/release-readiness.md` and `docs/internal-rc-audit-2026-07-13.md`.
 
 ## Release gates
 
