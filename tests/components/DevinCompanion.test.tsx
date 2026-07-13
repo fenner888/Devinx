@@ -196,7 +196,7 @@ describe('DevinCompanion', () => {
   });
 
   it('keeps a compact task caption attached to the traveling companion', async () => {
-    const { getByTestId, getByText, rerender } = render(
+    const { getByTestId, queryByText, rerender } = render(
       <DevinCompanion
         state="working"
         size={104}
@@ -215,7 +215,23 @@ describe('DevinCompanion', () => {
     ).toBeTruthy();
 
     rerender(<DevinCompanion state="waiting" size={104} travelTrack />);
-    expect(getByText('Waiting for your reply')).toBeTruthy();
+    expect(getByTestId('devin-companion-track').props.style[0]).toEqual({ height: 104 });
+    expect(queryByText('Editing the authentication middleware')).toBeNull();
+  });
+
+  it('suppresses passive captions even when a waiting message is supplied', async () => {
+    const { queryByTestId, queryByText } = render(
+      <DevinCompanion
+        state="waiting"
+        size={104}
+        message="Waiting for your reply"
+        travelTrack
+      />,
+    );
+    await resolveMotionPreference();
+
+    expect(queryByText('Waiting for your reply')).toBeNull();
+    expect(queryByTestId('devin-companion-task-caption')).toBeNull();
   });
 
   it('suppresses the message in compact mode', async () => {

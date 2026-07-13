@@ -1,7 +1,7 @@
 # Security Work and Enterprise Code Scans
 
-Status: session-based Security Work implemented for public account tiers; enterprise Code Scan
-enhancement deferred pending supported authorization
+Status: session-based Security Work and genuine scan discovery implemented; mobile Code Scan
+creation deferred pending a supported user-principal create route
 
 ## Objective
 
@@ -13,6 +13,29 @@ organization session API.
 
 The product must never redirect users to a second Devin login, consume browser cookies, call a
 private web endpoint, or label inferred session data as an official Code Scan finding.
+
+## Observed Pro/Max Web Code Scan workflow
+
+Code Scan availability in Devin's paid Web product is distinct from the documented enterprise API
+surface. A signed-in Pro/Max user can open **Security** at `/org/{org_slug}/code-scan`, select
+**Start scan**, and use the **New Scan** form to choose one repository or all repositories, an
+optional scan profile, an optional repeat schedule, and Interactive mode before submitting
+**Run Scan**. Existing rows are labeled **Created by you** and open
+`/org/{org_slug}/code-scan/{scan_id}`.
+
+The verified `fenner888/Push` example produced a genuine scan record, linked orchestrator session,
+interactive threat-model approval, investigation child sessions, and aggregated findings. Its
+orchestrator begins with the human-facing message `Perform a security scan on fenner888/Push.`, but
+that message alone is not evidence that a normal service-user-created session invokes the same
+private Web workflow; it may be the audit message synthesized by the scan form.
+
+DevinX v1 authenticates Cloud requests with a service-user key, optionally using
+`create_as_user_id` for attribution. Attribution does not change the authenticating principal. The
+mobile app therefore must not submit the natural-language scan command through `ServiceUserAuth`
+and claim an official Code Scan. PATs would authenticate as the human user, but they remain closed
+beta and the public API still documents no create-scan endpoint. Until Devin exposes a supported
+user-principal create route, genuine scan creation remains a Web capability; DevinX may discover
+verified scan sessions and separately launch its clearly labeled read-only review.
 
 ## Supported public workflow
 

@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
   travelTrack: { overflow: 'hidden', width: '100%' },
 });
 
-function fallbackCaptionForState(state: DevinCompanionProps['state']): string {
+function fallbackCaptionForState(state: DevinCompanionProps['state']): string | undefined {
   switch (state) {
     case 'thinking':
       return 'Thinking through the task';
@@ -43,12 +43,10 @@ function fallbackCaptionForState(state: DevinCompanionProps['state']): string {
       return 'Needs your attention';
     case 'reminding':
       return 'Reminder';
-    case 'sleeping':
-      return 'Sleeping';
     case 'idle':
-      return 'Ready';
+    case 'sleeping':
     case 'waiting':
-      return 'Waiting for your reply';
+      return undefined;
   }
 }
 
@@ -85,7 +83,10 @@ export function DevinCompanion({
   const frames = travel
     ? DEVIN_FRAME_SETS[travelDirection === 'right' ? 'running-right' : 'running-left']
     : animation.frames;
-  const travelCaption = compact ? undefined : visibleMessage ?? fallbackCaptionForState(state);
+  const passiveState = state === 'idle' || state === 'sleeping' || state === 'waiting';
+  const travelCaption =
+    compact || passiveState ? undefined : visibleMessage ?? fallbackCaptionForState(state);
+  const travelCaptionHeight = travelCaption ? TRAVEL_CAPTION_HEIGHT : 0;
 
   useEffect(() => {
     let mounted = true;
@@ -230,7 +231,7 @@ export function DevinCompanion({
       >
         <View
           testID="devin-companion-track"
-          style={[{ height: displaySize + TRAVEL_CAPTION_HEIGHT }, styles.travelTrack]}
+          style={[{ height: displaySize + travelCaptionHeight }, styles.travelTrack]}
           onLayout={handleTrackLayout}
         >
           <Animated.View
@@ -238,7 +239,7 @@ export function DevinCompanion({
             style={[
               styles.travelFrame,
               {
-                height: displaySize + TRAVEL_CAPTION_HEIGHT,
+                height: displaySize + travelCaptionHeight,
                 width: displaySize,
                 transform: [{ translateX: travelX }],
               },
