@@ -5,6 +5,18 @@ Review nor a public Connector release. The authenticated product inventory and s
 decisions are in `specs/033-cloud-local-settings-parity.md`; route-level authorization evidence is
 in `docs/authorization-matrix.md`.
 
+## Internal candidate produced
+
+- iOS `0.1.0 (48)` was archived from clean commit `07b7b52` with Node `24.18.0`.
+- IPA SHA-256: `466829f3457b22a8b0285a7643da61bbfda2e6d37d8ea03dedb4a3145257d690`.
+- Strict code-sign verification passed with `get-task-allow=false`, no APS entitlement,
+  `NSFileProtectionComplete`, exempt encryption set to false, the exact on-device microphone
+  disclosure, production update channel, and runtime `0.1.0`.
+- All 10 packaged privacy manifests declare zero collected-data types, no tracking, and no
+  tracking domains. No Sentry or notification artifact is packaged.
+- EAS submission `c08b65de-0ec7-464e-acc4-aecd6c5367ae` was accepted by Apple and is processing
+  in App Store Connect for internal TestFlight. No App Review or public release was submitted.
+
 ## Product surface verification
 
 | Surface | Supported mobile behavior | Boundary | Automated evidence |

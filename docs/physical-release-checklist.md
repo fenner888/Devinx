@@ -1,6 +1,7 @@
 # Final internal TestFlight physical checklist
 
-Use the exact newest internal candidate and only sanitized sessions, repositories, and prompts.
+Use internal TestFlight Build 48 (`0.1.0 (48)`) and only sanitized sessions, repositories, and
+prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.
 
