@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  copyFileSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -157,6 +158,7 @@ function rebuildSignedDmg(identity) {
   rmSync(dmgPath, { force: true });
   mkdirSync(stagingRoot, { recursive: true });
   cpSync(appRoot, resolve(stagingRoot, 'DevinX Connector.app'), { recursive: true });
+  copyFileSync(resolve(repositoryRoot, 'LICENSE'), resolve(stagingRoot, 'LICENSE.txt'));
   symlinkSync('/Applications', resolve(stagingRoot, 'Applications'));
   run('/usr/bin/hdiutil', [
     'create',

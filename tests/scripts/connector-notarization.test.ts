@@ -78,9 +78,13 @@ describe('macOS Connector notarization policy', () => {
 
   it('packages and verifies the MIT license in both the app and disk image', () => {
     const buildSource = readFileSync(buildScriptPath, 'utf8');
+    const notarizationSource = readFileSync(scriptPath, 'utf8');
     const verificationSource = readFileSync(verificationScriptPath, 'utf8');
     expect(buildSource).toContain("resolve(resourcesRoot, 'LICENSE.txt')");
     expect(buildSource).toContain("resolve(stagingRoot, 'LICENSE.txt')");
+    expect(notarizationSource).toContain(
+      "copyFileSync(resolve(repositoryRoot, 'LICENSE'), resolve(stagingRoot, 'LICENSE.txt'))",
+    );
     expect(verificationSource).toContain("requirePath(bundledLicense, 'bundled MIT license')");
     expect(verificationSource).toContain("requirePath(mountedLicense, 'DMG MIT license')");
   });
