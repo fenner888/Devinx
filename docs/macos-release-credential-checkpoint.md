@@ -4,10 +4,15 @@ Last checked: July 13, 2026
 
 The Connector's automated notarization workflow is ready, but this Mac does not yet hold a **Developer ID Application** identity. Keychain currently exposes an Apple Development identity and an iPhone Distribution identity; neither is valid for distributing a Mac app outside the Mac App Store. The July 13 fail-closed preflight stopped at `DEVINX_CODESIGN_IDENTITY is required` before any signing or upload.
 
-The checkpoint was repeated after Build 55 with the repository's pinned Node `24.18.0` runtime.
+The checkpoint was repeated after the Build 62 design freeze with the repository's pinned Node `24.18.0` runtime.
 `security find-identity -p codesigning` still returned no Developer ID Application identity, and
 `notarytool` confirmed that the `devinx-notary` Keychain profile does not exist. No signing,
 notarization, stapling, upload, or public artifact publication was attempted.
+
+The current private Apple-silicon artifact was rebuilt from release-evidence source `4c5f139` and
+passed the full deterministic ad-hoc verification workflow. Its SHA-256 is
+`8fffe9b33afcae1d152f63f0cf8fed4c99a3b3864e0619c88fa1c78e7843dd3e`. It remains private-test
+material and must not be represented or published as the public Connector.
 
 The native confirmed-uninstall path is now implemented and tested at the IPC/runner boundary: it
 stops the listener, deletes the Connector's protected Keychain record, unregisters launch at login,

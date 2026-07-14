@@ -2,6 +2,9 @@
 
 Use the exact final TestFlight candidate on the oldest supported physical iPhone available. Do not use production/customer sessions or credentials in screenshots, recordings, Instruments traces, or logs.
 
+The current target is DevinX `0.1.0 (62)`. If a source change requires a later build, replace this
+target and repeat every affected measurement rather than carrying Build 62 evidence forward.
+
 ## Cold launch
 
 - Force-quit the app, wait 10 seconds, and launch it five times in each configured connection mode.
