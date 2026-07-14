@@ -363,8 +363,8 @@ export default function ComputerConnectionScreen() {
           </Text>
           <Text className="text-text-mid text-text14 leading-5 mb-7">
             {isCombinedSetup
-              ? 'Devin Cloud is connected. Pair DevinX Connector to finish your combined setup; your computer credentials stay securely on your Mac.'
-              : 'Pair with DevinX Connector. Your Devin credentials stay securely on your Mac.'}
+              ? 'Devin Cloud is connected. Tailscale provides the private route to your Mac; Connector provides authorized local session access.'
+              : 'Tailscale provides the private route to your Mac. Connector provides authorized local session access; your Devin credentials stay on your Mac.'}
           </Text>
 
           {computers.length === 0 && (
@@ -378,8 +378,8 @@ export default function ComputerConnectionScreen() {
                     Set up DevinX Connector
                   </Text>
                   <Text className="text-text-mid text-text12 leading-4 mt-1">
-                    Send a guarded setup prompt to an AI assistant on your Mac. It installs only a
-                    signed official release and stops safely when one is unavailable.
+                    Tailscale alone does not expose Devin sessions. Send a guarded setup prompt to
+                    install the signed local service that connects DevinX to Devin for Terminal.
                   </Text>
                 </View>
               </View>
@@ -453,8 +453,8 @@ export default function ComputerConnectionScreen() {
             <View className="flex-row items-start">
               <Ionicons name="shield-checkmark-outline" size={16} color={tokens.brandText.hex} />
               <Text className="text-brand-text text-text12 leading-4 ml-2 flex-1">
-                Tailscale supplies the private network; DevinX still verifies the Mac and this
-                iPhone for every request.
+                Tailscale supplies the private network. Connector supplies the local Devin service,
+                and DevinX verifies the Mac and this iPhone for every request.
               </Text>
             </View>
             <Pressable

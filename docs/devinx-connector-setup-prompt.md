@@ -2,7 +2,11 @@
 
 This is the primary assisted installation guide presented by DevinX after a user chooses **Computer** or **Cloud + Computer**. The official release page is <https://github.com/fenner888/Devinx/releases/latest>. Until that page contains a Developer ID-signed, Apple-notarized Connector DMG and its adjacent SHA-256 file, the prompt must stop safely instead of installing a development artifact.
 
+Cloud-only users do not need Connector. For computer access, Tailscale provides only the private network route; Connector is the required trusted local service that communicates with Devin for Terminal and authenticates each iPhone. A Tailscale IP or password is not a replacement for a compatible service running on the computer.
+
 > Set up DevinX Connector on this computer so I can securely connect the DevinX iPhone app to Devin for Terminal through Tailscale.
+>
+> Before downloading anything, explain that Tailscale supplies only the private network route. DevinX Connector is the trusted local service that communicates with Devin for Terminal, authenticates this iPhone, and enforces its permissions. A Tailscale IP, server URL, or password cannot replace a compatible service running on this computer. Cloud-only DevinX use does not require Connector.
 >
 > Open the official DevinX release page at https://github.com/fenner888/Devinx/releases/latest. Download DevinX Connector only when that official release provides a macOS DMG for this Mac's architecture and an adjacent SHA-256 checksum file. If no signed release is available, stop and tell me that DevinX Connector has not been published yet. Do not clone or build the source, install a guessed npm package, use an unofficial repository or mirror, or substitute a similarly named application.
 >

@@ -13,19 +13,24 @@ signed with hardened runtime, submitted separately to Apple, accepted, stapled, 
 Gatekeeper as `Notarized Developer ID`. The final Apple-silicon DMG is:
 
 - Artifact: `artifacts/connector/DevinX-Connector-0.1.0-macos-arm64.dmg`
-- SHA-256: `8bd5e31d54ae607ac6302fc544c8e8392c46c20532ab3cd000ca3e9c4c682634`
-- App submission: `be66c7b7-291b-4e64-859a-9da71e234bed` (`Accepted`)
-- DMG submission: `092ebeb4-6235-4891-b8bf-1f7d7112201b` (`Accepted`)
+- Source commit: `106f163d53662c5a5b9a5df6d787f208e21a2217`
+- SHA-256: `659142d305644b42f1c29302faea0ebeded1dbb0085a09bb0512d1ce51710d73`
+- App submission: `dd101f69-fa3d-4d73-8a36-d3174b950f1b` (`Accepted`)
+- DMG submission: `a2070925-e2c4-411b-9c96-6c37357071af` (`Accepted`)
+- Public release: <https://github.com/fenner888/Devinx/releases/tag/connector-v0.1.0>
 
-The artifact is release-eligible from a signing and notarization perspective, but it has not been
-published. Public publication still requires an explicit owner decision after the clean-account
-install, login-start, repair, update, and uninstall checks below.
+The owner explicitly approved public Connector publication. The annotated `connector-v0.1.0` tag
+resolves to the source commit above, the public checksum verifies the downloaded DMG, Apple staple
+validation passes, Gatekeeper accepts it as `Notarized Developer ID`, and `/releases/latest` resolves
+to this release.
 
-The native confirmed-uninstall path is now implemented and tested at the IPC/runner boundary: it
+The native confirmed-uninstall path is implemented and tested at the IPC/runner boundary: it
 stops the listener, deletes the Connector's protected Keychain record, unregisters launch at login,
-and asks macOS to move the application to Trash. The artifact verifier also exercises isolated
-clean-copy, replacement-install, and temporary app-removal mechanics. A real clean-account click
-through and stable-identity replacement remain part of the final Developer ID artifact checkpoint.
+and asks macOS to move the application to Trash. A protected-state-wiped non-admin lifecycle test on
+the current account covered install, first launch, Tailscale/Devin detection, Keychain initialization,
+replacement, and confirmed uninstall. The artifact verifier also exercises isolated clean-copy,
+replacement-install, and temporary app-removal mechanics. A separate fresh-account exercise remains
+a documented hardening follow-up and is not represented as completed evidence.
 
 Apple requires a Developer ID Application certificate, hardened runtime, secure timestamp, valid signatures, and notarization for directly distributed modern macOS software. See Apple's [Developer ID certificate instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/) and [notarization requirements](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 

@@ -1,10 +1,12 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: macOS implementation, confirmed protected-state uninstall, automated packaging/replacement validation, Developer ID signing, Apple notarization, stapling, and Gatekeeper verification complete. The clean-account physical release checkpoint remains. Windows and Linux are required roadmap targets.
+Status: Apple-silicon macOS Connector 0.1.0 is publicly released with confirmed protected-state uninstall, automated clean-copy packaging/replacement validation, Developer ID signing, Apple notarization, stapling, Gatekeeper verification, and independent public-download checksum verification complete. A separate fresh-account physical lifecycle exercise remains a documented hardening follow-up. Windows, Linux, and Intel Mac packages remain roadmap targets.
 
 ## Product decision
 
 The local-computer feature is delivered as **DevinX Connector**. It is an optional companion for users who want DevinX on iPhone to discover, read, or explicitly steer sessions running through Devin for Terminal on a computer. Cloud-only users never need to install it.
+
+Tailscale and DevinX Connector have separate required roles in computer mode. Tailscale supplies only the private encrypted network route between the iPhone and computer; it does not start an application service, expose Devin sessions, authorize a phone, or communicate with Devin for Terminal. DevinX Connector is the trusted local service that performs those operations. A Tailscale address, server URL, or shared password cannot replace that service unless a compatible server is already installed and running. The separate Connector app is the current supported distribution of that required local service; a future supported desktop integration could embed the same bridge, but the bridge function itself cannot be omitted from local-computer mode.
 
 The user-facing action is **Connect this computer**. “Desktop Bridge,” ACP, listener addresses, ports, TLS fingerprints, and service managers are implementation details and must not be prerequisites for normal setup.
 
@@ -15,6 +17,8 @@ The Connector supervises its ACP subprocess while it remains online. If ACP exit
 DevinX Connector is not an official Cognition component. It uses the supported Devin CLI ACP surface but owns its installation experience, private listener, QR pairing, device authorization, background lifecycle, and platform packaging.
 
 ## Required setup experience
+
+Before presenting a Connector download or assisted-install action, DevinX and its public documentation must explain that cloud-only use needs no Connector, while computer access needs both Tailscale for private transport and Connector for authorized local Devin session access. The explanation must not imply that Tailscale alone exposes a computer service or that an IP address/password is sufficient without a compatible service listening on the computer.
 
 1. After choosing **Computer** or **Cloud + Computer**, the user receives an assisted setup prompt as the primary path. The iPhone share sheet lets them send or copy it to an AI assistant running on the computer. **Official releases** and **Already installed** remain visible alternatives.
 2. The assisted prompt references only the official DevinX GitHub Releases page. It tells the computer-side assistant to stop when no signed, notarized release and adjacent checksum are available; it never substitutes a source checkout, guessed package, unsigned artifact, or third-party mirror.

@@ -4,7 +4,14 @@ Mobile mission control for Devin sessions. Unofficial, independent client for th
 
 ## Status
 
-The cloud mobile client and macOS-first Connector foundation are implemented. Secure Tailscale pairing, per-device permissions, local session discovery/loading, authorized text steering, and per-computer disconnect are in the current source checkpoint. Physical release validation and Developer ID notarization remain release gates; see `docs/release-readiness.md`.
+The cloud mobile client and macOS-first Connector are implemented. Secure Tailscale pairing, per-device permissions, local session discovery/loading, authorized text steering, and per-computer disconnect are in the current source checkpoint. The Apple-silicon macOS Connector 0.1.0 is Developer ID signed, notarized, and available from the [official GitHub release](https://github.com/fenner888/Devinx/releases/latest).
+
+## Cloud and computer connections
+
+- **Devin Cloud:** connects from the iPhone to supported Devin Cloud APIs. Cloud-only users do not install DevinX Connector.
+- **Computer:** requires Tailscale and DevinX Connector on the computer. **Cloud + Computer** combines both paths without copying computer credentials to the phone.
+
+Tailscale and Connector are not substitutes for one another. Tailscale creates the private encrypted network route, but it does not run a server, expose Devin sessions, authorize the iPhone, or communicate with Devin for Terminal. DevinX Connector is the trusted local service that does those jobs. A Tailscale IP, server URL, or password is useful only when compatible server software is already installed and listening at that address.
 
 ## Stack
 
@@ -35,9 +42,11 @@ npm run ios                   # or npm run android / npm run web
 | `npm run audit`                  | `npm audit --audit-level=high`                                             |
 | `npm run ci`                     | lint → typecheck → test → build → audit (matches CI)                       |
 
-## DevinX Connector development checkpoint
+## DevinX Connector
 
 The macOS Connector stores its identity and device grants in macOS Keychain and uses Tailscale-only transport in v1. Launch the packaged Connector, select the permissions for the iPhone, generate a short-lived QR code, and approve the named device locally. Read access and message sending are separate grants.
+
+Users should install only the signed release from [GitHub Releases](https://github.com/fenner888/Devinx/releases/latest). The commands below are for source development, not normal installation.
 
 ```bash
 npm run connector:build:macos

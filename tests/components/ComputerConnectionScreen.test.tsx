@@ -101,7 +101,7 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByText('Send assisted setup prompt')).toBeTruthy();
     expect(screen.getByText('Open official releases')).toBeTruthy();
     expect(
-      screen.getByText('Send the assisted setup prompt to an AI assistant on your Mac.'),
+      screen.getByText(/Tailscale alone does not expose Devin sessions/),
     ).toBeTruthy();
     expect(screen.queryByText('Pairing transport pending')).toBeNull();
 
@@ -119,6 +119,7 @@ describe('Computer connection onboarding', () => {
     const screen = render(<ComputerConnectionScreen />);
 
     expect(screen.getByText(/Tailscale supplies the private network/)).toBeTruthy();
+    expect(screen.getByText(/Connector supplies the local Devin service/)).toBeTruthy();
     expect(screen.queryByText('Same Wi-Fi')).toBeNull();
     expect(screen.getByLabelText('Scan DevinX Connector pairing code')).toBeTruthy();
   });

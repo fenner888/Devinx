@@ -2,7 +2,7 @@
 
 Last updated: July 14, 2026
 
-This packet converts the frozen internal TestFlight candidate into an explicit public-release checklist. It is evidence and a handoff, not permission to submit App Review, publish the Connector, publish an OTA update, merge source to a public branch, or release the app. Each of those actions still requires the approval identified below.
+This packet converts the frozen internal TestFlight candidate into an explicit public-release checklist. It is evidence and a handoff, not permission to submit App Review, publish an OTA update, merge source to a public branch, or release the iOS app. The owner separately authorized and published macOS Connector 0.1.0 on July 14, 2026; that bounded Connector approval does not authorize any other release action.
 
 ## Frozen iOS candidate
 

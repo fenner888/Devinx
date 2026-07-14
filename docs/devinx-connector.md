@@ -2,9 +2,20 @@
 
 DevinX Connector is the optional computer companion for users who want the DevinX iPhone app to access sessions running through Devin for Terminal. Cloud-only users do not install it.
 
+## Why Tailscale is not enough by itself
+
+Computer mode needs two different layers:
+
+1. **Tailscale supplies the private network route.** It lets the iPhone reach the computer over an encrypted tailnet.
+2. **DevinX Connector supplies the trusted local service.** It listens on that private route, communicates with Devin for Terminal, stores its identity and grants in macOS Keychain, authenticates each paired iPhone, and enforces separate read, steering, and session-creation permissions.
+
+Tailscale does not start or provide that local service. Entering a Tailscale IP, server URL, or password would work only if compatible server software were already installed and running at that address. DevinX uses QR pairing instead of a shared password so each phone has its own cryptographic identity, permissions, and revocation path.
+
+The separate Connector application is the current supported way to install and operate the required local bridge. A future supported desktop client could embed the same bridge, but local-computer access would still require that bridge function. Cloud-only users bypass this architecture and need neither Tailscale nor Connector.
+
 ## User experience
 
-1. Download the signed connector for macOS, Windows, or Linux from the official DevinX release page.
+1. Download the supported signed connector from the official DevinX release page. Connector 0.1.0 currently supports Apple-silicon Macs; Windows, Linux, and Intel Mac packages are planned but are not available yet.
 2. Install and open **DevinX Connector**.
 3. Connect the computer and iPhone to the same Tailscale network, then confirm that the connector shows Tailscale and Devin for Terminal.
 4. In the iPhone app, open **Settings → Computers → Add Mac/PC → Scan pairing code**.

@@ -4,6 +4,8 @@ export const CONNECTOR_RELEASE_PAGE = branding.links.connectorReleases;
 
 export const CONNECTOR_SETUP_PROMPT = `Set up DevinX Connector on this computer so I can securely connect the DevinX iPhone app to Devin for Terminal through Tailscale.
 
+Before downloading anything, explain that Tailscale supplies only the private network route. DevinX Connector is the trusted local service that communicates with Devin for Terminal, authenticates this iPhone, and enforces its permissions. A Tailscale IP, server URL, or password cannot replace a compatible service running on this computer. Cloud-only DevinX use does not require Connector.
+
 Open the official DevinX release page at ${CONNECTOR_RELEASE_PAGE}. Download DevinX Connector only when that official release provides a macOS DMG for this Mac's architecture and an adjacent SHA-256 checksum file. If no signed release is available, stop and tell me that DevinX Connector has not been published yet. Do not clone or build the source, install a guessed npm package, use an unofficial repository or mirror, or substitute a similarly named application.
 
 Verify the downloaded DMG against the published SHA-256 value. Then verify with macOS that the app is signed with a Developer ID Application certificate, notarized by Apple, and passes Gatekeeper before opening it. Stop if any verification is missing or fails.

@@ -69,8 +69,8 @@ export default function ConnectionChoiceScreen() {
           <View className="flex-row items-start bg-tint-blue rounded-card px-4 py-3 mb-5">
             <Ionicons name="shield-checkmark-outline" size={17} color={tokens.brandText.hex} />
             <Text className="text-brand-text text-text12 leading-4 ml-2 flex-1">
-              Computer connections use a bridge you control. Your Devin credentials remain on the
-              computer and are never copied to your phone.
+              Tailscale provides the private network route. DevinX Connector provides authorized
+              access to local sessions. Your Devin credentials remain on the computer.
             </Text>
           </View>
           <OnboardingProgress current={3} total={3} />

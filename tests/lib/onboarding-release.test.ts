@@ -34,7 +34,8 @@ describe('release onboarding', () => {
     expect(features).toContain('Keep credentials private');
     expect(features).not.toContain('Manage files');
     expect(connections).toContain('Choose where Devin runs');
-    expect(connections).toContain('never copied to your phone');
+    expect(connections).toContain('Tailscale provides the private network route');
+    expect(connections).toContain('DevinX Connector provides authorized');
     expect(credentials).not.toContain('Personal token');
     expect(credentials).not.toContain('Personal access token');
     expect(credentials).toContain("connectionMode === 'both'");
@@ -45,6 +46,7 @@ describe('release onboarding', () => {
     expect(computer).toContain('Pair your computer');
     expect(computer).toContain('Devin Cloud is connected.');
     expect(computer).toContain('Send assisted setup prompt');
+    expect(computer).toContain('Tailscale alone does not expose Devin sessions');
     expect(computer).toContain('CONNECTOR_SETUP_PROMPT');
     expect(computer).toContain('CONNECTOR_RELEASE_PAGE');
     expect(computer).toContain('Remove from this iPhone');
