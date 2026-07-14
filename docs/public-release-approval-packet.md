@@ -15,9 +15,9 @@ This packet converts the frozen internal TestFlight candidate into an explicit p
 - Size: `21,022,809` bytes
 - SHA-256: `d7865dc9aabcdb48b612b0d6acf68362ddabce94d200071cb9e8b6e15a24915c`
 - EAS submission: `7822192f-c59e-4193-8bbe-53b4e8c7d861`
-- Current state: Build 64 uploaded successfully to App Store Connect. Apple processing and version
-  attachment remain external checkpoints. Final physical acceptance and the human release gates
-  below remain open.
+- Current state: Apple processing is complete, Build 64 is **Ready to Submit**, it is assigned to the
+  one-tester **Team (Expo)** internal group, and it is saved as the binary for App Store version 1.0.
+  Final physical acceptance and the human release gates below remain open.
 
 The owner froze the product UI after Build 62, then explicitly reopened and approved the onboarding
 presentation through Build 64. Screenshots must use Build 64 unless a release-blocking defect
@@ -67,11 +67,10 @@ Use the existing listing draft as the copy source:
 
 The public support URL is live. The public privacy URL is also live, but its current content does **not** match the frozen local `PRIVACY.md`. Publishing the frozen policy to the public URL and byte-verifying it is a release blocker. Do not publish or merge that source change without explicit approval.
 
-The last authenticated App Store Connect audit found the approved description, keywords, support
-URL, review notes, subtitle, primary/secondary categories, and Build 62 attached. Manual release was
-selected, so an App Review approval cannot automatically publish the app. Apple-silicon Mac and
-Vision Pro availability were disabled because those platforms have not been validated. Build 64's
-processing and attachment state must be refreshed live before submission.
+The authenticated App Store Connect draft contains the approved description, keywords, support URL,
+review notes, subtitle, primary/secondary categories, and Build 64. Manual release is selected, so
+an App Review approval cannot automatically publish the app. Apple-silicon Mac and Vision Pro
+availability are disabled because those platforms have not been validated.
 
 Apple metadata work still requires:
 

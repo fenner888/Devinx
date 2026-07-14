@@ -2,15 +2,13 @@
 
 Audited: July 13, 2026
 
-This records the last authenticated App Store Connect audit, initially performed against Build 62,
-plus the verified Build 64 upload checkpoint. It does not authorize App Review submission, privacy
-publication, or public release. Re-open the live version page before relying on attachment or
-processing state.
+This records the authenticated App Store Connect state after the Build 64 processing and attachment
+refresh. It does not authorize App Review submission, privacy publication, or public release.
 
 ## Confirmed and saved
 
-- Build `0.1.0 (62)` finished processing and is **Ready to Submit**.
-- Build 62 is attached to App Store version `1.0`, which remains **Prepare for Submission**.
+- Build `0.1.0 (64)` finished processing and is **Ready to Submit**.
+- Build 64 is attached to App Store version `1.0`, which remains **Prepare for Submission**.
 - The description, keywords, support URL, review notes, subtitle, primary category, and secondary category are saved from the reviewed release drafts.
 - **Manually release this version** is selected.
 - Apple-silicon Mac and Apple Vision Pro availability are disabled because neither platform has been validated.
@@ -22,9 +20,8 @@ processing state.
   - Device ID — App Functionality, not linked to the user, no tracking.
 - App Store Connect's preview consequently shows Identifiers and User Content under **Data Linked to You**, and an Identifier under **Data Not Linked to You**.
 - The live media manager currently requests an iPhone 6.5-inch set and an iPad 13-inch set. Both contain zero screenshots and zero previews.
-- Build `0.1.0 (64)` was uploaded successfully by EAS submission
-  `7822192f-c59e-4193-8bbe-53b4e8c7d861`; Apple processing and version attachment must be confirmed
-  in the live console before submission work continues.
+- Build 64 is assigned to the one-tester **Team (Expo)** internal group. The build has one invite and
+  no installs, sessions, crashes, or feedback recorded at this checkpoint.
 
 ## Intentionally not completed
 
