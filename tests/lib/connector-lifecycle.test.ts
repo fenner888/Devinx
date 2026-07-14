@@ -17,4 +17,17 @@ describe('macOS Connector lifecycle', () => {
     expect(connectorSource).toContain('Quit DevinX Connector');
     expect(connectorSource).toContain('NSApplication.shared.setActivationPolicy(.accessory)');
   });
+
+  it('can remove protected state when the bridge runtime is unavailable during uninstall', () => {
+    expect(connectorSource).toContain('private func removeProtectedStateWithHelper()');
+    expect(connectorSource).toContain(
+      'task.arguments = ["delete", keychainService, keychainAccount]',
+    );
+    expect(connectorSource).toMatch(
+      /if self\.uninstalling \{[\s\S]*?self\.removeProtectedStateWithHelper\(\)/,
+    );
+    expect(connectorSource).toMatch(
+      /if process\?\.isRunning == true \{[\s\S]*?type": "reset"[\s\S]*?\} else \{[\s\S]*?removeProtectedStateWithHelper\(\)/,
+    );
+  });
 });

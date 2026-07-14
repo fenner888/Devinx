@@ -6,6 +6,8 @@ import ServiceManagement
 import SwiftUI
 
 private let ipcVersion = 1
+private let keychainService = "com.devinx.desktop-bridge"
+private let keychainAccount = "bridge-state-v1"
 
 private struct ConnectorDevice: Decodable, Identifiable {
     let deviceId: String
@@ -88,6 +90,8 @@ private final class ConnectorModel: ObservableObject {
     private var outputBuffer = Data()
     private let maximumBufferedBytes = 65_536
     private var uninstalling = false
+    private var uninstallFallbackRunning = false
+    private var protectedStateRemovalConfirmed = false
 
     init() {
         refreshLaunchAtLogin()
@@ -138,7 +142,12 @@ private final class ConnectorModel: ObservableObject {
                 guard self.process === terminated else { return }
                 self.process = nil
                 self.inputPipe = nil
-                if self.uninstalling { return }
+                if self.uninstalling {
+                    if !self.protectedStateRemovalConfirmed {
+                        self.removeProtectedStateWithHelper()
+                    }
+                    return
+                }
                 if case .failed = self.status { return }
                 self.status = .failed(terminated.terminationStatus == 0
                     ? "The connector stopped."
@@ -224,8 +233,51 @@ private final class ConnectorModel: ObservableObject {
     func uninstall() {
         guard !uninstalling else { return }
         uninstalling = true
+        protectedStateRemovalConfirmed = false
         status = .uninstalling
-        send(["version": ipcVersion, "type": "reset"])
+        if process?.isRunning == true {
+            send(["version": ipcVersion, "type": "reset"])
+        } else {
+            removeProtectedStateWithHelper()
+        }
+    }
+
+    private func removeProtectedStateWithHelper() {
+        guard uninstalling, !uninstallFallbackRunning else { return }
+        guard let resources = Bundle.main.resourceURL else {
+            uninstalling = false
+            status = .failed("The connector resources are missing.")
+            return
+        }
+
+        uninstallFallbackRunning = true
+        let task = Process()
+        task.executableURL = resources.appendingPathComponent("macos-keychain-helper")
+        task.arguments = ["delete", keychainService, keychainAccount]
+        task.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        task.terminationHandler = { [weak self] terminated in
+            Task { @MainActor in
+                guard let self else { return }
+                self.uninstallFallbackRunning = false
+                guard self.uninstalling else { return }
+                guard terminated.terminationStatus == 0 else {
+                    self.uninstalling = false
+                    self.status = .failed("The connector could not remove its protected local data.")
+                    return
+                }
+                self.protectedStateRemovalConfirmed = true
+                self.finishUninstall()
+            }
+        }
+        do {
+            try task.run()
+        } catch {
+            uninstallFallbackRunning = false
+            uninstalling = false
+            status = .failed("The connector could not remove its protected local data.")
+        }
     }
 
     private func refreshLaunchAtLogin() {
@@ -307,6 +359,7 @@ private final class ConnectorModel: ObservableObject {
             allowSessionContent = false
             status = .paired
         case "reset_complete":
+            protectedStateRemovalConfirmed = true
             finishUninstall()
         case "devices":
             devices = event.devices ?? []
