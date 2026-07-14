@@ -1,6 +1,6 @@
 # Final internal TestFlight physical checklist
 
-Use internal TestFlight Build 63 for final acceptance and onboarding review. It supersedes Build 62 and contains the single
+Use internal TestFlight Build 64 for final acceptance, onboarding review, and sanitized App Store screenshot capture. It supersedes Build 63 and contains the single
 active **Devin working** companion caption with no timeline activity block (`8b2484b`), plus a
 keyboard-safe **Name this Mac** flow that keeps its field and pairing controls reachable (`0c81638`).
 It must preserve composer correction `d90fbb7`, keyboard-viewport fix
@@ -10,6 +10,8 @@ It must preserve composer correction `d90fbb7`, keyboard-viewport fix
 keyboard dismissal `af05c98`. Release-source commit `b0c7dcc` adds verified bundled model-family
 marks without changing live Cloud or ACP model IDs, and `b0aad7e` simplifies the Home readiness
 header without changing connection behavior.
+Build 64 also clarifies the combined connection path as two explicit steps: authenticate Devin Cloud,
+then pair the optional computer. It does not imply that Cloud authentication automatically pairs a Mac.
 Use only sanitized sessions, repositories, and prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.
