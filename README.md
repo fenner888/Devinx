@@ -25,15 +25,15 @@ npm run ios                   # or npm run android / npm run web
 
 ## Scripts
 
-| Command | What it does |
-|---|---|
-| `npm run lint` | ESLint, zero warnings |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run test` | Jest (schemas, polling, diagnostic scrub, key-leak gate, tokens, branding) |
-| `npm run bridge:start -- --help` | Show safe Desktop Bridge setup and detected private Mac addresses |
-| `npm run build` | Typecheck gate (EAS build invoked separately) |
-| `npm run audit` | `npm audit --audit-level=high` |
-| `npm run ci` | lint → typecheck → test → build → audit (matches CI) |
+| Command                          | What it does                                                               |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| `npm run lint`                   | ESLint, zero warnings                                                      |
+| `npm run typecheck`              | `tsc --noEmit`                                                             |
+| `npm run test`                   | Jest (schemas, polling, diagnostic scrub, key-leak gate, tokens, branding) |
+| `npm run bridge:start -- --help` | Show safe Desktop Bridge setup and detected private Mac addresses          |
+| `npm run build`                  | Typecheck gate (EAS build invoked separately)                              |
+| `npm run audit`                  | `npm audit --audit-level=high`                                             |
+| `npm run ci`                     | lint → typecheck → test → build → audit (matches CI)                       |
 
 ## DevinX Connector development checkpoint
 
@@ -52,6 +52,15 @@ After the QR code appears, open **Computer Connection** in DevinX on the iPhone 
 - **§10.2** No crash-reporting or analytics SDK ships in v1; the tested diagnostic boundary never logs or transmits errors, and its scrubber is required before any future provider integration.
 - **§10.5** Disconnect wipes Keychain, SQLite/query caches, drafts, templates, and remembered session context.
 - All API responses parsed through zod at the boundary (§8.3).
+
+Report suspected vulnerabilities privately according to [SECURITY.md](SECURITY.md). Do not place
+credentials, QR payloads, private session content, or working exploit details in a public issue.
+
+## License
+
+Original DevinX software and documentation are available under the [MIT License](LICENSE). See
+[NOTICE](NOTICE) for the boundary around third-party dependencies, names, logos, screenshots,
+reference material, and project trademarks.
 
 ## Repo layout (spec §6)
 
