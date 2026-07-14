@@ -25,7 +25,10 @@ DevinX creates a Code Scan through an undocumented API.
 
 ## Shared presentation
 
-- Dark DevinX visual system: black edges, restrained midnight-blue glow, original DevinX companion.
+- Dark DevinX visual system only: use the app's true-black surface across every source capture and
+  final composition, with restrained midnight-blue glow and the original DevinX companion.
+- Reject light-mode, white, gray-canvas, or mixed-appearance captures. Do not place a dark device
+  screenshot inside a white marketing background.
 - Straight-on device presentation; no perspective that makes the interface difficult to read.
 - One short headline and one supporting line per image.
 - Small `DEVINX · INDEPENDENT CLIENT` label on each image.
@@ -112,6 +115,8 @@ capture and compose the real iPad layout independently.
 ## Capture acceptance gate
 
 - Capture from the exact final internal build selected for screenshots.
+- Confirm the device is in dark appearance before every capture and visually verify that the app
+  background and final marketing canvas are black. Any light-mode capture fails this gate.
 - Complete the relevant dark-theme, Dynamic Type, VoiceOver, keyboard, dictation, session, and
   Security Work checks in `docs/physical-release-checklist.md` before capture.
 - Verify every repository, session title, prompt, message, PR, count, and status is fictional and
