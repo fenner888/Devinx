@@ -14,4 +14,22 @@ describe('ModelFamilyMark', () => {
     },
   );
 
+  it.each(['glm', 'gpt', 'grok'])('theme-tints the transparent %s mark', (family) => {
+    render(<ModelFamilyMark name={family} />);
+
+    expect(screen.getByTestId(`model-family-mark-image-${family}`).props.style).toEqual(
+      expect.objectContaining({ tintColor: expect.any(String) }),
+    );
+  });
+
+  it.each(['claude', 'swe', 'gemini', 'deepseek'])(
+    'preserves the supplied colors for the %s mark',
+    (family) => {
+      render(<ModelFamilyMark name={family} />);
+
+      expect(screen.getByTestId(`model-family-mark-image-${family}`).props.style).toEqual(
+        expect.objectContaining({ tintColor: undefined }),
+      );
+    },
+  );
 });

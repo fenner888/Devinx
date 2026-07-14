@@ -11,7 +11,7 @@ interface ModelFamilyMarkProps {
 }
 
 export function ModelFamilyMark({ name, size = 24 }: ModelFamilyMarkProps) {
-  const { name: themeName, tokens } = useTheme();
+  const { tokens } = useTheme();
   const kind = modelFamilyMarkKind(name);
   const iconSize = Math.max(16, Math.round(size * 0.82));
   const asset = MODEL_FAMILY_MARK_ASSETS[kind];
@@ -19,24 +19,16 @@ export function ModelFamilyMark({ name, size = 24 }: ModelFamilyMarkProps) {
   let mark: React.ReactNode;
   if (asset) {
     const imageSize = Math.max(14, Math.round(size * asset.scale));
-    const needsContrastTile = asset.contrastTile === themeName;
     mark = (
-      <View
-        className="items-center justify-center rounded-full"
-        style={
-          needsContrastTile
-            ? {
-                width: size,
-                height: size,
-                backgroundColor: tokens.textHiStrong.hex,
-              }
-            : undefined
-        }
-      >
+      <View className="items-center justify-center">
         <Image
           source={asset.source}
           resizeMode="contain"
-          style={{ width: imageSize, height: imageSize }}
+          style={{
+            width: imageSize,
+            height: imageSize,
+            tintColor: asset.tintWithTheme ? tokens.textHiStrong.hex : undefined,
+          }}
           accessible={false}
           testID={`model-family-mark-image-${kind}`}
         />

@@ -6,8 +6,9 @@ change model routing, and do not imply affiliation or endorsement. All marks
 remain the property of their respective owners.
 
 Retrieved 2026-07-13. The app preserves each supplied mark's geometry, color,
-and aspect ratio. A neutral contrast tile may be rendered behind a monochrome
-mark when the active app theme would otherwise make it invisible.
+and aspect ratio. Every raster asset has a genuinely transparent canvas.
+Monochrome marks follow the active theme's primary text color, so they remain
+legible without an opaque contrast tile.
 
 | File | Identifies | First-party source |
 |---|---|---|

@@ -14,8 +14,8 @@ export interface ModelFamilyMarkAsset {
   source: ImageSourcePropType;
   /** Scale within the fixed mark slot while preserving the supplied artwork. */
   scale: number;
-  /** Monochrome marks that need contrast only in the named app theme. */
-  contrastTile?: 'dark' | 'light';
+  /** Monochrome marks follow the active text color without an opaque backing tile. */
+  tintWithTheme?: boolean;
 }
 
 /**
@@ -26,10 +26,10 @@ export const MODEL_FAMILY_MARK_ASSETS: Partial<
   Record<ModelFamilyMarkKind, ModelFamilyMarkAsset>
 > = {
   claude: { source: claude, scale: 0.86 },
-  glm: { source: zai, scale: 0.88 },
-  swe: { source: cognition, scale: 0.78, contrastTile: 'light' },
-  gpt: { source: openai, scale: 0.68, contrastTile: 'dark' },
+  glm: { source: zai, scale: 0.88, tintWithTheme: true },
+  swe: { source: cognition, scale: 0.78 },
+  gpt: { source: openai, scale: 0.68, tintWithTheme: true },
   gemini: { source: gemini, scale: 0.82 },
   deepseek: { source: deepseek, scale: 0.88 },
-  grok: { source: grok, scale: 0.76, contrastTile: 'light' },
+  grok: { source: grok, scale: 0.76, tintWithTheme: true },
 };
