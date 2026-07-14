@@ -79,6 +79,9 @@ Apple metadata work still requires:
 - price, territories, copyright, and trader/compliance selections;
 - final review contact details and a private non-production review account entered directly in App Store Connect, never committed or pasted into chat.
 
+Use `docs/app-store-owner-decisions.md` for the recommended choices and the exact owner approvals
+that remain. Do not infer legal, commercial, territory, rights, or trader answers from product code.
+
 Useful official references:
 
 - [App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information)
