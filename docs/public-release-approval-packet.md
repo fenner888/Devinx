@@ -15,7 +15,7 @@ This packet converts the frozen internal TestFlight candidate into an explicit p
 - Size: `20,915,834` bytes
 - SHA-256: `e5bff1a0a29fdd6c88b6cce4fb24890b84c73d79ceba5719e893d83db005d353`
 - EAS submission: `4fa362d7-364c-4901-9372-7e3453d1b351`
-- Current state: uploaded for internal TestFlight; Apple processing and final physical acceptance remain external.
+- Current state: App Store Connect processing is complete, Build 62 is **Ready to Submit**, and the binary is attached to App Store version 1.0. Final physical acceptance and the human release gates below remain open.
 
 The owner froze the design after Build 62. Screenshots must use this exact build unless a release-blocking defect requires a new build and reopens affected validation.
 
@@ -61,13 +61,14 @@ Use the existing listing draft as the copy source:
 
 The public support URL is live. The public privacy URL is also live, but its current content does **not** match the frozen local `PRIVACY.md`. Publishing the frozen policy to the public URL and byte-verifying it is a release blocker. Do not publish or merge that source change without explicit approval.
 
+The authenticated App Store Connect draft now contains the approved description, keywords, support URL, review notes, subtitle, primary/secondary categories, and Build 62. Manual release is selected, so an App Review approval cannot automatically publish the app. Apple-silicon Mac and Vision Pro availability are disabled because those platforms have not been validated.
+
 Apple metadata work still requires:
 
 - the actual age-rating questionnaire;
 - the Content Rights declaration and retained evidence for the Devin name, companion artwork, Cognition reference/mark, and bundled model-provider marks;
 - price, territories, copyright, and trader/compliance selections;
-- a manual-release selection so App Review approval cannot automatically publish the app;
-- final review contact details, notes, and a private non-production review account entered directly in App Store Connect, never committed or pasted into chat.
+- final review contact details and a private non-production review account entered directly in App Store Connect, never committed or pasted into chat.
 
 Useful official references:
 
@@ -86,7 +87,7 @@ The conservative Store answer set remains the source-backed matrix in `docs/app-
 | Photos or Videos | App Functionality | Yes | No |
 | Device ID, limited to Expo's randomized installation token | App Functionality | No | No |
 
-Do not claim **Data Not Collected** merely because the compiled privacy manifests declare no SDK-side collected-data types. DevinX sends user-directed account and session content to the selected Devin service, and the Store answers must include relevant third-party partner handling. Final answers must be published in App Store Connect and compared line by line with the frozen app, policy, and `docs/app-privacy-review.md`.
+Do not claim **Data Not Collected** merely because the compiled privacy manifests declare no SDK-side collected-data types. DevinX sends user-directed account and session content to the selected Devin service, and the Store answers must include relevant third-party partner handling. The four conservative data-type answers above are saved as an unpublished App Store Connect draft and match its Product Page Preview: Identifiers and User Content linked to the user, plus an Identifier not linked to the user. Do not click **Publish** until the public policy matches the frozen policy and the final answers have been compared line by line with the app and `docs/app-privacy-review.md`.
 
 The precise retention treatment for the selected Pro/Max Devin account must be confirmed against the applicable current customer terms. Enterprise retention documentation alone is not proof of the individual-plan treatment.
 
@@ -96,7 +97,7 @@ Official reference: [Manage app privacy](https://developer.apple.com/help/app-st
 
 Because the binary supports iPad, capture both device families from Build 62 after physical acceptance:
 
-- iPhone 6.9-inch portrait, preferably `1320 x 2868`;
+- iPhone 6.5-inch portrait in the slot currently requested by App Store Connect;
 - iPad 13-inch portrait, `2064 x 2752` or `2048 x 2732`;
 - PNG or JPEG without transparency;
 - sanitized non-production data only;
