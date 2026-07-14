@@ -7,20 +7,21 @@ This packet converts the frozen internal TestFlight candidate into an explicit p
 ## Frozen iOS candidate
 
 - Product version: `0.1.0`
-- Build: `65`
-- Frozen source: `b621825`
-- Release-evidence source: `0a98524`
+- Build: `66`
+- Frozen source: `66dccd3`
+- Release-evidence source: this post-artifact documentation update (no app changes)
 - Bundle identifier: `com.fenner888.devinx`
-- IPA: `artifacts/eas/DevinX-0.1.0-65.ipa`
-- Size: `21,024,841` bytes
-- SHA-256: `07c00771a7a4e34db7d456f08e45a98676b033a4207dbf92f054a94caba5d509`
-- EAS submission: `013ce388-70dc-4e9b-b56d-b6c341b39f9e`
-- Current state: EAS finished successfully and uploaded Build 65 to App Store Connect for internal
-  TestFlight. Apple processing, group availability, and final physical acceptance remain external.
+- IPA: `artifacts/eas/DevinX-0.1.0-66.ipa`
+- Size: `21,024,994` bytes
+- SHA-256: `a4b7ef263d9957b8e8132d5a9a2f7dd4260edf30af8db27a80ab20255934f354`
+- EAS submission: `cf50f27c-61ca-44ad-8388-dcb4c81a7ad3`
+- Current state: EAS uploaded Build 66 and scheduled its App Store Connect submission. The EAS job is
+  queued at this checkpoint; Apple processing, group availability, and final physical acceptance remain external.
 
 The owner froze the product UI after Build 62, then explicitly reopened and approved the onboarding
-presentation through Build 65. Screenshots must use Build 65 unless a release-blocking defect
-requires a superseding build and reopens affected validation.
+presentation in Build 65. Build 66 preserves that implementation and adds only the clarified
+Connector/Tailscale boundary now captured in the release documents and draft PR. Screenshots must use
+Build 66 after a narrow visual/setup-link spot-check.
 
 ## Refreshed automated evidence
 
@@ -28,7 +29,7 @@ The exact Node `24.18.0` release runtime passed:
 
 - lint with zero warnings;
 - strict TypeScript for the mobile app and Connector;
-- 77 Jest suites and 567 tests;
+- 80 Jest suites and 575 tests;
 - app and Connector production builds;
 - the repository audit gate;
 - dry-run lockfile installation;
@@ -37,16 +38,17 @@ The exact Node `24.18.0` release runtime passed:
 
 The remaining 21 moderate advisories are transitive. `markdown-it` has no available fix, while the relevant Expo/PostCSS/UUID fixes require a breaking Expo 57 migration. They are documented risk, not silently ignored findings.
 
-The Build 65 IPA size, checksum, strict code signature, entitlements, microphone disclosure,
+The Build 66 IPA size, checksum, strict code signature, entitlements, microphone disclosure,
 exempt-encryption declaration, and all ten privacy manifests were independently reverified against
 the frozen artifact.
 
-## Current signed Connector candidate
+## Published signed Connector
 
-- Source: `8e2a4c2`
+- Release: `connector-v0.1.0`
+- Source: `106f163d53662c5a5b9a5df6d787f208e21a2217`
 - Architecture: Apple silicon (`arm64`)
 - Bundled Node: `24.18.0`
-- SHA-256: `8bd5e31d54ae607ac6302fc544c8e8392c46c20532ab3cd000ca3e9c4c682634`
+- SHA-256: `659142d305644b42f1c29302faea0ebeded1dbb0085a09bb0512d1ce51710d73`
 - Current signature: Developer ID Application with hardened runtime and secure timestamp
 
 Deterministic verification passed checksum, read-only DMG mounting, the exact Applications symlink,
@@ -55,8 +57,10 @@ entitlement allowlist, source-map absence, and bundled-Node inspection. Apple ac
 DMG notarization submissions, both tickets were stapled, and Gatekeeper reports `Notarized Developer
 ID`.
 
-Public distribution remains blocked only on the clean-account lifecycle test and separate explicit
-publication approval. See `docs/macos-release-credential-checkpoint.md`.
+The owner explicitly authorized publication on July 14, 2026. The notarized/stapled DMG and adjacent
+checksum are available from the official GitHub release, `/releases/latest` resolves correctly, and
+Gatekeeper accepts the downloaded artifact. A separate fresh-account lifecycle exercise remains a
+hardening follow-up and is not claimed as completed evidence.
 
 ## App Store product metadata
 
@@ -72,7 +76,7 @@ Use the existing listing draft as the copy source:
 The public support URL is live. The public privacy URL is also live, but its current content does **not** match the frozen local `PRIVACY.md`. Publishing the frozen policy to the public URL and byte-verifying it is a release blocker. Do not publish or merge that source change without explicit approval.
 
 The authenticated App Store Connect draft contains the approved description, keywords, support URL,
-review notes, subtitle, primary/secondary categories, and the prior processed build. Build 65 must be
+review notes, subtitle, primary/secondary categories, and the prior processed build. Build 66 must be
 selected after Apple processing completes. Manual release is selected, so
 an App Review approval cannot automatically publish the app. Apple-silicon Mac and Vision Pro
 availability are disabled because those platforms have not been validated.
@@ -112,7 +116,7 @@ Official reference: [Manage app privacy](https://developer.apple.com/help/app-st
 
 ## Screenshot set
 
-Because the binary supports iPad, capture both device families from Build 65 after physical acceptance:
+Because the binary supports iPad, capture both device families from Build 66 after the narrow visual spot-check:
 
 - iPhone 6.5-inch portrait in the slot currently requested by App Store Connect;
 - iPad 13-inch portrait, `2064 x 2752` or `2048 x 2732`;
@@ -122,7 +126,7 @@ Because the binary supports iPad, capture both device families from Build 65 aft
 
 Apple accepts one to ten screenshots per device size. See [Screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications?page_id=52545).
 
-## Required physical evidence for Build 65
+## Required physical evidence for Build 66
 
 Complete and record:
 
@@ -139,9 +143,9 @@ Complete and record:
 
 ## Approval sequence
 
-1. Complete and record the Build 65 physical and performance/stability evidence.
+1. Complete and record the Build 66 physical and performance/stability evidence.
 2. Approve publication of the frozen privacy policy, then byte-verify the public URL.
-3. Install the Developer ID and notary credentials; produce, notarize, staple, and clean-account test the public Connector candidate.
+3. Keep the published Connector checksum/release verification current; complete the separate fresh-account lifecycle hardening exercise when practical.
 4. Complete App Store Connect metadata, privacy, age rating, Content Rights, price/availability, screenshots, and private review information.
 5. Audit the final App Store product page against this packet and the exact binary.
 6. Obtain explicit approval to click **Submit for Review**.
