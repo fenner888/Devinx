@@ -7,17 +7,21 @@ This packet converts the frozen internal TestFlight candidate into an explicit p
 ## Frozen iOS candidate
 
 - Product version: `0.1.0`
-- Build: `62`
-- Frozen source: `0c81638`
-- Release-evidence source: `4c5f139`
+- Build: `64`
+- Frozen source: `f72db42`
+- Release-evidence source: `6419d28`
 - Bundle identifier: `com.fenner888.devinx`
-- IPA: `artifacts/eas/DevinX-0.1.0-62.ipa`
-- Size: `20,915,834` bytes
-- SHA-256: `e5bff1a0a29fdd6c88b6cce4fb24890b84c73d79ceba5719e893d83db005d353`
-- EAS submission: `4fa362d7-364c-4901-9372-7e3453d1b351`
-- Current state: App Store Connect processing is complete, Build 62 is **Ready to Submit**, and the binary is attached to App Store version 1.0. Final physical acceptance and the human release gates below remain open.
+- IPA: `artifacts/eas/DevinX-0.1.0-64.ipa`
+- Size: `21,022,809` bytes
+- SHA-256: `d7865dc9aabcdb48b612b0d6acf68362ddabce94d200071cb9e8b6e15a24915c`
+- EAS submission: `7822192f-c59e-4193-8bbe-53b4e8c7d861`
+- Current state: Build 64 uploaded successfully to App Store Connect. Apple processing and version
+  attachment remain external checkpoints. Final physical acceptance and the human release gates
+  below remain open.
 
-The owner froze the design after Build 62. Screenshots must use this exact build unless a release-blocking defect requires a new build and reopens affected validation.
+The owner froze the product UI after Build 62, then explicitly reopened and approved the onboarding
+presentation through Build 64. Screenshots must use Build 64 unless a release-blocking defect
+requires a superseding build and reopens affected validation.
 
 ## Refreshed automated evidence
 
@@ -25,7 +29,7 @@ The exact Node `24.18.0` release runtime passed:
 
 - lint with zero warnings;
 - strict TypeScript for the mobile app and Connector;
-- 74 Jest suites and 545 tests;
+- 77 Jest suites and 567 tests;
 - app and Connector production builds;
 - the repository audit gate;
 - dry-run lockfile installation;
@@ -34,7 +38,9 @@ The exact Node `24.18.0` release runtime passed:
 
 The remaining 21 moderate advisories are transitive. `markdown-it` has no available fix, while the relevant Expo/PostCSS/UUID fixes require a breaking Expo 57 migration. They are documented risk, not silently ignored findings.
 
-The Build 62 IPA size and checksum were independently reverified against the frozen artifact.
+The Build 64 IPA size, checksum, strict code signature, entitlements, microphone disclosure,
+exempt-encryption declaration, and all ten privacy manifests were independently reverified against
+the frozen artifact.
 
 ## Current private Connector artifact
 
@@ -61,7 +67,11 @@ Use the existing listing draft as the copy source:
 
 The public support URL is live. The public privacy URL is also live, but its current content does **not** match the frozen local `PRIVACY.md`. Publishing the frozen policy to the public URL and byte-verifying it is a release blocker. Do not publish or merge that source change without explicit approval.
 
-The authenticated App Store Connect draft now contains the approved description, keywords, support URL, review notes, subtitle, primary/secondary categories, and Build 62. Manual release is selected, so an App Review approval cannot automatically publish the app. Apple-silicon Mac and Vision Pro availability are disabled because those platforms have not been validated.
+The last authenticated App Store Connect audit found the approved description, keywords, support
+URL, review notes, subtitle, primary/secondary categories, and Build 62 attached. Manual release was
+selected, so an App Review approval cannot automatically publish the app. Apple-silicon Mac and
+Vision Pro availability were disabled because those platforms have not been validated. Build 64's
+processing and attachment state must be refreshed live before submission.
 
 Apple metadata work still requires:
 
@@ -95,7 +105,7 @@ Official reference: [Manage app privacy](https://developer.apple.com/help/app-st
 
 ## Screenshot set
 
-Because the binary supports iPad, capture both device families from Build 62 after physical acceptance:
+Because the binary supports iPad, capture both device families from Build 64 after physical acceptance:
 
 - iPhone 6.5-inch portrait in the slot currently requested by App Store Connect;
 - iPad 13-inch portrait, `2064 x 2752` or `2048 x 2732`;
@@ -105,7 +115,7 @@ Because the binary supports iPad, capture both device families from Build 62 aft
 
 Apple accepts one to ten screenshots per device size. See [Screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications?page_id=52545).
 
-## Required physical evidence for Build 62
+## Required physical evidence for Build 64
 
 Complete and record:
 
@@ -122,7 +132,7 @@ Complete and record:
 
 ## Approval sequence
 
-1. Complete and record the Build 62 physical and performance/stability evidence.
+1. Complete and record the Build 64 physical and performance/stability evidence.
 2. Approve publication of the frozen privacy policy, then byte-verify the public URL.
 3. Install the Developer ID and notary credentials; produce, notarize, staple, and clean-account test the public Connector candidate.
 4. Complete App Store Connect metadata, privacy, age rating, Content Rights, price/availability, screenshots, and private review information.

@@ -2,7 +2,10 @@
 
 Audited: July 13, 2026
 
-This records the authenticated App Store Connect state for the frozen iOS Build 62. It does not authorize App Review submission, privacy publication, or public release.
+This records the last authenticated App Store Connect audit, initially performed against Build 62,
+plus the verified Build 64 upload checkpoint. It does not authorize App Review submission, privacy
+publication, or public release. Re-open the live version page before relying on attachment or
+processing state.
 
 ## Confirmed and saved
 
@@ -19,6 +22,9 @@ This records the authenticated App Store Connect state for the frozen iOS Build 
   - Device ID — App Functionality, not linked to the user, no tracking.
 - App Store Connect's preview consequently shows Identifiers and User Content under **Data Linked to You**, and an Identifier under **Data Not Linked to You**.
 - The live media manager currently requests an iPhone 6.5-inch set and an iPad 13-inch set. Both contain zero screenshots and zero previews.
+- Build `0.1.0 (64)` was uploaded successfully by EAS submission
+  `7822192f-c59e-4193-8bbe-53b4e8c7d861`; Apple processing and version attachment must be confirmed
+  in the live console before submission work continues.
 
 ## Intentionally not completed
 
@@ -33,10 +39,11 @@ This records the authenticated App Store Connect state for the frozen iOS Build 
 
 ## Publication blockers
 
-1. Complete and record the Build 62 physical and performance/stability checks.
+1. Complete and record the Build 64 physical and performance/stability checks.
 2. Approve publication of the frozen `PRIVACY.md`, update the public URL, and byte-verify it before publishing the App Privacy draft.
 3. Supply the human/legal/commercial answers for Age Rating, Content Rights, price, territories, copyright, and trader status.
 4. Enter review contact information and a private non-production review account directly in App Store Connect.
-5. Capture sanitized Build 62 iPhone 6.5-inch and iPad 13-inch screenshots.
+5. Capture sanitized Build 64 iPhone 6.5-inch and iPad 13-inch screenshots using
+   `docs/app-store-screenshot-brief.md`.
 6. Complete Developer ID signing/notarization and clean-account lifecycle testing for the public macOS Connector.
 7. Obtain separate explicit approval before submitting App Review.

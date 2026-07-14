@@ -119,3 +119,27 @@ capture and compose the real iPad layout independently.
 - Confirm all copy remains accurate to the supported API and Connector boundaries.
 - Obtain owner approval on the full iPhone and iPad contact sheets before uploading them.
 
+## Final capture intake
+
+Use internal TestFlight Build `0.1.0 (64)` for every authenticated source capture. Submit the
+original PNG produced by iOS; do not send a messaging-app recompression, crop, mockup, or image with
+markup. Keep dark appearance, standard text size, a clean status bar, and the same sanitized review
+account across the set.
+
+Name the six iPhone sources:
+
+1. `01-home.png`
+2. `02-sessions.png`
+3. `03-needs-input.png`
+4. `04-voice-or-organize.png`
+5. `05-result-pr.png`
+6. `06-security-code-scan.png`
+
+Repeat the same states on the 13-inch iPad using `01-home-ipad.png` through
+`06-security-code-scan-ipad.png`. The Security Work source must visibly belong to a genuine
+`origin = code_scan` root. If a suitable sanitized state does not exist, omit that shot rather than
+substituting an ordinary security-review session.
+
+Before composition, verify each source against its image section above. After composition, export
+the iPhone set at `1242 x 2688` and the iPad set at `2048 x 2732`, generate one contact sheet per
+family, and obtain owner approval before uploading either set.
