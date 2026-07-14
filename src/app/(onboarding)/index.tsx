@@ -6,11 +6,12 @@ import { useRouter } from 'expo-router';
 import { OnboardingProgress } from '@components/onboarding/OnboardingProgress';
 import { branding } from '@lib/branding';
 import { useTheme } from '@theme/index';
-import APP_ICON from '../../../assets/icon.png';
+import WORDMARK_DARK from '../../../assets/wordmark.png';
+import WORDMARK_LIGHT from '../../../assets/wordmark-light.png';
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { tokens } = useTheme();
+  const { name } = useTheme();
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
@@ -19,24 +20,16 @@ export default function WelcomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="flex-1 justify-center min-h-80">
-          <View className="items-center justify-center h-72" accessibilityElementsHidden>
-            <View
-              className="absolute w-64 h-64 rounded-chip"
-              style={{ backgroundColor: tokens.companionStageGlow.hex }}
-            />
-            <View
-              className="absolute w-52 h-52 rounded-chip border"
-              style={{ borderColor: tokens.companionStageLine.hex }}
-            />
+          <View className="items-center justify-center h-52" accessibilityElementsHidden>
             <Image
-              source={APP_ICON}
-              className="w-40 h-40 rounded-cardLg"
-              resizeMode="cover"
+              source={name === 'light' ? WORDMARK_LIGHT : WORDMARK_DARK}
+              className="w-60 h-16"
+              resizeMode="contain"
               accessibilityIgnoresInvertColors
             />
           </View>
 
-          <Text className="text-text-hi-strong text-text28 font-semibold mt-4">
+          <Text className="text-text-hi-strong text-text28 font-semibold mt-2">
             Run Devin from anywhere.
           </Text>
           <Text className="text-text-mid text-text16 leading-6 mt-3">

@@ -296,7 +296,7 @@ devinx/
 ### 7.1 Onboarding / Connect
 Onboarding opens with a concise three-page orientation, then enters the existing provider-specific secure setup. The orientation is screenshot-ready but remains product UI, not an unsupported marketing promise:
 
-1. **Welcome** — product mark, value proposition, Cloud/Computer and on-device-voice proof points, independent-client disclaimer, and one primary CTA.
+1. **Welcome** — transparent theme-aware product wordmark without a decorative frame or opaque icon tile, value proposition, Cloud/Computer and on-device-voice proof points, independent-client disclaimer, and one primary CTA.
 2. **What DevinX supports** — create/steer sessions, Cloud or paired Computer, on-device dictation and prompt organization, genuine Code Scan session inspection, and credential-storage boundaries. Do not advertise unsupported file, approval, scan-creation, billing, or integration mutations.
 3. **Connection choice** — `Devin Cloud`, `Computer`, or `Cloud + Computer`, with distinct truthful descriptions. A Computer connection uses the user-controlled Connector and never copies Devin credentials to the phone.
 4. **Provider setup** — Cloud onboarding uses a `Service user key` only. Personal-token authentication is not presented until that product path is explicitly approved for release. The API key field is secure-entry and paste-first; the org ID and optional attribution ID follow the existing validated contract. Inline help links to Devin documentation for least-privilege service users. Computer setup uses the Tailscale-only QR flow and explicit Mac approval.
