@@ -46,8 +46,10 @@ export interface ConnectorControllerOptions {
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, milliseconds);
-    timer.unref();
+    // Keep the controller process alive while an IPC command is still settling. In particular,
+    // reset closes the listener and ACP before deleting Keychain state; an unref'ed poll timer can
+    // otherwise let Node exit before reset_complete reaches the native uninstall flow.
+    setTimeout(resolve, milliseconds);
   });
 }
 

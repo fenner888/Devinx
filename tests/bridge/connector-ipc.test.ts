@@ -240,7 +240,12 @@ describe('DevinX Connector platform and IPC boundary', () => {
     const output = new PassThrough();
     const chunks: Buffer[] = [];
     output.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
-    const resetPersistentState = jest.fn<Promise<void>, []>().mockResolvedValue();
+    const resetPersistentState = jest.fn<Promise<void>, []>().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(resolve, 25);
+        }),
+    );
     const runner = {
       start: async () => ({
         endpoint: 'http://100.90.80.70:45831/',
