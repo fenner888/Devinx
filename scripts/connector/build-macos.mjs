@@ -229,6 +229,7 @@ copyFileSync(
   resolve(resourcesRoot, 'macos-keychain-helper'),
 );
 chmodSync(resolve(resourcesRoot, 'macos-keychain-helper'), 0o755);
+copyFileSync(resolve(repositoryRoot, 'LICENSE'), resolve(resourcesRoot, 'LICENSE.txt'));
 
 run('/usr/bin/xcrun', [
   'swiftc',
@@ -280,6 +281,7 @@ rmSync(stagingRoot, { recursive: true, force: true });
 rmSync(dmgPath, { force: true });
 mkdirSync(stagingRoot, { recursive: true });
 cpSync(appRoot, resolve(stagingRoot, 'DevinX Connector.app'), { recursive: true });
+copyFileSync(resolve(repositoryRoot, 'LICENSE'), resolve(stagingRoot, 'LICENSE.txt'));
 symlinkSync('/Applications', resolve(stagingRoot, 'Applications'));
 run('/usr/bin/hdiutil', [
   'create',

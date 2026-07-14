@@ -26,6 +26,7 @@ const appRoot = resolve(outputRoot, appName);
 const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.0-macos-${architecture}.dmg`);
 const checksumPath = `${dmgPath}.sha256`;
 const auditPath = resolve(outputRoot, 'verification-audit.json');
+const expectedLicense = readFileSync(resolve(repositoryRoot, 'LICENSE'), 'utf8');
 const temporaryRoot = mkdtempSync(resolve(tmpdir(), 'devinx-connector-verify-'));
 const mountPoint = resolve(temporaryRoot, 'mounted');
 const installRoot = resolve(temporaryRoot, 'clean-install');
@@ -114,6 +115,11 @@ function validateApp(app) {
       throw new Error(`${basename(path)} is not executable`);
     }
   }
+  const bundledLicense = resolve(app, 'Contents', 'Resources', 'LICENSE.txt');
+  requirePath(bundledLicense, 'bundled MIT license');
+  if (readFileSync(bundledLicense, 'utf8') !== expectedLicense) {
+    throw new Error('Bundled MIT license does not match the repository license');
+  }
   const packagedFiles = readdirSync(resolve(app, 'Contents', 'Resources'), {
     recursive: true,
   }).map(String);
@@ -150,6 +156,11 @@ try {
   mounted = true;
   const mountedApp = resolve(mountPoint, appName);
   requirePath(mountedApp, 'mounted Connector app');
+  const mountedLicense = resolve(mountPoint, 'LICENSE.txt');
+  requirePath(mountedLicense, 'DMG MIT license');
+  if (readFileSync(mountedLicense, 'utf8') !== expectedLicense) {
+    throw new Error('DMG MIT license does not match the repository license');
+  }
   const applicationsLink = resolve(mountPoint, 'Applications');
   if (
     !lstatSync(applicationsLink).isSymbolicLink() ||

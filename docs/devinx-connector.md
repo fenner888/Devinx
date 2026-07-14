@@ -64,6 +64,8 @@ The builder checksum-verifies the pinned Node.js Foundation archive, then re-sig
 
 The release workflow submits the app ZIP first, requires an accepted response with an issue-free notary log, staples and Gatekeeper-checks the app, rebuilds the DMG around that stapled app, signs and verifies the DMG, submits it separately, staples it, and writes a final checksum plus `notarization-audit.json`. It does not use deprecated `altool` or accept ad-hoc/Apple Development identities.
 
+The app bundle and DMG root both include `LICENSE.txt`, byte-for-byte matching the repository's MIT `LICENSE`. Artifact verification fails closed when either notice is missing or changed.
+
 ## Runtime behavior
 
 - The app bundles a pinned Node LTS runtime rather than depending on the user's Node or shell configuration.

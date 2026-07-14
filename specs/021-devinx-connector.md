@@ -132,6 +132,7 @@ The QR payload may cross only the inherited local IPC pipe and native render pat
 - Tailscale requests accept HTTP only for canonical explicit-port `100.64.0.0/10` origins and never fall back to LAN or public transport.
 - Background startup is opt-in and visible; no silent LaunchAgent, root daemon, or systemd installation. Closing the macOS control window must not terminate an already-running Connector.
 - Release artifacts require code signing, notarization where applicable, checksums, provenance, a dependency audit, secret scan, authorization matrix, and clean-machine install/update/uninstall tests.
+- Every distributed app bundle and disk image includes the repository's MIT license notice, and artifact verification fails closed when either copy is missing or changed.
 - The public setup prompt references only an official signed release. It must never guess a package, repository, executable path, or download URL.
 
 ## Distribution boundary
