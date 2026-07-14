@@ -299,9 +299,9 @@ misrepresented as fixed.
   fill. Their shells and companion tracks remain transparent, and timeline clearance keeps the
   final message line above both pointer-free overlays.
 
-## Physical checkpoint for Build 60
+## Physical checkpoint for Build 65
 
-Use exact internal TestFlight Build 60 with sanitized sessions. Confirm:
+Use exact internal TestFlight Build 65 with sanitized sessions. Confirm:
 
 1. Home plus Cloud and Computer session creation, all destination-specific pickers, attachments,
    archive/terminate, device removal/revocation, and all three connection modes after cold launch.
@@ -310,7 +310,7 @@ Use exact internal TestFlight Build 60 with sanitized sessions. Confirm:
 3. Light/dark launch, long-history scrolling behind the transparent companion, no clipped content,
    conversation content visibly behind the floating translucent Cloud and Computer composers,
    complete final-line clearance above both overlays, keyboard clearance, scanner sizing, and no
-   raw Mac path or ACP identifier. Build 60 contains the floating-composer correction,
+   raw Mac path or ACP identifier. Build 65 contains the floating-composer correction,
    keyboard-viewport fix `791a338`, supported capability-boundary work from `4825409`, final
    model-contract enforcement from `3162a33`, truthful live activity `0907d2b`, and the approved
    owner-supplied Home companion artwork correction `e21c8c9`, keyboard dismissal `af05c98`, and
@@ -320,3 +320,24 @@ Use exact internal TestFlight Build 60 with sanitized sessions. Confirm:
 
 Only internal TestFlight upload is approved. App Review, public release, production OTA publication,
 and public Connector distribution still require separate explicit approval.
+
+## Build 65 assisted Connector checkpoint
+
+- Release source `b621825` contains guarded official-release guidance, a primary AI-assisted setup
+  prompt, an explicit already-installed path, signed revocation, and honest local-only removal when the
+  Mac is unavailable.
+- Closing the native Connector window left both the Connector process and bundled bridge runtime
+  active; reopening the app restored the window without replacing either process. The menu-bar item
+  provides explicit Open and Quit actions, and launch at login remains opt-in.
+- Lint, strict TypeScript, 80 Jest suites / 573 tests, app and Connector builds, isolated DMG
+  install/replace/remove verification, and the 0-high/0-critical dependency gate passed.
+- The private ad-hoc arm64 DMG SHA-256 is
+  `7bd3f70bdd1503d23872c82b6a32be2d7c1308c0180587fd4093a46cb773fa02`. It is not a public
+  distribution artifact; the setup prompt fails closed until a Developer ID-signed, notarized DMG
+  and adjacent checksum are published on the official GitHub Releases page.
+- The signed iOS `0.1.0 (65)` IPA is 21,024,841 bytes with SHA-256
+  `07c00771a7a4e34db7d456f08e45a98676b033a4207dbf92f054a94caba5d509`. Its strict signature,
+  bundle metadata, production entitlement, and 10 privacy manifests passed inspection.
+- EAS submission `013ce388-70dc-4e9b-b56d-b6c341b39f9e` finished successfully and uploaded the
+  exact IPA to App Store Connect for internal TestFlight. Apple processing and physical acceptance
+  remain external; no App Review or public release action was taken.

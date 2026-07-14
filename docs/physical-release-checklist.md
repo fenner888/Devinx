@@ -1,6 +1,6 @@
 # Final internal TestFlight physical checklist
 
-Use internal TestFlight Build 64 for final acceptance, onboarding review, and sanitized App Store screenshot capture. It supersedes Build 63 and contains the single
+Use internal TestFlight Build 65 for final acceptance, assisted Connector setup, onboarding review, and sanitized App Store screenshot capture. It supersedes Build 64 and contains the single
 active **Devin working** companion caption with no timeline activity block (`8b2484b`), plus a
 keyboard-safe **Name this Mac** flow that keeps its field and pairing controls reachable (`0c81638`).
 It must preserve composer correction `d90fbb7`, keyboard-viewport fix
@@ -10,8 +10,13 @@ It must preserve composer correction `d90fbb7`, keyboard-viewport fix
 keyboard dismissal `af05c98`. Release-source commit `b0c7dcc` adds verified bundled model-family
 marks without changing live Cloud or ACP model IDs, and `b0aad7e` simplifies the Home readiness
 header without changing connection behavior.
-Build 64 also clarifies the combined connection path as two explicit steps: authenticate Devin Cloud,
+Build 65 preserves the combined connection path as two explicit steps: authenticate Devin Cloud,
 then pair the optional computer. It does not imply that Cloud authentication automatically pairs a Mac.
+It also makes the guarded AI-assisted setup prompt the primary Computer path, preserves an explicit
+already-installed route, keeps the Connector runtime in a visible menu-bar item after its window closes,
+and offers an honestly labeled local-only iPhone removal when the Mac is unreachable. The setup prompt
+must stop safely until the official release has a Developer ID signature, notarization, and adjacent
+checksum.
 Use only sanitized sessions, repositories, and prompts.
 Record pass/fail evidence without credentials, private paths, session identifiers, QR payloads, or
 customer content.
@@ -29,6 +34,14 @@ the internal group.
 - On **Connect your Mac**, focus **Name this Mac** on a small iPhone. Confirm the field and Scan
   button can scroll above the keyboard, the typed name remains visible, dragging and Done dismiss the
   keyboard, and neither path clears the name.
+- Starting from the Computer or Cloud + Computer onboarding choice, confirm **Send assisted setup
+  prompt** opens the iOS share sheet with the guarded prompt, **Open official releases** resolves only
+  to `github.com/fenner888/Devinx/releases/latest`, and **Already installed? Continue below** reaches
+  pairing without claiming that the Connector was installed automatically.
+- With the Mac available, confirm **Disconnect** completes signed Mac-side revocation before local
+  credentials disappear. With the Connector intentionally unavailable, confirm the fallback explicitly
+  says the inactive Mac record remains and **Remove from this iPhone** deletes only the iPhone-side
+  credential and device key.
 - Open **Connections & MCP** in Cloud or Cloud + Computer mode. Confirm the read-only Integrations
   and MCP catalogs load or show an honest permission state, contain no Install/Configure/OAuth
   action, and are absent in Computer-only mode.
