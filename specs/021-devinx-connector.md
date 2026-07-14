@@ -1,6 +1,6 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: macOS implementation, confirmed protected-state uninstall, and automated packaging/replacement validation complete; physical release checkpoint and Developer ID notarization remain. Windows and Linux are required roadmap targets.
+Status: macOS implementation, confirmed protected-state uninstall, automated packaging/replacement validation, Developer ID signing, Apple notarization, stapling, and Gatekeeper verification complete. The clean-account physical release checkpoint remains. Windows and Linux are required roadmap targets.
 
 ## Product decision
 

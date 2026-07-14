@@ -41,17 +41,22 @@ The Build 65 IPA size, checksum, strict code signature, entitlements, microphone
 exempt-encryption declaration, and all ten privacy manifests were independently reverified against
 the frozen artifact.
 
-## Current private Connector artifact
+## Current signed Connector candidate
 
-- Source: `4c5f139`
+- Source: `8e2a4c2`
 - Architecture: Apple silicon (`arm64`)
 - Bundled Node: `24.18.0`
-- SHA-256: `8fffe9b33afcae1d152f63f0cf8fed4c99a3b3864e0619c88fa1c78e7843dd3e`
-- Current signature: ad hoc, private testing only
+- SHA-256: `8bd5e31d54ae607ac6302fc544c8e8392c46c20532ab3cd000ca3e9c4c682634`
+- Current signature: Developer ID Application with hardened runtime and secure timestamp
 
-Deterministic verification passed checksum, read-only DMG mounting, the exact Applications symlink, clean-copy installation, deliberate replacement, temporary removal, strict nested signatures, the entitlement allowlist, source-map absence, and bundled-Node inspection. Gatekeeper rejection is expected and required for this ad-hoc artifact.
+Deterministic verification passed checksum, read-only DMG mounting, the exact Applications symlink,
+clean-copy installation, deliberate replacement, temporary removal, strict nested signatures, the
+entitlement allowlist, source-map absence, and bundled-Node inspection. Apple accepted the app and
+DMG notarization submissions, both tickets were stapled, and Gatekeeper reports `Notarized Developer
+ID`.
 
-Public Connector distribution remains blocked until the Apple Developer Program Account Holder installs a **Developer ID Application** identity, stores the `devinx-notary` Keychain profile, signs with hardened runtime and timestamping, notarizes and staples the app and DMG, and completes the clean-account lifecycle test. See `docs/macos-release-credential-checkpoint.md`.
+Public distribution remains blocked only on the clean-account lifecycle test and separate explicit
+publication approval. See `docs/macos-release-credential-checkpoint.md`.
 
 ## App Store product metadata
 
