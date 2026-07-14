@@ -1,54 +1,73 @@
-/**
- * Welcome screen — spec §7.1 step 1.
- * Value prop, disclaimer footer (§1.4), connection-choice CTA.
- */
-import { View, Text, Pressable, ScrollView, Image } from 'react-native';
+/** Welcome screen — spec §7.1 orientation page 1. */
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+
+import { OnboardingProgress } from '@components/onboarding/OnboardingProgress';
 import { branding } from '@lib/branding';
 import { useTheme } from '@theme/index';
-import WORDMARK_DARK from '../../../assets/wordmark.png';
-import WORDMARK_LIGHT from '../../../assets/wordmark-light.png';
+import APP_ICON from '../../../assets/icon.png';
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { name } = useTheme();
+  const { tokens } = useTheme();
 
   return (
-    <SafeAreaView className="flex-1 bg-surface0" edges={['top', 'bottom']}>
-      <ScrollView contentContainerClassName="flex-1 items-center justify-center px-6">
-        {/* DevinX wordmark */}
-        <Image
-          source={name === 'light' ? WORDMARK_LIGHT : WORDMARK_DARK}
-          className="w-56 h-14 mb-4"
-          resizeMode="contain"
-          accessibilityLabel={branding.name}
-        />
-        <Text className="text-text-mid text-text14 text-center mb-8">
-          {branding.subtitle}
-        </Text>
+    <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
+      <ScrollView
+        contentContainerClassName="px-6 pt-4 pb-4 flex-grow"
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="flex-1 justify-center min-h-80">
+          <View className="items-center justify-center h-72" accessibilityElementsHidden>
+            <View
+              className="absolute w-64 h-64 rounded-chip"
+              style={{ backgroundColor: tokens.companionStageGlow.hex }}
+            />
+            <View
+              className="absolute w-52 h-52 rounded-chip border"
+              style={{ borderColor: tokens.companionStageLine.hex }}
+            />
+            <Image
+              source={APP_ICON}
+              className="w-40 h-40 rounded-cardLg"
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
+          </View>
 
-        <View className="w-full max-w-sm mb-8">
-          <Text className="text-text-mid text-text13 text-center leading-5">
-            Mission control for your Devin sessions. See what needs your attention,
-            steer active work, and ship PRs — all from your phone.
+          <Text className="text-text-hi-strong text-text28 font-semibold mt-4">
+            Run Devin from anywhere.
           </Text>
+          <Text className="text-text-mid text-text16 leading-6 mt-3">
+            Start and steer cloud sessions, or securely pair a computer you control—all from your
+            iPhone.
+          </Text>
+
+          <View className="flex-row flex-wrap gap-2 mt-5">
+            <View className="flex-row items-center rounded-chip bg-tint-blue px-3 py-2">
+              <View className="w-2 h-2 rounded-dot bg-finished mr-2" />
+              <Text className="text-text-mid text-text12">Cloud + Computer</Text>
+            </View>
+            <View className="flex-row items-center rounded-chip bg-tint-purple px-3 py-2">
+              <View className="w-2 h-2 rounded-dot bg-merged mr-2" />
+              <Text className="text-text-mid text-text12">On-device voice</Text>
+            </View>
+          </View>
         </View>
 
-        <Pressable
-          className="bg-brand rounded-button px-buttonPrimaryX py-buttonPrimaryY"
-          onPress={() => router.push('/(onboarding)/connections')}
-          accessibilityRole="button"
-          accessibilityLabel="Choose how to connect DevinX"
-        >
-          <Text className="text-text-always-white text-text14 font-medium">
-            Choose how to connect
-          </Text>
-        </Pressable>
+        <View className="mt-8">
+          <OnboardingProgress current={1} total={3} />
+          <Pressable
+            className="min-h-14 bg-brand rounded-button items-center justify-center mt-5"
+            onPress={() => router.push('/(onboarding)/features')}
+            accessibilityRole="button"
+            accessibilityLabel="Get started with DevinX"
+          >
+            <Text className="text-text-always-white text-text16 font-semibold">Get started</Text>
+          </Pressable>
 
-        {/* Disclaimer footer (§1.4) */}
-        <View className="mt-12 px-4">
-          <Text className="text-text-low text-text12 text-center leading-4">
+          <Text className="text-text-low text-text11 text-center leading-4 mt-4 px-3">
             {branding.disclaimer}
           </Text>
         </View>

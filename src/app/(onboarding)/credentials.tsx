@@ -1,29 +1,31 @@
 /**
- * Credentials screen — spec §7.1 step 2.
- * Segmented control: Service user key | Personal token (beta).
- * Service path: API key field (secure entry), org ID field, optional
- * attribution user ID. Inline help links to Devin docs.
- *
- * §10.6: credential fields use secureTextEntry to prevent screen recording
- * and shoulder-surfing.
+ * Cloud credential setup — spec §7.1.
+ * Secrets remain in memory until validation and are never passed in route params.
  */
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, Linking, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@auth/AuthContext';
+
 import { setPendingCredentials } from '@auth/pendingCredentials';
+import { OnboardingBackButton } from '@components/onboarding/OnboardingBackButton';
 import { branding } from '@lib/branding';
 import { useTheme } from '@theme/index';
 
-type AuthMode = 'service_user' | 'pat';
-
 export default function CredentialsScreen() {
   const router = useRouter();
-  const { isPatAvailable } = useAuth();
   const { tokens } = useTheme();
 
-  const [mode, setMode] = useState<AuthMode>('service_user');
   const [apiKey, setApiKey] = useState('');
   const [orgId, setOrgId] = useState('');
   const [attributionUserId, setAttributionUserId] = useState('');
@@ -33,19 +35,17 @@ export default function CredentialsScreen() {
 
   function handleSubmit() {
     setError(null);
-    // Both service-user keys and PATs use the cog_ prefix.
     if (!apiKey.startsWith(branding.serviceKeyPrefix)) {
-      setError(`${mode === 'pat' ? 'Personal access token' : 'API key'} must start with ${branding.serviceKeyPrefix}`);
+      setError(`API key must start with ${branding.serviceKeyPrefix}`);
       return;
     }
     if (!orgId.startsWith(branding.orgIdPrefix)) {
       setError(`Org ID must start with ${branding.orgIdPrefix}`);
       return;
     }
-    // Hand credentials to the validate step in memory — never via router
-    // params (they serialize into the URL on web; spec §10.1).
+
     setPendingCredentials({
-      kind: mode,
+      kind: 'service_user',
       apiKey,
       orgId,
       attributionUserId: attributionUserId || undefined,
@@ -54,118 +54,122 @@ export default function CredentialsScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-surface0" edges={['top', 'bottom']}>
-      <ScrollView contentContainerClassName="px-6 py-8" keyboardShouldPersistTaps="handled">
-        <Text className="text-text-hi text-text17 mb-6">Connect to Devin</Text>
+    <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerClassName="px-6 pt-3 pb-6 flex-grow"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <OnboardingBackButton onPress={() => router.back()} />
 
-        {/* Segmented control */}
-        <View className="flex-row bg-tint-secondary rounded-button p-1 mb-6">
-          <Pressable
-            className={`flex-1 rounded-button py-2 ${mode === 'service_user' ? 'bg-surface2' : ''}`}
-            onPress={() => setMode('service_user')}
-          >
-            <Text className={`text-center text-text14 ${mode === 'service_user' ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
-              Service user key
-            </Text>
-          </Pressable>
-          {isPatAvailable ? (
-            <Pressable
-              className={`flex-1 rounded-button py-2 ${mode === 'pat' ? 'bg-surface2' : ''}`}
-              onPress={() => setMode('pat')}
-            >
-              <Text className={`text-center text-text14 ${mode === 'pat' ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
-                Personal token
-              </Text>
-            </Pressable>
-          ) : (
-            <View className="flex-1 py-2">
-              <Text className="text-center text-text14 text-text-low">Personal token (soon)</Text>
-            </View>
-          )}
-        </View>
-
-        {/* API key field — §10.6 secureTextEntry */}
-        <View className="mb-4">
-          <Text className="text-text-mid text-text13 mb-2">
-            {mode === 'service_user' ? 'Service user API key' : 'Personal access token'}
+          <View className="w-14 h-14 rounded-card bg-tint-blue items-center justify-center mt-7">
+            <Ionicons name="cloud-outline" size={27} color={tokens.brandText.hex} />
+          </View>
+          <Text className="text-text-hi-strong text-text28 font-semibold mt-5">
+            Connect Devin Cloud
           </Text>
-          <TextInput
-            className="bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
-            value={apiKey}
-            onChangeText={setApiKey}
-            placeholder="cog_..."
-            placeholderTextColor={tokens.textLow.hex}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            accessibilityLabel="Devin API key"
-            testID="api-key-input"
-          />
-        </View>
+          <Text className="text-text-mid text-text14 leading-5 mt-3 mb-7">
+            Use a scoped credential for your Devin organization. DevinX stores it in the iOS
+            Keychain and never places it in logs or ordinary app storage.
+          </Text>
 
-        {/* Org ID field */}
-        <View className="mb-4">
-          <Text className="text-text-mid text-text13 mb-2">Organization ID</Text>
-          <TextInput
-            className="bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
-            value={orgId}
-            onChangeText={setOrgId}
-            placeholder="org-..."
-            placeholderTextColor={tokens.textLow.hex}
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            accessibilityLabel="Organization ID"
-            testID="org-id-input"
-          />
-        </View>
-
-        {/* Optional attribution user ID (service user mode only) */}
-        {mode === 'service_user' && (
           <View className="mb-4">
-            <Text className="text-text-mid text-text13 mb-2">
-              Attribute sessions to (optional)
-            </Text>
+            <Text className="text-text-mid text-text13 mb-2">Service user API key</Text>
             <TextInput
-              className="bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
-              value={attributionUserId}
-              onChangeText={setAttributionUserId}
-              placeholder="Your user ID (for create_as_user_id)"
+              className="min-h-13 bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
+              value={apiKey}
+              onChangeText={setApiKey}
+              placeholder="cog_..."
+              placeholderTextColor={tokens.textLow.hex}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              textContentType="password"
+              accessibilityLabel="Devin API key"
+              testID="api-key-input"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="text-text-mid text-text13 mb-2">Organization ID</Text>
+            <TextInput
+              className="min-h-13 bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
+              value={orgId}
+              onChangeText={setOrgId}
+              placeholder="org-..."
               placeholderTextColor={tokens.textLow.hex}
               autoCapitalize="none"
               autoCorrect={false}
               spellCheck={false}
+              accessibilityLabel="Organization ID"
+              testID="org-id-input"
             />
           </View>
-        )}
 
-        {/* Inline help — link to Devin docs */}
-        <Pressable
-          className="mb-6"
-          onPress={() => Linking.openURL(branding.links.createServiceUser)}
-        >
-          <Text className="text-link text-text13 underline">
-            How to create a least-privilege service user →
-          </Text>
-        </Pressable>
-
-        {error && (
-          <View className="mb-4 bg-tint-red rounded-card px-4 py-3">
-            <Text className="text-failed text-text13">{error}</Text>
+          <View className="mb-4">
+            <Text className="text-text-mid text-text13 mb-2">
+              Attribution user ID (optional)
+            </Text>
+            <TextInput
+              className="min-h-13 bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
+              value={attributionUserId}
+              onChangeText={setAttributionUserId}
+              placeholder="Attribute newly created sessions"
+              placeholderTextColor={tokens.textLow.hex}
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              accessibilityLabel="Attribution user ID"
+            />
           </View>
-        )}
 
-        <Pressable
-          className={`rounded-button px-buttonPrimaryX py-buttonPrimaryY ${canSubmit ? 'bg-brand' : 'bg-tint-secondary'}`}
-          disabled={!canSubmit}
-          onPress={handleSubmit}
-        >
-          <Text className={`text-center text-text14 font-medium ${canSubmit ? 'text-text-always-white' : 'text-text-low'}`}>
-            Validate & connect
-          </Text>
-        </Pressable>
-      </ScrollView>
+          <View className="flex-row items-start bg-tint-blue rounded-card px-4 py-3 mt-1">
+            <Ionicons name="shield-checkmark-outline" size={17} color={tokens.brandText.hex} />
+            <Text className="text-brand-text text-text12 leading-4 ml-2 flex-1">
+              Create a least-privilege service user with session-use and read permissions only.
+            </Text>
+          </View>
+
+          <Pressable
+            className="self-start py-4"
+            onPress={() => Linking.openURL(branding.links.createServiceUser)}
+            accessibilityRole="link"
+            accessibilityLabel="Open Devin service user documentation"
+          >
+            <Text className="text-link text-text13 font-medium">
+              Open service user instructions
+            </Text>
+          </Pressable>
+
+          {error && (
+            <View className="mb-4 bg-tint-red rounded-card px-4 py-3" accessibilityRole="alert">
+              <Text className="text-failed text-text13">{error}</Text>
+            </View>
+          )}
+
+          <View className="flex-1 min-h-4" />
+          <Pressable
+            className={`min-h-14 rounded-button items-center justify-center ${canSubmit ? 'bg-brand' : 'bg-tint-secondary'}`}
+            disabled={!canSubmit}
+            onPress={handleSubmit}
+            accessibilityRole="button"
+            accessibilityLabel="Validate and connect Devin Cloud"
+            accessibilityState={{ disabled: !canSubmit }}
+          >
+            <Text
+              className={`text-text16 font-semibold ${canSubmit ? 'text-text-always-white' : 'text-text-low'}`}
+            >
+              Validate & connect
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

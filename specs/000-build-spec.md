@@ -293,10 +293,16 @@ devinx/
 
 ## 7. Screens & Flows
 
-### 7.1 Onboarding / Connect (3 steps)
-1. **Welcome** — value prop, disclaimer footer (§1.4), "Connect your Devin account."
-2. **Credentials** — segmented control: `Service user key` | `Personal token (beta)`. Service path: API key field (secure entry, paste-first UX), org ID field, optional "attribute sessions to me" user picker (uses `create_as_user_id`; fetch member list if permission allows, else free-text user ID). Inline help links to Devin docs for creating a least-privilege service user (`UseDevinSessions` + read permissions only — the app should TELL users to scope down; that's the GRC DNA).
-3. **Validate** — live check: authenticated `GET` self/sessions call. Success → store in Keychain → land on Board with a one-time coach-mark tour. Failure → specific error (401 invalid key / 403 missing permission, with which permission to add / network).
+### 7.1 Onboarding / Connect
+Onboarding opens with a concise three-page orientation, then enters the existing provider-specific secure setup. The orientation is screenshot-ready but remains product UI, not an unsupported marketing promise:
+
+1. **Welcome** — product mark, value proposition, Cloud/Computer and on-device-voice proof points, independent-client disclaimer, and one primary CTA.
+2. **What DevinX supports** — create/steer sessions, Cloud or paired Computer, on-device dictation and prompt organization, genuine Code Scan session inspection, and credential-storage boundaries. Do not advertise unsupported file, approval, scan-creation, billing, or integration mutations.
+3. **Connection choice** — `Devin Cloud`, `Computer`, or `Cloud + Computer`, with distinct truthful descriptions. A Computer connection uses the user-controlled Connector and never copies Devin credentials to the phone.
+4. **Provider setup** — Cloud onboarding uses a `Service user key` only. Personal-token authentication is not presented until that product path is explicitly approved for release. The API key field is secure-entry and paste-first; the org ID and optional attribution ID follow the existing validated contract. Inline help links to Devin documentation for least-privilege service users. Computer setup uses the Tailscale-only QR flow and explicit Mac approval.
+5. **Validate** — Cloud performs a live authenticated sessions call before Keychain persistence. Combined mode continues to Computer pairing; Cloud-only lands on Home. Failures remain specific enough to recover without exposing secrets or remote response bodies.
+
+The orientation requests no microphone, camera, notification, or network permission. Every page supports VoiceOver, Dynamic Type, small-screen scrolling, and dismissal/back navigation where applicable. Unavailable modes are omitted rather than shown as dead or "soon" controls.
 
 ### 7.2 Session Board (home)
 - Sections: **Needs input** (blocked, always top, amber), **Working**, **Recent** (finished/failed, grouped Today / Yesterday / Earlier), **Sleeping/Archived** (collapsed).
