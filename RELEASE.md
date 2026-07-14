@@ -42,7 +42,14 @@ Do not use production credentials or a destructive prompt for this checkpoint.
 
 ## macOS Connector distribution
 
-Local development artifacts can be ad-hoc signed, but public distribution requires an Apple **Developer ID Application** certificate and notarization credentials. After those credentials are available:
+The July 14, 2026 Apple-silicon Connector candidate is signed with **Developer ID Application: Mark
+Fenner (Q7H78WYTAR)**, accepted by Apple's notarization service, stapled, and accepted by Gatekeeper.
+Its DMG SHA-256 is
+`8bd5e31d54ae607ac6302fc544c8e8392c46c20532ab3cd000ca3e9c4c682634`. The artifact has not been
+published. Exact submission evidence is recorded in `docs/macos-release-credential-checkpoint.md` and
+the generated private release audit under `artifacts/connector/`.
+
+For a deliberate rebuild on the authorized build Mac:
 
 1. Store notarization credentials in Keychain with `xcrun notarytool store-credentials devinx-notary`.
 2. Set `DEVINX_CODESIGN_IDENTITY` to the exact Developer ID Application identity and `DEVINX_NOTARYTOOL_PROFILE` to the Keychain profile name.
@@ -50,7 +57,8 @@ Local development artifacts can be ad-hoc signed, but public distribution requir
 4. Run `npm run connector:notarize:macos` to notarize/staple the app first, rebuild and sign the DMG, notarize/staple the DMG, run Gatekeeper checks, and write the checksum/audit record.
 5. Test the resulting artifact on a clean macOS account before publication.
 
-The existing Apple Development certificate is not a substitute for Developer ID distribution signing.
+The remaining Connector release gate is the clean-account installation, login-start, repair, update,
+and uninstall workflow. Public artifact publication still requires separate explicit approval.
 
 ## EAS builds
 
