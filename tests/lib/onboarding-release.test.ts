@@ -18,6 +18,10 @@ describe('release onboarding', () => {
       resolve(repositoryRoot, 'src/app/(onboarding)/credentials.tsx'),
       'utf8',
     );
+    const computer = readFileSync(
+      resolve(repositoryRoot, 'src/app/(onboarding)/computer.tsx'),
+      'utf8',
+    );
 
     expect(welcome).toContain('Run Devin from anywhere.');
     expect(welcome).toContain('{branding.disclaimer}');
@@ -33,5 +37,12 @@ describe('release onboarding', () => {
     expect(connections).toContain('never copied to your phone');
     expect(credentials).not.toContain('Personal token');
     expect(credentials).not.toContain('Personal access token');
+    expect(credentials).toContain("connectionMode === 'both'");
+    expect(credentials).toContain('STEP 1 OF 2');
+    expect(credentials).toContain('Connect Cloud & continue');
+    expect(computer).toContain("mode === 'both'");
+    expect(computer).toContain('STEP 2 OF 2');
+    expect(computer).toContain('Pair your computer');
+    expect(computer).toContain('Devin Cloud is connected.');
   });
 });

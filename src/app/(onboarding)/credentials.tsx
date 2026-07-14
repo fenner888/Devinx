@@ -20,11 +20,14 @@ import { useRouter } from 'expo-router';
 import { setPendingCredentials } from '@auth/pendingCredentials';
 import { OnboardingBackButton } from '@components/onboarding/OnboardingBackButton';
 import { branding } from '@lib/branding';
+import { useAppPreferences } from '@store/preferences';
 import { useTheme } from '@theme/index';
 
 export default function CredentialsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
+  const connectionMode = useAppPreferences((state) => state.connectionMode);
+  const isCombinedSetup = connectionMode === 'both';
 
   const [apiKey, setApiKey] = useState('');
   const [orgId, setOrgId] = useState('');
@@ -70,12 +73,18 @@ export default function CredentialsScreen() {
           <View className="w-14 h-14 rounded-card bg-tint-blue items-center justify-center mt-7">
             <Ionicons name="cloud-outline" size={27} color={tokens.brandText.hex} />
           </View>
+          {isCombinedSetup && (
+            <Text className="text-brand-text text-text12 font-semibold tracking-wider mt-5">
+              STEP 1 OF 2
+            </Text>
+          )}
           <Text className="text-text-hi-strong text-text28 font-semibold mt-5">
             Connect Devin Cloud
           </Text>
           <Text className="text-text-mid text-text14 leading-5 mt-3 mb-7">
-            Use a scoped credential for your Devin organization. DevinX stores it in the iOS
-            Keychain and never places it in logs or ordinary app storage.
+            {isCombinedSetup
+              ? 'First connect your Devin Cloud account. Next, you’ll pair your computer. Your scoped credential stays in the iOS Keychain.'
+              : 'Use a scoped credential for your Devin organization. DevinX stores it in the iOS Keychain and never places it in logs or ordinary app storage.'}
           </Text>
 
           <View className="mb-4">
@@ -113,9 +122,7 @@ export default function CredentialsScreen() {
           </View>
 
           <View className="mb-4">
-            <Text className="text-text-mid text-text13 mb-2">
-              Attribution user ID (optional)
-            </Text>
+            <Text className="text-text-mid text-text13 mb-2">Attribution user ID (optional)</Text>
             <TextInput
               className="min-h-13 bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
               value={attributionUserId}
@@ -165,7 +172,7 @@ export default function CredentialsScreen() {
             <Text
               className={`text-text16 font-semibold ${canSubmit ? 'text-text-always-white' : 'text-text-low'}`}
             >
-              Validate & connect
+              {isCombinedSetup ? 'Connect Cloud & continue' : 'Validate & connect'}
             </Text>
           </Pressable>
         </ScrollView>

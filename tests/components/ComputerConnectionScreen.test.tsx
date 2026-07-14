@@ -23,6 +23,7 @@ const mockPairComputer = jest.fn(
 const mockGetPermission = jest.fn(async () => 'authorized');
 const mockRequestPermission = jest.fn(async () => 'authorized');
 const mockSetConnectionMode = jest.fn();
+let mockConnectionMode = 'computer';
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, back: mockBack }),
@@ -64,7 +65,7 @@ jest.mock('../../src/components/connections/DevinXQrScanner', () => {
 
 jest.mock('../../src/store/preferences', () => ({
   useAppPreferences: (selector: (state: unknown) => unknown) =>
-    selector({ connectionMode: 'computer', setConnectionMode: mockSetConnectionMode }),
+    selector({ connectionMode: mockConnectionMode, setConnectionMode: mockSetConnectionMode }),
 }));
 
 jest.mock('../../src/theme/index', () => ({
@@ -85,6 +86,7 @@ import ComputerConnectionScreen from '../../src/app/(onboarding)/computer';
 describe('Computer connection onboarding', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConnectionMode = 'computer';
     mockGetPermission.mockResolvedValue('authorized');
     mockRequestPermission.mockResolvedValue('authorized');
   });
@@ -114,6 +116,16 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByText(/Tailscale supplies the private network/)).toBeTruthy();
     expect(screen.queryByText('Same Wi-Fi')).toBeNull();
     expect(screen.getByLabelText('Scan DevinX Connector pairing code')).toBeTruthy();
+  });
+
+  it('identifies computer pairing as the second step of combined setup', () => {
+    mockConnectionMode = 'both';
+    const screen = render(<ComputerConnectionScreen />);
+
+    expect(screen.getByText('STEP 2 OF 2')).toBeTruthy();
+    expect(screen.getByText('Pair your computer')).toBeTruthy();
+    expect(screen.getByText(/Devin Cloud is connected/)).toBeTruthy();
+    expect(screen.queryByText('Connect your Mac')).toBeNull();
   });
 
   it('keeps the Mac name reachable above the keyboard and supports dismissal', () => {
