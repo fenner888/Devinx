@@ -1,6 +1,6 @@
 # Final internal TestFlight physical checklist
 
-Use internal TestFlight Build 62 for final acceptance. It supersedes Build 61 and contains the single
+Use internal TestFlight Build 63 for final acceptance and onboarding review. It supersedes Build 62 and contains the single
 active **Devin working** companion caption with no timeline activity block (`8b2484b`), plus a
 keyboard-safe **Name this Mac** flow that keeps its field and pairing controls reachable (`0c81638`).
 It must preserve composer correction `d90fbb7`, keyboard-viewport fix
