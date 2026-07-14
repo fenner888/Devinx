@@ -3,9 +3,9 @@
 Prepared: July 13, 2026
 
 This packet contains the remaining human, legal, commercial, and physical decisions for App Store
-version 1.0. It is not permission to submit App Review or release the app. Build `0.1.0 (64)` is
-processed, **Ready to Submit**, assigned to the internal **Team (Expo)** group, and attached to the
-version.
+version 1.0. It is not permission to submit App Review or release the app. Build `0.1.0 (66)` is the
+current signed candidate; its EAS submission is queued. Select it only after Apple processing
+completes and the narrow visual/setup-link spot-check passes.
 
 ## Recommended launch choices
 
@@ -83,7 +83,7 @@ Enter these directly in App Store Connect; never commit review credentials:
 ## Privacy publication approval
 
 The local `PRIVACY.md` is newer and materially more complete than `origin/main:PRIVACY.md`. The
-public URL therefore does not yet match the Build 64 data flow. Required sequence:
+public URL therefore does not yet match the Build 66 data flow. Required sequence:
 
 1. Owner explicitly approves publishing the frozen local policy.
 2. Publish that exact file to the public privacy URL.
@@ -94,22 +94,17 @@ public URL therefore does not yet match the Build 64 data flow. Required sequenc
 
 ## Screenshot handoff
 
-Install Build 64 from TestFlight and provide the twelve original PNG source captures specified in
+Install Build 66 from TestFlight and provide the twelve original PNG source captures specified in
 `docs/app-store-screenshot-brief.md`: six iPhone states and the same six real states on a 13-inch
 iPad. Do not send compressed chat images. The Security Work capture must be a genuine
 `origin = code_scan` root; omit the shot if no sanitized root exists.
 
-## Connector credential checkpoint
+## Connector distribution checkpoint
 
-The current Mac has Apple Development and iPhone Distribution identities only. It still lacks:
-
-- a **Developer ID Application** certificate;
-- a working `devinx-notary` Keychain profile.
-
-The owner must create/install the certificate and store notarization credentials interactively.
-Never paste an app-specific password, private key, or token into chat or the repository. After that,
-run the fail-closed workflow in `docs/macos-release-credential-checkpoint.md` and complete the clean
-macOS-account install, startup, update, repair, and uninstall checks before publishing the Connector.
+Connector 0.1.0 is published from the official GitHub release with a Developer ID signature,
+notarization ticket, staple, adjacent checksum, and Gatekeeper acceptance. The current-account
+non-admin lifecycle path passed. A separate fresh-account install/startup/update/repair/uninstall
+exercise remains a hardening follow-up; it is not represented as completed evidence.
 
 ## Final stop boundary
 

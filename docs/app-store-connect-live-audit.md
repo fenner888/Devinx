@@ -5,6 +5,11 @@ Audited: July 13, 2026
 This records the authenticated App Store Connect state after the Build 64 processing and attachment
 refresh. It does not authorize App Review submission, privacy publication, or public release.
 
+July 14 update: Build 66 is the superseding signed screenshot/release candidate. EAS submission
+`cf50f27c-61ca-44ad-8388-dcb4c81a7ad3` is queued at this checkpoint; do not replace the attached
+version build until Apple processing completes and the narrow Build 66 spot-check passes. Connector
+0.1.0 is now published, signed, notarized, stapled, checksum-verified, and Gatekeeper accepted.
+
 ## Confirmed and saved
 
 - Build `0.1.0 (64)` finished processing and is **Ready to Submit**.
@@ -36,11 +41,11 @@ refresh. It does not authorize App Review submission, privacy publication, or pu
 
 ## Publication blockers
 
-1. Complete and record the Build 64 physical and performance/stability checks.
+1. Complete and record the Build 66 physical and performance/stability checks.
 2. Approve publication of the frozen `PRIVACY.md`, update the public URL, and byte-verify it before publishing the App Privacy draft.
 3. Supply the human/legal/commercial answers for Age Rating, Content Rights, price, territories, copyright, and trader status.
 4. Enter review contact information and a private non-production review account directly in App Store Connect.
-5. Capture sanitized Build 64 iPhone 6.5-inch and iPad 13-inch screenshots using
+5. Capture sanitized Build 66 iPhone 6.5-inch and iPad 13-inch screenshots using
    `docs/app-store-screenshot-brief.md`.
-6. Complete Developer ID signing/notarization and clean-account lifecycle testing for the public macOS Connector.
+6. Keep the published Connector release/checksum verification current; complete the separate fresh-account lifecycle hardening exercise when practical.
 7. Obtain separate explicit approval before submitting App Review.

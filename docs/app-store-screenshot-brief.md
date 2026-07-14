@@ -126,7 +126,8 @@ capture and compose the real iPad layout independently.
 
 ## Final capture intake
 
-Use internal TestFlight Build `0.1.0 (64)` for every authenticated source capture. Submit the
+Use internal TestFlight Build `0.1.0 (66)` for every authenticated source capture after its narrow
+visual/setup-link spot-check. Submit the
 original PNG produced by iOS; do not send a messaging-app recompression, crop, mockup, or image with
 markup. Keep dark appearance, standard text size, a clean status bar, and the same sanitized review
 account across the set.
