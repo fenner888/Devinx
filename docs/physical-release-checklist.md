@@ -25,6 +25,10 @@ Before testing, confirm TestFlight shows the exact build number and release-sour
 in `docs/release-readiness.md`. Do not test an older installed build merely because it remains in
 the internal group.
 
+Owner acceptance note (July 14, 2026): Mark physically verified the Build 65 onboarding and assisted
+Connector setup flow and reported that it works. This evidence covers onboarding/setup only; the
+remaining physical, screenshot, stability, and App Review gates below are not implied to have passed.
+
 ## Launch, navigation, and appearance
 
 - Cold-launch once in light mode and once in dark mode. Confirm the transparent DevinX wordmark
