@@ -1,5 +1,14 @@
 export type ModelFamilyMarkKind =
-  'adaptive' | 'claude' | 'glm' | 'swe' | 'gpt' | 'gemini' | 'deepseek' | 'grok' | 'generic';
+  | 'adaptive'
+  | 'claude'
+  | 'glm'
+  | 'swe'
+  | 'gpt'
+  | 'gemini'
+  | 'deepseek'
+  | 'grok'
+  | 'kimi'
+  | 'generic';
 
 /**
  * Maps only recognizable provider/family names to presentation marks.
@@ -16,5 +25,6 @@ export function modelFamilyMarkKind(name: string | null | undefined): ModelFamil
   if (/^gemini(\b|[-_])/.test(normalized)) return 'gemini';
   if (/^deepseek(\b|[-_])/.test(normalized)) return 'deepseek';
   if (/^grok(\b|[-_])/.test(normalized)) return 'grok';
+  if (/^(kimi|moonshot)(\b|[-_])/.test(normalized)) return 'kimi';
   return 'generic';
 }

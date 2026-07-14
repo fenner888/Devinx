@@ -31,7 +31,7 @@ selection, spacing, and dismissal remain consistent.
 - Local model rows mirror Devin Desktop's current hierarchy: a recognizable
   family mark appears at the leading edge and the selection checkmark appears
   at the trailing edge. Adaptive/Fusion, Claude, GLM, SWE, GPT, Gemini,
-  DeepSeek, and Grok use bounded code-native marks; unknown live ACP families
+  DeepSeek, Grok, and Kimi use bounded verified provider marks; unknown live ACP families
   use a neutral chip fallback. The same mark appears in the selected-model
   composer control. Marks are presentation only and never create, rename, or
   remap an ACP model ID.

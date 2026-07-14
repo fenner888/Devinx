@@ -18,6 +18,7 @@ legible without an opaque contrast tile.
 | `gemini.png` | Google Gemini | [Gemini](https://gemini.google.com/) (`gemini_sparkle_aurora...svg`) |
 | `deepseek.png` | DeepSeek | [DeepSeek](https://www.deepseek.com/) (official inline logo SVG) |
 | `grok.png` | xAI Grok | [xAI](https://x.ai/) (`GROKLogo...svg`) |
+| `kimi-dark.png`, `kimi-light.png` | Kimi / Moonshot AI | [Kimi](https://www.kimi.com/) (`/favicon.ico`); transparent theme variants retain the official blue accent |
 | `cognition.png` | Cognition SWE models | [Cognition](https://cognition.ai/) (`/icon.svg`) |
 
 Do not recolor, distort, animate, or reuse these files as DevinX product marks.

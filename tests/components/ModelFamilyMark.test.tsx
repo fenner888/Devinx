@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react-native';
 import { ModelFamilyMark } from '../../src/components/sessions/ModelFamilyMark';
 
 describe('ModelFamilyMark', () => {
-  it.each(['claude', 'glm', 'swe', 'gpt', 'gemini', 'deepseek', 'grok'])(
+  it.each(['claude', 'glm', 'swe', 'gpt', 'gemini', 'deepseek', 'grok', 'kimi'])(
     'renders the verified %s asset instead of an approximated glyph',
     (family) => {
       render(<ModelFamilyMark name={family} />);
@@ -22,7 +22,7 @@ describe('ModelFamilyMark', () => {
     );
   });
 
-  it.each(['claude', 'swe', 'gemini', 'deepseek'])(
+  it.each(['claude', 'swe', 'gemini', 'deepseek', 'kimi'])(
     'preserves the supplied colors for the %s mark',
     (family) => {
       render(<ModelFamilyMark name={family} />);

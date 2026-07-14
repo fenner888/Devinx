@@ -2,7 +2,17 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 
-const MARKS = ['claude', 'cognition', 'deepseek', 'gemini', 'grok', 'openai', 'zai'];
+const MARKS = [
+  'claude',
+  'cognition',
+  'deepseek',
+  'gemini',
+  'grok',
+  'kimi-dark',
+  'kimi-light',
+  'openai',
+  'zai',
+];
 
 function paethPredictor(left: number, up: number, upperLeft: number) {
   const prediction = left + up - upperLeft;

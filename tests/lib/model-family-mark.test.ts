@@ -11,6 +11,8 @@ describe('model family presentation marks', () => {
     ['Gemini 3 Flash', 'gemini'],
     ['DeepSeek V4 Pro', 'deepseek'],
     ['Grok 4.5', 'grok'],
+    ['Kimi K2.5', 'kimi'],
+    ['Moonshot Kimi K2', 'kimi'],
     ['Future Model 1', 'generic'],
     [null, 'generic'],
   ])('maps %s to %s without changing the catalog', (name, expected) => {
@@ -20,5 +22,6 @@ describe('model family presentation marks', () => {
   it('does not match lookalike names that only contain a provider word', () => {
     expect(modelFamilyMarkKind('Not Claude')).toBe('generic');
     expect(modelFamilyMarkKind('My SWE Tool')).toBe('generic');
+    expect(modelFamilyMarkKind('Not Kimi')).toBe('generic');
   });
 });
