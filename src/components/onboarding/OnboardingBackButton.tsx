@@ -14,7 +14,7 @@ export function OnboardingBackButton({ onPress }: { onPress: () => void }) {
       accessibilityLabel="Go back"
       hitSlop={8}
     >
-      <Ionicons name="chevron-back" size={20} color={tokens.textMid.hex} />
+      <Ionicons name="chevron-back" size={20} color={tokens.textHi.hex} />
     </Pressable>
   );
 }
