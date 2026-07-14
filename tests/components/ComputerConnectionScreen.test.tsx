@@ -97,7 +97,12 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByText('Connect your Mac')).toBeTruthy();
     expect(screen.getByText('Name this Mac')).toBeTruthy();
     expect(screen.getByText('Open Tailscale setup guide')).toBeTruthy();
-    expect(screen.getByText('Open DevinX Connector on your Mac.')).toBeTruthy();
+    expect(screen.getByText('Set up DevinX Connector')).toBeTruthy();
+    expect(screen.getByText('Send assisted setup prompt')).toBeTruthy();
+    expect(screen.getByText('Open official releases')).toBeTruthy();
+    expect(
+      screen.getByText('Send the assisted setup prompt to an AI assistant on your Mac.'),
+    ).toBeTruthy();
     expect(screen.queryByText('Pairing transport pending')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));

@@ -16,16 +16,24 @@ DevinX Connector is not an official Cognition component. It uses the supported D
 
 ## Required setup experience
 
-1. The user downloads the signed connector for the computer's operating system.
-2. The connector detects Devin for Terminal and an active Tailscale IPv4 address without reading Devin credentials.
-3. Tailscale is the only v1 connection path. The connector fails closed when no active `100.64.0.0/10` address exists and never falls back to LAN.
-4. On macOS, the bridge binds only to the selected active `100.64.0.0/10` tailnet interface. The connector never binds to a LAN, wildcard, or public interface and reports a bounded health status.
-5. The user chooses **Connect iPhone** and sees a large short-lived QR code.
-6. DevinX scans the QR and the connector displays the requesting device name and requested permissions locally.
-7. The computer owner approves or denies the device. Content access and prompt steering remain separate explicit grants.
-8. The connector can run as the signed-in user after login, show status, regenerate a code, list/revoke paired devices, stop, repair, update, and uninstall.
+1. After choosing **Computer** or **Cloud + Computer**, the user receives an assisted setup prompt as the primary path. The iPhone share sheet lets them send or copy it to an AI assistant running on the computer. **Official releases** and **Already installed** remain visible alternatives.
+2. The assisted prompt references only the official DevinX GitHub Releases page. It tells the computer-side assistant to stop when no signed, notarized release and adjacent checksum are available; it never substitutes a source checkout, guessed package, unsigned artifact, or third-party mirror.
+3. The user downloads and explicitly approves the signed connector for the computer's operating system. iPhone never claims it can silently install or remotely launch an unpaired computer application.
+4. The connector detects Devin for Terminal and an active Tailscale IPv4 address without reading Devin credentials.
+5. Tailscale is the only v1 connection path. The connector fails closed when no active `100.64.0.0/10` address exists and never falls back to LAN.
+6. On macOS, the bridge binds only to the selected active `100.64.0.0/10` tailnet interface. The connector never binds to a LAN, wildcard, or public interface and reports a bounded health status.
+7. The connector presents a large short-lived QR code after first launch. DevinX opens its camera only after an explicit **Scan pairing code** tap.
+8. DevinX scans the QR and the connector displays the requesting device name and requested permissions locally.
+9. The computer owner approves or denies the device. Content access, prompt steering, and session creation remain separate explicit grants.
+10. The connector can run as the signed-in user after login, show status, regenerate a code, list/revoke paired devices, stop, repair, update, and uninstall.
 
-The phone never asks for a server URL, IP address, port, shared password, certificate fingerprint, or Tailscale authentication key. An AI-assisted setup prompt and command-line runner may remain available for technical recovery, but they are not the primary product path.
+The phone never asks for a server URL, IP address, port, shared password, certificate fingerprint, or Tailscale authentication key. The AI-assisted prompt is the primary installation guide, but it cannot bypass platform installation consent, Tailscale login, Connector device approval, or macOS background-item approval.
+
+## macOS window and background lifecycle
+
+The Connector window is a control surface, not the service lifetime. Closing its last window keeps the signed-in-user Connector process and protected Tailscale listener running. A visible menu-bar item provides bounded status, **Open DevinX Connector**, and an explicit **Quit DevinX Connector** action. Reopening the app or choosing the menu command restores the same control window. Only explicit Quit, uninstall, logout without an enabled login item, or process failure stops the runtime.
+
+Launch at login remains an explicit visible user choice through `SMAppService`; the assisted prompt may direct the user to enable it but may not silently register it. The Connector does not install a root daemon or hidden LaunchAgent. After pairing, the user may close the control window and continue using DevinX through the menu-bar background process.
 
 ## Shared architecture
 
@@ -122,7 +130,7 @@ The QR payload may cross only the inherited local IPC pipe and native render pat
 - Unauthorized resources return a generic `404` path.
 - Pairing and write endpoints remain rate limited and replay protected.
 - Tailscale requests accept HTTP only for canonical explicit-port `100.64.0.0/10` origins and never fall back to LAN or public transport.
-- Background startup is opt-in and visible; no silent LaunchAgent, service, or systemd installation.
+- Background startup is opt-in and visible; no silent LaunchAgent, root daemon, or systemd installation. Closing the macOS control window must not terminate an already-running Connector.
 - Release artifacts require code signing, notarization where applicable, checksums, provenance, a dependency audit, secret scan, authorization matrix, and clean-machine install/update/uninstall tests.
 - The public setup prompt references only an official signed release. It must never guess a package, repository, executable path, or download URL.
 

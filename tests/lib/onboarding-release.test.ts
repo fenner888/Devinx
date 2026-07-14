@@ -44,5 +44,10 @@ describe('release onboarding', () => {
     expect(computer).toContain('STEP 2 OF 2');
     expect(computer).toContain('Pair your computer');
     expect(computer).toContain('Devin Cloud is connected.');
+    expect(computer).toContain('Send assisted setup prompt');
+    expect(computer).toContain('CONNECTOR_SETUP_PROMPT');
+    expect(computer).toContain('CONNECTOR_RELEASE_PAGE');
+    expect(computer).toContain('Remove from this iPhone');
+    expect(computer).toContain('inactive Mac record');
   });
 });

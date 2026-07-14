@@ -5,6 +5,7 @@ const mockStorePairedComputers = jest.fn(async (_input: unknown) => {});
 const mockCreateRequestIdentity = jest.fn();
 const mockSign = jest.fn();
 const mockPostPinnedBridgeJson = jest.fn();
+const mockDeleteDeviceIdentity = jest.fn(async (_keyId: string) => {});
 
 jest.mock('../../src/auth/pairedComputers', () => ({
   loadPairedComputers: () => mockLoadPairedComputers(),
@@ -13,7 +14,7 @@ jest.mock('../../src/auth/pairedComputers', () => ({
 
 jest.mock('../../src/auth/deviceSigning', () => ({
   createRequestIdentity: () => mockCreateRequestIdentity(),
-  deleteDeviceIdentity: jest.fn(async () => {}),
+  deleteDeviceIdentity: (keyId: string) => mockDeleteDeviceIdentity(keyId),
   sign: (keyId: string, message: string) => mockSign(keyId, message),
   postTailnetBridgeJson: (endpoint: string, path: string, body: unknown) =>
     mockPostPinnedBridgeJson(endpoint, path, body),
@@ -38,6 +39,7 @@ import {
   openComputerBridge,
   openComputerBridges,
   promptComputerSession,
+  removeComputerFromThisIPhone,
 } from '../../src/auth/computerBridge';
 
 const NOW = 1_800_000_000_000;
@@ -307,6 +309,16 @@ describe('authenticated mobile Computer Bridge client', () => {
       body: {},
     });
     expect(mockStorePairedComputers).toHaveBeenCalledWith([]);
+    expect(mockDeleteDeviceIdentity).toHaveBeenCalledWith(KEY_ID);
+  });
+
+  it('can remove the local pairing without claiming or attempting Mac revocation', async () => {
+    await expect(removeComputerFromThisIPhone(BRIDGE_ID)).resolves.toBeUndefined();
+
+    expect(mockPostPinnedBridgeJson).not.toHaveBeenCalled();
+    expect(mockSign).not.toHaveBeenCalled();
+    expect(mockStorePairedComputers).toHaveBeenCalledWith([]);
+    expect(mockDeleteDeviceIdentity).toHaveBeenCalledWith(KEY_ID);
   });
 
   it('fails local history closed for absent grants, handle mismatch, or invalid sequence', async () => {

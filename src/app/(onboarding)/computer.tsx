@@ -9,6 +9,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -19,7 +20,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 
 import { useConnections } from '@auth/ConnectionContext';
-import { disconnectComputer } from '@auth/computerBridge';
+import {
+  ComputerBridgeError,
+  disconnectComputer,
+  removeComputerFromThisIPhone,
+} from '@auth/computerBridge';
 import { pairComputerFromQrPayload, type ComputerPairingStatus } from '@auth/computerPairing';
 import {
   getQrScannerPermissionStatus,
@@ -27,12 +32,13 @@ import {
   requestQrScannerPermission,
 } from '@auth/deviceSigning';
 import { DevinXQrScanner } from '@components/connections/DevinXQrScanner';
+import { CONNECTOR_RELEASE_PAGE, CONNECTOR_SETUP_PROMPT } from '@lib/connectorSetup';
 import { useAppPreferences } from '@store/preferences';
 import { useTheme } from '@theme/index';
 
 const STEPS = [
-  'Connect this iPhone and your Mac to the same Tailscale network.',
-  'Open DevinX Connector on your Mac.',
+  'Send the assisted setup prompt to an AI assistant on your Mac.',
+  'Approve the signed install, Tailscale login, and visible background setting on your Mac.',
   'Scan its code, then approve this iPhone on your Mac.',
 ];
 
@@ -154,16 +160,52 @@ export default function ComputerConnectionScreen() {
             setRemovingBridgeId(bridgeId);
             disconnectComputer(bridgeId)
               .then(refreshComputers)
-              .catch(() =>
+              .catch((disconnectError: unknown) => {
+                if (
+                  disconnectError instanceof ComputerBridgeError &&
+                  disconnectError.code === 'unavailable'
+                ) {
+                  Alert.alert(
+                    'Mac unavailable',
+                    'DevinX cannot revoke this iPhone on the Mac while Connector is offline. You can retry later, or remove the pairing key from this iPhone now. The inactive Mac record will remain until you revoke it in DevinX Connector.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Remove from this iPhone',
+                        style: 'destructive',
+                        onPress: () => {
+                          setRemovingBridgeId(bridgeId);
+                          removeComputerFromThisIPhone(bridgeId)
+                            .then(refreshComputers)
+                            .catch(() =>
+                              setError(
+                                'The local computer pairing could not be removed securely. Try again.',
+                              ),
+                            )
+                            .finally(() => setRemovingBridgeId(null));
+                        },
+                      },
+                    ],
+                  );
+                  return;
+                }
                 setError(
                   'The computer could not be securely disconnected. Open DevinX Connector and try again.',
-                ),
-              )
+                );
+              })
               .finally(() => setRemovingBridgeId(null));
           },
         },
       ],
     );
+  }
+
+  function shareAssistedSetup() {
+    setError(null);
+    Share.share({
+      title: 'Set up DevinX Connector',
+      message: CONNECTOR_SETUP_PROMPT,
+    }).catch(() => setError('The assisted setup prompt could not be shared. Try again.'));
   }
 
   async function startScanning() {
@@ -324,6 +366,54 @@ export default function ComputerConnectionScreen() {
               ? 'Devin Cloud is connected. Pair DevinX Connector to finish your combined setup; your computer credentials stay securely on your Mac.'
               : 'Pair with DevinX Connector. Your Devin credentials stay securely on your Mac.'}
           </Text>
+
+          {computers.length === 0 && (
+            <View className="bg-surface1 border border-border-subtle rounded-card px-4 py-4 mb-5">
+              <View className="flex-row items-start">
+                <View className="w-9 h-9 rounded-input bg-tint-blue items-center justify-center mr-3">
+                  <Ionicons name="sparkles-outline" size={18} color={tokens.brandText.hex} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-text-hi text-text14 font-semibold">
+                    Set up DevinX Connector
+                  </Text>
+                  <Text className="text-text-mid text-text12 leading-4 mt-1">
+                    Send a guarded setup prompt to an AI assistant on your Mac. It installs only a
+                    signed official release and stops safely when one is unavailable.
+                  </Text>
+                </View>
+              </View>
+
+              <Pressable
+                className="bg-brand rounded-button px-buttonPrimaryX py-buttonPrimaryY mt-4"
+                onPress={shareAssistedSetup}
+                accessibilityRole="button"
+                accessibilityLabel="Share assisted DevinX Connector setup prompt"
+              >
+                <View className="flex-row items-center justify-center">
+                  <Ionicons name="share-outline" size={17} color={tokens.textAlwaysWhite.hex} />
+                  <Text className="text-text-always-white text-text14 font-medium ml-2">
+                    Send assisted setup prompt
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                className="border border-border rounded-button px-buttonPrimaryX py-buttonPrimaryY mt-3"
+                onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
+                accessibilityRole="link"
+                accessibilityLabel="Open official DevinX Connector releases"
+              >
+                <Text className="text-text-hi text-text13 font-medium text-center">
+                  Open official releases
+                </Text>
+              </Pressable>
+
+              <Text className="text-text-low text-text11 leading-4 text-center mt-3">
+                Already installed? Continue below to name this Mac and scan its pairing code.
+              </Text>
+            </View>
+          )}
 
           {computers.length > 0 && (
             <View className="mb-6">

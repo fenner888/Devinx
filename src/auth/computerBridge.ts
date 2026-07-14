@@ -622,3 +622,14 @@ export async function disconnectComputer(bridgeIdInput: string): Promise<void> {
   await storePairedComputers(computers.filter((candidate) => candidate.bridgeId !== bridgeId));
   await deleteDeviceIdentity(computer.deviceKeyId);
 }
+
+export async function removeComputerFromThisIPhone(bridgeIdInput: string): Promise<void> {
+  const bridgeId = opaqueIdSchema.parse(bridgeIdInput);
+  const computers = await validatedComputerRegistry();
+  const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
+  if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {
+    throw new ComputerBridgeError('This Mac is not paired through Tailscale.', 'not_paired');
+  }
+  await storePairedComputers(computers.filter((candidate) => candidate.bridgeId !== bridgeId));
+  await deleteDeviceIdentity(computer.deviceKeyId);
+}

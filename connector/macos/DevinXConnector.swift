@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import ServiceManagement
@@ -550,6 +551,11 @@ private struct ConnectorView: View {
                 ))
                 .toggleStyle(.switch)
 
+                Text("You can close this window. DevinX Connector keeps running from the menu bar until you choose Quit.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
                 Button("Uninstall DevinX Connector", role: .destructive) {
                     model.showingUninstallConfirmation = true
                 }
@@ -586,17 +592,23 @@ private struct ConnectorView: View {
 }
 
 @MainActor
-private final class AppDelegate: NSObject, NSApplicationDelegate {
+private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let model = ConnectorModel()
     private var window: NSWindow?
+    private var statusItem: NSStatusItem?
+    private var statusMenuItem: NSMenuItem?
+    private var statusSubscription: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installStatusItem()
         showWindow()
     }
 
     func showWindow() {
+        NSApplication.shared.setActivationPolicy(.regular)
         guard window == nil else {
             window?.makeKeyAndOrderFront(nil)
+            NSApplication.shared.activate(ignoringOtherApps: true)
             return
         }
         let content = ConnectorView(model: model)
@@ -608,6 +620,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask.insert(.fullSizeContentView)
         window.setContentSize(NSSize(width: 560, height: 760))
         window.minSize = NSSize(width: 520, height: 700)
+        window.isReleasedWhenClosed = false
+        window.delegate = self
         window.center()
         window.makeKeyAndOrderFront(nil)
         self.window = window
@@ -615,7 +629,57 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        false
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        NSApplication.shared.setActivationPolicy(.accessory)
+    }
+
+    func applicationShouldHandleReopen(
+        _ sender: NSApplication,
+        hasVisibleWindows flag: Bool
+    ) -> Bool {
+        showWindow()
+        return true
+    }
+
+    private func installStatusItem() {
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem.button?.image = NSImage(
+            systemSymbolName: "shippingbox.fill",
+            accessibilityDescription: "DevinX Connector"
+        )
+        let menu = NSMenu()
+        let statusMenuItem = NSMenuItem(title: model.status.label, action: nil, keyEquivalent: "")
+        statusMenuItem.isEnabled = false
+        menu.addItem(statusMenuItem)
+        menu.addItem(.separator())
+        menu.addItem(
+            withTitle: "Open DevinX Connector",
+            action: #selector(openConnectorWindow),
+            keyEquivalent: ""
+        ).target = self
+        menu.addItem(.separator())
+        menu.addItem(
+            withTitle: "Quit DevinX Connector",
+            action: #selector(quitConnector),
+            keyEquivalent: "q"
+        ).target = self
+        statusItem.menu = menu
+        self.statusItem = statusItem
+        self.statusMenuItem = statusMenuItem
+        statusSubscription = model.$status.sink { [weak self] status in
+            self?.statusMenuItem?.title = status.label
+        }
+    }
+
+    @objc private func openConnectorWindow() {
+        showWindow()
+    }
+
+    @objc private func quitConnector() {
+        NSApplication.shared.terminate(nil)
     }
 
     func applicationWillTerminate(_ notification: Notification) {

@@ -137,6 +137,11 @@ the internal group.
 - Use the final Developer ID-signed/notarized Connector on a clean non-admin macOS account. Confirm
   first launch, QR pairing, explicit launch-at-login enablement, logout/login startup, and repair
   after stopping Tailscale or Devin for Terminal.
+- Close the Connector window and confirm its menu-bar item and mobile bridge stay available. Reopen
+  the window from the menu-bar item, then choose **Quit DevinX Connector** and confirm the bridge
+  stops.
+- With Connector offline, confirm mobile disconnect offers retry or clearly labeled local-only
+  removal. Reopen Connector later and revoke the inactive iPhone record from the Mac.
 - Quit the Connector, replace it with the newer official signed DMG, and confirm its stable identity
   preserves approved device state without a new Keychain prompt or silent permission expansion.
 - Perform uninstall last: confirm the destructive warning, then verify the listener stops, launch at

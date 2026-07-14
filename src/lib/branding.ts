@@ -40,6 +40,7 @@ export const branding = {
     docs: 'https://docs.devin.ai',
     status: 'https://status.devin.ai',
     createServiceUser: 'https://docs.devin.ai/api-reference/api-keys',
+    connectorReleases: 'https://github.com/fenner888/Devinx/releases/latest',
   },
 } as const;
 

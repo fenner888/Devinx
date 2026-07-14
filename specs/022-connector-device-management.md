@@ -16,7 +16,7 @@ The native app may send only strict `update_device` and `revoke_device` commands
 
 Revocation is immediate and server-authoritative. Subsequent protected requests from that device return the existing generic 404 authorization response. Re-pairing requires a new short-lived QR and explicit computer approval.
 
-The iPhone may disconnect itself through the signed `device.revoke` operation. It removes the local credential and native signing key only after the Mac confirms revocation. If the Mac cannot be reached, the credential remains so the user can retry or revoke it directly in Connector instead of silently leaving an active server grant behind.
+The iPhone may disconnect itself through the signed `device.revoke` operation. The preferred path removes the local credential and native signing key only after the Mac confirms revocation. If the Mac cannot be reached, DevinX must explain that complete Mac-side revocation is unavailable and offer two explicit choices: retry later, or **Remove from this iPhone anyway**. The local-only choice deletes the non-exportable device key and stored computer credential so that iPhone can no longer authenticate, but it must also state that the inactive Mac-side record remains until the user revokes it in Connector. The UI must never call local-only removal a completed Mac revocation.
 
 ## Acceptance gates
 
@@ -25,4 +25,5 @@ The iPhone may disconnect itself through the signed `device.revoke` operation. I
 - Keychain persistence failure leaves active authorization unchanged;
 - revoked devices cannot regain permissions through an update command;
 - Connector UI clearly separates read-history and send-message grants;
+- an unreachable Mac never produces a false full-revocation success; local-only removal destroys the iPhone key and clearly identifies the remaining Mac-side cleanup;
 - automated state, IPC, controller, and macOS packaging validation.
