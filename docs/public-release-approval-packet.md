@@ -9,7 +9,7 @@ This packet converts the frozen internal TestFlight candidate into an explicit p
 - Product version: `0.1.0`
 - Build: `65`
 - Frozen source: `b621825`
-- Release-evidence source: pending this evidence commit
+- Release-evidence source: `0a98524`
 - Bundle identifier: `com.fenner888.devinx`
 - IPA: `artifacts/eas/DevinX-0.1.0-65.ipa`
 - Size: `21,024,841` bytes
