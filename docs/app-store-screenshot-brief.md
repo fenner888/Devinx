@@ -12,11 +12,11 @@ features and metrics.
 The six images tell one sequence:
 
 1. Connect and begin from anywhere.
-2. Monitor Cloud and Computer work together.
+2. Monitor active work in one clear session board.
 3. Respond when a session needs a human decision.
-4. Speak a substantial task instead of typing it with thumbs.
-5. Review the resulting changes and pull request.
-6. Inspect and steer genuine Code Scan work.
+4. Choose Cloud, Computer, or both without confusing their boundaries.
+5. Review the resulting work and continue the session.
+6. Choose from the live Computer model catalog.
 
 Every screenshot uses real in-app UI at readable scale. Marketing text may explain the visible
 experience but must not obscure it. Do not use Cognition's logo, Devin's official logomark, fake
@@ -48,9 +48,9 @@ Show the final Home screen with the companion, readiness status, composer, `Clou
 availability, and two or three sanitized recent sessions. The screen should immediately establish
 the product without opening a picker or sheet.
 
-## Image 2 — Combined session board
+## Image 2 — Session board
 
-**Headline:** `Cloud and computer. One view.`
+**Headline:** `Every session. One clear view.`
 
 **Supporting line:** `See every session with a clear source and status.`
 
@@ -69,38 +69,37 @@ question, and a prepared user response in the composer. The visible response sho
 decision without including secrets or production identifiers. Do not manufacture a status-transition
 control that the app does not render.
 
-## Image 4 — Voice and prompt organization
+## Image 4 — Connection modes
 
-**Headline:** `Speak the task. Send the plan.`
+**Headline:** `Cloud, computer, or both.`
 
-**Supporting line:** `Turn a spoken idea into an editable work order.`
+**Supporting line:** `Choose the connection that fits how you work.`
 
-Show the real new-session composer during on-device dictation or the real Organize Prompt preview.
-The transcript should be a realistic technical task. Keep the microphone state, timer, Cancel/Stop,
-and on-device language visible when capturing the recording state. Do not call the guaranteed
-deterministic organizer a cloud LLM.
+Show the real **Choose where Devin runs** screen with Devin Cloud, Computer, and Cloud + Computer.
+Keep the Connector boundary visible: Tailscale supplies the private network, while the Connector
+keeps computer credentials on the computer. Do not imply that Cloud sign-in automatically pairs a
+computer or that the Connector installs without an explicit user action on that computer.
 
-## Image 5 — Result and pull request
+## Image 5 — Result
 
-**Headline:** `From prompt to pull request.`
+**Headline:** `Review real results.`
 
-**Supporting line:** `Review results, changes, tests, and linked pull requests.`
+**Supporting line:** `Read clear summaries and continue from your phone.`
 
-Show a sanitized completed Cloud session on the Changes tab, or the strongest real completion state
-that visibly includes its summary and linked PR. Any counts must match the captured session. Do not
-invent files changed, tests passed, or PR state in the marketing composition.
+Show a sanitized session containing a readable, internally consistent result and its composer. Any
+counts, links, tests, or pull-request state shown must belong to the captured session. Do not invent
+files changed, tests passed, or PR state in the marketing composition.
 
-## Image 6 — Security Work
+## Image 6 — Model picker
 
-**Headline:** `Review security work anywhere.`
+**Headline:** `Choose the right model.`
 
-**Supporting line:** `Inspect Code Scan sessions, agent activity, and findings.`
+**Supporting line:** `Use Adaptive or select from supported Devin models.`
 
-Show only a genuine `origin = code_scan` Security Work root. Prefer a detail view with a readable,
-sanitized report and visible follow-up composer; use the grouped Security Work screen only when its
-root and child-agent structure communicates more clearly at App Store size. This image represents
-review and steering of existing Code Scan sessions, not scan creation or Cognition's enterprise
-findings dashboard.
+Show the real Computer model picker populated from the live ACP catalog. Keep Adaptive, recent
+families, recognizable bundled family marks, and selection state visible. Model names and promotion
+badges must come from the live catalog; do not add unsupported models or claim Adaptive/Fusion exists
+in the Cloud API. Capture with a clean status bar and no Dynamic Island media artwork.
 
 ## Required export sets
 
@@ -119,7 +118,7 @@ media.
 - Confirm the device is in dark appearance before every capture and visually verify that the app
   background and final marketing canvas are black. Any light-mode capture fails this gate.
 - Complete the relevant dark-theme, Dynamic Type, VoiceOver, keyboard, dictation, session, and
-  Security Work checks in `docs/physical-release-checklist.md` before capture.
+  model-picker checks in `docs/physical-release-checklist.md` before capture.
 - Verify every repository, session title, prompt, message, PR, count, and status is fictional and
   internally consistent.
 - Confirm all copy remains accurate to the supported API and Connector boundaries.
@@ -136,13 +135,14 @@ Name the six iPhone sources:
 1. `01-home.png`
 2. `02-sessions.png`
 3. `03-needs-input.png`
-4. `04-voice-or-organize.png`
-5. `05-result-pr.png`
-6. `06-security-code-scan.png`
-
-The Security Work source must visibly belong to a genuine `origin = code_scan` root. If a suitable
-sanitized state does not exist, omit that shot rather than substituting an ordinary security-review
-session.
+4. `04-choose-where-devin-runs.png`
+5. `05-result.png`
+6. `06-model-picker.png`
 
 Before upload, verify each composition against its image section above. Export the iPhone set at
 `1242 x 2688`, generate one contact sheet, and obtain owner approval before uploading it.
+
+Current package note (July 14, 2026): images 1–5 pass dimension and visual-content review. The
+prepared image 6 is rejected because its source capture contains active Dynamic Island media artwork.
+Replace image 6 with a clean simulator or device capture before final package approval; do not mask,
+crop, or upload the rejected source.
