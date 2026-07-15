@@ -8,7 +8,7 @@
     "scheme": "devinx",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.fenner888.devinx",
       "infoPlist": {
         "NSFileProtection": "NSFileProtectionComplete",
