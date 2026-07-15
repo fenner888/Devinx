@@ -1,6 +1,6 @@
 # App Store listing draft
 
-Last updated: July 13, 2026
+Last updated: July 14, 2026
 
 This is a review draft only. Do not publish it or submit App Review without explicit release approval.
 
@@ -16,9 +16,13 @@ This is a review draft only. Do not publish it or submit App Review without expl
 
 ## Description
 
-DevinX is an independent mobile client for the Devin API. Monitor cloud sessions, review progress, send follow-up messages, create sessions, and keep work moving from your iPhone.
+DevinX is an independent mobile client for the Devin API. Monitor cloud sessions, review progress,
+send follow-up messages, create sessions, and keep work moving from your iPhone.
 
-Optionally pair DevinX with DevinX Connector on a Mac you control. The Connector uses your private Tailscale network and per-device approval so you can view minimized local Devin session history and send text to an authorized session without copying Devin credentials to your phone.
+Optionally pair DevinX with the signed DevinX Connector on an Apple-silicon Mac you control. The
+Connector uses your private Tailscale network and per-device approval so you can view minimized
+local Devin session history and send text to an authorized session without copying Devin
+credentials to your phone.
 
 Highlights:
 
@@ -31,7 +35,10 @@ Highlights:
 - Dark and light appearance, reduced-motion support, and VoiceOver labels
 - An in-app Devin companion that reflects session state without covering controls
 
-DevinX is an independent, unofficial client for the Devin API. It is not affiliated with, endorsed by, or a product of Cognition AI. A Devin account and appropriate API access are required for cloud features. Computer features require DevinX Connector, Devin for Terminal, and Tailscale on a supported Mac.
+DevinX is an independent, unofficial client for the Devin API. It is not affiliated with, endorsed
+by, or a product of Cognition AI. A Devin account and appropriate API access are required for cloud
+features. Computer features require the separately installed DevinX Connector 0.1.0, Devin for
+Terminal, and Tailscale on an Apple-silicon Mac.
 
 ## Review constraints
 

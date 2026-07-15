@@ -1,6 +1,6 @@
 # App Store owner decisions
 
-Prepared: July 13, 2026
+Prepared: July 14, 2026
 
 This packet contains the remaining human, legal, commercial, and physical decisions for App Store
 version 1.0. It is not permission to submit App Review or release the app. Build `0.1.0 (67)` is the
@@ -84,7 +84,7 @@ Enter these directly in App Store Connect; never commit review credentials:
 ## Privacy publication approval
 
 The local `PRIVACY.md` is newer and materially more complete than `origin/main:PRIVACY.md`. The
-public URL therefore does not yet match the Build 66 data flow. Required sequence:
+public URL therefore does not yet match the Build 67 data flow. Required sequence:
 
 1. Owner explicitly approves publishing the frozen local policy.
 2. Publish that exact file to the public privacy URL.
@@ -95,11 +95,14 @@ public URL therefore does not yet match the Build 66 data flow. Required sequenc
 
 ## Screenshot handoff
 
-The six final iPhone 6.5-inch compositions are prepared at `1242 x 2688` under
+Five approved iPhone 6.5-inch compositions and one blocked replacement slot are prepared at
+`1242 x 2688` under
 `artifacts/app-store/screenshots/iphone-6.5/final/`. Build 67 is the verified, processed, and installed
-iPhone-only screenshot and release candidate; physically spot-check it before these images are uploaded. No iPad
-set is required for the initial release. The Security Work composition must remain based on a genuine
-`origin = code_scan` root; omit it if that provenance cannot be retained.
+iPhone-only screenshot and release candidate; physically spot-check it before these images are
+uploaded. No iPad set is required for the initial release. Images 1–5 passed the sanitized visual
+review. Image 6 (model picker) must be recaptured with a clean status bar because the current source
+contains personal media artwork in the Dynamic Island. The screenshot manifest blocks that file from
+upload until it is replaced and re-reviewed.
 
 ## Connector distribution checkpoint
 
