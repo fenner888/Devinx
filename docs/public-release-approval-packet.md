@@ -19,8 +19,9 @@ This packet converts the frozen internal TestFlight candidate into an explicit p
   `ba956d4c3df7a25c1573beb0138c35500cb9028dce24600f446ed760847c591f`
 - Current EAS submission: `3416da8d-2299-45b8-89d7-1a835ed042c5`
 - Current state: Build 66 is retained as signed evidence but superseded because it advertises
-  unvalidated iPad support. Build 67 is the verified iPhone-only candidate and has been uploaded to
-  EAS Submit; Apple processing and physical acceptance remain external.
+  unvalidated iPad support. Build 67 is the verified iPhone-only candidate; Apple processing completed
+  and the owner installed it from TestFlight on a physical iPhone. Remaining physical acceptance is
+  still external.
 
 The owner froze the product UI after Build 62, then explicitly reopened and approved the onboarding
 presentation in Build 65. Build 67 preserves that implementation, the clarified Connector/Tailscale

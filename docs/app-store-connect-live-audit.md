@@ -6,10 +6,11 @@ This records the authenticated App Store Connect state after the Build 64 proces
 refresh. It does not authorize App Review submission, privacy publication, or public release.
 
 July 14 update: Build 66 remains historical signed TestFlight evidence, but it is no longer the final
-screenshot/release target. Build 67 was exported and independently verified as iPhone-only, then
-uploaded to EAS Submit under submission `3416da8d-2299-45b8-89d7-1a835ed042c5`. Do not replace the
-attached version build until Apple processing finishes and Build 67 is physically accepted. Connector
-0.1.0 is now published, signed, notarized, stapled, checksum-verified, and Gatekeeper accepted.
+screenshot/release target. Build 67 was exported and independently verified as iPhone-only, uploaded
+under EAS submission `3416da8d-2299-45b8-89d7-1a835ed042c5`, processed by Apple, and installed by the
+owner from TestFlight on a physical iPhone. Installation is not full release acceptance; do not replace
+the attached version build until the remaining Build 67 acceptance checks pass. Connector 0.1.0 is now
+published, signed, notarized, stapled, checksum-verified, and Gatekeeper accepted.
 
 ## Confirmed and saved
 
@@ -44,8 +45,8 @@ attached version build until Apple processing finishes and Build 67 is physicall
 
 ## Publication blockers
 
-1. Wait for Apple processing, then complete the narrow physical and performance/stability checks for
-   the uploaded iPhone-only Build 67 candidate.
+1. Complete the narrow physical and performance/stability checks for the processed and installed
+   iPhone-only Build 67 candidate.
 2. Approve publication of the frozen `PRIVACY.md`, update the public URL, and byte-verify it before publishing the App Privacy draft.
 3. Supply the human/legal/commercial answers for Age Rating, Content Rights, price, territories, copyright, and trader status.
 4. Enter review contact information and a private non-production review account directly in App Store Connect.

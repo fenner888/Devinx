@@ -3,9 +3,10 @@
 Prepared: July 13, 2026
 
 This packet contains the remaining human, legal, commercial, and physical decisions for App Store
-version 1.0. It is not permission to submit App Review or release the app. Build `0.1.0 (66)` is the
-current signed candidate; its EAS submission is queued. Select it only after Apple processing
-completes and the narrow visual/setup-link spot-check passes.
+version 1.0. It is not permission to submit App Review or release the app. Build `0.1.0 (67)` is the
+current signed iPhone-only candidate; Apple processing completed and the owner installed it from
+TestFlight. Select it only after the remaining physical acceptance checks and the narrow
+visual/setup-link spot-check pass.
 
 ## Recommended launch choices
 
@@ -95,8 +96,8 @@ public URL therefore does not yet match the Build 66 data flow. Required sequenc
 ## Screenshot handoff
 
 The six final iPhone 6.5-inch compositions are prepared at `1242 x 2688` under
-`artifacts/app-store/screenshots/iphone-6.5/final/`. Build 67 is the verified, uploaded iPhone-only
-screenshot and release candidate; physically spot-check it after processing before these images are uploaded. No iPad
+`artifacts/app-store/screenshots/iphone-6.5/final/`. Build 67 is the verified, processed, and installed
+iPhone-only screenshot and release candidate; physically spot-check it before these images are uploaded. No iPad
 set is required for the initial release. The Security Work composition must remain based on a genuine
 `origin = code_scan` root; omit it if that provenance cannot be retained.
 

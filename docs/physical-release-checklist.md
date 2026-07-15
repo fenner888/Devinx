@@ -34,6 +34,10 @@ remaining physical, screenshot, stability, and App Review gates below are not im
 Build 67 requires a narrow visual/setup-link spot-check before the prepared iPhone screenshots are
 uploaded.
 
+Build 67 delivery note (July 14, 2026): Apple processing completed and Mark installed `0.1.0 (67)`
+from TestFlight on a physical iPhone. This closes the binary delivery/install gate only; use the
+installed Build 67 for every remaining check below.
+
 ## Launch, navigation, and appearance
 
 - Cold-launch once in light mode and once in dark mode. Confirm the transparent DevinX wordmark
