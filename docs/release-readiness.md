@@ -158,6 +158,13 @@ This is the source of truth for the current release checkpoint. A passing intern
   from TestFlight on a physical iPhone. This confirms delivery and installation only; the remaining
   functional, accessibility, performance/stability, screenshot-upload, and App Review gates are not
   implied to have passed.
+- [x] Post-install release gates were refreshed on documentation checkpoint `4a2dd07` with exact
+  Node `24.18.0`: lint passed with zero warnings; strict app and bridge TypeScript passed; all 80
+  Jest suites / 575 tests passed with handle detection; app and Connector builds passed; lockfile
+  dry-run and tracked-file key/sensitive-file scans passed; the dependency gate reports 0 high / 0
+  critical and the same 21 reviewed moderate transitive advisories; and the published Connector DMG
+  re-verified at SHA-256 `659142d305644b42f1c29302faea0ebeded1dbb0085a09bb0512d1ce51710d73`
+  with its Developer ID signature and bundled Node `24.18.0`.
 - [x] The public repository now carries the MIT license, a third-party asset/mark notice, and a responsible-disclosure policy. GitHub private vulnerability reporting, Dependabot vulnerability alerts/security updates, secret scanning, and push protection were live-verified enabled on July 14, 2026; this repository-only change does not require a replacement iOS binary
 - [x] Post-upload release gates were refreshed on evidence source `4c5f139` with exact Node `24.18.0`: lint, strict TypeScript, 74 Jest suites / 545 tests, app and Connector builds, repository audit, lockfile dry-run, tracked-file secret scan, 0 high / 0 critical npm advisories, and independent Build 62 IPA size/checksum verification all passed
 - [x] The July 14 arm64 Connector candidate was signed with `Developer ID Application: Mark Fenner (Q7H78WYTAR)`, accepted by Apple for both app and DMG submissions, stapled, and accepted by Gatekeeper as `Notarized Developer ID`; SHA-256 `8bd5e31d54ae607ac6302fc544c8e8392c46c20532ab3cd000ca3e9c4c682634`. The one-time API private-key download was removed after the validated `devinx-notary` Keychain profile was created. The artifact remains unpublished pending the clean-account lifecycle test and explicit publication approval
