@@ -1,14 +1,19 @@
-# Build 62 physical acceptance record
+# Build 67 physical acceptance record
 
-Candidate: DevinX `0.1.0 (62)`  
-IPA SHA-256: `e5bff1a0a29fdd6c88b6cce4fb24890b84c73d79ceba5719e893d83db005d353`  
+This worksheet was originally created for Build 62. Build 67 supersedes that candidate; the
+historical filename is retained to avoid breaking release-document links.
+
+Candidate: DevinX `0.1.0 (67)`
+
+IPA SHA-256: `ba956d4c3df7a25c1573beb0138c35500cb9028dce24600f446ed760847c591f`
+
 Tester:  
 Date started:  
 Date completed:  
 iPhone model / iOS:  
-iPad model / iPadOS:  
 Devin account tier used:  
-Connector source / hash: `4c5f139` / `8fffe9b33afcae1d152f63f0cf8fed4c99a3b3864e0619c88fa1c78e7843dd3e`
+Connector release source / DMG SHA-256: `106f163d53662c5a5b9a5df6d787f208e21a2217` /
+`659142d305644b42f1c29302faea0ebeded1dbb0085a09bb0512d1ce51710d73`
 
 Use only a non-production account, sanitized repositories, and harmless prompts. Record **Pass**, **Fail**, or **Not available** plus a short observation. A privacy, authorization, data-loss, crash, or unsupported-capability failure blocks release.
 
@@ -126,7 +131,6 @@ Use only a non-production account, sanitized repositories, and harmless prompts.
 | Reduce Motion replaces unnecessary movement while preserving state |  |  |
 | Light and dark themes remain readable across Home, sessions, Settings, and sheets |  |  |
 | Pairing scanner is immediately visible, bounded, and dismissible in both themes |  |  |
-| iPad portrait and landscape layouts avoid phone-width stretching and clipped sheets |  |  |
 
 ## Performance and stability
 
@@ -142,7 +146,7 @@ Use only a non-production account, sanitized repositories, and harmless prompts.
 - [ ] All available checks passed.
 - [ ] Every **Not available** item is documented and does not create an unsupported product claim.
 - [ ] No release-blocking privacy, authorization, data-loss, crash, or accessibility defect remains.
-- [ ] The tester accepts Build 62 as the screenshot candidate.
+- [ ] The tester accepts Build 67 as the release and screenshot candidate.
 
 Tester sign-off:  
 Owner acceptance:  

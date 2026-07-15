@@ -216,7 +216,8 @@ historical signed TestFlight evidence, but it advertises unvalidated iPad suppor
 initial public binary. The owner already accepted Build 65 onboarding and assisted Connector setup;
 Build 67 preserves that flow and requires a narrow visual/setup-link spot-check before the prepared
 iPhone screenshot set is uploaded. Record the remaining functional matrix in
-`docs/build-62-physical-acceptance-record.md`. The official Connector DMG is Developer ID signed,
+  `docs/build-62-physical-acceptance-record.md`; the concise current handoff is
+  `docs/build-67-release-handoff.md`. The official Connector DMG is Developer ID signed,
 notarized, stapled, checksum-published, and available from the guarded official release link.
 
 - [x] In Build 35, switching Home from Cloud to Computer changed Recent from Cloud sessions to sessions from the selected Mac, switching back restored Cloud recents, and View all retained the combined cross-origin Sessions screen
