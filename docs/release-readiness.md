@@ -143,6 +143,9 @@ This is the source of truth for the current release checkpoint. A passing intern
 - [x] Release-source commit `66dccd3` records the owner-accepted onboarding result and the clarified Connector/Tailscale boundary. Exact Node `24.18.0` release CI passed lint, strict TypeScript, 80 Jest suites / 575 tests, app and Connector builds, lockfile dry-run, tracked-file secret and sensitive-file scans, and the dependency gate with 0 high / 0 critical advisories; the 21 moderate transitive advisories remain documented and require no unsafe forced upgrade.
 - [x] iOS `0.1.0 (66)` was built locally from clean source `66dccd3` with exact Node `24.18.0` and Xcode `26.6`; the signed 21,024,994-byte IPA passed strict code-signature, bundle-ID/version/build-number, production update channel/runtime, complete file protection, exempt-encryption, entitlement, source-map/source-file absence, and privacy-manifest inspection. All 10 manifests declare no tracking, no debug or APS entitlement is present, and SHA-256 is `a4b7ef263d9957b8e8132d5a9a2f7dd4260edf30af8db27a80ab20255934f354`.
 - [ ] Build 66 EAS submission `cf50f27c-61ca-44ad-8388-dcb4c81a7ad3` uploaded the exact IPA to EAS Submit and was scheduled for App Store Connect on July 14, 2026. The EAS job is still in queue at this checkpoint; Apple processing, the narrow Build 66 visual spot-check, sanitized screenshot capture, and App Review remain external.
+- [x] Release commit `809ed48` disables tablet support for the initial release. Lint, strict
+  TypeScript, and 80 Jest suites / 575 tests passed after the change. Build 67 is the next planned
+  internal candidate; it is not represented as built or uploaded until that workflow completes.
 - [x] The public repository now carries the MIT license, a third-party asset/mark notice, and a responsible-disclosure policy. GitHub private vulnerability reporting, Dependabot vulnerability alerts/security updates, secret scanning, and push protection were live-verified enabled on July 14, 2026; this repository-only change does not require a replacement iOS binary
 - [x] Post-upload release gates were refreshed on evidence source `4c5f139` with exact Node `24.18.0`: lint, strict TypeScript, 74 Jest suites / 545 tests, app and Connector builds, repository audit, lockfile dry-run, tracked-file secret scan, 0 high / 0 critical npm advisories, and independent Build 62 IPA size/checksum verification all passed
 - [x] The July 14 arm64 Connector candidate was signed with `Developer ID Application: Mark Fenner (Q7H78WYTAR)`, accepted by Apple for both app and DMG submissions, stapled, and accepted by Gatekeeper as `Notarized Developer ID`; SHA-256 `8bd5e31d54ae607ac6302fc544c8e8392c46c20532ab3cd000ca3e9c4c682634`. The one-time API private-key download was removed after the validated `devinx-notary` Keychain profile was created. The artifact remains unpublished pending the clean-account lifecycle test and explicit publication approval
@@ -189,7 +192,13 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-Use internal TestFlight Build 66 as the superseding release and screenshot target. The owner already accepted Build 65 onboarding and assisted Connector setup; Build 66 preserves that implementation and adds the clarified Connector/Tailscale explanation now published in the draft release PR. Perform a narrow visual/setup-link spot-check on Build 66 before sanitized screenshots are finalized, then record the remaining functional matrix in `docs/build-62-physical-acceptance-record.md`. The official Connector DMG is now Developer ID signed, notarized, stapled, checksum-published, and available from the guarded official release link.
+Use the next iPhone-only Build 67 as the release and screenshot-validation target. Build 66 remains
+historical signed TestFlight evidence, but it advertises unvalidated iPad support and must not be the
+initial public binary. The owner already accepted Build 65 onboarding and assisted Connector setup;
+Build 67 preserves that flow and requires a narrow visual/setup-link spot-check before the prepared
+iPhone screenshot set is uploaded. Record the remaining functional matrix in
+`docs/build-62-physical-acceptance-record.md`. The official Connector DMG is Developer ID signed,
+notarized, stapled, checksum-published, and available from the guarded official release link.
 
 - [x] In Build 35, switching Home from Cloud to Computer changed Recent from Cloud sessions to sessions from the selected Mac, switching back restored Cloud recents, and View all retained the combined cross-origin Sessions screen
 - [x] In Build 35, the destination and workspace sheets remained compact, bounded, explicitly dismissible, and free of raw paths or excessive empty space
@@ -234,7 +243,9 @@ Use internal TestFlight Build 66 as the superseding release and screenshot targe
 - [x] Review current official Cognition, Expo, and Tailscale privacy/retention materials and record the EAS Update randomized installation token in `docs/app-privacy-review.md`
 - [ ] Confirm the selected Devin account/agreement's exact retention treatment and publish the final App Store Connect privacy answers from `docs/app-privacy-review.md`
 - [x] Freeze the owner-approved visual direction at Build 64; no further design changes are planned before release validation
-- [ ] Physically accept the affected Build 64 screens, then capture final iPhone 6.5-inch and iPad 13-inch screenshots in the slots currently requested by App Store Connect, without credentials or private session content
+- [ ] Physically accept the iPhone-only Build 67 screens, review the prepared final iPhone 6.5-inch
+  set, and upload it without credentials or private session content. iPad is intentionally outside the
+  initial release scope.
 - [ ] Approve publication of the frozen `PRIVACY.md`, update the public policy URL, and byte-verify the published content
 - [x] Save the approved App Store description, keywords, support URL, review notes, subtitle, categories, and manual-release method; Build 64 is the current binary candidate, and unvalidated Apple-silicon Mac and Vision Pro availability remain disabled
 - [x] Save the conservative App Privacy data-type draft without publishing it

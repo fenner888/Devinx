@@ -5,10 +5,11 @@ Audited: July 13, 2026
 This records the authenticated App Store Connect state after the Build 64 processing and attachment
 refresh. It does not authorize App Review submission, privacy publication, or public release.
 
-July 14 update: Build 66 is the superseding signed screenshot/release candidate. EAS submission
-`cf50f27c-61ca-44ad-8388-dcb4c81a7ad3` is queued at this checkpoint; do not replace the attached
-version build until Apple processing completes and the narrow Build 66 spot-check passes. Connector
-0.1.0 is now published, signed, notarized, stapled, checksum-verified, and Gatekeeper accepted.
+July 14 update: Build 66 remains historical signed TestFlight evidence, but it is no longer the final
+screenshot/release target. The next candidate is Build 67, configured as iPhone-only so the initial
+release does not claim an unvalidated iPad experience. Do not replace the attached version build until
+Build 67 is built, uploaded, processed, and physically accepted. Connector 0.1.0 is now published,
+signed, notarized, stapled, checksum-verified, and Gatekeeper accepted.
 
 ## Confirmed and saved
 
@@ -24,7 +25,9 @@ version build until Apple processing completes and the narrow Build 66 spot-chec
   - User ID — App Functionality, linked to the user, no tracking;
   - Device ID — App Functionality, not linked to the user, no tracking.
 - App Store Connect's preview consequently shows Identifiers and User Content under **Data Linked to You**, and an Identifier under **Data Not Linked to You**.
-- The live media manager currently requests an iPhone 6.5-inch set and an iPad 13-inch set. Both contain zero screenshots and zero previews.
+- Build 66 still advertises iPad support, so its live media manager requests both iPhone 6.5-inch and
+  iPad 13-inch sets. Build 67 is intentionally configured with `supportsTablet: false`; after it is
+  selected for the version, the initial release should require only the iPhone set.
 - Build 64 is assigned to the one-tester **Team (Expo)** internal group. The build has one invite and
   no installs, sessions, crashes, or feedback recorded at this checkpoint.
 
@@ -41,11 +44,12 @@ version build until Apple processing completes and the narrow Build 66 spot-chec
 
 ## Publication blockers
 
-1. Complete and record the Build 66 physical and performance/stability checks.
+1. Build, upload, process, and complete the narrow physical and performance/stability checks for the
+   iPhone-only Build 67 candidate.
 2. Approve publication of the frozen `PRIVACY.md`, update the public URL, and byte-verify it before publishing the App Privacy draft.
 3. Supply the human/legal/commercial answers for Age Rating, Content Rights, price, territories, copyright, and trader status.
 4. Enter review contact information and a private non-production review account directly in App Store Connect.
-5. Capture sanitized Build 66 iPhone 6.5-inch and iPad 13-inch screenshots using
-   `docs/app-store-screenshot-brief.md`.
+5. Review and upload the six sanitized iPhone 6.5-inch compositions defined in
+   `docs/app-store-screenshot-brief.md`; do not provide an iPad set for the iPhone-only initial release.
 6. Keep the published Connector release/checksum verification current; complete the separate fresh-account lifecycle hardening exercise when practical.
 7. Obtain separate explicit approval before submitting App Review.

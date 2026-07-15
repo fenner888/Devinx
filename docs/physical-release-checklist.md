@@ -1,6 +1,9 @@
 # Final internal TestFlight physical checklist
 
-Use internal TestFlight Build 66 for final release acceptance and sanitized App Store screenshot capture. It supersedes Build 65, whose onboarding and assisted Connector setup flow the owner physically accepted on July 14, 2026, and contains the single
+Use the next iPhone-only TestFlight Build 67 for final release acceptance and sanitized App Store
+screenshot validation. Build 66 remains historical signed evidence but advertises unvalidated iPad
+support, so it is not the initial public-release target. Build 67 preserves Build 65's owner-accepted
+onboarding and assisted Connector setup flow and contains the single
 active **Devin working** companion caption with no timeline activity block (`8b2484b`), plus a
 keyboard-safe **Name this Mac** flow that keeps its field and pairing controls reachable (`0c81638`).
 It must preserve composer correction `d90fbb7`, keyboard-viewport fix
@@ -27,7 +30,9 @@ the internal group.
 
 Owner acceptance note (July 14, 2026): Mark physically verified the Build 65 onboarding and assisted
 Connector setup flow and reported that it works. This evidence covers onboarding/setup only; the
-remaining physical, screenshot, stability, and App Review gates below are not implied to have passed. Build 66 preserves that implementation and requires a narrow visual/setup-link spot-check before final screenshot capture.
+remaining physical, screenshot, stability, and App Review gates below are not implied to have passed.
+Build 67 requires a narrow visual/setup-link spot-check before the prepared iPhone screenshots are
+uploaded.
 
 ## Launch, navigation, and appearance
 

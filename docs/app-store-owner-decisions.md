@@ -94,10 +94,11 @@ public URL therefore does not yet match the Build 66 data flow. Required sequenc
 
 ## Screenshot handoff
 
-Install Build 66 from TestFlight and provide the twelve original PNG source captures specified in
-`docs/app-store-screenshot-brief.md`: six iPhone states and the same six real states on a 13-inch
-iPad. Do not send compressed chat images. The Security Work capture must be a genuine
-`origin = code_scan` root; omit the shot if no sanitized root exists.
+The six final iPhone 6.5-inch compositions are prepared at `1242 x 2688` under
+`artifacts/app-store/screenshots/iphone-6.5/final/`. Build 67 is the planned iPhone-only screenshot
+and release candidate; physically spot-check that build before these images are uploaded. No iPad
+set is required for the initial release. The Security Work composition must remain based on a genuine
+`origin = code_scan` root; omit it if that provenance cannot be retained.
 
 ## Connector distribution checkpoint
 

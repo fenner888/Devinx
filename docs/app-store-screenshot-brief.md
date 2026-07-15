@@ -104,13 +104,14 @@ findings dashboard.
 
 ## Required export sets
 
-The authenticated App Store Connect media manager currently requests:
+Build 66 still reports tablet support and therefore caused App Store Connect to request both device
+families. The next candidate intentionally sets `supportsTablet: false`, so the initial release set is:
 
 - iPhone 6.5-inch portrait: `1284 × 2778` or `1242 × 2688` PNG.
-- iPad 13-inch portrait: `2064 × 2752` or `2048 × 2732` PNG.
 
-Create all six images for both families. Do not stretch an iPhone capture into the iPad artwork;
-capture and compose the real iPad layout independently.
+Create all six images for this iPhone family. Do not upload iPad artwork or claim iPad support in the
+initial release. A later iPad release requires its own layout validation and independently captured
+media.
 
 ## Capture acceptance gate
 
@@ -122,15 +123,13 @@ capture and compose the real iPad layout independently.
 - Verify every repository, session title, prompt, message, PR, count, and status is fictional and
   internally consistent.
 - Confirm all copy remains accurate to the supported API and Connector boundaries.
-- Obtain owner approval on the full iPhone and iPad contact sheets before uploading them.
+- Obtain owner approval on the full iPhone contact sheet before uploading it.
 
 ## Final capture intake
 
-Use internal TestFlight Build `0.1.0 (66)` for every authenticated source capture after its narrow
-visual/setup-link spot-check. Submit the
-original PNG produced by iOS; do not send a messaging-app recompression, crop, mockup, or image with
-markup. Keep dark appearance, standard text size, a clean status bar, and the same sanitized review
-account across the set.
+Use the prepared sanitized iPhone sources and compositions only after the iPhone-only Build 67
+candidate passes its narrow visual/setup-link spot-check. Keep dark appearance, standard text size,
+a clean status bar, and internally consistent sanitized review content across the set.
 
 Name the six iPhone sources:
 
@@ -141,11 +140,9 @@ Name the six iPhone sources:
 5. `05-result-pr.png`
 6. `06-security-code-scan.png`
 
-Repeat the same states on the 13-inch iPad using `01-home-ipad.png` through
-`06-security-code-scan-ipad.png`. The Security Work source must visibly belong to a genuine
-`origin = code_scan` root. If a suitable sanitized state does not exist, omit that shot rather than
-substituting an ordinary security-review session.
+The Security Work source must visibly belong to a genuine `origin = code_scan` root. If a suitable
+sanitized state does not exist, omit that shot rather than substituting an ordinary security-review
+session.
 
-Before composition, verify each source against its image section above. After composition, export
-the iPhone set at `1242 x 2688` and the iPad set at `2048 x 2732`, generate one contact sheet per
-family, and obtain owner approval before uploading either set.
+Before upload, verify each composition against its image section above. Export the iPhone set at
+`1242 x 2688`, generate one contact sheet, and obtain owner approval before uploading it.
