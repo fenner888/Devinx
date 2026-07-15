@@ -4,24 +4,25 @@ Last updated: July 14, 2026
 
 This packet converts the frozen internal TestFlight candidate into an explicit public-release checklist. It is evidence and a handoff, not permission to submit App Review, publish an OTA update, merge source to a public branch, or release the iOS app. The owner separately authorized and published macOS Connector 0.1.0 on July 14, 2026; that bounded Connector approval does not authorize any other release action.
 
-## Frozen iOS candidate
+## Superseded signed candidate and next build
 
 - Product version: `0.1.0`
-- Build: `66`
-- Frozen source: `66dccd3`
-- Release-evidence source: this post-artifact documentation update (no app changes)
+- Historical signed build: `66`
+- Historical source: `66dccd3`
+- Next planned build: `67`
+- Next source: `d593cfb`
 - Bundle identifier: `com.fenner888.devinx`
-- IPA: `artifacts/eas/DevinX-0.1.0-66.ipa`
-- Size: `21,024,994` bytes
-- SHA-256: `a4b7ef263d9957b8e8132d5a9a2f7dd4260edf30af8db27a80ab20255934f354`
-- EAS submission: `cf50f27c-61ca-44ad-8388-dcb4c81a7ad3`
-- Current state: EAS uploaded Build 66 and scheduled its App Store Connect submission. The EAS job is
-  queued at this checkpoint; Apple processing, group availability, and final physical acceptance remain external.
+- Historical artifact: `artifacts/eas/DevinX-0.1.0-66.ipa`, 21,024,994 bytes, SHA-256
+  `a4b7ef263d9957b8e8132d5a9a2f7dd4260edf30af8db27a80ab20255934f354`
+- Historical EAS submission: `cf50f27c-61ca-44ad-8388-dcb4c81a7ad3`
+- Current state: Build 66 is retained as signed evidence but superseded as the public candidate because
+  it advertises unvalidated iPad support. Build 67 is not represented as built or uploaded until its
+  release workflow completes.
 
 The owner froze the product UI after Build 62, then explicitly reopened and approved the onboarding
-presentation in Build 65. Build 66 preserves that implementation and adds only the clarified
-Connector/Tailscale boundary now captured in the release documents and draft PR. Screenshots must use
-Build 66 after a narrow visual/setup-link spot-check.
+presentation in Build 65. Build 67 preserves that implementation, the clarified Connector/Tailscale
+boundary, and sets `supportsTablet: false` for the initial iPhone release. The prepared iPhone
+screenshots must be spot-checked against Build 67 before upload.
 
 ## Refreshed automated evidence
 
@@ -38,7 +39,7 @@ The exact Node `24.18.0` release runtime passed:
 
 The remaining 21 moderate advisories are transitive. `markdown-it` has no available fix, while the relevant Expo/PostCSS/UUID fixes require a breaking Expo 57 migration. They are documented risk, not silently ignored findings.
 
-The Build 66 IPA size, checksum, strict code signature, entitlements, microphone disclosure,
+The historical Build 66 IPA size, checksum, strict code signature, entitlements, microphone disclosure,
 exempt-encryption declaration, and all ten privacy manifests were independently reverified against
 the frozen artifact.
 
@@ -76,8 +77,8 @@ Use the existing listing draft as the copy source:
 The public support URL is live. The public privacy URL is also live, but its current content does **not** match the frozen local `PRIVACY.md`. Publishing the frozen policy to the public URL and byte-verifying it is a release blocker. Do not publish or merge that source change without explicit approval.
 
 The authenticated App Store Connect draft contains the approved description, keywords, support URL,
-review notes, subtitle, primary/secondary categories, and the prior processed build. Build 66 must be
-selected after Apple processing completes. Manual release is selected, so
+review notes, subtitle, primary/secondary categories, and the prior processed build. Build 67 must be
+selected only after it is built, uploaded, processed, and physically accepted. Manual release is selected, so
 an App Review approval cannot automatically publish the app. Apple-silicon Mac and Vision Pro
 availability are disabled because those platforms have not been validated.
 
@@ -116,17 +117,17 @@ Official reference: [Manage app privacy](https://developer.apple.com/help/app-st
 
 ## Screenshot set
 
-Because the binary supports iPad, capture both device families from Build 66 after the narrow visual spot-check:
+The initial release is intentionally iPhone-only. Review and upload the six prepared iPhone 6.5-inch
+compositions after the Build 67 narrow visual spot-check:
 
 - iPhone 6.5-inch portrait in the slot currently requested by App Store Connect;
-- iPad 13-inch portrait, `2064 x 2752` or `2048 x 2732`;
 - PNG or JPEG without transparency;
 - sanitized non-production data only;
 - one coherent sequence covering Home, a live session, Cloud/Computer origin clarity, voice/Scribe, and supported product-management surfaces.
 
 Apple accepts one to ten screenshots per device size. See [Screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications?page_id=52545).
 
-## Required physical evidence for Build 66
+## Required physical evidence for Build 67
 
 Complete and record:
 
@@ -137,13 +138,13 @@ Complete and record:
 5. Cloud Normal/Fast where the account is entitled and a Computer Adaptive/model dispatch confirmed by the live session;
 6. Security Work exact `code_scan` filtering and navigation;
 7. disconnect, revoke, re-pair, data wipe, and unauthenticated cold launch;
-8. light/dark, Dynamic Type, VoiceOver, scanner, and iPad layout checks;
+8. light/dark, Dynamic Type, VoiceOver, and scanner checks on supported iPhones;
 9. the cold-launch, 200-row scroll, one-hour battery, and seven-day TestFlight stability evidence in `docs/physical-performance-checklist.md`;
 10. the timed internal OTA rollback drill, only after separate approval to publish the internal update.
 
 ## Approval sequence
 
-1. Complete and record the Build 66 physical and performance/stability evidence.
+1. Build, upload, process, and complete the affected Build 67 physical and performance/stability evidence.
 2. Approve publication of the frozen privacy policy, then byte-verify the public URL.
 3. Keep the published Connector checksum/release verification current; complete the separate fresh-account lifecycle hardening exercise when practical.
 4. Complete App Store Connect metadata, privacy, age rating, Content Rights, price/availability, screenshots, and private review information.
