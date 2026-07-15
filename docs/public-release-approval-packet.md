@@ -121,7 +121,7 @@ Official reference: [Manage app privacy](https://developer.apple.com/help/app-st
 
 ## Screenshot set
 
-The initial release is intentionally iPhone-only. Review and upload the six prepared iPhone 6.5-inch
+The initial release is intentionally iPhone-only. Review and upload the five selected iPhone 6.5-inch
 compositions after the Build 67 narrow visual spot-check:
 
 - iPhone 6.5-inch portrait in the slot currently requested by App Store Connect;

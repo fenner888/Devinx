@@ -9,14 +9,13 @@ features and metrics.
 
 ## Product story
 
-The six images tell one sequence:
+The five selected images tell one sequence:
 
 1. Connect and begin from anywhere.
 2. Monitor active work in one clear session board.
 3. Respond when a session needs a human decision.
 4. Choose Cloud, Computer, or both without confusing their boundaries.
 5. Review the resulting work and continue the session.
-6. Choose from the live Computer model catalog.
 
 Every screenshot uses real in-app UI at readable scale. Marketing text may explain the visible
 experience but must not obscure it. Do not use Cognition's logo, Devin's official logomark, fake
@@ -90,7 +89,7 @@ Show a sanitized session containing a readable, internally consistent result and
 counts, links, tests, or pull-request state shown must belong to the captured session. Do not invent
 files changed, tests passed, or PR state in the marketing composition.
 
-## Image 6 — Model picker
+## Deferred optional image — Model picker
 
 **Headline:** `Choose the right model.`
 
@@ -108,7 +107,7 @@ families. The next candidate intentionally sets `supportsTablet: false`, so the 
 
 - iPhone 6.5-inch portrait: `1284 × 2778` or `1242 × 2688` PNG.
 
-Create all six images for this iPhone family. Do not upload iPad artwork or claim iPad support in the
+Create the five selected images for this iPhone family. Do not upload iPad artwork or claim iPad support in the
 initial release. A later iPad release requires its own layout validation and independently captured
 media.
 
@@ -130,19 +129,18 @@ Use the prepared sanitized iPhone sources and compositions only after the iPhone
 candidate passes its narrow visual/setup-link spot-check. Keep dark appearance, standard text size,
 a clean status bar, and internally consistent sanitized review content across the set.
 
-Name the six iPhone sources:
+Name the five selected iPhone sources:
 
 1. `01-home.png`
 2. `02-sessions.png`
 3. `03-needs-input.png`
 4. `04-choose-where-devin-runs.png`
 5. `05-result.png`
-6. `06-model-picker.png`
 
 Before upload, verify each composition against its image section above. Export the iPhone set at
 `1242 x 2688`, generate one contact sheet, and obtain owner approval before uploading it.
 
-Current package note (July 14, 2026): images 1–5 pass dimension and visual-content review. The
-prepared image 6 is rejected because its source capture contains active Dynamic Island media artwork.
-Replace image 6 with a clean simulator or device capture before final package approval; do not mask,
-crop, or upload the rejected source.
+Current package note (July 15, 2026): images 1–5 pass dimension and visual-content review and form the
+initial release set. The previously prepared model-picker source is rejected because it contains
+active Dynamic Island media artwork. It is excluded from this release and must not be masked, cropped,
+or uploaded.

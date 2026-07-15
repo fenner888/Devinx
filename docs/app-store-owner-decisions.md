@@ -95,14 +95,13 @@ public URL therefore does not yet match the Build 67 data flow. Required sequenc
 
 ## Screenshot handoff
 
-Five approved iPhone 6.5-inch compositions and one blocked replacement slot are prepared at
+Five approved iPhone 6.5-inch compositions are selected for the initial release at
 `1242 x 2688` under
 `artifacts/app-store/screenshots/iphone-6.5/final/`. Build 67 is the verified, processed, and installed
 iPhone-only screenshot and release candidate; physically spot-check it before these images are
 uploaded. No iPad set is required for the initial release. Images 1–5 passed the sanitized visual
-review. Image 6 (model picker) must be recaptured with a clean status bar because the current source
-contains personal media artwork in the Dynamic Island. The screenshot manifest blocks that file from
-upload until it is replaced and re-reviewed.
+review. The rejected model-picker source is intentionally excluded and must not be uploaded; its
+replacement is deferred and is not a release blocker.
 
 ## Connector distribution checkpoint
 

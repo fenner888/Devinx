@@ -50,9 +50,8 @@ published, signed, notarized, stapled, checksum-verified, and Gatekeeper accepte
 2. Approve publication of the frozen `PRIVACY.md`, update the public URL, and byte-verify it before publishing the App Privacy draft.
 3. Supply the human/legal/commercial answers for Age Rating, Content Rights, price, territories, copyright, and trader status.
 4. Enter review contact information and a private non-production review account directly in App Store Connect.
-5. Upload the five approved sanitized iPhone 6.5-inch compositions and first replace the blocked
-   model-picker image with a clean-status-bar recapture, as recorded in
-   `docs/app-store-screenshot-manifest.md`. Do not provide an iPad set for the iPhone-only initial
-   release.
+5. Upload the five approved sanitized iPhone 6.5-inch compositions recorded in
+   `docs/app-store-screenshot-manifest.md`. Exclude the rejected model-picker source and do not provide
+   an iPad set for the iPhone-only initial release.
 6. Keep the published Connector release/checksum verification current; complete the separate fresh-account lifecycle hardening exercise when practical.
 7. Obtain separate explicit approval before submitting App Review.

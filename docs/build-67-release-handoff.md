@@ -47,21 +47,19 @@ blocks release and requires a superseding build. A cosmetic preference alone doe
 
 ## Product-page work still required
 
-1. Recapture screenshot 6 (model picker) with a clean status bar/Dynamic Island. The current source
-   includes personal media artwork and is blocked from upload. Re-review its checksum after replacement.
-2. Owner approves the final six-image order; upload only the iPhone 6.5-inch set. iPad is outside the
-   initial release scope.
-3. Owner explicitly approves the frozen `PRIVACY.md`; merge it to the public `main` branch and verify
+1. Upload the owner-selected five-image iPhone 6.5-inch set recorded in
+   `docs/app-store-screenshot-manifest.md`. Exclude the rejected model-picker source; it is not part of
+   the initial release. iPad is outside the initial release scope.
+2. Owner explicitly approves the frozen `PRIVACY.md`; merge it to the public `main` branch and verify
    the raw public file against the checksum in `docs/privacy-publication-handoff.md`.
-4. Reconcile and publish the App Store privacy answers only after the public policy matches.
-5. Enter the owner/legal/commercial fields directly in App Store Connect: age rating, Content Rights,
+3. Reconcile and publish the App Store privacy answers only after the public policy matches.
+4. Enter the owner/legal/commercial fields directly in App Store Connect: age rating, Content Rights,
    free price, territories, copyright, DSA trader status, review contact, and a private non-production
    review credential.
-6. Attach Build 67 to version 1.0 only after the owner accepts it as the release binary.
+5. Attach Build 67 to version 1.0 only after the owner accepts it as the release binary.
 
 ## Stop boundary
 
 After every item above is evidenced, audit the product page once more and stop. Do not select
 **Add for Review**, submit App Review, or release publicly until the owner gives separate explicit
 approval for that exact action.
-
