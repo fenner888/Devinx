@@ -4,20 +4,23 @@ Last updated: July 14, 2026
 
 This packet converts the frozen internal TestFlight candidate into an explicit public-release checklist. It is evidence and a handoff, not permission to submit App Review, publish an OTA update, merge source to a public branch, or release the iOS app. The owner separately authorized and published macOS Connector 0.1.0 on July 14, 2026; that bounded Connector approval does not authorize any other release action.
 
-## Superseded signed candidate and next build
+## Current signed candidate
 
 - Product version: `0.1.0`
 - Historical signed build: `66`
 - Historical source: `66dccd3`
-- Next planned build: `67`
-- Next source: `d593cfb`
+- Current signed build: `67`
+- Current source: `3c80334`
 - Bundle identifier: `com.fenner888.devinx`
 - Historical artifact: `artifacts/eas/DevinX-0.1.0-66.ipa`, 21,024,994 bytes, SHA-256
   `a4b7ef263d9957b8e8132d5a9a2f7dd4260edf30af8db27a80ab20255934f354`
 - Historical EAS submission: `cf50f27c-61ca-44ad-8388-dcb4c81a7ad3`
-- Current state: Build 66 is retained as signed evidence but superseded as the public candidate because
-  it advertises unvalidated iPad support. Build 67 is not represented as built or uploaded until its
-  release workflow completes.
+- Current artifact: `artifacts/eas/DevinX-0.1.0-67.ipa`, 20,259,641 bytes, SHA-256
+  `ba956d4c3df7a25c1573beb0138c35500cb9028dce24600f446ed760847c591f`
+- Current EAS submission: `3416da8d-2299-45b8-89d7-1a835ed042c5`
+- Current state: Build 66 is retained as signed evidence but superseded because it advertises
+  unvalidated iPad support. Build 67 is the verified iPhone-only candidate and has been uploaded to
+  EAS Submit; Apple processing and physical acceptance remain external.
 
 The owner froze the product UI after Build 62, then explicitly reopened and approved the onboarding
 presentation in Build 65. Build 67 preserves that implementation, the clarified Connector/Tailscale
