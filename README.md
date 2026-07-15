@@ -175,8 +175,9 @@ tunnel, analytics SDK, or silent updater.
   context from the iPhone.
 - Version 1 ships no product-analytics, crash-reporting, or remote-push SDK.
 
-Read the complete [Privacy Policy](PRIVACY.md), [Security Policy](SECURITY.md), and
-[Authorization Matrix](docs/authorization-matrix.md). Report vulnerabilities through
+Read the complete [Privacy Policy](PRIVACY.md), [Security Policy](SECURITY.md),
+[Authorization Matrix](docs/authorization-matrix.md), and
+[latest dependency audit](docs/dependency-audit-2026-07-15.md). Report vulnerabilities through
 [GitHub's private vulnerability reporting](https://github.com/fenner888/Devinx/security/advisories/new),
 never through a public issue containing sensitive details.
 
