@@ -1,7 +1,7 @@
 /**
  * Settings screen — grouped card sections with icon tiles, matching the
  * Devin settings design (specs/reference-ui/04-settings.png).
- * Theme toggle, auth status, usage link, about, disconnect.
+ * Connection status, theme, behavior, account, resources, and secure disconnect.
  */
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Linking, TextInput } from 'react-native';
@@ -10,11 +10,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@auth/AuthContext';
+import { useConnections } from '@auth/ConnectionContext';
+import { computerTransportLabel } from '@auth/pairedComputers';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCodeScanFindings, useSelf } from '@api/devin/queries';
+import { useSelf } from '@api/devin/queries';
 import { purgeCache } from '@cache/index';
 import { branding } from '@lib/branding';
+import { connectionModeOptions } from '@lib/connections';
 import { confirmAction } from '@lib/confirm';
+import { purgeUserScopedStorage } from '@lib/localUserData';
 import { normalizeDefaultTags, useAppPreferences, type PollingMode } from '@store/preferences';
 import {
   setThemePreference,
@@ -25,9 +29,16 @@ import {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { disconnect, provider } = useAuth();
+  const { provider, isAuthenticated } = useAuth();
+  const {
+    mode: connectionMode,
+    hasCloudConnection,
+    hasComputerConnection,
+    computers,
+    connectionError,
+    disconnectAll,
+  } = useConnections();
   const queryClient = useQueryClient();
-  const { data: scanFindings } = useCodeScanFindings();
   const { data: self } = useSelf();
   const { tokens } = useTheme();
   const currentPref = useThemePreference();
@@ -37,8 +48,10 @@ export default function SettingsScreen() {
   const setHaptics = useAppPreferences((s) => s.setHaptics);
   const defaultTags = useAppPreferences((s) => s.defaultTags);
   const setDefaultTags = useAppPreferences((s) => s.setDefaultTags);
+  const resetUserScopedData = useAppPreferences((s) => s.resetUserScopedData);
   const [defaultTagsInput, setDefaultTagsInput] = useState(defaultTags.join(', '));
   const [credentialFingerprint, setCredentialFingerprint] = useState<string | null>(null);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -64,15 +77,23 @@ export default function SettingsScreen() {
       {
         title: 'Disconnect?',
         message:
-          'This wipes your API key, org ID, and all cached session data from this device. Your Devin sessions are not affected.',
+          'This wipes Devin Cloud credentials, paired-computer keys, and all cached session data from this device. Your Devin sessions are not affected.',
         confirmLabel: 'Disconnect',
         destructive: true,
       },
       async () => {
-        await disconnect();
-        await purgeCache();
-        queryClient.clear();
-        router.replace('/(onboarding)');
+        setDisconnectError(null);
+        try {
+          await disconnectAll();
+          await Promise.all([purgeCache(), purgeUserScopedStorage()]);
+          resetUserScopedData();
+          queryClient.clear();
+          router.replace('/(onboarding)');
+        } catch {
+          setDisconnectError(
+            'The secure wipe did not complete. Your connections remain locked; please try again.',
+          );
+        }
       },
     );
   }
@@ -99,6 +120,78 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView className="flex-1 px-5" contentContainerClassName="pb-10">
+        {/* Connections */}
+        <Text className="text-text-low text-text12 font-medium uppercase mb-2">Connections</Text>
+        <View className="bg-surface1 rounded-2xl border border-border-subtle overflow-hidden mb-6">
+          <View className="flex-row items-center px-4 py-3 border-b border-border-subtle">
+            <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
+              <Ionicons name="git-compare-outline" size={15} color={tokens.brandText.hex} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-text-hi text-text14">Connection mode</Text>
+              <Text className="text-text-low text-text12 mt-0.5">
+                {connectionModeOptions.find((option) => option.key === connectionMode)?.label}
+              </Text>
+            </View>
+          </View>
+          <View className="flex-row items-center px-4 py-3 border-b border-border-subtle">
+            <Ionicons
+              name="cloud-outline"
+              size={17}
+              color={hasCloudConnection ? tokens.finished.hex : tokens.textLow.hex}
+            />
+            <Text className="text-text-hi text-text14 flex-1 ml-3">Devin Cloud</Text>
+            <Text className="text-text-low text-text12">
+              {hasCloudConnection ? 'Connected' : 'Not connected'}
+            </Text>
+          </View>
+          <Pressable
+            className="flex-row items-center px-4 py-3 border-b border-border-subtle"
+            onPress={() => router.push('/(main)/computer')}
+            accessibilityRole="button"
+            accessibilityLabel="Add or pair a Mac"
+          >
+            <Ionicons
+              name="desktop-outline"
+              size={17}
+              color={hasComputerConnection ? tokens.finished.hex : tokens.textLow.hex}
+            />
+            <View className="flex-1 ml-3">
+              <Text className="text-text-hi text-text14">
+                {computers.length === 1 ? computers[0]?.computerName : 'Computers'}
+              </Text>
+              <Text className="text-text-low text-text12 mt-0.5">
+                {hasComputerConnection
+                  ? `${computers.length} paired ${computers.length === 1 ? `computer · ${computerTransportLabel(computers[0]!.transportKind)}` : 'computers'}`
+                  : 'No paired computers'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+          </Pressable>
+          {isAuthenticated && (
+            <Pressable
+              className="flex-row items-center px-4 py-3"
+              onPress={() => router.push('/(main)/connections')}
+              accessibilityRole="button"
+              accessibilityLabel="View organization integrations and MCP servers"
+            >
+              <Ionicons name="extension-puzzle-outline" size={17} color={tokens.brandText.hex} />
+              <View className="flex-1 ml-3">
+                <Text className="text-text-hi text-text14">Integrations & MCP</Text>
+                <Text className="text-text-low text-text12 mt-0.5">
+                  Installed and available organization capabilities
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+            </Pressable>
+          )}
+          {connectionError && (
+            <View className="bg-tint-red px-4 py-3 border-t border-border-subtle">
+              <Text className="text-failed text-text12">{connectionError}</Text>
+            </View>
+          )}
+        </View>
+
         {/* Appearance */}
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">Appearance</Text>
         <View className="flex-row bg-tint-secondary rounded-button p-1 mb-6">
@@ -210,27 +303,37 @@ export default function SettingsScreen() {
                 {self?.service_user_name ||
                   self?.service_user_id ||
                   self?.user_id ||
-                  (provider?.kind === 'pat' ? 'Personal access token' : 'Service user key')}
+                  (provider
+                    ? provider.kind === 'pat'
+                      ? 'Personal access token'
+                      : 'Service user key'
+                    : 'Devin Cloud not connected')}
               </Text>
               <Text className="text-text-low text-text12 mt-0.5">
                 {self?.org_id ? `${self.org_id} · ` : ''}
-                {provider?.kind === 'pat' ? 'Personal access token' : 'Service user key'}
-                {credentialFingerprint ? ` · ending ${credentialFingerprint}` : ''}
+                {provider
+                  ? provider.kind === 'pat'
+                    ? 'Personal access token'
+                    : 'Service user key'
+                  : 'Computer-only mode'}
+                {provider && credentialFingerprint ? ` · ending ${credentialFingerprint}` : ''}
               </Text>
             </View>
           </View>
-          <Pressable
-            className="flex-row items-center px-4 py-3"
-            onPress={() => router.push('/(main)/usage')}
-            accessibilityRole="button"
-            accessibilityLabel="View ACU consumption"
-          >
-            <View className="w-8 h-8 rounded-button bg-tint-green items-center justify-center mr-3">
-              <Ionicons name="speedometer-outline" size={15} color={tokens.finished.hex} />
-            </View>
-            <Text className="text-text-hi text-text14 flex-1">Usage & limits</Text>
-            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
-          </Pressable>
+          {provider && (
+            <Pressable
+              className="flex-row items-center px-4 py-3"
+              onPress={() => router.push('/(main)/usage')}
+              accessibilityRole="button"
+              accessibilityLabel="View ACU consumption"
+            >
+              <View className="w-8 h-8 rounded-button bg-tint-green items-center justify-center mr-3">
+                <Ionicons name="speedometer-outline" size={15} color={tokens.finished.hex} />
+              </View>
+              <Text className="text-text-hi text-text14 flex-1">Usage & limits</Text>
+              <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+            </Pressable>
+          )}
         </View>
 
         {/* Products */}
@@ -239,23 +342,26 @@ export default function SettingsScreen() {
           {(
             [
               {
+                icon: 'time-outline',
+                label: 'Automations',
+                route: '/(main)/automations',
+                tint: 'bg-tint-blue',
+                color: tokens.brandText.hex,
+              },
+              {
                 icon: 'git-pull-request-outline',
                 label: 'Review',
                 route: '/(main)/review',
                 tint: 'bg-tint-blue',
                 color: tokens.brandText.hex,
               },
-              ...(scanFindings
-                ? [
-                    {
-                      icon: 'shield-outline',
-                      label: 'Security',
-                      route: '/(main)/security',
-                      tint: 'bg-tint-red',
-                      color: tokens.failed.hex,
-                    } as const,
-                  ]
-                : []),
+              {
+                icon: 'shield-checkmark-outline',
+                label: 'Security Work',
+                route: '/(main)/security-work',
+                tint: 'bg-tint-green',
+                color: tokens.finished.hex,
+              },
             ] as const
           ).map(({ icon, label, route, tint, color }, i, arr) => (
             <Pressable
@@ -285,6 +391,13 @@ export default function SettingsScreen() {
                 route: '/(main)/knowledge',
                 tint: 'bg-tint-purple',
                 color: tokens.merged.hex,
+              },
+              {
+                icon: 'folder-open-outline',
+                label: 'Repositories & Wiki',
+                route: '/(main)/repositories',
+                tint: 'bg-tint-blue',
+                color: tokens.brandText.hex,
               },
               {
                 icon: 'book-outline',
@@ -374,6 +487,11 @@ export default function SettingsScreen() {
         </View>
 
         {/* Disconnect */}
+        {disconnectError && (
+          <View className="bg-tint-red rounded-card px-4 py-3 mb-3">
+            <Text className="text-failed text-text12">{disconnectError}</Text>
+          </View>
+        )}
         <Pressable
           className="flex-row items-center justify-center bg-destructive rounded-button px-buttonPrimaryX py-buttonPrimaryY mb-8"
           onPress={handleDisconnect}
@@ -382,7 +500,7 @@ export default function SettingsScreen() {
         >
           <Ionicons name="log-out-outline" size={16} color={tokens.textAlwaysWhite.hex} />
           <Text className="text-text-always-white text-text14 font-medium ml-2">
-            Disconnect & wipe data
+            Disconnect & wipe all connections
           </Text>
         </Pressable>
       </ScrollView>

@@ -1,0 +1,17 @@
+export {
+  createDeviceIdentity,
+  createRequestIdentity,
+  deleteAllDeviceIdentities,
+  deleteDeviceIdentity,
+  fingerprintPublicKeySpki,
+  getQrScannerPermissionStatus,
+  hasDeviceIdentity,
+  hmacSha256,
+  isDeviceCryptoAvailable,
+  isPinnedBridgeTransportAvailable,
+  isQrScannerAvailable,
+  postPinnedBridgeJson,
+  requestQrScannerPermission,
+  sign,
+  verify,
+} from '../../../src/auth/deviceSigning';

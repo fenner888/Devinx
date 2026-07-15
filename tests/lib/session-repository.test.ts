@@ -68,6 +68,12 @@ describe('session repository context', () => {
     await expect(getSessionMode('session-1')).resolves.toBeNull();
   });
 
+  it('ignores a previously cached preview mode that is not in the public API contract', async () => {
+    storage.getItem.mockResolvedValue('fusion');
+
+    await expect(getSessionMode('session-1')).resolves.toBeNull();
+  });
+
   it('falls back to the repository in a pull request URL', async () => {
     storage.getItem.mockResolvedValue(null);
 

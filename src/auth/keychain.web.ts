@@ -1,47 +1,41 @@
 /**
  * Keychain — web stub.
- * expo-secure-store is not available on web. This stub uses localStorage
- * for dev preview only. The real native implementation lives in
- * keychain.native.ts with WHEN_UNLOCKED_THIS_DEVICE_ONLY.
- *
- * WARNING: localStorage is NOT secure. This is for web dev preview only.
- * The production app runs on iOS/Android where keychain.native.ts is used.
+ * expo-secure-store is not available on web. The web target therefore keeps
+ * credentials in process memory only; refresh closes the authenticated
+ * preview session. Auth tokens are never written to localStorage.
  */
 
 import { branding } from '@lib/branding';
 
-const PREFIX = 'devinx_';
-
-/**
- * Hard block in production: localStorage is plaintext and readable by any
- * XSS. The web target is a DEV PREVIEW only — a production web build must
- * not store real API keys this way. `__DEV__` is false in production bundles.
- */
-function assertDevPreview(): void {
-  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
-    throw new Error(
-      'Web credential storage is disabled in production builds — the web target is a dev preview only. Use the iOS/Android app, where secrets are stored in the device Keychain.',
-    );
-  }
-}
+const memoryStore = new Map<string, string>();
 
 export async function storeSecret(key: string, value: string): Promise<void> {
-  assertDevPreview();
-  localStorage.setItem(PREFIX + key, value);
+  memoryStore.set(key, value);
 }
 
 export async function getSecret(key: string): Promise<string | null> {
-  return localStorage.getItem(PREFIX + key);
+  return memoryStore.get(key) ?? null;
 }
 
 export async function deleteSecret(key: string): Promise<void> {
-  localStorage.removeItem(PREFIX + key);
+  memoryStore.delete(key);
+}
+
+export async function wipeCloudSecrets(): Promise<void> {
+  for (const key of [
+    branding.keychain.apiKey,
+    branding.keychain.orgId,
+    branding.keychain.attributionUserId,
+    branding.keychain.authKind,
+  ]) {
+    memoryStore.delete(key);
+  }
 }
 
 export async function wipeAllSecrets(): Promise<void> {
   const keys = Object.values(branding.keychain);
   for (const k of keys) {
-    localStorage.removeItem(PREFIX + k);
+    memoryStore.delete(k);
   }
 }
 

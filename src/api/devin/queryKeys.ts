@@ -9,8 +9,10 @@ export const queryKeys = {
   messageFollowUp: (id: string) => ['messageFollowUp', id] as const,
   playbooks: ['playbooks'] as const,
   knowledge: ['knowledge'] as const,
+  knowledgeFolders: ['knowledgeFolders'] as const,
   secrets: ['secrets'] as const,
   consumption: ['consumption'] as const,
+  billingLimits: ['billingLimits'] as const,
   insights: (id: string) => ['insights', id] as const,
   tags: (id: string) => ['tags', id] as const,
   schedules: ['schedules'] as const,
@@ -18,7 +20,5 @@ export const queryKeys = {
   repositories: ['repositories'] as const,
   self: ['self'] as const,
   sessionConsumption: (id: string) => ['sessionConsumption', id] as const,
-  repoIndexing: ['repoIndexing'] as const,
   prReview: (url: string) => ['prReview', url] as const,
-  codeScanFindings: ['codeScanFindings'] as const,
 } as const;

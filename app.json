@@ -8,12 +8,20 @@
     "scheme": "devinx",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.fenner888.devinx",
       "infoPlist": {
         "NSFileProtection": "NSFileProtectionComplete",
+        "NSCameraUsageDescription": "Allow DevinX to scan a pairing code shown by DevinX Connector.",
+        "NSMicrophoneUsageDescription": "DevinX uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded.",
+        "NSLocalNetworkUsageDescription": "Allow DevinX to connect securely to a computer you approve in DevinX Connector.",
         "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": false
+          "NSAllowsArbitraryLoads": false,
+          "NSExceptionDomains": {
+            "100.64.0.0/10": {
+              "NSExceptionAllowsInsecureHTTPLoads": true
+            }
+          }
         },
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -24,9 +32,7 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#141414"
       },
-      "permissions": [
-        "android.permission.MODIFY_AUDIO_SETTINGS"
-      ]
+      "permissions": ["android.permission.MODIFY_AUDIO_SETTINGS"]
     },
     "web": {
       "bundler": "metro",
@@ -41,22 +47,14 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/brand/icon-transparent.png",
+          "image": "./assets/wordmark-light.png",
           "imageWidth": 180,
           "resizeMode": "contain",
-          "backgroundColor": "#141414",
+          "backgroundColor": "#FCFCFC",
           "dark": {
-            "backgroundColor": "#141414"
+            "image": "./assets/wordmark.png",
+            "backgroundColor": "#000000"
           }
-        }
-      ],
-      [
-        "@sentry/react-native",
-        {
-          "organization": "devinx",
-          "project": "devinx-mobile",
-          "setCommits": false,
-          "uploadNativeSymbols": false
         }
       ],
       [
@@ -72,13 +70,18 @@
       ],
       "expo-web-browser",
       "expo-video",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "DevinX uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded."
+        }
+      ],
       "expo-asset",
       [
         "expo-image-picker",
         {
           "photosPermission": "Allow DevinX to attach photos and videos to Devin sessions.",
-          "cameraPermission": false,
+          "cameraPermission": "Allow DevinX to scan a pairing code shown by DevinX Connector.",
           "microphonePermission": false
         }
       ]

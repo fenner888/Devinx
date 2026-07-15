@@ -1,5 +1,38 @@
 const mockUploadAttachment = jest.fn();
 const mockCreateSession = jest.fn();
+const mockCreateComputerSession = jest.fn();
+const mockRefetchRepositories = jest.fn();
+const mockDevinCompanion = jest.fn((_props: unknown) => null);
+let mockConnection = {
+  mode: 'cloud',
+  hasCloudConnection: true,
+  usesCloud: true,
+  computers: [] as Array<{ bridgeId: string; computerName: string }>,
+};
+let mockComputerCreateOptions:
+  | {
+      workspaces: Array<{ id: string; name: string }>;
+      models: Array<{
+        id: string;
+        name: string;
+        description?: string;
+        supportsImages?: boolean;
+        badge?: 'new' | 'free_promo';
+        recent?: boolean;
+        recommended?: boolean;
+      }>;
+      defaultModelId?: string | null;
+      catalogSource?: 'live' | 'recent';
+    }
+  | undefined = { workspaces: [], models: [] };
+let mockComputerCreateOptionsError: Error | null = null;
+let mockComputerCreateOptionsLoading = false;
+let mockCloudSessions: Array<Record<string, unknown>> = [];
+let mockRepositoriesError: Error | null = null;
+let mockComputerBoard: {
+  sessions: Array<Record<string, unknown>>;
+  computers: Array<Record<string, unknown>>;
+} = { sessions: [], computers: [] };
 
 jest.mock('react-native-safe-area-context', () => ({
   ...jest.requireActual('react-native-safe-area-context'),
@@ -11,6 +44,7 @@ jest.mock('@expo/vector-icons', () => ({
 }));
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: jest.fn(),
   useRouter: jest.fn(() => ({ push: jest.fn() })),
 }));
 
@@ -21,7 +55,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 jest.mock('@api/devin/queries', () => ({
-  useSessions: jest.fn(() => ({ data: [] })),
+  useSessions: jest.fn(() => ({ data: mockCloudSessions })),
   useCreateSession: jest.fn(() => ({ isPending: false, mutate: mockCreateSession })),
   usePlaybooks: jest.fn(() => ({ data: [] })),
   useRepositories: jest.fn(() => ({
@@ -37,9 +71,28 @@ jest.mock('@api/devin/queries', () => ({
         last_updated_at: null,
       },
     ],
+    isLoading: false,
+    error: mockRepositoriesError,
+    refetch: mockRefetchRepositories,
   })),
-  useCodeScanFindings: jest.fn(() => ({ data: [] })),
   useUploadAttachment: jest.fn(() => ({ isPending: false, mutateAsync: mockUploadAttachment })),
+}));
+
+jest.mock('@api/bridge/queries', () => ({
+  useComputerSessions: () => ({ data: mockComputerBoard }),
+  useComputerCreateOptions: () => ({
+    data: mockComputerCreateOptions,
+    isLoading: mockComputerCreateOptionsLoading,
+    error: mockComputerCreateOptionsError,
+  }),
+  useCreateComputerSession: () => ({
+    isPending: false,
+    mutate: mockCreateComputerSession,
+  }),
+}));
+
+jest.mock('@auth/ConnectionContext', () => ({
+  useConnections: () => mockConnection,
 }));
 
 jest.mock('@components/OfflineBanner', () => ({
@@ -54,6 +107,11 @@ jest.mock('@components/ModeSettings', () => ({
   ModeSettings: () => null,
 }));
 
+jest.mock('@components/pets', () => ({
+  DevinCompanion: (props: unknown) => mockDevinCompanion(props),
+  HomeCompanionStage: ({ children }: { children: unknown }) => children,
+}));
+
 jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: jest.fn(),
 }));
@@ -63,6 +121,7 @@ jest.mock('expo-document-picker', () => ({
 }));
 
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import HomeScreen from '../../src/app/(main)/index';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
@@ -70,6 +129,200 @@ import { ThemeProvider } from '../../src/theme/ThemeProvider';
 describe('home attachment control', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConnection = {
+      mode: 'cloud',
+      hasCloudConnection: true,
+      usesCloud: true,
+      computers: [],
+    };
+    mockComputerCreateOptions = { workspaces: [], models: [] };
+    mockComputerCreateOptionsError = null;
+    mockComputerCreateOptionsLoading = false;
+    mockCloudSessions = [];
+    mockRepositoriesError = null;
+    mockComputerBoard = { sessions: [], computers: [] };
+  });
+
+  it('uses Devin as the prominent home-screen visual anchor', () => {
+    const { getByText, getByLabelText, queryByText } = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(getByText('Ready')).toBeTruthy();
+    expect(getByText('Cloud connected')).toBeTruthy();
+    expect(getByText('What should Devin build?')).toBeTruthy();
+    expect(getByLabelText('Session prompt').props.className).toContain('min-h-[84px]');
+    expect(
+      queryByText('Describe a task — it runs in the cloud and you can steer it here.'),
+    ).toBeNull();
+    const props = mockDevinCompanion.mock.calls[0]?.[0] as
+      { size?: number; state?: string } | undefined;
+    expect(props?.state).toBe('idle');
+    expect(props?.size).toBeGreaterThanOrEqual(164);
+  });
+
+  it('shows paired-Mac sessions without presenting the Cloud composer as active', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
+    };
+    mockComputerBoard = {
+      sessions: [
+        {
+          id: `local_${'L'.repeat(43)}`,
+          origin: 'computer',
+          workspaceName: 'DevinX',
+          hasTitle: false,
+          bridgeId: 'bridge_1234567890',
+          computerName: 'Studio Mac',
+        },
+      ],
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac', state: 'ready' }],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText('What should Devin build?')).toBeTruthy();
+    expect(screen.getByPlaceholderText(/Ask Devin on your Mac/)).toBeTruthy();
+    expect(screen.getByText('Studio Mac paired')).toBeTruthy();
+    expect(screen.getAllByText('Studio Mac').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DevinX').length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('Execution mode')).toBeNull();
+  });
+
+  it('does not render cached sessions from a connection source excluded by the mode', () => {
+    mockComputerBoard = {
+      sessions: [
+        {
+          id: `local_${'L'.repeat(43)}`,
+          origin: 'computer',
+          workspaceName: 'Hidden local workspace',
+          hasTitle: false,
+          bridgeId: 'bridge_1234567890',
+          computerName: 'Hidden Mac',
+        },
+      ],
+      computers: [],
+    };
+    const cloudScreen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+    expect(cloudScreen.queryByText('Hidden Mac')).toBeNull();
+    cloudScreen.unmount();
+
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: true,
+      usesCloud: false,
+      computers: [],
+    };
+    mockCloudSessions = [
+      {
+        session_id: 'devin-hidden',
+        title: 'Hidden Cloud session',
+        updated_at: 1,
+        pull_requests: [],
+      },
+    ];
+    mockComputerBoard = { sessions: [], computers: [] };
+    const computerScreen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+    expect(computerScreen.queryByText('Hidden Cloud session')).toBeNull();
+  });
+
+  it('scopes Home Recent to the active Cloud or selected-computer destination', () => {
+    mockConnection = {
+      mode: 'both',
+      hasCloudConnection: true,
+      usesCloud: true,
+      computers: [
+        { bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' },
+        { bridgeId: 'bridge_0987654321', computerName: 'Other Mac' },
+      ],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      models: [],
+    };
+    mockCloudSessions = [
+      {
+        session_id: 'devin-cloud-recent',
+        title: 'Cloud recent session',
+        status: 'running',
+        status_detail: 'working',
+        updated_at: 10,
+        pull_requests: [],
+      },
+    ];
+    mockComputerBoard = {
+      sessions: [
+        {
+          id: `local_${'L'.repeat(43)}`,
+          origin: 'computer',
+          title: 'Studio Mac recent session',
+          hasTitle: true,
+          canLoad: true,
+          workspaceName: 'DevinX',
+          bridgeId: 'bridge_1234567890',
+          computerName: 'Studio Mac',
+          updatedAt: '2026-07-12T12:00:00.000Z',
+        },
+        {
+          id: `local_${'M'.repeat(43)}`,
+          origin: 'computer',
+          title: 'Other Mac recent session',
+          hasTitle: true,
+          canLoad: true,
+          workspaceName: 'Other',
+          bridgeId: 'bridge_0987654321',
+          computerName: 'Other Mac',
+          updatedAt: '2026-07-12T13:00:00.000Z',
+        },
+      ],
+      computers: [
+        { bridgeId: 'bridge_1234567890', computerName: 'Studio Mac', state: 'ready' },
+        { bridgeId: 'bridge_0987654321', computerName: 'Other Mac', state: 'ready' },
+      ],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText('Cloud connected • Studio Mac paired')).toBeTruthy();
+
+    expect(screen.getByText('Cloud recent session')).toBeTruthy();
+    expect(screen.queryByText('Studio Mac recent session')).toBeNull();
+    expect(screen.queryByText('Other Mac recent session')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Session destination: Devin Cloud'));
+    fireEvent.press(screen.getByLabelText('Use Studio Mac'));
+
+    expect(screen.getByText('Studio Mac recent session')).toBeTruthy();
+    expect(screen.queryByText('Cloud recent session')).toBeNull();
+    expect(screen.queryByText('Other Mac recent session')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Session destination: Studio Mac'));
+    fireEvent.press(screen.getByLabelText('Use Devin Cloud'));
+
+    expect(screen.getByText('Cloud recent session')).toBeTruthy();
+    expect(screen.queryByText('Studio Mac recent session')).toBeNull();
   });
 
   it('opens attachment sources without opening the execution mode picker', () => {
@@ -89,6 +342,298 @@ describe('home attachment control', () => {
     expect(queryByText('Session settings')).toBeNull();
   });
 
+  it('keeps Computer workspace and model controls separate from Cloud controls', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByLabelText('Workspace: DevinX')).toBeTruthy();
+    expect(screen.getByLabelText('Model: Default')).toBeTruthy();
+    expect(screen.queryByLabelText('Execution mode')).toBeNull();
+    expect(screen.queryByLabelText('Select playbook')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Model: Default'));
+    fireEvent.press(screen.getByLabelText('Use model family GPT 5.6 Sol'));
+    fireEvent.changeText(screen.getByLabelText('Session prompt'), 'Build the local feature');
+    fireEvent.press(screen.getByLabelText('Start session'));
+
+    expect(mockCreateComputerSession).toHaveBeenCalledWith(
+      {
+        workspaceId: `workspace_${'W'.repeat(43)}`,
+        modelId: 'gpt-5-6-sol-medium',
+        text: 'Build the local feature',
+      },
+      expect.any(Object),
+    );
+  });
+
+  it('uses grouped destination and a deliberate floating workspace picker', () => {
+    mockConnection = {
+      mode: 'both',
+      hasCloudConnection: true,
+      usesCloud: true,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [
+        { id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' },
+        { id: `workspace_${'X'.repeat(43)}`, name: 'Push' },
+      ],
+      models: [],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Session destination: Devin Cloud'));
+    expect(screen.getByTestId('destination-picker-group').props.className).toContain(
+      'overflow-hidden',
+    );
+    expect(screen.getByLabelText('Close destination picker')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Use Studio Mac'));
+
+    fireEvent.press(screen.getByLabelText('Workspace: DevinX'));
+    expect(screen.getByTestId('workspace-picker-group')).toBeTruthy();
+    expect(screen.getByText('Current Workspace')).toBeTruthy();
+    expect(screen.getByText('Other Workspaces')).toBeTruthy();
+    expect(screen.getByLabelText('Use workspace Push')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Use workspace Push'));
+    expect(screen.getByLabelText('Use workspace Push').props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(screen.getByLabelText('Done choosing workspace')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Done choosing workspace'));
+    expect(screen.getByLabelText('Workspace: Push')).toBeTruthy();
+  });
+
+  it('submits the exact local model variant selected through reasoning and speed', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      defaultModelId: 'adaptive',
+      catalogSource: 'live',
+      models: [
+        { id: 'adaptive', name: 'Adaptive', recommended: true },
+        { id: 'gpt-low', name: 'GPT-5.6 Sol Low Thinking', recent: true },
+        { id: 'gpt-high', name: 'GPT-5.6 Sol High Thinking' },
+      ],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Model: Adaptive'));
+    fireEvent.press(screen.getByLabelText('Use model family GPT-5.6 Sol'));
+    expect(screen.getByLabelText('Reasoning and speed: Low')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Reasoning and speed: Low'));
+    fireEvent.press(screen.getByLabelText('Use High for GPT-5.6 Sol'));
+    expect(screen.getByLabelText('Reasoning and speed: High')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByLabelText('Session prompt'), 'Use the exact model');
+    fireEvent.press(screen.getByLabelText('Start session'));
+
+    expect(mockCreateComputerSession).toHaveBeenCalledWith(
+      {
+        workspaceId: `workspace_${'W'.repeat(43)}`,
+        modelId: 'gpt-high',
+        text: 'Use the exact model',
+      },
+      expect.any(Object),
+    );
+  });
+
+  it('submits Adaptive as the exact live default instead of treating it as a display-only label', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      defaultModelId: 'adaptive',
+      catalogSource: 'live',
+      models: [{ id: 'adaptive', name: 'Adaptive', recommended: true }],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByLabelText('Model: Adaptive')).toBeTruthy();
+    expect(screen.getByTestId('model-family-mark-adaptive')).toBeTruthy();
+    fireEvent.changeText(screen.getByLabelText('Session prompt'), 'Use adaptive routing');
+    fireEvent.press(screen.getByLabelText('Start session'));
+
+    expect(mockCreateComputerSession).toHaveBeenCalledWith(
+      {
+        workspaceId: `workspace_${'W'.repeat(43)}`,
+        modelId: 'adaptive',
+        text: 'Use adaptive routing',
+      },
+      expect.any(Object),
+    );
+  });
+
+  it('explains unavailable local options without opening an inescapable empty sheet', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = undefined;
+    mockComputerCreateOptionsError = Object.assign(new Error('not authorized'), {
+      code: 'permission_denied',
+    });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Workspace: Unavailable'));
+    expect(alert).toHaveBeenCalledWith(
+      'Connector permission required',
+      expect.stringContaining('enable Create new sessions'),
+    );
+    expect(screen.queryByLabelText('Close workspace picker')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Model: Default'));
+    expect(alert).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not mislabel a Connector handler failure as a missing permission', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = undefined;
+    mockComputerCreateOptionsError = Object.assign(new Error('temporarily unavailable'), {
+      code: 'unavailable',
+    });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(
+      screen.getByText(
+        'DevinX Connector could not load workspaces and models. Confirm Connector and Devin for Terminal are ready, then try again.',
+      ),
+    ).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Workspace: Unavailable'));
+    expect(alert).toHaveBeenCalledWith(
+      'Mac options unavailable',
+      expect.stringContaining('could not load workspaces and models'),
+    );
+  });
+
+  it('organizes the live model catalog into recommended, recent, searchable options and badges', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      defaultModelId: 'adaptive',
+      catalogSource: 'live',
+      models: [
+        {
+          id: 'adaptive',
+          name: 'Adaptive',
+          description: 'Automatically balances quality and cost',
+          recommended: true,
+        },
+        { id: 'gpt-recent', name: 'GPT Recent', recent: true },
+        { id: 'deepseek-v4', name: 'DeepSeek V4 Pro', badge: 'new' },
+        { id: 'model-4', name: 'Model Four' },
+        { id: 'model-5', name: 'Model Five' },
+        { id: 'model-6', name: 'Model Six' },
+        { id: 'model-7', name: 'Model Seven' },
+        { id: 'model-8', name: 'Model Eight' },
+        { id: 'model-9', name: 'Model Nine' },
+      ],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByLabelText('Model: Adaptive')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Model: Adaptive'));
+    expect(screen.getByText('Recommended')).toBeTruthy();
+    expect(screen.getByText('Recent')).toBeTruthy();
+    expect(screen.getByText('All Models')).toBeTruthy();
+    expect(screen.getByLabelText('Use model family Adaptive')).toBeTruthy();
+    expect(screen.getByLabelText('Use model family DeepSeek V4 Pro, New')).toBeTruthy();
+    expect(screen.getByText('New')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByLabelText('Search local models'), 'deepseek');
+    expect(screen.getByText('Results')).toBeTruthy();
+    expect(screen.queryByLabelText('Use model family GPT Recent')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Use model family DeepSeek V4 Pro, New'));
+    expect(screen.getByLabelText('Model: DeepSeek V4 Pro')).toBeTruthy();
+  });
+
+  it('always provides an explicit close control for local picker sheets', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerCreateOptions = {
+      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+      models: [],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Workspace: DevinX'));
+    expect(screen.getByLabelText('Close workspace picker')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Close workspace picker'));
+    expect(screen.queryByLabelText('Close workspace picker')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Model: Default'));
+    expect(screen.getByLabelText('Close model menu')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Close model menu'));
+    expect(screen.queryByLabelText('Close model menu')).toBeNull();
+  });
+
   it('shows and selects the repository context', () => {
     const { getByLabelText } = render(
       <ThemeProvider>
@@ -100,6 +645,36 @@ describe('home attachment control', () => {
     fireEvent.press(getByLabelText('Use repository fenner888/Devinx'));
 
     expect(getByLabelText('Repository: fenner888/Devinx')).toBeTruthy();
+  });
+
+  it('filters repository rows from the picker search field', () => {
+    const { getByLabelText, queryByLabelText, getByText } = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(getByLabelText('Repository: Any repository'));
+    fireEvent.changeText(getByLabelText('Search repositories'), 'missing');
+
+    expect(queryByLabelText('Use repository fenner888/Devinx')).toBeNull();
+    expect(getByText('No repositories match your search.')).toBeTruthy();
+  });
+
+  it('does not present a partial Cloud repository result as complete', () => {
+    mockRepositoriesError = new Error('Repository pagination returned an invalid cursor');
+    const { getByLabelText, getByText, queryByLabelText } = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(getByLabelText('Repository: Any repository'));
+
+    expect(getByText('Connected repositories could not be loaded completely.')).toBeTruthy();
+    expect(queryByLabelText('Use repository fenner888/Devinx')).toBeNull();
+    fireEvent.press(getByLabelText('Try loading repositories again'));
+    expect(mockRefetchRepositories).toHaveBeenCalledTimes(1);
   });
 
   it('includes the selected repository when starting a session', () => {

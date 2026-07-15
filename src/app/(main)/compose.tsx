@@ -29,17 +29,18 @@ import {
   useSecrets,
   useUploadAttachment,
   useRepositories,
-  useIndexedRepositories,
-  useIndexRepository,
 } from '@api/devin/queries';
 import { ModeSettings } from '@components/ModeSettings';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
+import { VoiceComposerStatus, VoiceMicButton, useVoiceComposer } from '@components/VoiceInput';
 import type { DevinMode } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
+import { COMPOSE_DRAFT_KEY } from '@lib/localUserData';
 import { useAppPreferences } from '@store/preferences';
+import { userFacingError } from '@lib/user-facing-error';
+import { repositoryIndexPresentation } from '@lib/repository-indexing';
 
-const DRAFT_KEY = '@devinx/compose-draft';
 const MAX_PROMPT = 10000;
 const MAX_TITLE = 200;
 
@@ -76,8 +77,6 @@ export default function ComposeScreen() {
   const { data: knowledge } = useKnowledge();
   const { data: secrets } = useSecrets();
   const { data: repositories } = useRepositories();
-  const { data: indexedRepos } = useIndexedRepositories();
-  const indexRepo = useIndexRepository();
   const uploadAttachment = useUploadAttachment();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -99,7 +98,7 @@ export default function ComposeScreen() {
 
   // Load draft from AsyncStorage on mount.
   useEffect(() => {
-    AsyncStorage.getItem(DRAFT_KEY)
+    AsyncStorage.getItem(COMPOSE_DRAFT_KEY)
       .then((json) => {
         if (json) {
           try {
@@ -118,7 +117,7 @@ export default function ComposeScreen() {
   useEffect(() => {
     if (!loaded) return;
     const id = setTimeout(() => {
-      AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft)).catch(() => {
+      AsyncStorage.setItem(COMPOSE_DRAFT_KEY, JSON.stringify(draft)).catch(() => {
         // ignore storage errors
       });
     }, 500);
@@ -131,6 +130,24 @@ export default function ComposeScreen() {
   const updateDraft = useCallback((patch: Partial<Draft>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
   }, []);
+  const updatePrompt = useCallback((prompt: string) => {
+    setDraft((current) => ({ ...current, prompt }));
+  }, []);
+  const voice = useVoiceComposer({
+    value: draft.prompt,
+    onChangeText: updatePrompt,
+    disabled: !loaded || createSession.isPending,
+    maximumLength: MAX_PROMPT,
+    hints: {
+      repositories: (repositories ?? []).map((repository) => repository.repo_name),
+      playbooks: (playbooks ?? []).map((playbook) => playbook.title),
+      tags: draft.tags,
+    },
+    scribeContext: {
+      destination: 'Devin Cloud',
+      repository: draft.repos.join(', ') || undefined,
+    },
+  });
 
   function addTag() {
     const tag = tagInput.trim().toLowerCase();
@@ -172,7 +189,7 @@ export default function ComposeScreen() {
         },
       ]);
     } catch (e) {
-      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Unknown error');
+      Alert.alert('Upload failed', userFacingError(e, 'Could not upload this attachment.'));
     }
   }
 
@@ -202,11 +219,11 @@ export default function ComposeScreen() {
         rememberSessionMode(session.session_id, draft.mode),
       ]);
       // Clear draft on success.
-      await AsyncStorage.removeItem(DRAFT_KEY);
+      await AsyncStorage.removeItem(COMPOSE_DRAFT_KEY);
       setDraft(emptyDraft);
       router.replace(`/(main)/session/${session.session_id}`);
     } catch (e) {
-      Alert.alert('Could not create session', e instanceof Error ? e.message : 'Unknown error');
+      Alert.alert('Could not create session', userFacingError(e, 'Could not create this session.'));
     }
   }
 
@@ -261,6 +278,7 @@ export default function ComposeScreen() {
             Prompt {'\u2022'} {draft.prompt.length}/{MAX_PROMPT}
           </Text>
           <TextInput
+            ref={voice.inputRef}
             className="bg-surface1 rounded-input px-3 py-3 text-text14 text-text-hi mb-1 min-h-32"
             value={draft.prompt}
             onChangeText={(v) => updateDraft({ prompt: v.slice(0, MAX_PROMPT) })}
@@ -269,7 +287,9 @@ export default function ComposeScreen() {
             multiline
             textAlignVertical="top"
             maxLength={MAX_PROMPT}
+            onSelectionChange={voice.onSelectionChange}
           />
+          <VoiceComposerStatus voice={voice} />
           {draft.prompt.length > MAX_PROMPT * 0.9 && (
             <Text className="text-text-low text-text11 mb-4">
               {MAX_PROMPT - draft.prompt.length} characters remaining
@@ -471,9 +491,12 @@ export default function ComposeScreen() {
         </ScrollView>
 
         {/* Submit bar */}
-        <View className="border-t border-border-subtle px-4 py-3">
+        <View
+          className={`flex-row items-center gap-2 border-t border-border-subtle px-4 py-3 ${voice.isRecording ? 'hidden' : ''}`}
+        >
+          <VoiceMicButton voice={voice} disabled={createSession.isPending} />
           <Pressable
-            className={`rounded-button py-3 items-center ${canSubmit ? 'bg-brand' : 'bg-tint-secondary'}`}
+            className={`flex-1 rounded-button py-3 items-center ${canSubmit ? 'bg-brand' : 'bg-tint-secondary'}`}
             disabled={!canSubmit}
             onPress={handleSubmit}
           >
@@ -519,9 +542,7 @@ export default function ComposeScreen() {
               <ScrollView>
                 {repositories.map((repo) => {
                   const selected = draft.repos.includes(repo.repo_path);
-                  const indexed = indexedRepos?.some(
-                    (r) => r.repository_path === repo.repo_path && r.indexing_enabled,
-                  );
+                  const indexStatus = repositoryIndexPresentation(repo);
                   return (
                     <Pressable
                       key={repo.provider_repository_id}
@@ -541,7 +562,7 @@ export default function ComposeScreen() {
                           >
                             {repo.repo_name}
                           </Text>
-                          {indexed && (
+                          {indexStatus.indexed && (
                             <View className="flex-row items-center ml-2">
                               <Ionicons name="sparkles" size={10} color={tokens.finished.hex} />
                               <Text className="text-finished text-text11 ml-0.5">indexed</Text>
@@ -553,16 +574,6 @@ export default function ComposeScreen() {
                           {repo.repo_language ? ` · ${repo.repo_language}` : ''}
                         </Text>
                       </View>
-                      {!indexed && (
-                        <Pressable
-                          className="rounded-chip px-2.5 py-1 bg-tint-secondary mr-2"
-                          onPress={() => indexRepo.mutate({ repoPath: repo.repo_path })}
-                          disabled={indexRepo.isPending}
-                          accessibilityLabel={`Index ${repo.repo_name}`}
-                        >
-                          <Text className="text-brand-text text-text11 font-medium">Index</Text>
-                        </Pressable>
-                      )}
                       {selected && (
                         <Ionicons name="checkmark" size={16} color={tokens.brandText.hex} />
                       )}

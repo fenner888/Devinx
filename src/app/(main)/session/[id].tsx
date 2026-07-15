@@ -7,7 +7,7 @@
  * Message steering: send message to session.
  * Polls with useSession + useMessages hooks.
  */
-import { useState, useRef, useEffect } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,11 +22,12 @@ import {
   RefreshControl,
   Alert,
   Image,
+  Keyboard,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
   useSession,
@@ -53,7 +54,17 @@ import type { DevinMode, SessionMessage } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
+import { DevinCompanion } from '@components/pets';
+import { KeyboardDismissButton } from '@components/KeyboardDismissButton';
+import {
+  VoiceComposerStatus,
+  VoiceMicButton,
+  useVoiceComposer,
+} from '@components/VoiceInput';
 import { getSessionMode, getSessionRepository } from '@lib/session-repository';
+import { activityForCloudSession } from '@/pets/devin/activity';
+import { ApiError } from '@api/devin/client';
+import { userFacingError } from '@lib/user-facing-error';
 
 type Tab = 'timeline' | 'worklog' | 'changes' | 'insights';
 
@@ -90,6 +101,9 @@ export default function SessionDetailScreen() {
   const [tagError, setTagError] = useState<string | null>(null);
   // Optimistically-echoed user message, shown instantly until the real one lands.
   const [pendingText, setPendingText] = useState<string | null>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [companionActive, setCompanionActive] = useState(false);
+  const [composerHeight, setComposerHeight] = useState(0);
 
   const validId = id && isValidSessionId(id) ? id : undefined;
   const { data: session, isLoading, error, refetch } = useSession(validId);
@@ -100,6 +114,26 @@ export default function SessionDetailScreen() {
   const updateTags = useUpdateTags(validId);
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
+  const voice = useVoiceComposer({
+    value: messageText,
+    onChangeText: setMessageText,
+    disabled: !session || sendMessage.isPending,
+    hints: {
+      repositories: sessionRepository ? [sessionRepository] : [],
+      tags: session?.tags ?? [],
+    },
+    scribeContext: {
+      destination: 'Devin Cloud',
+      repository: sessionRepository ?? undefined,
+    },
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      setCompanionActive(true);
+      return () => setCompanionActive(false);
+    }, []),
+  );
 
   // Clear the optimistic echo once the real user message shows up in the list.
   useEffect(() => {
@@ -125,9 +159,22 @@ export default function SessionDetailScreen() {
     };
   }, [session]);
 
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   if (!validId) {
     return (
-      <SafeAreaView className="flex-1 bg-surface0 items-center justify-center" edges={['top']}>
+      <SafeAreaView className="flex-1 bg-canvas items-center justify-center" edges={['top']}>
         <Text className="text-failed text-text14">Invalid session ID</Text>
         <Pressable className="mt-4" onPress={() => router.back()}>
           <Text className="text-brand-text text-text14">Go back</Text>
@@ -138,7 +185,7 @@ export default function SessionDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
+      <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
         <View className="flex-row items-center px-4 py-3">
           <BackButton onPress={() => router.back()} />
         </View>
@@ -149,7 +196,7 @@ export default function SessionDetailScreen() {
 
   if (error || !session) {
     return (
-      <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
+      <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
         <View className="flex-row items-center px-4 py-3">
           <BackButton onPress={() => router.back()} />
         </View>
@@ -170,6 +217,7 @@ export default function SessionDetailScreen() {
   // (sleeping) session automatically resumes it (per the Devin API), so the
   // composer must show there too — only truly ended sessions hide it.
   const canSend = session.status !== 'exit' && session.status !== 'error';
+  const composerOverlayHeight = canSend ? Math.max(composerHeight, 152) : 0;
   const sessionRepositoryName =
     sessionRepository?.split('/').filter(Boolean).pop() ?? 'Repository unavailable';
 
@@ -198,6 +246,9 @@ export default function SessionDetailScreen() {
     const text = messageText.trim();
     if (!text || sendMessage.isPending || uploadAttachment.isPending) return;
     hapticLight();
+    // Give the timeline back the full viewport as soon as the user sends so
+    // the response and Devin's walking state are not hidden by the keyboard.
+    Keyboard.dismiss();
     // Echo the message immediately, clear the input, then send.
     const attachments = messageAttachments;
     setPendingText(text);
@@ -230,9 +281,11 @@ export default function SessionDetailScreen() {
     session.status === 'running' ||
     session.status === 'resuming' ||
     session.status_detail === 'working';
+  const companionIsSending = sendMessage.isPending || !!pendingText;
+  const companionActivity = activityForCloudSession(session, statusKey, companionIsSending);
 
   return (
-    <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
       {/* Header */}
       <View className="px-4 py-3 border-b border-border-subtle">
         <View className="flex-row items-center mb-2">
@@ -327,6 +380,8 @@ export default function SessionDetailScreen() {
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* Absolute overlays must live inside the flex child KAV shrinks above the keyboard. */}
+        <View className="flex-1" testID="cloud-session-keyboard-viewport">
         <View className="flex-1">
           {tab === 'timeline' && (
             <TimelineTab
@@ -335,25 +390,43 @@ export default function SessionDetailScreen() {
               pendingText={pendingText}
               isSending={sendMessage.isPending}
               isWorking={isWorking}
+              bottomClearance={composerOverlayHeight + (keyboardVisible ? 88 : 120)}
             />
           )}
           {tab === 'worklog' && <WorklogTab session={session} />}
           {tab === 'changes' && <ChangesTab session={session} />}
           {tab === 'insights' && <InsightsTab sessionId={validId} />}
+          {/* Foreground-only track: conversation scrolls behind it. It has no
+              shelf/background and never consumes a layout row. */}
+          {tab === 'timeline' && (
+            <View
+              pointerEvents="none"
+              className="absolute inset-x-0 px-4 pb-1"
+              style={{ bottom: composerOverlayHeight }}
+              testID="cloud-session-companion-dock"
+            >
+              <DevinCompanion
+                state={companionActivity.state}
+                size={keyboardVisible ? 72 : 104}
+                message={companionActivity.message}
+                active={companionActive}
+                travel={companionActivity.travel}
+                travelTrack
+                accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
+              />
+            </View>
+          )}
         </View>
 
-        {/* Message steering bar — any non-terminal session (sleeping resumes).
-            Bottom inset clears the iOS home indicator without sitting too low. */}
+        {/* Message steering composer — any non-terminal session (sleeping resumes).
+            It floats above the home indicator instead of becoming a bottom shelf. */}
         {canSend && (
           <View
-            className="px-3 pt-2 border-t border-border-subtle bg-surface0"
-            style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+            className="absolute inset-x-0 bottom-0 px-4 pt-2"
+            style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
+            onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
+            testID="cloud-session-composer-shell"
           >
-            {session.status === 'suspended' && (
-              <Text className="text-text-low text-text12 px-1 pb-1.5">
-                Sleeping — sending a message will wake Devin.
-              </Text>
-            )}
             {(messageAttachments.length > 0 || uploadingAttachmentName) && (
               <View className="flex-row flex-wrap px-1 pb-2">
                 {uploadingAttachmentName && (
@@ -395,51 +468,71 @@ export default function SessionDetailScreen() {
                 ))}
               </View>
             )}
-            <View className="flex-row items-end bg-surface1 rounded-2xl border border-border px-2 py-2">
-              <Pressable
-                className="w-8 h-8 rounded-full items-center justify-center mr-1"
-                onPress={() => setShowAttachmentPicker(true)}
-                disabled={uploadAttachment.isPending}
-                accessibilityRole="button"
-                accessibilityLabel="Add attachment"
-              >
-                {uploadAttachment.isPending ? (
-                  <ActivityIndicator size="small" color={tokens.brandText.hex} />
-                ) : (
-                  <Ionicons name="add" size={20} color={tokens.textMid.hex} />
-                )}
-              </Pressable>
+            <View
+              className="rounded-card border border-border px-3 pt-2 pb-2"
+              style={{ backgroundColor: tokens.tintPrimary.hex }}
+              testID="cloud-session-composer"
+            >
               <TextInput
-                className="flex-1 text-text14 text-text-hi max-h-24 py-1"
+                ref={voice.inputRef}
+                className="min-h-[44px] max-h-24 px-1 text-text-hi text-text14"
                 value={messageText}
                 onChangeText={setMessageText}
                 placeholder="Ask Devin to build features, fix bugs, or work on your code"
                 placeholderTextColor={tokens.textLow.hex}
                 multiline
+                textAlignVertical="top"
+                accessibilityLabel="Cloud session message"
+                onSelectionChange={voice.onSelectionChange}
+                onFocus={() => setKeyboardVisible(true)}
               />
-              <Pressable
-                className={`w-8 h-8 rounded-full items-center justify-center ml-2 ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
-                disabled={
-                  !messageText.trim() || sendMessage.isPending || uploadAttachment.isPending
-                }
-                onPress={handleSend}
-                accessibilityRole="button"
-                accessibilityLabel="Send message"
+              <VoiceComposerStatus voice={voice} />
+              <View
+                className={`mt-1 flex-row items-center justify-between ${voice.isRecording ? 'hidden' : ''}`}
               >
-                {sendMessage.isPending ? (
-                  <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
-                ) : (
-                  <Ionicons
-                    name="arrow-up"
-                    size={17}
-                    color={
-                      messageText.trim() && !uploadAttachment.isPending
-                        ? tokens.textAlwaysWhite.hex
-                        : tokens.textLow.hex
+                <View className="flex-row items-center">
+                  <Pressable
+                    className="h-11 w-11 items-center justify-center rounded-full"
+                    onPress={() => setShowAttachmentPicker(true)}
+                    disabled={uploadAttachment.isPending}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add attachment"
+                  >
+                    {uploadAttachment.isPending ? (
+                      <ActivityIndicator size="small" color={tokens.brandText.hex} />
+                    ) : (
+                      <Ionicons name="add" size={22} color={tokens.textMid.hex} />
+                    )}
+                  </Pressable>
+                </View>
+                <View className="flex-row items-center gap-1">
+                  <KeyboardDismissButton visible={keyboardVisible} />
+                  <VoiceMicButton voice={voice} disabled={sendMessage.isPending} />
+                  <Pressable
+                    className={`h-10 w-10 items-center justify-center rounded-full ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
+                    disabled={
+                      !messageText.trim() || sendMessage.isPending || uploadAttachment.isPending
                     }
-                  />
-                )}
-              </Pressable>
+                    onPress={handleSend}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send message"
+                  >
+                    {sendMessage.isPending ? (
+                      <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+                    ) : (
+                      <Ionicons
+                        name="arrow-up"
+                        size={19}
+                        color={
+                          messageText.trim() && !uploadAttachment.isPending
+                            ? tokens.textAlwaysWhite.hex
+                            : tokens.textLow.hex
+                        }
+                      />
+                    )}
+                  </Pressable>
+                </View>
+              </View>
             </View>
             <View className="flex-row items-center px-1 pt-2">
               <View className="flex-row items-center mr-4">
@@ -472,6 +565,7 @@ export default function SessionDetailScreen() {
             )}
           </View>
         )}
+        </View>
       </KeyboardAvoidingView>
 
       <AttachmentPickerSheet
@@ -503,7 +597,7 @@ export default function SessionDetailScreen() {
                       onSuccess: () => setShowTagEditor(false),
                       onError: (e) => {
                         hapticError();
-                        setTagError(e instanceof Error ? e.message : 'Could not save tags.');
+                        setTagError(userFacingError(e, 'Could not save tags.'));
                       },
                     });
                   } else {
@@ -590,12 +684,12 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
   // treat that the same as "not generated yet".
   if (error || !insights || !insights.analysis) {
     // A 404 means "not generated yet"; anything else is a real error.
-    const isRealError = !!error && !/404|not found/i.test(error.message);
+    const isRealError = !!error && !(error instanceof ApiError && error.code === 'not_found');
     return (
       <View className="flex-1 items-center justify-center px-6">
         <Text className="text-text-mid text-text14 text-center mb-4">
           {isRealError
-            ? `Could not load insights: ${error.message}`
+            ? userFacingError(error, 'Could not load insights.')
             : 'No insights generated for this session yet.'}
         </Text>
         {isRealError ? (
@@ -748,12 +842,14 @@ function TimelineTab({
   pendingText,
   isSending,
   isWorking,
+  bottomClearance,
 }: {
   messages: SessionMessage[];
   isLoading: boolean;
   pendingText: string | null;
   isSending: boolean;
   isWorking: boolean;
+  bottomClearance: number;
 }) {
   const listRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
@@ -792,7 +888,11 @@ function TimelineTab({
     <ScrollView
       ref={listRef}
       className="flex-1 px-4"
-      contentContainerClassName="py-3"
+      contentContainerClassName="pt-3"
+      contentContainerStyle={{ paddingBottom: bottomClearance }}
+      testID="cloud-session-timeline"
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      keyboardShouldPersistTaps="handled"
       onScroll={handleScroll}
       scrollEventThrottle={100}
       onContentSizeChange={() => {
@@ -813,19 +913,7 @@ function TimelineTab({
           </Text>
         </View>
       )}
-      {/* Live "Devin is working" indicator. */}
-      {isWorking && <WorkingIndicator />}
     </ScrollView>
-  );
-}
-
-function WorkingIndicator() {
-  const { tokens } = useTheme();
-  return (
-    <View className="flex-row items-center mb-4">
-      <ActivityIndicator size="small" color={tokens.brandText.hex} />
-      <Text className="text-text-mid text-text13 ml-2">Devin is working…</Text>
-    </View>
   );
 }
 

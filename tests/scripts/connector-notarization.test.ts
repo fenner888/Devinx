@@ -1,0 +1,115 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+
+const repositoryRoot = resolve(__dirname, '..', '..');
+const scriptPath = resolve(repositoryRoot, 'scripts', 'connector', 'notarize-macos.mjs');
+const buildScriptPath = resolve(repositoryRoot, 'scripts', 'connector', 'build-macos.mjs');
+const verificationScriptPath = resolve(
+  repositoryRoot,
+  'scripts',
+  'connector',
+  'verify-macos-artifact.mjs',
+);
+const nodeVersionPath = resolve(repositoryRoot, '.nvmrc');
+const packagePath = resolve(repositoryRoot, 'package.json');
+const runtimeEntitlementsPath = resolve(
+  repositoryRoot,
+  'connector',
+  'macos',
+  'NodeRuntime.entitlements',
+);
+
+function checkWithEnvironment(environment: Record<string, string | undefined>) {
+  const env = { ...process.env };
+  delete env.DEVINX_CODESIGN_IDENTITY;
+  delete env.DEVINX_NOTARYTOOL_PROFILE;
+  for (const [name, value] of Object.entries(environment)) {
+    if (value !== undefined) env[name] = value;
+  }
+  return spawnSync(process.execPath, [scriptPath, '--check'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    env,
+    shell: false,
+  });
+}
+
+describe('macOS Connector notarization policy', () => {
+  it('fails closed when release credentials are not explicitly selected', () => {
+    const result = checkWithEnvironment({});
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('DEVINX_CODESIGN_IDENTITY is required');
+  });
+
+  it('rejects development identities before any notary operation', () => {
+    const result = checkWithEnvironment({
+      DEVINX_CODESIGN_IDENTITY: 'Apple Development: Example',
+      DEVINX_NOTARYTOOL_PROFILE: 'example-profile',
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('must be a Developer ID Application identity');
+  });
+
+  it('uses the current two-stage notarytool workflow and release verifiers', () => {
+    const source = readFileSync(scriptPath, 'utf8');
+    expect(source).toContain("'notarytool'");
+    expect(source).toContain("'stapler'");
+    expect(source).toContain("'/usr/bin/hdiutil'");
+    expect(source).toContain("'/usr/sbin/spctl'");
+    expect(source).not.toContain("'altool'");
+    expect(source.match(/submitAndReview\(/g)).toHaveLength(3); // definition + app + DMG
+  });
+
+  it('grants the bundled runtime only JIT permission', () => {
+    const entitlements = readFileSync(runtimeEntitlementsPath, 'utf8');
+    expect(entitlements).toContain('com.apple.security.cs.allow-jit');
+    expect(entitlements).not.toContain('com.apple.security.get-task-allow');
+    expect(entitlements).not.toContain('allow-dyld-environment-variables');
+    expect(entitlements).not.toContain('disable-executable-page-protection');
+    expect(entitlements).not.toContain('disable-library-validation');
+  });
+
+  it('preserves the development Keychain helper identity across packaging', () => {
+    const buildSource = readFileSync(buildScriptPath, 'utf8');
+    expect(buildSource).toContain("if (identity === '-')");
+    expect(buildSource).toContain("['--verify', '--strict', '--verbose=2', keychainHelperPath]");
+  });
+
+  it('packages and verifies the MIT license in both the app and disk image', () => {
+    const buildSource = readFileSync(buildScriptPath, 'utf8');
+    const notarizationSource = readFileSync(scriptPath, 'utf8');
+    const verificationSource = readFileSync(verificationScriptPath, 'utf8');
+    expect(buildSource).toContain("resolve(resourcesRoot, 'LICENSE.txt')");
+    expect(buildSource).toContain("resolve(stagingRoot, 'LICENSE.txt')");
+    expect(notarizationSource).toContain(
+      "copyFileSync(resolve(repositoryRoot, 'LICENSE'), resolve(stagingRoot, 'LICENSE.txt'))",
+    );
+    expect(verificationSource).toContain("requirePath(bundledLicense, 'bundled MIT license')");
+    expect(verificationSource).toContain("requirePath(mountedLicense, 'DMG MIT license')");
+  });
+
+  it('uses one supported Node runtime for development and the packaged Connector', () => {
+    const nodeVersion = readFileSync(nodeVersionPath, 'utf8').trim();
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf8')) as {
+      engines?: { node?: string };
+    };
+    const buildSource = readFileSync(buildScriptPath, 'utf8');
+
+    expect(nodeVersion).toMatch(/^24\.\d+\.\d+$/);
+    expect(packageJson.engines?.node).toBe(nodeVersion);
+    expect(buildSource).toContain("readFileSync(resolve(repositoryRoot, '.nvmrc')");
+    expect(buildSource).not.toMatch(/const NODE_VERSION = 'v\d/);
+  });
+
+  it('verifies a clean copied artifact without launching or mutating active pairing state', () => {
+    const source = readFileSync(verificationScriptPath, 'utf8');
+    expect(source).toContain("['attach', '-readonly', '-nobrowse'");
+    expect(source).toContain("['--verify', '--deep', '--strict'");
+    expect(source).toMatch(/['"]--assess['"]/);
+    expect(source).toContain("['stapler', 'validate'");
+    expect(source).toContain('cleanInstallCopyVerified: true');
+    expect(source).not.toMatch(/\bopen\s*\(/);
+    expect(source).not.toContain("['open'");
+  });
+});

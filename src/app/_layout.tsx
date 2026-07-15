@@ -1,12 +1,11 @@
 /**
- * Root layout — wires ThemeProvider, TanStack Query, Sentry, and the
+ * Root layout — wires ThemeProvider, TanStack Query, and the
  * SafeAreaProvider. Expo Router file-based routing lives under /src/app.
  */
 
 import '../../global.css';
-import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
-import { Stack, Redirect, useSegments, useRouter } from 'expo-router';
+import { Stack, Redirect, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -17,14 +16,12 @@ import {
 } from '@tanstack/react-query';
 import NetInfo from '@react-native-community/netinfo';
 import { ThemeProvider, useTheme, loadThemePreference } from '@theme/index';
-import { initSentry } from '@lib/sentry';
 import { shouldRetryQuery } from '@api/devin/client';
-import { AuthProvider, useAuth } from '@auth/AuthContext';
-import { getPushToken, setupNotificationListener } from '@lib/notifications';
+import { AuthProvider } from '@auth/AuthContext';
+import { ConnectionProvider, useConnections } from '@auth/ConnectionContext';
 import { ErrorBoundary } from '@components/ErrorBoundary';
 import { PrivacyShield } from '@components/PrivacyShield';
 
-initSentry();
 loadThemePreference();
 
 // TanStack Query has no built-in focus/online detection on React Native —
@@ -57,26 +54,8 @@ const queryClient = new QueryClient({
 
 /** Initial route — declarative redirect based on auth state. */
 function InitialRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isConfigured, isLoading } = useConnections();
   const segments = useSegments();
-  const router = useRouter();
-
-  // Register for push notifications when authenticated.
-  useEffect(() => {
-    if (isAuthenticated) {
-      getPushToken().catch(() => {
-        /* ignore */
-      });
-    }
-  }, [isAuthenticated]);
-
-  // Listen for notification taps → navigate to session detail.
-  useEffect(() => {
-    const unsubscribe = setupNotificationListener((sessionId) => {
-      router.push(`/(main)/session/${sessionId}`);
-    });
-    return unsubscribe;
-  }, [router]);
 
   const inOnboarding = segments[0] === '(onboarding)';
 
@@ -84,10 +63,10 @@ function InitialRoute() {
   // authenticated cold start flashes the onboarding screen.
   if (isLoading) return null;
 
-  if (!isAuthenticated && !inOnboarding) {
+  if (!isConfigured && !inOnboarding) {
     return <Redirect href="/(onboarding)" />;
   }
-  if (isAuthenticated && inOnboarding) {
+  if (isConfigured && inOnboarding) {
     return <Redirect href="/(main)" />;
   }
   return null;
@@ -118,9 +97,11 @@ export default function RootLayout() {
         <ErrorBoundary>
           <ThemeProvider>
             <AuthProvider>
-              <InitialRoute />
-              <ThemedStack />
-              <PrivacyShield />
+              <ConnectionProvider>
+                <InitialRoute />
+                <ThemedStack />
+                <PrivacyShield />
+              </ConnectionProvider>
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>

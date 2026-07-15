@@ -16,7 +16,17 @@ import {
   secretResponseSchema,
   attachmentResponseSchema,
   consumptionResponseSchema,
+  consumptionCycleListResponseSchema,
+  devinAcuLimitListResponseSchema,
   sessionCreateRequestSchema,
+  repositoryResponseSchema,
+  knowledgeFolderTreeSchema,
+  knowledgeNoteCreateRequestSchema,
+  knowledgeNoteUpdateRequestSchema,
+  playbookCreateRequestSchema,
+  scheduleCreateRequestSchema,
+  scheduleUpdateRequestSchema,
+  secretCreateRequestSchema,
 } from '../../src/api/devin/schemas';
 
 const sessionFixture = {
@@ -222,6 +232,26 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(out.name).toBe('My note');
   });
 
+  it('parses bounded repository indexing status', () => {
+    const out = repositoryResponseSchema.parse({
+      provider_repository_id: 'provider-repo-1',
+      git_connection_id: 'connection-1',
+      git_connection_host: 'github.com',
+      repo_name: 'DevinX',
+      repo_path: 'fenner888/DevinX',
+      indexing_status: {
+        indexing_enabled: true,
+        latest_completed_wiki_index_job: {
+          branch_name: 'main',
+          commit: 'abc123',
+          created_at: 1_700_000_000,
+          job_id: 'job-1',
+        },
+      },
+    });
+    expect(out.indexing_status?.latest_completed_wiki_index_job?.branch_name).toBe('main');
+  });
+
   it('parses a secret WITHOUT a value field (values never returned)', () => {
     const out = secretResponseSchema.parse({
       access_type: 'org',
@@ -238,6 +268,25 @@ describe('API schema boundary validation (§8.3)', () => {
     });
     expect(out.key).toBe('GITHUB_TOKEN');
     expect((out as Record<string, unknown>).value).toBeUndefined();
+  });
+
+  it('parses a Knowledge folder tree and rejects negative note counts', () => {
+    const fixture = {
+      folders: [
+        {
+          folder_id: 'folder-1',
+          name: 'Engineering',
+          note_count: 2,
+          parent_folder_id: null,
+          path: 'Engineering',
+        },
+      ],
+      root_note_count: 3,
+    };
+    expect(knowledgeFolderTreeSchema.parse(fixture).folders[0]?.name).toBe('Engineering');
+    expect(() =>
+      knowledgeFolderTreeSchema.parse({ ...fixture, root_note_count: -1 }),
+    ).toThrow();
   });
 
   it('parses an attachment response', () => {
@@ -286,6 +335,24 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(out.consumption_by_date[1]?.acus_by_product).toEqual({});
   });
 
+  it('parses enterprise consumption cycles using after/before timestamps', () => {
+    const out = consumptionCycleListResponseSchema.parse({
+      items: [{ after: 1751342400, before: 1754020800 }],
+      end_cursor: null,
+      has_next_page: false,
+    });
+    expect(out.items[0]).toEqual(expect.objectContaining({ after: 1751342400, before: 1754020800 }));
+  });
+
+  it('parses organization ACU limits without requiring optional user scope', () => {
+    const out = devinAcuLimitListResponseSchema.parse({
+      items: [{ cycle_acu_limit: 250, org_id: 'org-abc' }],
+      end_cursor: null,
+      has_next_page: false,
+    });
+    expect(out.items[0]?.cycle_acu_limit).toBe(250);
+  });
+
   it('parses a session create request with all optional fields', () => {
     const out = sessionCreateRequestSchema.parse({
       prompt: 'fix the bug',
@@ -297,7 +364,49 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(out.unlisted).toBe(true);
   });
 
+  it('rejects undocumented Cloud modes instead of sending a cosmetic preview value', () => {
+    expect(() =>
+      sessionCreateRequestSchema.parse({ prompt: 'Try Fusion.', devin_mode: 'fusion' }),
+    ).toThrow();
+  });
+
   it('rejects a session create request without a prompt', () => {
     expect(() => sessionCreateRequestSchema.parse({ tags: ['x'] })).toThrow();
+  });
+
+  it('strictly validates resource writes and rejects empty updates', () => {
+    expect(() =>
+      knowledgeNoteCreateRequestSchema.parse({
+        name: 'Rules',
+        trigger: 'Always',
+        body: 'Use strict TypeScript.',
+        unexpected: true,
+      }),
+    ).toThrow();
+    expect(() => knowledgeNoteUpdateRequestSchema.parse({})).toThrow();
+    expect(() => playbookCreateRequestSchema.parse({ title: 'Bad', body: 'x', macro: 'bad' })).toThrow();
+    expect(() =>
+      secretCreateRequestSchema.parse({ type: 'key-value', key: 'TOKEN', value: '' }),
+    ).toThrow();
+  });
+
+  it('requires schedule timing fields and rejects unsupported write agents', () => {
+    expect(() =>
+      scheduleCreateRequestSchema.parse({
+        name: 'Recurring',
+        prompt: 'Check dependencies.',
+        schedule_type: 'recurring',
+      }),
+    ).toThrow();
+    expect(() =>
+      scheduleCreateRequestSchema.parse({
+        name: 'Advanced',
+        prompt: 'Check dependencies.',
+        schedule_type: 'recurring',
+        frequency: '0 9 * * *',
+        agent: 'advanced',
+      }),
+    ).toThrow();
+    expect(() => scheduleUpdateRequestSchema.parse({})).toThrow();
   });
 });

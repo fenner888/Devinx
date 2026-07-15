@@ -1,0 +1,24 @@
+{
+  "probeVersion": 1,
+  "observedAt": "2026-07-10",
+  "platform": "macOS",
+  "cli": {
+    "version": "devin 2026.8.18 (16737566)"
+  },
+  "acp": {
+    "requestedProtocolVersion": 1,
+    "negotiatedProtocolVersion": 1,
+    "agent": {
+      "name": "affogato",
+      "version": "0.0.0-dev"
+    },
+    "capabilities": [
+      "loadSession",
+      "promptCapabilities.embeddedContext",
+      "promptCapabilities.image",
+      "sessionCapabilities.additionalDirectories",
+      "sessionCapabilities.list"
+    ],
+    "unknownCapabilityCount": 0
+  }
+}

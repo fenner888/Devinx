@@ -26,6 +26,8 @@ export interface ColorToken {
 }
 
 export interface ThemeTokens {
+  /** Full-screen canvas used where the product calls for true black in dark mode. */
+  canvas: ColorToken;
   /** App background (Devin `--bg-page`). */
   surface0: ColorToken;
   /** Cards / sidebar / list rows (Devin `--bg-wash`). */
@@ -36,6 +38,16 @@ export interface ThemeTokens {
   surface2Wax: ColorToken;
   /** Transparent elevated (over-content overlays). */
   surface2Transparent: ColorToken;
+  /** Translucent floating composer surface. */
+  composerSurface: ColorToken;
+  /** Home companion stage: quiet planetary surface behind Devin. */
+  companionStageSurface: ColorToken;
+  /** Home companion stage: broad ambient halo. */
+  companionStageGlow: ColorToken;
+  /** Home companion stage: horizon and orbital line. */
+  companionStageLine: ColorToken;
+  /** Home companion stage: sparse atmospheric points. */
+  companionStageStar: ColorToken;
   /** Modal scrim / overlay backdrop. */
   scrim: ColorToken;
   /** Neutral accent surface (rare). */
@@ -125,11 +137,17 @@ const c = (channels: string, hex: string): ColorToken => ({ channels, hex });
 // [FALLBACK-REPLACED §1.1] surface1 #11151F → #191919 (Devin --bg-wash dark)
 // [FALLBACK-REPLACED §1.1] surface2 #1A2029 → #1F1F1F (Devin --bg-elevated dark)
 export const dark: ThemeTokens = {
+  canvas: c('0 0 0', '#000000'),
   surface0: c('20 20 20', '#141414'),
   surface1: c('25 25 25', '#191919'),
   surface2: c('31 31 31', '#1F1F1F'),
   surface2Wax: c('31 31 31 / .94', '#1F1F1FF0'),
   surface2Transparent: c('255 255 255 / .05', '#FFFFFF0D'),
+  composerSurface: c('31 31 31 / .72', '#1F1F1FB8'),
+  companionStageSurface: c('4 16 43', '#04102B'),
+  companionStageGlow: c('68 137 255 / .14', '#4489FF24'),
+  companionStageLine: c('73 176 255 / .72', '#49B0FFB8'),
+  companionStageStar: c('73 176 255 / .7', '#49B0FFB3'),
   scrim: c('0 0 0 / .32', '#00000052'),
   surfaceAccentNeutral: c('249 249 249', '#F9F9F9'),
 
@@ -189,18 +207,26 @@ export const dark: ThemeTokens = {
 // [FALLBACK-REPLACED §1.1] surface1 #FFFFFF → #F8F8F8 (Devin --bg-wash light)
 // [FALLBACK-REPLACED §1.1] surface2 #F1EDE6 → #FFFFFF (Devin --bg-elevated light)
 export const light: ThemeTokens = {
+  canvas: c('252 252 252', '#FCFCFC'),
   surface0: c('252 252 252', '#FCFCFC'),
   surface1: c('248 248 248', '#F8F8F8'),
   surface2: c('255 255 255', '#FFFFFF'),
   surface2Wax: c('255 255 255 / .94', '#FFFFFFF0'),
   surface2Transparent: c('255 255 255', '#FFFFFF'),
+  composerSurface: c('255 255 255 / .84', '#FFFFFFD6'),
+  companionStageSurface: c('230 239 255', '#E6EFFF'),
+  companionStageGlow: c('49 124 255 / .1', '#317CFF1A'),
+  companionStageLine: c('49 124 255 / .42', '#317CFF6B'),
+  companionStageStar: c('37 99 235 / .3', '#2563EB4D'),
   scrim: c('0 0 0 / .12', '#0000001F'),
   surfaceAccentNeutral: c('54 54 54', '#363636'),
 
   // [FALLBACK-REPLACED §1.2] textHi #16181D → #191919 (Devin --text-primary light)
   textHi: c('25 25 25', '#191919'),
   textHiStrong: c('0 0 0', '#000000'),
-  textMid: c('25 25 25 / .56', '#1919198F'),
+  // Accessibility override: the extracted 56% value is only 4.03:1 on the
+  // light canvas. 60% preserves the hierarchy while clearing WCAG AA text.
+  textMid: c('25 25 25 / .6', '#19191999'),
   textLow: c('25 25 25 / .4', '#19191966'),
   textInverse: c('255 255 255', '#FFFFFF'),
   textAlwaysBlack: c('13 15 13', '#0D0F0D'),
@@ -208,7 +234,9 @@ export const light: ThemeTokens = {
 
   // [FALLBACK-REPLACED §1.3] brand #2563EB → #317CFF (Devin --bg-accent-primary light)
   brand: c('49 124 255', '#317CFF'),
-  brandText: c('49 124 255', '#317CFF'),
+  // Accessibility override: keep the extracted blue for fills, but use a
+  // darker semantic link/text blue that clears 4.5:1 on light surfaces.
+  brandText: c('37 99 235', '#2563EB'),
   brandBorder: c('49 124 255', '#317CFF'),
   brandSecondaryBg: c('21 107 255 / .2', '#156BFF33'),
   brandSecondaryTint: c('49 124 255 / .08', '#317CFF14'),

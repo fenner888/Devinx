@@ -19,21 +19,26 @@ import {
   sessionInsightsResponseSchema,
   playbookListResponseSchema,
   knowledgeNoteListResponseSchema,
+  knowledgeFolderTreeSchema,
   secretListResponseSchema,
   attachmentResponseSchema,
   consumptionResponseSchema,
+  consumptionCycleListResponseSchema,
+  devinAcuLimitListResponseSchema,
   selfResponseSchema,
-  repositoryIndexingListSchema,
-  repositoryIndexingSchema,
   scheduleResponseSchema,
   scheduleListResponseSchema,
   prReviewResponseSchema,
-  codeScanFindingListResponseSchema,
   knowledgeNoteCreateRequestSchema,
+  knowledgeNoteUpdateRequestSchema,
   knowledgeNoteResponseSchema,
   playbookCreateRequestSchema,
+  playbookUpdateRequestSchema,
   playbookResponseSchema,
   secretCreateRequestSchema,
+  resourceIdSchema,
+  scheduleCreateRequestSchema,
+  scheduleUpdateRequestSchema,
   secretResponseSchema,
   sessionMetricsSchema,
   prMetricsSchema,
@@ -49,16 +54,18 @@ import type {
   SessionTagsUpdateRequest,
   PlaybookResponse,
   KnowledgeNoteResponse,
+  KnowledgeFolderTree,
   SecretResponse,
   AttachmentResponse,
   DailyConsumptionResponse,
+  ConsumptionCycle,
+  DevinAcuLimit,
   SessionInsightsResponse,
   InsightsGenerateResponse,
   ScheduleResponse,
   ScheduleCreateRequest,
   ScheduleUpdateRequest,
   PrReviewResponse,
-  CodeScanFinding,
   KnowledgeNoteCreateRequest,
   KnowledgeNoteUpdateRequest,
   PlaybookCreateRequest,
@@ -71,7 +78,6 @@ import type {
   MetricsQuery,
   RepositoryResponse,
   SelfResponse,
-  RepositoryIndexing,
   Cursor,
 } from './types';
 
@@ -279,17 +285,35 @@ export async function listPlaybooks(auth: AuthProvider): Promise<PlaybookRespons
 }
 
 export async function listKnowledge(auth: AuthProvider): Promise<KnowledgeNoteResponse[]> {
-  const orgPath = await auth.orgPath();
-  const orgId = orgPath.replace('/v3/organizations/', '');
-  const data = await apiRequest<{
-    items: KnowledgeNoteResponse[];
-    end_cursor: Cursor | null;
-    has_next_page: boolean;
-  }>(auth, paths.knowledge(orgId), {
+  const items: KnowledgeNoteResponse[] = [];
+  const seenCursors = new Set<string>();
+  let cursor: Cursor | null = null;
+  for (let page = 0; page < 10; page++) {
+    const data: {
+      items: KnowledgeNoteResponse[];
+      end_cursor: Cursor | null;
+      has_next_page: boolean;
+    } = await apiRequest(auth, paths.knowledge(await orgIdOf(auth)), {
+      method: 'GET',
+      query: { first: 100, after: cursor },
+      schema: knowledgeNoteListResponseSchema,
+    });
+    items.push(...data.items);
+    if (!data.has_next_page) return items;
+    if (!data.end_cursor || seenCursors.has(data.end_cursor)) {
+      throw new Error('Knowledge pagination returned an invalid cursor');
+    }
+    seenCursors.add(data.end_cursor);
+    cursor = data.end_cursor;
+  }
+  throw new Error('Knowledge list exceeds the supported pagination limit');
+}
+
+export async function listKnowledgeFolders(auth: AuthProvider): Promise<KnowledgeFolderTree> {
+  return apiRequest<KnowledgeFolderTree>(auth, paths.knowledgeFolders(await orgIdOf(auth)), {
     method: 'GET',
-    schema: knowledgeNoteListResponseSchema,
+    schema: knowledgeFolderTreeSchema,
   });
-  return data.items;
 }
 
 export async function listSecrets(auth: AuthProvider): Promise<SecretResponse[]> {
@@ -372,6 +396,48 @@ export async function getDailyConsumption(
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** Read-only enterprise billing cycles. Requires enterprise ManageBilling. */
+export async function listConsumptionCycles(auth: AuthProvider): Promise<ConsumptionCycle[]> {
+  const items: ConsumptionCycle[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 5; page++) {
+    const data: {
+      items: ConsumptionCycle[];
+      end_cursor?: string | null;
+      has_next_page?: boolean;
+    } = await apiRequest(auth, paths.consumptionCycles(), {
+      method: 'GET',
+      query: { first: 100, after: cursor },
+      schema: consumptionCycleListResponseSchema,
+    });
+    items.push(...data.items);
+    if (!data.has_next_page || !data.end_cursor) break;
+    cursor = data.end_cursor;
+  }
+  return items.sort((a, b) => b.after - a.after);
+}
+
+/** Read-only enterprise ACU limits. Requires enterprise ManageBilling. */
+export async function listDevinAcuLimits(auth: AuthProvider): Promise<DevinAcuLimit[]> {
+  const items: DevinAcuLimit[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 5; page++) {
+    const data: {
+      items: DevinAcuLimit[];
+      end_cursor?: string | null;
+      has_next_page?: boolean;
+    } = await apiRequest(auth, paths.devinAcuLimits(), {
+      method: 'GET',
+      query: { first: 100, after: cursor },
+      schema: devinAcuLimitListResponseSchema,
+    });
+    items.push(...data.items);
+    if (!data.has_next_page || !data.end_cursor) break;
+    cursor = data.end_cursor;
+  }
+  return items;
+}
+
 // ---------------------------------------------------------------------------
 // Schedules (Automations)
 // ---------------------------------------------------------------------------
@@ -408,11 +474,12 @@ export async function createSchedule(
   auth: AuthProvider,
   body: ScheduleCreateRequest,
 ): Promise<ScheduleResponse> {
+  const input = scheduleCreateRequestSchema.parse(body);
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   const raw = await apiRequest<Record<string, unknown>>(auth, paths.schedules(orgId), {
     method: 'POST',
-    body,
+    body: input,
     schema: scheduleResponseSchema,
   });
   return normalizeSchedule(raw);
@@ -423,20 +490,28 @@ export async function updateSchedule(
   scheduleId: string,
   body: ScheduleUpdateRequest,
 ): Promise<ScheduleResponse> {
+  const safeScheduleId = resourceIdSchema.parse(scheduleId);
+  const input = scheduleUpdateRequestSchema.parse(body);
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  const raw = await apiRequest<Record<string, unknown>>(auth, paths.schedule(orgId, scheduleId), {
-    method: 'PATCH',
-    body,
-    schema: scheduleResponseSchema,
-  });
+  const raw = await apiRequest<Record<string, unknown>>(
+    auth,
+    paths.schedule(orgId, safeScheduleId),
+    {
+      method: 'PATCH',
+      body: input,
+      schema: scheduleResponseSchema,
+    },
+  );
   return normalizeSchedule(raw);
 }
 
 export async function deleteSchedule(auth: AuthProvider, scheduleId: string): Promise<void> {
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
-  await apiRequest(auth, paths.schedule(orgId, scheduleId), { method: 'DELETE' });
+  await apiRequest(auth, paths.schedule(orgId, resourceIdSchema.parse(scheduleId)), {
+    method: 'DELETE',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -467,37 +542,6 @@ export async function getPrReview(auth: AuthProvider, prUrl: string): Promise<Pr
 }
 
 // ---------------------------------------------------------------------------
-// Code scans (Devin Security — enterprise-scoped)
-// ---------------------------------------------------------------------------
-
-export async function listCodeScanFindings(auth: AuthProvider): Promise<CodeScanFinding[]> {
-  const items: CodeScanFinding[] = [];
-  let cursor: string | null = null;
-  for (let page = 0; page < 5; page++) {
-    const data: { items: CodeScanFinding[]; end_cursor?: string | null; has_next_page?: boolean } =
-      await apiRequest(auth, paths.codeScanFindings(), {
-        method: 'GET',
-        query: { first: 100, after: cursor },
-        schema: codeScanFindingListResponseSchema,
-      });
-    items.push(...data.items);
-    if (!data.has_next_page || !data.end_cursor) break;
-    cursor = data.end_cursor;
-  }
-  return items;
-}
-
-export async function remediateFinding(
-  auth: AuthProvider,
-  scanId: string,
-  findingId: string,
-): Promise<void> {
-  const orgPath = await auth.orgPath();
-  const orgId = orgPath.replace('/v3/organizations/', '');
-  await apiRequest(auth, paths.codeScanRemediate(orgId, scanId, findingId), { method: 'POST' });
-}
-
-// ---------------------------------------------------------------------------
 // Resource management (Knowledge / Playbooks / Secrets)
 // ---------------------------------------------------------------------------
 
@@ -509,10 +553,10 @@ export async function createKnowledgeNote(
   auth: AuthProvider,
   body: KnowledgeNoteCreateRequest,
 ): Promise<KnowledgeNoteResponse> {
-  knowledgeNoteCreateRequestSchema.parse(body);
+  const input = knowledgeNoteCreateRequestSchema.parse(body);
   return apiRequest<KnowledgeNoteResponse>(auth, paths.knowledge(await orgIdOf(auth)), {
     method: 'POST',
-    body,
+    body: input,
     schema: knowledgeNoteResponseSchema,
   });
 }
@@ -522,25 +566,32 @@ export async function updateKnowledgeNote(
   noteId: string,
   body: KnowledgeNoteUpdateRequest,
 ): Promise<KnowledgeNoteResponse> {
-  return apiRequest<KnowledgeNoteResponse>(auth, paths.knowledgeNote(await orgIdOf(auth), noteId), {
-    method: 'PUT',
-    body,
-    schema: knowledgeNoteResponseSchema,
-  });
+  const input = knowledgeNoteUpdateRequestSchema.parse(body);
+  return apiRequest<KnowledgeNoteResponse>(
+    auth,
+    paths.knowledgeNote(await orgIdOf(auth), resourceIdSchema.parse(noteId)),
+    {
+      method: 'PUT',
+      body: input,
+      schema: knowledgeNoteResponseSchema,
+    },
+  );
 }
 
 export async function deleteKnowledgeNote(auth: AuthProvider, noteId: string): Promise<void> {
-  await apiRequest(auth, paths.knowledgeNote(await orgIdOf(auth), noteId), { method: 'DELETE' });
+  await apiRequest(auth, paths.knowledgeNote(await orgIdOf(auth), resourceIdSchema.parse(noteId)), {
+    method: 'DELETE',
+  });
 }
 
 export async function createPlaybook(
   auth: AuthProvider,
   body: PlaybookCreateRequest,
 ): Promise<PlaybookResponse> {
-  playbookCreateRequestSchema.parse(body);
+  const input = playbookCreateRequestSchema.parse(body);
   return apiRequest<PlaybookResponse>(auth, paths.playbooks(await orgIdOf(auth)), {
     method: 'POST',
-    body,
+    body: input,
     schema: playbookResponseSchema,
   });
 }
@@ -550,31 +601,40 @@ export async function updatePlaybook(
   playbookId: string,
   body: PlaybookUpdateRequest,
 ): Promise<PlaybookResponse> {
-  return apiRequest<PlaybookResponse>(auth, paths.playbook(await orgIdOf(auth), playbookId), {
-    method: 'PUT',
-    body,
-    schema: playbookResponseSchema,
-  });
+  const input = playbookUpdateRequestSchema.parse(body);
+  return apiRequest<PlaybookResponse>(
+    auth,
+    paths.playbook(await orgIdOf(auth), resourceIdSchema.parse(playbookId)),
+    {
+      method: 'PUT',
+      body: input,
+      schema: playbookResponseSchema,
+    },
+  );
 }
 
 export async function deletePlaybook(auth: AuthProvider, playbookId: string): Promise<void> {
-  await apiRequest(auth, paths.playbook(await orgIdOf(auth), playbookId), { method: 'DELETE' });
+  await apiRequest(auth, paths.playbook(await orgIdOf(auth), resourceIdSchema.parse(playbookId)), {
+    method: 'DELETE',
+  });
 }
 
 export async function createSecret(
   auth: AuthProvider,
   body: SecretCreateRequest,
 ): Promise<SecretResponse> {
-  secretCreateRequestSchema.parse(body);
+  const input = secretCreateRequestSchema.parse(body);
   return apiRequest<SecretResponse>(auth, paths.secrets(await orgIdOf(auth)), {
     method: 'POST',
-    body,
+    body: input,
     schema: secretResponseSchema,
   });
 }
 
 export async function deleteSecret(auth: AuthProvider, secretId: string): Promise<void> {
-  await apiRequest(auth, paths.secret(await orgIdOf(auth), secretId), { method: 'DELETE' });
+  await apiRequest(auth, paths.secret(await orgIdOf(auth), resourceIdSchema.parse(secretId)), {
+    method: 'DELETE',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -631,17 +691,43 @@ export async function getWeeklyActiveUsers(
 // Repositories (v3beta1)
 // ---------------------------------------------------------------------------
 
+const MAX_REPOSITORY_PAGES = 10;
+type RepositoryPage = {
+  items: RepositoryResponse[];
+  end_cursor: Cursor | null;
+  has_next_page: boolean;
+};
+
 export async function listRepositories(auth: AuthProvider): Promise<RepositoryResponse[]> {
-  const data = await apiRequest<{ items: RepositoryResponse[] }>(
-    auth,
-    paths.repositories(await orgIdOf(auth)),
-    {
+  const repositoryPath = paths.repositories(await orgIdOf(auth));
+  const repositories: RepositoryResponse[] = [];
+  const seenRepositories = new Set<string>();
+  const seenCursors = new Set<string>();
+  let cursor: Cursor | null = null;
+
+  for (let page = 0; page < MAX_REPOSITORY_PAGES; page++) {
+    const data: RepositoryPage = await apiRequest<RepositoryPage>(auth, repositoryPath, {
       method: 'GET',
-      query: { first: 100 },
+      query: { first: 100, after: cursor },
       schema: repositoryListResponseSchema,
-    },
-  );
-  return data.items;
+    });
+
+    for (const repository of data.items) {
+      const identity = `${repository.git_connection_id}:${repository.provider_repository_id}`;
+      if (seenRepositories.has(identity)) continue;
+      seenRepositories.add(identity);
+      repositories.push(repository);
+    }
+
+    if (!data.has_next_page) return repositories;
+    if (!data.end_cursor || seenCursors.has(data.end_cursor)) {
+      throw new Error('Repository pagination returned an invalid cursor');
+    }
+    seenCursors.add(data.end_cursor);
+    cursor = data.end_cursor;
+  }
+
+  throw new Error('Repository list exceeds the supported pagination limit');
 }
 
 // ---------------------------------------------------------------------------
@@ -673,31 +759,4 @@ export async function getSessionConsumption(
     },
   );
   return data.total_acus ?? 0;
-}
-
-// ---------------------------------------------------------------------------
-// Repository indexing (v3beta1)
-// ---------------------------------------------------------------------------
-
-export async function listIndexedRepositories(auth: AuthProvider): Promise<RepositoryIndexing[]> {
-  const orgId = await orgIdOf(auth);
-  const data = await apiRequest<{ items: RepositoryIndexing[] }>(auth, paths.repoIndexing(orgId), {
-    method: 'GET',
-    query: { first: 100 },
-    schema: repositoryIndexingListSchema,
-  });
-  return data.items;
-}
-
-export async function indexRepository(
-  auth: AuthProvider,
-  repoPath: string,
-  branches?: string[],
-): Promise<RepositoryIndexing> {
-  const orgId = await orgIdOf(auth);
-  return apiRequest<RepositoryIndexing>(auth, paths.repoIndex(orgId, repoPath), {
-    method: 'PUT',
-    body: { branch_names: branches ?? [] },
-    schema: repositoryIndexingSchema,
-  });
 }

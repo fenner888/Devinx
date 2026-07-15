@@ -1,0 +1,46 @@
+import type { ImageSourcePropType } from 'react-native';
+
+import claude from '../../../assets/model-marks/claude.png';
+import cognition from '../../../assets/model-marks/cognition.png';
+import deepseek from '../../../assets/model-marks/deepseek.png';
+import gemini from '../../../assets/model-marks/gemini.png';
+import grok from '../../../assets/model-marks/grok.png';
+import kimiDark from '../../../assets/model-marks/kimi-dark.png';
+import kimiLight from '../../../assets/model-marks/kimi-light.png';
+import openai from '../../../assets/model-marks/openai.png';
+import zai from '../../../assets/model-marks/zai.png';
+
+import type { ModelFamilyMarkKind } from '@lib/model-family-mark';
+
+export interface ModelFamilyMarkAsset {
+  source: ImageSourcePropType;
+  /** Optional theme-specific sources for multicolor marks with a monochrome element. */
+  darkSource?: ImageSourcePropType;
+  lightSource?: ImageSourcePropType;
+  /** Scale within the fixed mark slot while preserving the supplied artwork. */
+  scale: number;
+  /** Monochrome marks follow the active text color without an opaque backing tile. */
+  tintWithTheme?: boolean;
+}
+
+/**
+ * Verified first-party model/provider marks. These are presentation metadata
+ * only: the live ACP catalog remains the sole source of selectable models.
+ */
+export const MODEL_FAMILY_MARK_ASSETS: Partial<
+  Record<ModelFamilyMarkKind, ModelFamilyMarkAsset>
+> = {
+  claude: { source: claude, scale: 0.86 },
+  glm: { source: zai, scale: 0.88, tintWithTheme: true },
+  swe: { source: cognition, scale: 0.78 },
+  gpt: { source: openai, scale: 0.68, tintWithTheme: true },
+  gemini: { source: gemini, scale: 0.82 },
+  deepseek: { source: deepseek, scale: 0.88 },
+  grok: { source: grok, scale: 0.76, tintWithTheme: true },
+  kimi: {
+    source: kimiDark,
+    darkSource: kimiDark,
+    lightSource: kimiLight,
+    scale: 0.8,
+  },
+};

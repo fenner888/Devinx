@@ -1,0 +1,468 @@
+import { generateKeyPairSync, sign as nodeSign } from 'node:crypto';
+
+const mockLoadPairedComputers = jest.fn();
+const mockStorePairedComputers = jest.fn(async (_input: unknown) => {});
+const mockCreateRequestIdentity = jest.fn();
+const mockSign = jest.fn();
+const mockPostPinnedBridgeJson = jest.fn();
+const mockDeleteDeviceIdentity = jest.fn(async (_keyId: string) => {});
+
+jest.mock('../../src/auth/pairedComputers', () => ({
+  loadPairedComputers: () => mockLoadPairedComputers(),
+  storePairedComputers: (input: unknown) => mockStorePairedComputers(input),
+}));
+
+jest.mock('../../src/auth/deviceSigning', () => ({
+  createRequestIdentity: () => mockCreateRequestIdentity(),
+  deleteDeviceIdentity: (keyId: string) => mockDeleteDeviceIdentity(keyId),
+  sign: (keyId: string, message: string) => mockSign(keyId, message),
+  postTailnetBridgeJson: (endpoint: string, path: string, body: unknown) =>
+    mockPostPinnedBridgeJson(endpoint, path, body),
+  postPinnedBridgeJson: (endpoint: string, path: string, fingerprint: string, body: unknown) =>
+    mockPostPinnedBridgeJson(endpoint, path, fingerprint, body),
+}));
+
+import { canonicalJson } from '../../src/auth/canonicalJson';
+import { FixedWindowRateLimiter } from '../../bridge/src/rate-limit';
+import { InMemoryReplayGuard } from '../../bridge/src/replay';
+import { BridgeService } from '../../bridge/src/service';
+import { SessionHandleRegistry } from '../../bridge/src/session-handles';
+import { WorkspaceHandleRegistry } from '../../bridge/src/workspace-handles';
+import {
+  ComputerBridgeError,
+  createComputerSession,
+  disconnectComputer,
+  getComputerBridgeHealth,
+  getComputerCreateOptions,
+  listComputerSessions,
+  loadComputerSession,
+  openComputerBridge,
+  openComputerBridges,
+  promptComputerSession,
+  removeComputerFromThisIPhone,
+} from '../../src/auth/computerBridge';
+
+const NOW = 1_800_000_000_000;
+const BRIDGE_ID = 'bridge_1234567890';
+const DEVICE_ID = 'device_1234567890';
+const KEY_ID = '3e399a5d-79c4-4a23-8aa7-a418565d974d';
+const REQUEST_ID = 'd9428888-122b-11e1-b85c-61cd3cbb3210';
+const NONCE = 'N'.repeat(32);
+const SIGNATURE = 'S'.repeat(86);
+
+const COMPUTER = {
+  version: 3,
+  bridgeId: BRIDGE_ID,
+  computerName: 'Frank’s MacBook',
+  endpoint: 'http://100.127.166.87:45831/',
+  transportSecurity: 'tailscale_wireguard',
+  tlsCertificateFingerprint: 'T'.repeat(43),
+  bridgePublicKeySpki: 'B'.repeat(59),
+  bridgeKeyFingerprint: 'F'.repeat(43),
+  deviceId: DEVICE_ID,
+  deviceKeyId: KEY_ID,
+  devicePublicKeySpki: 'D'.repeat(59),
+  permissions: ['bridge:health', 'session:metadata:read'],
+  pairedAt: NOW - 60_000,
+};
+
+describe('authenticated mobile Computer Bridge client', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    mockLoadPairedComputers.mockResolvedValue([COMPUTER]);
+    mockCreateRequestIdentity.mockResolvedValue({ requestId: REQUEST_ID, nonce: NONCE });
+    mockSign.mockResolvedValue(SIGNATURE);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('signs a short-lived health envelope and sends it only through the Tailscale route', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({
+      status: 200,
+      body: {
+        protocolVersion: 2,
+        status: 'ready',
+        capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+      },
+    });
+
+    await expect(getComputerBridgeHealth(BRIDGE_ID)).resolves.toEqual({
+      protocolVersion: 2,
+      status: 'ready',
+      capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+    });
+
+    expect(mockSign).toHaveBeenCalledTimes(1);
+    const unsigned = JSON.parse(mockSign.mock.calls[0]?.[1] as string) as Record<string, unknown>;
+    expect(mockSign).toHaveBeenCalledWith(KEY_ID, canonicalJson(unsigned));
+    expect(unsigned).toEqual({
+      body: {},
+      bridgeId: BRIDGE_ID,
+      deviceId: DEVICE_ID,
+      expiresAt: NOW + 15_000,
+      issuedAt: NOW,
+      method: 'bridge.health',
+      nonce: NONCE,
+      protocolVersion: 2,
+      requestId: REQUEST_ID,
+    });
+    expect(mockPostPinnedBridgeJson).toHaveBeenCalledWith(COMPUTER.endpoint, '/v1/request', {
+      ...unsigned,
+      signature: SIGNATURE,
+    });
+  });
+
+  it('interoperates with the real server authorization and canonicalization path', async () => {
+    const keys = generateKeyPairSync('ed25519');
+    const publicKeySpki = keys.publicKey
+      .export({ format: 'der', type: 'spki' })
+      .toString('base64url');
+    mockLoadPairedComputers.mockResolvedValue([
+      { ...COMPUTER, devicePublicKeySpki: publicKeySpki },
+    ]);
+    mockSign.mockImplementation(async (_keyId: string, message: string) =>
+      nodeSign(null, Buffer.from(message, 'utf8'), keys.privateKey).toString('base64url'),
+    );
+    const sessionHandles = new SessionHandleRegistry(BRIDGE_ID, Buffer.alloc(32, 7));
+    const service = new BridgeService({
+      bridgeId: BRIDGE_ID,
+      devices: {
+        get: (deviceId) =>
+          deviceId === DEVICE_ID
+            ? {
+                bridgeId: BRIDGE_ID,
+                deviceId: DEVICE_ID,
+                deviceName: 'Frank’s iPhone',
+                publicKeySpki,
+                status: 'active',
+                pairedAt: NOW - 60_000,
+                permissions: ['bridge:health', 'session:metadata:read'],
+              }
+            : undefined,
+      },
+      replayGuard: new InMemoryReplayGuard(),
+      rateLimiter: new FixedWindowRateLimiter(),
+      sessionHandles,
+      workspaceHandles: new WorkspaceHandleRegistry(BRIDGE_ID, Buffer.alloc(32, 8)),
+      sessions: {
+        isSessionListSupported: () => true,
+        listSessions: async () => ({ sessions: [] }),
+        isSessionLoadSupported: () => false,
+        loadSession: async () => {
+          throw new Error('Session loading is disabled');
+        },
+        isSessionPromptSupported: () => true,
+        promptSession: async () => {},
+      },
+    });
+    mockPostPinnedBridgeJson.mockImplementation(
+      async (_endpoint: string, _path: string, envelope: unknown) => {
+        const response = await service.handle(envelope, { peerKey: 'phone', now: NOW });
+        return { status: response.status, body: response.body };
+      },
+    );
+
+    await expect(getComputerBridgeHealth(BRIDGE_ID)).resolves.toMatchObject({
+      status: 'ready',
+      capabilities: { sessionList: true },
+    });
+    sessionHandles.destroy();
+  });
+
+  it('validates a privacy-redacted local session page and optional cursor', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({
+      status: 200,
+      body: {
+        sessions: [
+          {
+            id: `local_${'L'.repeat(43)}`,
+            origin: 'computer',
+            workspaceName: 'DevinX',
+            hasTitle: true,
+            updatedAt: '2027-01-15T12:00:00.000Z',
+          },
+        ],
+        nextCursor: 'next-page',
+      },
+    });
+
+    await expect(listComputerSessions(BRIDGE_ID, { cursor: 'current-page' })).resolves.toEqual({
+      sessions: [
+        {
+          id: `local_${'L'.repeat(43)}`,
+          origin: 'computer',
+          workspaceName: 'DevinX',
+          hasTitle: true,
+          updatedAt: '2027-01-15T12:00:00.000Z',
+        },
+      ],
+      nextCursor: 'next-page',
+    });
+    const envelope = mockPostPinnedBridgeJson.mock.calls[0]?.[2] as Record<string, unknown>;
+    expect(envelope).toMatchObject({ method: 'session.list', body: { cursor: 'current-page' } });
+  });
+
+  it('signs a content-gated load request and validates minimized history', async () => {
+    const sessionId = `local_${'L'.repeat(43)}`;
+    mockLoadPairedComputers.mockResolvedValue([
+      { ...COMPUTER, permissions: [...COMPUTER.permissions, 'session:content:read'] },
+    ]);
+    mockPostPinnedBridgeJson.mockResolvedValue({
+      status: 200,
+      body: {
+        session: { id: sessionId, origin: 'computer', workspaceName: 'DevinX' },
+        messages: [
+          { sequence: 1, source: 'user', text: 'Review this.' },
+          { sequence: 2, source: 'devin', text: 'Review complete.' },
+        ],
+        truncated: false,
+      },
+    });
+
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).resolves.toMatchObject({
+      session: { id: sessionId, workspaceName: 'DevinX' },
+      messages: [{ source: 'user' }, { source: 'devin' }],
+    });
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
+      method: 'session.load',
+      body: { sessionId },
+    });
+  });
+
+  it('sends steering to the authoritative Mac even when the cached pairing grant is stale', async () => {
+    const sessionId = `local_${'P'.repeat(43)}`;
+    mockPostPinnedBridgeJson.mockResolvedValue({ status: 200, body: { accepted: true } });
+
+    await expect(
+      promptComputerSession(BRIDGE_ID, sessionId, 'Continue the task.', 'swe-1.7-high'),
+    ).resolves.toBeUndefined();
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
+      method: 'session.prompt',
+      body: { sessionId, text: 'Continue the task.', modelId: 'swe-1.7-high' },
+    });
+  });
+
+  it('returns a validated continuation handle from the authoritative Mac', async () => {
+    const sessionId = `local_${'P'.repeat(43)}`;
+    const continuedSessionId = `local_${'C'.repeat(43)}`;
+    mockPostPinnedBridgeJson.mockResolvedValue({
+      status: 200,
+      body: { accepted: true, sessionId: continuedSessionId },
+    });
+
+    await expect(
+      promptComputerSession(BRIDGE_ID, sessionId, 'Continue the task.'),
+    ).resolves.toEqual({ sessionId: continuedSessionId });
+  });
+
+  it('validates local creation options and lets the Mac authorize creation authoritatively', async () => {
+    const workspaceId = `workspace_${'W'.repeat(43)}`;
+    const sessionId = `local_${'C'.repeat(43)}`;
+    mockPostPinnedBridgeJson
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          workspaces: [{ id: workspaceId, name: 'DevinX' }],
+          models: [{ id: 'gpt-5-6-sol-medium', name: 'GPT 5.6 Sol Medium' }],
+        },
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: { accepted: true, sessionId },
+      });
+
+    await expect(getComputerCreateOptions(BRIDGE_ID)).resolves.toEqual({
+      workspaces: [{ id: workspaceId, name: 'DevinX' }],
+      models: [
+        {
+          id: 'gpt-5-6-sol-medium',
+          name: 'GPT 5.6 Sol Medium',
+          recent: false,
+          recommended: false,
+        },
+      ],
+      defaultModelId: null,
+      catalogSource: 'recent',
+    });
+    await expect(
+      createComputerSession(BRIDGE_ID, {
+        workspaceId,
+        modelId: 'gpt-5-6-sol-medium',
+        text: 'Build this.',
+      }),
+    ).resolves.toEqual({ sessionId });
+    expect(mockPostPinnedBridgeJson.mock.calls[1]?.[2]).toMatchObject({
+      method: 'session.create',
+      body: { workspaceId, modelId: 'gpt-5-6-sol-medium', text: 'Build this.' },
+    });
+  });
+
+  it('revokes on the Mac before removing the local computer credential', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({ status: 200, body: { revoked: true } });
+
+    await expect(disconnectComputer(BRIDGE_ID)).resolves.toBeUndefined();
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
+      method: 'device.revoke',
+      body: {},
+    });
+    expect(mockStorePairedComputers).toHaveBeenCalledWith([]);
+    expect(mockDeleteDeviceIdentity).toHaveBeenCalledWith(KEY_ID);
+  });
+
+  it('can remove the local pairing without claiming or attempting Mac revocation', async () => {
+    await expect(removeComputerFromThisIPhone(BRIDGE_ID)).resolves.toBeUndefined();
+
+    expect(mockPostPinnedBridgeJson).not.toHaveBeenCalled();
+    expect(mockSign).not.toHaveBeenCalled();
+    expect(mockStorePairedComputers).toHaveBeenCalledWith([]);
+    expect(mockDeleteDeviceIdentity).toHaveBeenCalledWith(KEY_ID);
+  });
+
+  it('fails local history closed for absent grants, handle mismatch, or invalid sequence', async () => {
+    const sessionId = `local_${'L'.repeat(43)}`;
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).rejects.toMatchObject({
+      code: 'permission_denied',
+    });
+    expect(mockSign).not.toHaveBeenCalled();
+
+    mockLoadPairedComputers.mockResolvedValue([
+      { ...COMPUTER, permissions: [...COMPUTER.permissions, 'session:content:read'] },
+    ]);
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        session: {
+          id: `local_${'M'.repeat(43)}`,
+          origin: 'computer',
+          workspaceName: 'DevinX',
+        },
+        messages: [],
+        truncated: false,
+      },
+    });
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        session: { id: sessionId, origin: 'computer', workspaceName: 'DevinX' },
+        messages: [{ sequence: 2, source: 'devin', text: 'Out of sequence' }],
+        truncated: false,
+      },
+    });
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
+
+  it('validates the Keychain credential once for a multi-request discovery cycle', async () => {
+    mockPostPinnedBridgeJson
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          protocolVersion: 2,
+          status: 'ready',
+          capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+        },
+      })
+      .mockResolvedValueOnce({ status: 200, body: { sessions: [] } });
+
+    const connection = await openComputerBridge(BRIDGE_ID);
+    await connection.getHealth();
+    await connection.listSessions();
+
+    expect(mockLoadPairedComputers).toHaveBeenCalledTimes(1);
+    expect(mockCreateRequestIdentity).toHaveBeenCalledTimes(2);
+    expect(mockSign).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens all selected paired Macs from one validated credential-registry read', async () => {
+    const second = {
+      ...COMPUTER,
+      bridgeId: 'bridge_0987654321',
+      deviceId: 'device_0987654321',
+    };
+    mockLoadPairedComputers.mockResolvedValue([COMPUTER, second]);
+
+    const connections = await openComputerBridges([COMPUTER.bridgeId, second.bridgeId]);
+
+    expect(connections.get(COMPUTER.bridgeId)?.bridgeId).toBe(COMPUTER.bridgeId);
+    expect(connections.get(second.bridgeId)?.bridgeId).toBe(second.bridgeId);
+    expect(mockLoadPairedComputers).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails before signing when the local grant is absent', async () => {
+    mockLoadPairedComputers.mockResolvedValue([{ ...COMPUTER, permissions: ['bridge:health'] }]);
+
+    await expect(listComputerSessions(BRIDGE_ID)).rejects.toMatchObject({
+      code: 'permission_denied',
+    });
+    expect(mockCreateRequestIdentity).not.toHaveBeenCalled();
+    expect(mockSign).not.toHaveBeenCalled();
+    expect(mockPostPinnedBridgeJson).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [404, 'authorization_failed'],
+    [429, 'rate_limited'],
+    [503, 'unavailable'],
+    [400, 'invalid_response'],
+  ])('maps status %s without exposing server details', async (status, code) => {
+    mockPostPinnedBridgeJson.mockResolvedValue({ status, body: { error: 'private_detail' } });
+
+    const request = getComputerBridgeHealth(BRIDGE_ID);
+    await expect(request).rejects.toBeInstanceOf(ComputerBridgeError);
+    await expect(request).rejects.toMatchObject({ code });
+  });
+
+  it('fails closed on malformed response fields, duplicate sessions, or transport errors', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        sessions: [
+          {
+            id: `local_${'L'.repeat(43)}`,
+            origin: 'computer',
+            workspaceName: 'Repo',
+            hasTitle: false,
+            title: 'Leaked title',
+          },
+        ],
+      },
+    });
+    await expect(listComputerSessions(BRIDGE_ID)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        sessions: [
+          {
+            id: `local_${'M'.repeat(43)}`,
+            origin: 'computer',
+            workspaceName: 'Repo',
+            hasTitle: true,
+            title: 'Content outside the metadata grant',
+          },
+        ],
+      },
+    });
+    await expect(listComputerSessions(BRIDGE_ID)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+
+    mockPostPinnedBridgeJson.mockRejectedValueOnce(new Error('certificate mismatch details'));
+    await expect(getComputerBridgeHealth(BRIDGE_ID)).rejects.toEqual(
+      expect.objectContaining({
+        code: 'unavailable',
+        message: 'The paired Mac could not be reached securely.',
+      }),
+    );
+  });
+});

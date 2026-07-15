@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { usePrReview, useTriggerPrReview } from '@api/devin/queries';
 import { ApiError } from '@api/devin/client';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
+import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 import type { PrReviewStatus } from '@api/devin/types';
 
@@ -58,7 +59,7 @@ export default function ReviewScreen() {
       },
       onError: (e) => {
         hapticError();
-        setTriggerError(e instanceof Error ? e.message : 'Could not trigger review.');
+        setTriggerError(userFacingError(e, 'Could not trigger this review.'));
       },
     });
   }
@@ -167,7 +168,9 @@ export default function ReviewScreen() {
           {lookupUrl && review.error && !isNotFound && !review.data && (
             <View className="flex-row items-start bg-tint-red rounded-card px-3 py-2">
               <Ionicons name="alert-circle-outline" size={13} color={tokens.failed.hex} />
-              <Text className="text-failed text-text12 ml-2 flex-1">{review.error.message}</Text>
+              <Text className="text-failed text-text12 ml-2 flex-1">
+                {userFacingError(review.error, 'Could not load the review status.')}
+              </Text>
             </View>
           )}
 

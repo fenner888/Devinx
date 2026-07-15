@@ -1,0 +1,48 @@
+{
+  "schema": "agent_pets.mobile.events.v1",
+  "petId": "devin",
+  "eventToState": {
+    "app_opened": "idle",
+    "task_started": "working",
+    "task_completed": "success",
+    "task_failed": "error",
+    "task_blocked": "blocked",
+    "approval_required": "blocked",
+    "risky_action": "warning",
+    "delete_requested": "warning",
+    "sync_started": "working",
+    "sync_completed": "success",
+    "background_task_started": "focused",
+    "background_task_completed": "success",
+    "reminder_due": "reminding",
+    "waiting_for_input": "waiting",
+    "network_waiting": "waiting",
+    "focus_started": "focused",
+    "focus_finished": "success",
+    "sleep": "sleeping",
+    "wake": "idle"
+  },
+  "examples": [
+    {
+      "type": "delete_requested",
+      "severity": "warning",
+      "title": "Delete file?",
+      "message": "Devin found the file and is waiting for confirmation.",
+      "state": "warning"
+    },
+    {
+      "type": "task_completed",
+      "severity": "success",
+      "title": "Done",
+      "message": "Devin finished the task.",
+      "state": "success"
+    },
+    {
+      "type": "reminder_due",
+      "severity": "info",
+      "title": "Check-in",
+      "message": "Devin has a follow-up for you.",
+      "state": "reminding"
+    }
+  ]
+}

@@ -6,7 +6,7 @@
  * Components never import this. Hooks/queries do.
  */
 
-import * as Sentry from '@sentry/react-native';
+import { captureDiagnostic } from '@lib/diagnostics';
 import type { AuthProvider } from '@auth/AuthProvider';
 import { ApiSchemaError } from '@auth/AuthProvider';
 import type { ZodTypeAny } from 'zod';
@@ -228,7 +228,7 @@ export async function apiRequest<T = unknown>(
             path,
             parsed.error.issues,
           );
-          Sentry.captureException(err);
+          captureDiagnostic(err);
           throw err;
         }
         return parsed.data as T;
@@ -247,7 +247,7 @@ export async function apiRequest<T = unknown>(
         }
         throw lastError;
       }
-      Sentry.captureException(e);
+      captureDiagnostic(e);
       throw e;
     }
   }

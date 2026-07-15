@@ -64,6 +64,14 @@ describe('compose', () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it('rejects web-only preview modes that the public API does not document', () => {
+      const result = sessionCreateRequestSchema.safeParse({
+        prompt: 'Do something',
+        devin_mode: 'fusion',
+      });
+      expect(result.success).toBe(false);
+    });
   });
 
   describe('draft shape', () => {

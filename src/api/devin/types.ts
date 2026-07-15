@@ -81,7 +81,8 @@ export type SessionCategory =
   | 'security'
   | 'unit_test_generation';
 
-export type DevinMode = 'normal' | 'fast' | 'lite' | 'ultra' | 'fusion';
+/** Modes accepted by the documented v3 create-session contract. */
+export type DevinMode = 'normal' | 'fast';
 
 export type SessionSize = 'xs' | 's' | 'm' | 'l' | 'xl';
 
@@ -386,12 +387,18 @@ export interface DailyConsumptionResponse {
 }
 
 export interface ConsumptionCycle {
-  /** Cycle start timestamp. */
-  start: UnixTimestamp;
-  end: UnixTimestamp;
-  acus: AcuCount;
-  /** Org the cycle belongs to. */
+  /** Inclusive billing-cycle start timestamp. */
+  after: UnixTimestamp;
+  /** Exclusive billing-cycle end timestamp. */
+  before: UnixTimestamp;
+}
+
+export interface DevinAcuLimit {
+  cycle_acu_limit: AcuCount;
+  /** Present for organization-level limits. */
   org_id?: string;
+  /** Present for user-level limits if Devin adds them to this response. */
+  user_id?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -426,6 +433,7 @@ export const paths = {
     `/v3/organizations/${orgId}/sessions/${devinId}/insights`,
   playbooks: (orgId: OrgId) => `/v3/organizations/${orgId}/playbooks`,
   knowledge: (orgId: OrgId) => `/v3/organizations/${orgId}/knowledge/notes`,
+  knowledgeFolders: (orgId: OrgId) => `/v3/organizations/${orgId}/knowledge/folders`,
   secrets: (orgId: OrgId) => `/v3/organizations/${orgId}/secrets`,
   /** Enterprise-level (requires ViewAccountMembership). */
   membersEnterprise: (orgId: OrgId) => `/v3/enterprise/organizations/${orgId}/members/users`,
@@ -437,6 +445,8 @@ export const paths = {
   consumptionDaily: (orgId: OrgId) => `/v3/organizations/${orgId}/consumption/daily`,
   /** Enterprise-level (requires ManageBilling). */
   consumptionCycles: () => `/v3/enterprise/consumption/cycles`,
+  /** Read-only enterprise Devin ACU limits (requires ManageBilling). */
+  devinAcuLimits: () => `/v3/enterprise/consumption/acu-limits/devin`,
   playbook: (orgId: OrgId, playbookId: string) =>
     `/v3/organizations/${orgId}/playbooks/${playbookId}`,
   knowledgeNote: (orgId: OrgId, noteId: string) =>
@@ -450,17 +460,10 @@ export const paths = {
   self: () => `/v3/self`,
   sessionConsumption: (orgId: OrgId, devinId: DevinId) =>
     `/v3/organizations/${orgId}/consumption/daily/sessions/${devinId}`,
-  repoIndexing: (orgId: OrgId) => `/v3beta1/organizations/${orgId}/repositories/indexing`,
-  repoIndex: (orgId: OrgId, repoPath: string) =>
-    `/v3beta1/organizations/${orgId}/repositories/${encodeURIComponent(repoPath)}/indexing`,
   schedules: (orgId: OrgId) => `/v3/organizations/${orgId}/schedules`,
   schedule: (orgId: OrgId, scheduleId: string) =>
     `/v3/organizations/${orgId}/schedules/${scheduleId}`,
   prReviews: (orgId: OrgId) => `/v3/organizations/${orgId}/pr-reviews`,
-  /** Enterprise-level (requires enterprise code-scan permissions). */
-  codeScanFindings: () => `/v3/enterprise/code-scans/findings`,
-  codeScanRemediate: (orgId: OrgId, scanId: string, findingId: string) =>
-    `/v3/enterprise/organizations/${orgId}/code-scans/${scanId}/findings/${findingId}/remediate`,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -468,6 +471,8 @@ export const paths = {
 // ---------------------------------------------------------------------------
 
 export type ScheduleType = 'recurring' | 'one_time';
+export type ScheduleNotifyOn = 'always' | 'failure' | 'never';
+export type ScheduleAgent = 'devin' | 'data_analyst';
 
 export interface ScheduleResponse {
   /** Schedule ID (prefix: sched-). */
@@ -480,8 +485,10 @@ export interface ScheduleResponse {
   frequency: string | null;
   /** ISO 8601 datetime (one-time schedules). */
   scheduled_at: string | null;
+  /** Read path remains forward-compatible with agent values not yet accepted by the write schema. */
   agent?: string;
-  notify_on?: string;
+  notify_on?: ScheduleNotifyOn;
+  playbook?: { playbook_id: string; title: string } | null;
   consecutive_failures?: number;
   last_executed_at?: string | null;
   last_error_message?: string | null;
@@ -498,8 +505,9 @@ export interface ScheduleCreateRequest {
   scheduled_at?: string | null;
   tags?: string[];
   playbook_id?: string | null;
+  notify_on?: ScheduleNotifyOn;
   /** Which agent runs the schedule (the API supports both). */
-  agent?: 'devin' | 'data_analyst';
+  agent?: ScheduleAgent;
 }
 
 export interface ScheduleUpdateRequest {
@@ -508,6 +516,11 @@ export interface ScheduleUpdateRequest {
   enabled?: boolean;
   frequency?: string | null;
   scheduled_at?: string | null;
+  schedule_type?: ScheduleType;
+  tags?: string[] | null;
+  playbook_id?: string | null;
+  notify_on?: ScheduleNotifyOn;
+  agent?: ScheduleAgent | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -526,29 +539,6 @@ export interface PrReviewResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Code scans (Devin Security — enterprise-scoped)
-// ---------------------------------------------------------------------------
-
-export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
-export type FindingStatus = 'open' | 'dismissed' | 'resolved';
-
-export interface CodeScanFinding {
-  finding_id: string;
-  scan_id: string;
-  title: string;
-  description: string | null;
-  recommendation: string | null;
-  severity: FindingSeverity;
-  status: FindingStatus;
-  category: string | null;
-  repo_name: string;
-  pr_url: string | null;
-  /** Remediation session, when one has been launched. */
-  session_id?: string | null;
-  created_at?: number;
-}
-
-// ---------------------------------------------------------------------------
 // Resource management (Knowledge / Playbooks / Secrets)
 // ---------------------------------------------------------------------------
 
@@ -559,6 +549,19 @@ export interface KnowledgeNoteCreateRequest {
   folder_id?: string | null;
   is_enabled?: boolean;
   pinned_repo?: string | null;
+}
+
+export interface KnowledgeFolderSummary {
+  folder_id: string;
+  name: string;
+  note_count: number;
+  parent_folder_id: string | null;
+  path: string;
+}
+
+export interface KnowledgeFolderTree {
+  folders: KnowledgeFolderSummary[];
+  root_note_count: number;
 }
 
 export type KnowledgeNoteUpdateRequest = Partial<KnowledgeNoteCreateRequest>;
@@ -629,7 +632,21 @@ export interface RepositoryResponse {
   repo_description: string | null;
   repo_language: string | null;
   last_updated_at: string | number | null;
-  indexing_status?: unknown;
+  indexing_status?: RepositoryIndexingStatus | null;
+}
+
+export interface RepositoryIndexJob {
+  branch_name: string;
+  commit: string;
+  created_at: number | string;
+  job_id: string;
+}
+
+export interface RepositoryIndexingStatus {
+  indexing_enabled: boolean;
+  latest_completed_search_index_job?: RepositoryIndexJob | null;
+  latest_completed_wiki_index_job?: RepositoryIndexJob | null;
+  latest_indexes?: RepositoryIndexJob[];
 }
 
 // ---------------------------------------------------------------------------
@@ -646,15 +663,4 @@ export interface SelfResponse {
   user_id?: string;
   api_key_id?: string;
   api_key_name?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Repository indexing (v3beta1)
-// ---------------------------------------------------------------------------
-
-export interface RepositoryIndexing {
-  repository_path: string;
-  indexing_enabled: boolean;
-  branches: string[];
-  indexing_status?: unknown;
 }

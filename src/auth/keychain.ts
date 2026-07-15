@@ -1,6 +1,6 @@
 /**
  * Keychain access — the ONLY module that imports expo-secure-store (spec §8.1, §10.1).
- * Stores: devin_api_key, devin_org_id, attribution_user_id, auth_kind.
+ * Stores Cloud credentials plus the encrypted-at-rest paired-computer registry.
  * Accessibility: WHEN_UNLOCKED_THIS_DEVICE_ONLY (spec §10.1) — not in iCloud/backup.
  */
 
@@ -24,13 +24,23 @@ export async function deleteSecret(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(key);
 }
 
+export async function wipeCloudSecrets(): Promise<void> {
+  const keys = [
+    branding.keychain.apiKey,
+    branding.keychain.orgId,
+    branding.keychain.attributionUserId,
+    branding.keychain.authKind,
+  ];
+  await Promise.all(keys.map((key) => deleteSecret(key)));
+}
+
 /**
- * Wipe ALL keychain entries for DevinX (spec §10.5).
+ * Wipe ALL Keychain entries for DevinX (spec §10.5).
  * Called on disconnect. The §10.5 gate test asserts this leaves nothing.
  */
 export async function wipeAllSecrets(): Promise<void> {
   const keys = Object.values(branding.keychain);
-  await Promise.all(keys.map((k) => deleteSecret(k).catch(() => {})));
+  await Promise.all(keys.map((key) => deleteSecret(key)));
 }
 
 /**

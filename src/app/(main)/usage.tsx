@@ -6,15 +6,27 @@
  * returns data (it's enterprise-billing-scoped and empty for self-serve orgs).
  */
 import { useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as WebBrowser from 'expo-web-browser';
-import { useDailyConsumption, useOrgMetrics, type OrgMetricsBundle } from '@api/devin/queries';
+import {
+  useBillingLimits,
+  useDailyConsumption,
+  useOrgMetrics,
+  type OrgMetricsBundle,
+} from '@api/devin/queries';
 import { ApiError } from '@api/devin/client';
+import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
-import type { DailyConsumptionResponse } from '@api/devin/types';
+import type { ConsumptionCycle, DailyConsumptionResponse, DevinAcuLimit } from '@api/devin/types';
 
 type Tab = 'overview' | 'sessions' | 'reviews' | 'automations';
 
@@ -51,10 +63,22 @@ function Distribution({ data }: { data: Record<string, number> }) {
   const total = entries.reduce((sum, [, v]) => sum + v, 0);
   if (total === 0) return <Text className="text-text-low text-text12">No data in this range.</Text>;
   const sizeColors: Record<string, string> = {
-    xs: tokens.brand.hex, s: tokens.finished.hex, m: tokens.chartAmber.hex, l: tokens.blocked.hex, xl: tokens.failed.hex,
+    xs: tokens.brand.hex,
+    s: tokens.finished.hex,
+    m: tokens.chartAmber.hex,
+    l: tokens.blocked.hex,
+    xl: tokens.failed.hex,
   };
-  const palette = [tokens.brand.hex, tokens.finished.hex, tokens.merged.hex, tokens.blocked.hex, tokens.chartAmber.hex, tokens.failed.hex];
-  const color = (k: string, i: number) => sizeColors[k] ?? palette[i % palette.length] ?? tokens.brand.hex;
+  const palette = [
+    tokens.brand.hex,
+    tokens.finished.hex,
+    tokens.merged.hex,
+    tokens.blocked.hex,
+    tokens.chartAmber.hex,
+    tokens.failed.hex,
+  ];
+  const color = (k: string, i: number) =>
+    sizeColors[k] ?? palette[i % palette.length] ?? tokens.brand.hex;
   return (
     <View>
       <View className="flex-row h-2.5 rounded-chip overflow-hidden mb-2">
@@ -64,7 +88,10 @@ function Distribution({ data }: { data: Record<string, number> }) {
       </View>
       {entries.map(([k, v], i) => (
         <View key={k} className="flex-row items-center py-1">
-          <View className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: color(k, i) }} />
+          <View
+            className="w-2.5 h-2.5 rounded-full mr-2"
+            style={{ backgroundColor: color(k, i) }}
+          />
           <Text className="text-text-mid text-text13 flex-1">{k.replace(/_/g, ' ')}</Text>
           <Text className="text-text-hi text-text13">{v}</Text>
           <Text className="text-text-low text-text12 ml-2">({Math.round((v / total) * 100)}%)</Text>
@@ -97,9 +124,11 @@ export default function UsageScreen() {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('overview');
   const metrics = useOrgMetrics(30);
-  const { data: daily } = useDailyConsumption(30);
+  const { data: daily } = useDailyConsumption(45);
+  const billing = useBillingLimits();
 
-  const isPermissionError = metrics.error instanceof ApiError && metrics.error.code === 'permission';
+  const isPermissionError =
+    metrics.error instanceof ApiError && metrics.error.code === 'permission';
   const bundle = metrics.data;
 
   return (
@@ -126,7 +155,9 @@ export default function UsageScreen() {
             className={`px-3 py-2.5 ${tab === key ? 'border-b-2 border-brand' : ''}`}
             onPress={() => setTab(key)}
           >
-            <Text className={`text-text13 ${tab === key ? 'text-brand-text font-medium' : 'text-text-mid'}`}>
+            <Text
+              className={`text-text13 ${tab === key ? 'text-brand-text font-medium' : 'text-text-mid'}`}
+            >
               {label}
             </Text>
           </Pressable>
@@ -151,7 +182,9 @@ export default function UsageScreen() {
       {metrics.error && !isPermissionError && !bundle && (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-failed text-text14 mb-2">Could not load usage data</Text>
-          <Text className="text-text-mid text-text13 text-center mb-4">{metrics.error.message}</Text>
+          <Text className="text-text-mid text-text13 text-center mb-4">
+            {userFacingError(metrics.error, 'Usage data is unavailable right now.')}
+          </Text>
           <Pressable
             className="bg-tint-secondary rounded-button px-buttonPrimaryX py-buttonPrimaryY"
             onPress={() => metrics.refetch()}
@@ -162,25 +195,57 @@ export default function UsageScreen() {
       )}
 
       {bundle && (
-        <ScrollView className="flex-1 px-4 py-4" contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-          {tab === 'overview' && <OverviewTab bundle={bundle} daily={daily} />}
+        <ScrollView
+          className="flex-1 px-4 py-4"
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        >
+          {tab === 'overview' && (
+            <OverviewTab
+              bundle={bundle}
+              daily={daily}
+              billing={billing.data}
+              billingPermissionDenied={
+                billing.error instanceof ApiError && billing.error.code === 'permission'
+              }
+              billingFailed={!!billing.error}
+              billingLoading={billing.isLoading}
+            />
+          )}
           {tab === 'sessions' && <SessionsTab bundle={bundle} />}
           {tab === 'reviews' && <ReviewsTab bundle={bundle} />}
-          {tab === 'automations' && <AutomationsTab bundle={bundle} onManage={() => router.push('/(main)/automations')} />}
+          {tab === 'automations' && (
+            <AutomationsTab bundle={bundle} onManage={() => router.push('/(main)/automations')} />
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
   );
 }
 
-function OverviewTab({ bundle, daily }: { bundle: OrgMetricsBundle; daily?: DailyConsumptionResponse[] }) {
+function OverviewTab({
+  bundle,
+  daily,
+  billing,
+  billingPermissionDenied,
+  billingFailed,
+  billingLoading,
+}: {
+  bundle: OrgMetricsBundle;
+  daily?: DailyConsumptionResponse[];
+  billing?: { currentCycle?: ConsumptionCycle; orgLimit?: DevinAcuLimit };
+  billingPermissionDenied: boolean;
+  billingFailed: boolean;
+  billingLoading: boolean;
+}) {
   const s = bundle.sessions;
   const totalAcu = s.avg_acus_per_session * s.sessions_created_count;
   const hasDaily = !!daily && daily.length > 0;
   return (
     <>
       <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
-        <Text className="text-text-low text-text12 font-medium uppercase mb-3">ACU consumption · last 30 days</Text>
+        <Text className="text-text-low text-text12 font-medium uppercase mb-3">
+          ACU consumption · last 30 days
+        </Text>
         <StatGrid
           items={[
             { label: 'Total ACU', value: formatAcu(totalAcu) },
@@ -192,7 +257,13 @@ function OverviewTab({ bundle, daily }: { bundle: OrgMetricsBundle; daily?: Dail
       </View>
       {hasDaily && <ConsumptionChart data={daily} />}
       {hasDaily && <ConsumptionSummary data={daily} />}
-      <PlanAndQuotas />
+      <PlanAndQuotas
+        daily={daily}
+        billing={billing}
+        permissionDenied={billingPermissionDenied}
+        failed={billingFailed}
+        loading={billingLoading}
+      />
     </>
   );
 }
@@ -202,7 +273,9 @@ function SessionsTab({ bundle }: { bundle: OrgMetricsBundle }) {
   return (
     <>
       <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
-        <Text className="text-text-low text-text12 font-medium uppercase mb-3">Sessions · last 30 days</Text>
+        <Text className="text-text-low text-text12 font-medium uppercase mb-3">
+          Sessions · last 30 days
+        </Text>
         <StatGrid
           items={[
             { label: 'Created', value: String(s.sessions_created_count) },
@@ -232,7 +305,9 @@ function ReviewsTab({ bundle }: { bundle: OrgMetricsBundle }) {
   return (
     <>
       <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
-        <Text className="text-text-low text-text12 font-medium uppercase mb-3">Pull requests · last 30 days</Text>
+        <Text className="text-text-low text-text12 font-medium uppercase mb-3">
+          Pull requests · last 30 days
+        </Text>
         <StatGrid
           items={[
             { label: 'Created', value: String(created) },
@@ -243,7 +318,9 @@ function ReviewsTab({ bundle }: { bundle: OrgMetricsBundle }) {
         />
       </View>
       <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
-        <Text className="text-text-low text-text12 font-medium uppercase mb-3">Merged PRs by session size</Text>
+        <Text className="text-text-low text-text12 font-medium uppercase mb-3">
+          Merged PRs by session size
+        </Text>
         <Distribution data={bundle.sessions.sessions_with_merged_prs_by_size} />
       </View>
     </>
@@ -257,7 +334,9 @@ function AutomationsTab({ bundle, onManage }: { bundle: OrgMetricsBundle; onMana
   return (
     <>
       <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
-        <Text className="text-text-low text-text12 font-medium uppercase mb-3">Automations · last 30 days</Text>
+        <Text className="text-text-low text-text12 font-medium uppercase mb-3">
+          Automations · last 30 days
+        </Text>
         <StatGrid
           items={[
             { label: 'Automated sessions', value: String(automationSessions) },
@@ -284,34 +363,121 @@ function AutomationsTab({ bundle, onManage }: { bundle: OrgMetricsBundle; onMana
   );
 }
 
+function dateFromUnix(timestamp: number): string {
+  return new Date(timestamp * 1000).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function cycleConsumption(
+  daily: DailyConsumptionResponse[] | undefined,
+  cycle?: ConsumptionCycle,
+): number | undefined {
+  if (!daily || !cycle) return undefined;
+  const start = new Date(cycle.after * 1000).toISOString().slice(0, 10);
+  const end = new Date(cycle.before * 1000).toISOString().slice(0, 10);
+  return daily
+    .filter((day) => day.date >= start && day.date < end)
+    .reduce((total, day) => total + dayTotal(day), 0);
+}
+
 /**
- * Plan, quota, and on-demand balance aren't exposed by the public Devin API —
- * only ACU consumption is. Hand off to the web app's Usage & Limits page.
+ * Enterprise cycle and organization limits are rendered in-app when the
+ * connected service user has ManageBilling. Self-serve allowance and credit
+ * balance remain web-only because the Devin v3 API does not expose them.
  */
-function PlanAndQuotas() {
+function PlanAndQuotas({
+  daily,
+  billing,
+  permissionDenied,
+  failed,
+  loading,
+}: {
+  daily?: DailyConsumptionResponse[];
+  billing?: { currentCycle?: ConsumptionCycle; orgLimit?: DevinAcuLimit };
+  permissionDenied: boolean;
+  failed: boolean;
+  loading: boolean;
+}) {
   const { tokens } = useTheme();
+  const cycle = billing?.currentCycle;
+  const limit = billing?.orgLimit?.cycle_acu_limit;
+  const used = cycleConsumption(daily, cycle);
+  const remaining =
+    limit === undefined || used === undefined ? undefined : Math.max(0, limit - used);
   return (
-    <Pressable
-      className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4"
-      onPress={() => {
-        WebBrowser.openBrowserAsync('https://app.devin.ai/settings/usage-limits').catch(() => {});
-      }}
-      accessibilityRole="button"
-      accessibilityLabel="Plan and quotas (opens in browser)"
-    >
-      <View className="flex-row items-center">
+    <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
+      <View className="flex-row items-center mb-3">
         <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
           <Ionicons name="card-outline" size={15} color={tokens.brandText.hex} />
         </View>
         <View className="flex-1">
-          <Text className="text-text-hi text-text14">Plan, quotas & billing</Text>
+          <Text className="text-text-hi text-text14">Current cycle & limits</Text>
           <Text className="text-text-low text-text12 mt-0.5">
-            Daily/weekly quota and on-demand balance aren't exposed by the Devin API — manage them on the web.
+            Read directly from Devin when billing access is available.
           </Text>
         </View>
-        <Ionicons name="open-outline" size={15} color={tokens.textLow.hex} />
       </View>
-    </Pressable>
+
+      {cycle && (
+        <StatGrid
+          items={[
+            {
+              label: 'Cycle usage',
+              value: used === undefined ? 'Unavailable' : `${formatAcu(used)} ACU`,
+            },
+            {
+              label: 'Organization limit',
+              value: limit === undefined ? 'No cap set' : `${formatAcu(limit)} ACU`,
+            },
+            { label: 'Cycle starts', value: dateFromUnix(cycle.after) },
+            {
+              label: 'Remaining',
+              value:
+                limit === undefined
+                  ? 'Unlimited'
+                  : remaining === undefined
+                    ? 'Unavailable'
+                    : `${formatAcu(remaining)} ACU`,
+            },
+          ]}
+        />
+      )}
+
+      {!cycle && permissionDenied && (
+        <Text className="text-text-mid text-text13 mb-3">
+          The connected service user does not have enterprise ManageBilling access. Your in-app
+          activity analytics remain available above.
+        </Text>
+      )}
+      {!cycle && failed && !permissionDenied && (
+        <Text className="text-text-mid text-text13 mb-3">
+          Current billing-cycle details could not be loaded.
+        </Text>
+      )}
+      {!cycle && loading && (
+        <View className="flex-row items-center mb-3">
+          <ActivityIndicator size="small" color={tokens.brand.hex} />
+          <Text className="text-text-mid text-text13 ml-2">Loading billing-cycle details…</Text>
+        </View>
+      )}
+      {!cycle && !loading && !failed && (
+        <Text className="text-text-mid text-text13 mb-3">
+          No active enterprise billing cycle was returned for this account.
+        </Text>
+      )}
+
+      <Text className="text-text-low text-text12 mb-3">
+        The connected Devin v3 credential does not expose self-serve daily/weekly allowance or
+        on-demand credit balance.
+      </Text>
+      <Text className="text-text-low text-text12 border-t border-border-subtle pt-3">
+        DevinX leaves self-serve plan, invoice, credit-balance, and auto-reload changes unavailable
+        until Devin publishes a supported account-scoped management API.
+      </Text>
+    </View>
   );
 }
 
@@ -329,7 +495,9 @@ function ConsumptionChart({ data }: { data: DailyConsumptionResponse[] }) {
   return (
     <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
       <Text className="text-text-low text-text12 font-medium uppercase mb-1">ACU Consumption</Text>
-      <Text className="text-text-hi text-text17 mb-4">{formatAcu(totalAcu)} ACU · last {recent.length} days</Text>
+      <Text className="text-text-hi text-text17 mb-4">
+        {formatAcu(totalAcu)} ACU · last {recent.length} days
+      </Text>
 
       {/* Bar chart */}
       <View className="flex-row items-end justify-between" style={{ height: CHART_HEIGHT }}>
@@ -347,9 +515,7 @@ function ConsumptionChart({ data }: { data: DailyConsumptionResponse[] }) {
 
       {/* Date range */}
       <View className="flex-row justify-between mt-2">
-        <Text className="text-text-low text-text11">
-          {recent[0]?.date.slice(0, 10) ?? '—'}
-        </Text>
+        <Text className="text-text-low text-text11">{recent[0]?.date.slice(0, 10) ?? '—'}</Text>
         <Text className="text-text-low text-text11">
           {recent[recent.length - 1]?.date.slice(0, 10) ?? '—'}
         </Text>
@@ -358,7 +524,13 @@ function ConsumptionChart({ data }: { data: DailyConsumptionResponse[] }) {
   );
 }
 
-const PRODUCT_COLORS = ['text-brand-text', 'text-finished', 'text-blocked', 'text-merged', 'text-link'];
+const PRODUCT_COLORS = [
+  'text-brand-text',
+  'text-finished',
+  'text-blocked',
+  'text-merged',
+  'text-link',
+];
 
 function productLabel(key: string): string {
   const label = key.replace(/_/g, ' ');
@@ -381,7 +553,9 @@ function ConsumptionSummary({ data }: { data: DailyConsumptionResponse[] }) {
   if (rows.length === 0) {
     return (
       <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
-        <Text className="text-text-low text-text12 font-medium uppercase mb-2">By product (30 days)</Text>
+        <Text className="text-text-low text-text12 font-medium uppercase mb-2">
+          By product (30 days)
+        </Text>
         <Text className="text-text-mid text-text13">No per-product breakdown available.</Text>
       </View>
     );
@@ -389,9 +563,14 @@ function ConsumptionSummary({ data }: { data: DailyConsumptionResponse[] }) {
 
   return (
     <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
-      <Text className="text-text-low text-text12 font-medium uppercase mb-3">By product (30 days)</Text>
+      <Text className="text-text-low text-text12 font-medium uppercase mb-3">
+        By product (30 days)
+      </Text>
       {rows.map(([product, value], i) => (
-        <View key={product} className={`flex-row items-center py-2 ${i < rows.length - 1 ? 'border-b border-border-subtle' : ''}`}>
+        <View
+          key={product}
+          className={`flex-row items-center py-2 ${i < rows.length - 1 ? 'border-b border-border-subtle' : ''}`}
+        >
           <Text className="text-text-mid text-text13 flex-1">{productLabel(product)}</Text>
           <Text className={`text-text14 font-medium ${PRODUCT_COLORS[i % PRODUCT_COLORS.length]}`}>
             {formatAcu(value)} ACU

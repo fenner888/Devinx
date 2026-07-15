@@ -47,12 +47,9 @@ export function AttachmentPickerSheet({ visible, onClose, onPick }: AttachmentPi
         type: asset.mimeType ?? (asset.type === 'video' ? 'video/quicktime' : 'image/jpeg'),
         uri: asset.uri,
       });
-    } catch (error) {
+    } catch {
       onClose();
-      Alert.alert(
-        'Could not select media',
-        error instanceof Error ? error.message : 'Unknown error',
-      );
+      Alert.alert('Could not select media', 'The selected media could not be opened.');
     }
   }
 
@@ -71,12 +68,9 @@ export function AttachmentPickerSheet({ visible, onClose, onPick }: AttachmentPi
         type: asset.mimeType ?? 'application/octet-stream',
         uri: asset.uri,
       });
-    } catch (error) {
+    } catch {
       onClose();
-      Alert.alert(
-        'Could not select file',
-        error instanceof Error ? error.message : 'Unknown error',
-      );
+      Alert.alert('Could not select file', 'The selected file could not be opened.');
     }
   }
 

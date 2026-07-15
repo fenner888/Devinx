@@ -3,7 +3,7 @@
  * Uses mocked secure-store + mocked sqlite.
  */
 
-import { wipeAllSecrets, hasCredentials } from '../../src/auth/keychain';
+import { wipeAllSecrets, wipeCloudSecrets, hasCredentials } from '../../src/auth/keychain';
 import { purgeCache, cacheIsEmpty } from '../../src/cache';
 
 // Mock expo-secure-store
@@ -50,6 +50,7 @@ describe('disconnect wipe (§10.5 gate)', () => {
     await SecureStore.setItemAsync('devin_api_key', 'cog_test123456789012');
     await SecureStore.setItemAsync('devin_org_id', 'org-test123456789012');
     await SecureStore.setItemAsync('auth_kind', 'service_user');
+    await SecureStore.setItemAsync('paired_computers_v1', '[{"paired":true}]');
     expect(await hasCredentials()).toBe(true);
 
     await wipeAllSecrets();
@@ -59,6 +60,19 @@ describe('disconnect wipe (§10.5 gate)', () => {
     expect(await SecureStore.getItemAsync('devin_org_id')).toBeNull();
     expect(await SecureStore.getItemAsync('auth_kind')).toBeNull();
     expect(await SecureStore.getItemAsync('attribution_user_id')).toBeNull();
+    expect(await SecureStore.getItemAsync('paired_computers_v1')).toBeNull();
+  });
+
+  it('can disconnect Cloud without deleting paired-computer credentials', async () => {
+    await SecureStore.setItemAsync('devin_api_key', 'cog_test123456789012');
+    await SecureStore.setItemAsync('devin_org_id', 'org-test123456789012');
+    await SecureStore.setItemAsync('paired_computers_v1', '[{"paired":true}]');
+
+    await wipeCloudSecrets();
+
+    expect(await SecureStore.getItemAsync('devin_api_key')).toBeNull();
+    expect(await SecureStore.getItemAsync('devin_org_id')).toBeNull();
+    expect(await SecureStore.getItemAsync('paired_computers_v1')).toBe('[{"paired":true}]');
   });
 
   it('purges the SQLite cache', async () => {

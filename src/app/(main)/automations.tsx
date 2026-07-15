@@ -18,12 +18,25 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSchedules, useCreateSchedule, useUpdateSchedule, useDeleteSchedule } from '@api/devin/queries';
+import {
+  useSchedules,
+  useCreateSchedule,
+  useUpdateSchedule,
+  useDeleteSchedule,
+  usePlaybooks,
+} from '@api/devin/queries';
 import { ErrorState, EmptyState } from '@components/Skeletons';
 import { hapticLight, hapticSuccess, hapticError, hapticWarning } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
+import { normalizeScheduleTags, validateScheduleTiming } from '@lib/schedule-validation';
+import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
-import type { ScheduleResponse } from '@api/devin/types';
+import type {
+  ScheduleAgent,
+  ScheduleNotifyOn,
+  ScheduleResponse,
+  ScheduleType,
+} from '@api/devin/types';
 
 const CRON_PRESETS: { label: string; cron: string }[] = [
   { label: 'Daily 9am', cron: '0 9 * * *' },
@@ -40,31 +53,55 @@ export default function AutomationsScreen() {
   const createSchedule = useCreateSchedule();
   const updateSchedule = useUpdateSchedule();
   const deleteSchedule = useDeleteSchedule();
+  const { data: playbooks } = usePlaybooks();
 
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
   const [cron, setCron] = useState('0 9 * * 1-5');
-  const [agent, setAgent] = useState<'devin' | 'data_analyst'>('devin');
+  const [scheduleType, setScheduleType] = useState<ScheduleType>('recurring');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [agent, setAgent] = useState<ScheduleAgent>('devin');
+  const [notifyOn, setNotifyOn] = useState<ScheduleNotifyOn>('failure');
+  const [playbookId, setPlaybookId] = useState<string | null>(null);
+  const [tags, setTags] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const timingError = validateScheduleTiming(scheduleType, cron, scheduledAt);
+  const canCreate =
+    !!name.trim() && !!prompt.trim() && !timingError && !createSchedule.isPending;
 
   function handleCreate() {
-    if (!name.trim() || !prompt.trim() || !cron.trim() || createSchedule.isPending) return;
+    if (!canCreate) return;
     setCreateError(null);
     createSchedule.mutate(
-      { name: name.trim(), prompt: prompt.trim(), schedule_type: 'recurring', frequency: cron.trim(), agent },
+      {
+        name: name.trim(),
+        prompt: prompt.trim(),
+        schedule_type: scheduleType,
+        frequency: scheduleType === 'recurring' ? cron.trim() : null,
+        scheduled_at: scheduleType === 'one_time' ? new Date(scheduledAt.trim()).toISOString() : null,
+        agent,
+        notify_on: notifyOn,
+        playbook_id: playbookId,
+        tags: normalizeScheduleTags(tags),
+      },
       {
         onSuccess: () => {
           hapticSuccess();
           setShowCreate(false);
           setName('');
           setPrompt('');
+          setScheduleType('recurring');
+          setScheduledAt('');
+          setNotifyOn('failure');
+          setPlaybookId(null);
+          setTags('');
         },
         onError: (e) => {
           hapticError();
-          setCreateError(e instanceof Error ? e.message : 'Could not create schedule.');
+          setCreateError(userFacingError(e, 'Could not create this automation.'));
         },
       },
     );
@@ -84,7 +121,12 @@ export default function AutomationsScreen() {
         onSettled: () => setPendingId(null),
         onError: (e) => {
           hapticError();
-          setActionError(`Could not ${target ? 'enable' : 'disable'} "${schedule.name}": ${e.message}`);
+          setActionError(
+            userFacingError(
+              e,
+              `Could not ${target ? 'enable' : 'disable'} "${schedule.name}".`,
+            ),
+          );
         },
       },
     );
@@ -103,7 +145,7 @@ export default function AutomationsScreen() {
         deleteSchedule.mutate(schedule.schedule_id, {
           onError: (e) => {
             hapticError();
-            setActionError(`Could not delete "${schedule.name}": ${e.message}`);
+            setActionError(userFacingError(e, `Could not delete "${schedule.name}".`));
           },
         }),
     );
@@ -143,7 +185,7 @@ export default function AutomationsScreen() {
       {error && !schedules && (
         <ErrorState
           title="Could not load automations"
-          message={error.message}
+          message={userFacingError(error, 'Automations are unavailable right now.')}
           onRetry={() => refetch()}
         />
       )}
@@ -213,6 +255,16 @@ export default function AutomationsScreen() {
                   <Ionicons name="trash-outline" size={15} color={tokens.failed.hex} />
                 </Pressable>
               </View>
+              <Text className="text-text-low text-text12 mt-1" numberOfLines={1}>
+                {s.agent === 'data_analyst'
+                  ? 'Data Analyst'
+                  : s.agent === 'advanced'
+                    ? 'Advanced'
+                    : 'Devin'}{' '}
+                · Notify {s.notify_on ?? 'failure'}
+                {s.playbook?.title ? ` · ${s.playbook.title}` : ''}
+                {s.tags?.length ? ` · ${s.tags.join(', ')}` : ''}
+              </Text>
               {s.last_error_message && (
                 <View className="flex-row items-start bg-tint-red rounded-card px-3 py-2 mt-2">
                   <Ionicons name="alert-circle-outline" size={13} color={tokens.failed.hex} />
@@ -238,6 +290,9 @@ export default function AutomationsScreen() {
                     setShowCreate(false);
                     setCreateError(null);
                   }}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close new automation"
                 >
                   <Ionicons name="close" size={18} color={tokens.textMid.hex} />
                 </Pressable>
@@ -284,25 +339,119 @@ export default function AutomationsScreen() {
                 ))}
               </View>
 
-              <Text className="text-text-low text-text12 font-medium uppercase mb-1">Schedule (cron, UTC)</Text>
-              <View className="flex-row flex-wrap mb-2">
-                {CRON_PRESETS.map((p) => (
+              <Text className="text-text-low text-text12 font-medium uppercase mb-1">Run</Text>
+              <View className="flex-row bg-tint-secondary rounded-button p-1 mb-3">
+                {(
+                  [
+                    { key: 'recurring', label: 'Recurring' },
+                    { key: 'one_time', label: 'One time' },
+                  ] as const
+                ).map(({ key, label }) => (
                   <Pressable
-                    key={p.cron}
-                    className={`rounded-chip px-pillX py-pillY mr-2 mb-2 ${cron === p.cron ? 'bg-brand' : 'bg-tint-secondary'}`}
-                    onPress={() => setCron(p.cron)}
+                    key={key}
+                    className={`flex-1 rounded-button py-2 ${scheduleType === key ? 'bg-surface1' : ''}`}
+                    onPress={() => setScheduleType(key)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: scheduleType === key }}
                   >
-                    <Text className={`text-text12 ${cron === p.cron ? 'text-text-always-white' : 'text-text-mid'}`}>
-                      {p.label}
+                    <Text className={`text-center text-text13 ${scheduleType === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}>
+                      {label}
                     </Text>
                   </Pressable>
                 ))}
               </View>
+
+              {scheduleType === 'recurring' ? (
+                <>
+                  <Text className="text-text-low text-text12 font-medium uppercase mb-1">Schedule (cron, UTC)</Text>
+                  <View className="flex-row flex-wrap mb-2">
+                    {CRON_PRESETS.map((p) => (
+                      <Pressable
+                        key={p.cron}
+                        className={`rounded-chip px-pillX py-pillY mr-2 mb-2 ${cron === p.cron ? 'bg-brand' : 'bg-tint-secondary'}`}
+                        onPress={() => setCron(p.cron)}
+                      >
+                        <Text className={`text-text12 ${cron === p.cron ? 'text-text-always-white' : 'text-text-mid'}`}>
+                          {p.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <TextInput
+                    className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi font-mono mb-3"
+                    value={cron}
+                    onChangeText={setCron}
+                    placeholder="0 9 * * 1-5"
+                    placeholderTextColor={tokens.textLow.hex}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text className="text-text-low text-text12 font-medium uppercase mb-1">Date and time (ISO 8601)</Text>
+                  <TextInput
+                    className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi font-mono mb-1"
+                    value={scheduledAt}
+                    onChangeText={setScheduledAt}
+                    placeholder="2026-07-14T13:00:00-04:00"
+                    placeholderTextColor={tokens.textLow.hex}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              )}
+              {timingError && (
+                <Text className="text-failed text-text12 mb-3">{timingError}</Text>
+              )}
+
+              <Text className="text-text-low text-text12 font-medium uppercase mb-1">Notify</Text>
+              <View className="flex-row flex-wrap mb-2">
+                {(['failure', 'always', 'never'] as ScheduleNotifyOn[]).map((value) => (
+                  <Pressable
+                    key={value}
+                    className={`rounded-chip px-3 py-2 mr-2 mb-2 ${notifyOn === value ? 'bg-brand' : 'bg-tint-secondary'}`}
+                    onPress={() => setNotifyOn(value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: notifyOn === value }}
+                  >
+                    <Text className={`text-text12 capitalize ${notifyOn === value ? 'text-text-always-white' : 'text-text-mid'}`}>
+                      {value}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {playbooks && playbooks.length > 0 && (
+                <>
+                  <Text className="text-text-low text-text12 font-medium uppercase mb-1">Playbook (optional)</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
+                    {[{ playbook_id: null, title: 'None' }, ...playbooks].map((playbook) => {
+                      const selected = playbookId === playbook.playbook_id;
+                      return (
+                        <Pressable
+                          key={playbook.playbook_id ?? 'none'}
+                          className={`rounded-chip px-3 py-2 mr-2 ${selected ? 'bg-brand' : 'bg-surface1'}`}
+                          onPress={() => setPlaybookId(playbook.playbook_id)}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected }}
+                        >
+                          <Text className={`text-text12 ${selected ? 'text-text-always-white' : 'text-text-mid'}`}>
+                            {playbook.title}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              )}
+
+              <Text className="text-text-low text-text12 font-medium uppercase mb-1">Tags (optional)</Text>
               <TextInput
-                className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi font-mono mb-3"
-                value={cron}
-                onChangeText={setCron}
-                placeholder="0 9 * * 1-5"
+                className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-3"
+                value={tags}
+                onChangeText={setTags}
+                placeholder="security, weekly"
                 placeholderTextColor={tokens.textLow.hex}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -316,14 +465,14 @@ export default function AutomationsScreen() {
               )}
 
               <Pressable
-                className={`rounded-button py-3 items-center mb-2 ${name.trim() && prompt.trim() && cron.trim() ? 'bg-brand' : 'bg-tint-secondary'}`}
-                disabled={!name.trim() || !prompt.trim() || !cron.trim() || createSchedule.isPending}
+                className={`rounded-button py-3 items-center mb-2 ${canCreate ? 'bg-brand' : 'bg-tint-secondary'}`}
+                disabled={!canCreate}
                 onPress={handleCreate}
               >
                 {createSchedule.isPending ? (
                   <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
                 ) : (
-                  <Text className={`text-text14 font-medium ${name.trim() && prompt.trim() && cron.trim() ? 'text-text-always-white' : 'text-text-low'}`}>
+                  <Text className={`text-text14 font-medium ${canCreate ? 'text-text-always-white' : 'text-text-low'}`}>
                     Create automation
                   </Text>
                 )}

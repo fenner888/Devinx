@@ -4,7 +4,8 @@
  *
  * Boundary validation rule (spec §8.3): every API response parses through
  * these schemas. Unknown fields PASS THROUGH (API evolves monthly); missing
- * REQUIRED fields fail closed with a typed `ApiSchemaError` logged to Sentry.
+ * REQUIRED fields fail closed with a typed `ApiSchemaError` passed through the
+ * local diagnostic boundary without logging user data.
  *
  * The `.passthrough()` on object schemas enforces the "unknown fields ok"
  * rule. Required fields are non-optional; optional fields use `.nullish()`.
@@ -84,7 +85,7 @@ export const sessionCategorySchema = z.enum([
   'unit_test_generation',
 ]);
 
-export const devinModeSchema = z.enum(['normal', 'fast', 'lite', 'ultra', 'fusion']);
+export const devinModeSchema = z.enum(['normal', 'fast']);
 export const sessionSizeSchema = z.enum(['xs', 's', 'm', 'l', 'xl']);
 export const insightSeveritySchema = z.enum(['low', 'medium', 'high', 'critical']);
 export const secretTypeSchema = z.enum(['cookie', 'key-value', 'totp']);
@@ -197,9 +198,9 @@ export const sessionResponseSchema = z
     // Web-app-only enrichment fields (best-effort, all optional).
     latest_status_contents: z
       .object({
-        enum: z.string().optional(),
-        reason: z.string().optional(),
-        user_action_required: z.string().optional(),
+        enum: z.string().max(80).optional(),
+        reason: z.string().max(500).optional(),
+        user_action_required: z.string().max(500).optional(),
       })
       .nullable()
       .optional(),
@@ -207,8 +208,8 @@ export const sessionResponseSchema = z
     latest_permission_contents: z
       .object({
         type: z.string().optional(),
-        tool_name: z.string().optional(),
-        permission_type: z.string().optional(),
+        tool_name: z.string().max(160).optional(),
+        permission_type: z.string().max(160).optional(),
       })
       .nullable()
       .optional(),
@@ -418,6 +419,23 @@ export const knowledgeNoteResponseSchema = z
 
 export const knowledgeNoteListResponseSchema = paginatedResponseSchema(knowledgeNoteResponseSchema);
 
+export const knowledgeFolderSummarySchema = z
+  .object({
+    folder_id: z.string(),
+    name: z.string(),
+    note_count: z.number().int().nonnegative(),
+    parent_folder_id: z.string().nullable(),
+    path: z.string(),
+  })
+  .passthrough();
+
+export const knowledgeFolderTreeSchema = z
+  .object({
+    folders: z.array(knowledgeFolderSummarySchema),
+    root_note_count: z.number().int().nonnegative(),
+  })
+  .passthrough();
+
 // The real SecretResponse has no org_id; keep metadata optional.
 export const secretResponseSchema = z
   .object({
@@ -492,14 +510,22 @@ export const consumptionResponseSchema = z
 
 export const consumptionCycleSchema = z
   .object({
-    start: unixTimestampSchema,
-    end: unixTimestampSchema,
-    acus: acuCountSchema,
-    org_id: z.string().optional(),
+    after: unixTimestampSchema,
+    before: unixTimestampSchema,
   })
   .passthrough();
 
 export const consumptionCycleListResponseSchema = paginatedResponseSchema(consumptionCycleSchema);
+
+export const devinAcuLimitSchema = z
+  .object({
+    cycle_acu_limit: acuCountSchema,
+    org_id: z.string().optional(),
+    user_id: z.string().optional(),
+  })
+  .passthrough();
+
+export const devinAcuLimitListResponseSchema = paginatedResponseSchema(devinAcuLimitSchema);
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -530,8 +556,11 @@ export const scheduleResponseSchema = z
     schedule_type: z.enum(['recurring', 'one_time']).catch('recurring'),
     frequency: z.string().nullable().optional(),
     scheduled_at: z.string().nullable().optional(),
+    // The docs currently mention an advanced agent in prose while the request/response
+    // enum tables omit it. Preserve unknown read values without offering unsupported writes.
     agent: z.string().optional(),
-    notify_on: z.string().optional(),
+    notify_on: z.enum(['always', 'failure', 'never']).optional(),
+    playbook: z.object({ playbook_id: z.string(), title: z.string() }).nullable().optional(),
     consecutive_failures: z.number().optional(),
     last_executed_at: z.string().nullable().optional(),
     last_error_message: z.string().nullable().optional(),
@@ -562,60 +591,91 @@ export const prReviewResponseSchema = z
   .passthrough();
 
 // ---------------------------------------------------------------------------
-// Code scans (Devin Security — enterprise-scoped)
-// ---------------------------------------------------------------------------
-
-export const codeScanFindingSchema = z
-  .object({
-    finding_id: z.string(),
-    scan_id: z.string(),
-    title: z.string().nullable(),
-    description: z.string().nullable().optional(),
-    recommendation: z.string().nullable().optional(),
-    severity: z.enum(['critical', 'high', 'medium', 'low']).catch('medium'),
-    status: z.enum(['open', 'dismissed', 'resolved']).catch('open'),
-    category: z.string().nullable().optional(),
-    repo_name: z.string(),
-    pr_url: z.string().nullable().optional(),
-    session_id: z.string().nullable().optional(),
-    created_at: z.number().optional(),
-  })
-  .passthrough();
-
-export const codeScanFindingListResponseSchema = paginatedResponseSchema(codeScanFindingSchema);
-
-// ---------------------------------------------------------------------------
 // Resource management requests (outbound validation)
 // ---------------------------------------------------------------------------
 
 export const knowledgeNoteCreateRequestSchema = z
   .object({
-    name: z.string().min(1),
-    body: z.string().min(1),
-    trigger: z.string().min(1),
-    folder_id: z.string().nullable().optional(),
+    name: z.string().trim().min(1).max(200),
+    body: z.string().trim().min(1).max(100_000),
+    trigger: z.string().trim().min(1).max(5_000),
+    folder_id: z.string().min(1).max(256).nullable().optional(),
     is_enabled: z.boolean().optional(),
-    pinned_repo: z.string().nullable().optional(),
+    pinned_repo: z.string().min(1).max(1_024).nullable().optional(),
   })
-  .passthrough();
+  .strict();
+
+export const knowledgeNoteUpdateRequestSchema = knowledgeNoteCreateRequestSchema
+  .partial()
+  .refine((body) => Object.keys(body).length > 0, { message: 'update is empty' });
 
 export const playbookCreateRequestSchema = z
   .object({
-    title: z.string().min(1),
-    body: z.string().min(1),
-    macro: z.string().nullable().optional(),
+    title: z.string().trim().min(1).max(200),
+    body: z.string().trim().min(1).max(100_000),
+    macro: z
+      .string()
+      .regex(/^![A-Za-z0-9_-]+$/)
+      .max(100)
+      .nullable()
+      .optional(),
   })
-  .passthrough();
+  .strict();
+
+export const playbookUpdateRequestSchema = playbookCreateRequestSchema
+  .partial()
+  .refine((body) => Object.keys(body).length > 0, { message: 'update is empty' });
 
 export const secretCreateRequestSchema = z
   .object({
     type: secretTypeSchema,
-    key: z.string().min(1).max(256),
-    value: z.string().min(1),
-    note: z.string().nullable().optional(),
+    key: z.string().trim().min(1).max(256),
+    value: z.string().min(1).max(100_000),
+    note: z.string().max(2_000).nullable().optional(),
     is_sensitive: z.boolean().optional(),
   })
-  .passthrough();
+  .strict();
+
+export const resourceIdSchema = z
+  .string()
+  .min(1)
+  .max(256)
+  .regex(/^[A-Za-z0-9._:-]+$/);
+
+const scheduleWriteFieldsSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    prompt: z.string().trim().min(1).max(10_000).optional(),
+    enabled: z.boolean().optional(),
+    schedule_type: z.enum(['recurring', 'one_time']).optional(),
+    frequency: z.string().trim().min(1).max(256).nullable().optional(),
+    scheduled_at: z.string().datetime({ offset: true }).nullable().optional(),
+    tags: z.array(z.string().trim().min(1).max(100)).max(50).nullable().optional(),
+    playbook_id: resourceIdSchema.nullable().optional(),
+    notify_on: z.enum(['always', 'failure', 'never']).optional(),
+    agent: z.enum(['devin', 'data_analyst']).nullable().optional(),
+  })
+  .strict();
+
+export const scheduleCreateRequestSchema = scheduleWriteFieldsSchema
+  .extend({
+    name: z.string().trim().min(1).max(100),
+    prompt: z.string().trim().min(1).max(10_000),
+  })
+  .superRefine((body, context) => {
+    const type = body.schedule_type ?? 'recurring';
+    if (type === 'recurring' && !body.frequency) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'frequency is required' });
+    }
+    if (type === 'one_time' && !body.scheduled_at) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'scheduled_at is required' });
+    }
+  });
+
+export const scheduleUpdateRequestSchema = scheduleWriteFieldsSchema.refine(
+  (body) => Object.keys(body).length > 0,
+  { message: 'update is empty' },
+);
 
 // ---------------------------------------------------------------------------
 // Org metrics (Analytics)
@@ -677,6 +737,24 @@ export const activeUsersResponseSchema = z.union([
 // Repositories (v3beta1)
 // ---------------------------------------------------------------------------
 
+const repositoryIndexJobSchema = z
+  .object({
+    branch_name: z.string(),
+    commit: z.string(),
+    created_at: z.union([z.number(), z.string()]),
+    job_id: z.string(),
+  })
+  .passthrough();
+
+const repositoryIndexingStatusSchema = z
+  .object({
+    indexing_enabled: z.boolean().optional().default(false),
+    latest_completed_search_index_job: repositoryIndexJobSchema.nullable().optional(),
+    latest_completed_wiki_index_job: repositoryIndexJobSchema.nullable().optional(),
+    latest_indexes: z.array(repositoryIndexJobSchema).optional().default([]),
+  })
+  .passthrough();
+
 export const repositoryResponseSchema = z
   .object({
     provider_repository_id: z.string(),
@@ -687,16 +765,14 @@ export const repositoryResponseSchema = z
     repo_description: z.string().nullable().optional(),
     repo_language: z.string().nullable().optional(),
     last_updated_at: z.union([z.string(), z.number()]).nullable().optional(),
-    // Contract types this as an object (RepoIndexingStatusResponse) | null,
-    // not a string — accept anything so indexed repos aren't dropped.
-    indexing_status: z.unknown().optional(),
+    indexing_status: repositoryIndexingStatusSchema.nullable().optional(),
   })
   .passthrough();
 
 export const repositoryListResponseSchema = paginatedResponseSchema(repositoryResponseSchema);
 
 // ---------------------------------------------------------------------------
-// Self / identity + repository indexing
+// Self / identity
 // ---------------------------------------------------------------------------
 
 export const selfResponseSchema = z
@@ -710,14 +786,3 @@ export const selfResponseSchema = z
     api_key_name: z.string().optional(),
   })
   .passthrough();
-
-export const repositoryIndexingSchema = z
-  .object({
-    repository_path: z.string(),
-    indexing_enabled: z.boolean().optional().default(false),
-    branches: z.array(z.string()).optional().default([]),
-    indexing_status: z.unknown().optional(),
-  })
-  .passthrough();
-
-export const repositoryIndexingListSchema = paginatedResponseSchema(repositoryIndexingSchema);

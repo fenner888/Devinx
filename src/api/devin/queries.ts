@@ -17,10 +17,13 @@ import {
   createSession,
   listPlaybooks,
   listKnowledge,
+  listKnowledgeFolders,
   listSecrets,
   archiveSession,
   terminateSession,
   getDailyConsumption,
+  listConsumptionCycles,
+  listDevinAcuLimits,
   getInsights,
   generateInsights,
   replaceTags,
@@ -31,8 +34,6 @@ import {
   deleteSchedule,
   triggerPrReview,
   getPrReview,
-  listCodeScanFindings,
-  remediateFinding,
   createKnowledgeNote,
   updateKnowledgeNote,
   deleteKnowledgeNote,
@@ -48,8 +49,6 @@ import {
   listRepositories,
   getSelf,
   getSessionConsumption,
-  listIndexedRepositories,
-  indexRepository,
 } from './endpoints';
 import { queryKeys } from './queryKeys';
 import {
@@ -315,6 +314,21 @@ export function useKnowledge() {
   });
 }
 
+export function useKnowledgeFolders() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.knowledgeFolders,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      return listKnowledgeFolders(provider);
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
 async function reconcileAmbiguousSessionCreate(
   provider: AuthProvider,
   body: SessionCreateRequest,
@@ -379,6 +393,30 @@ export function useDailyConsumption(rangeDays = 30) {
         time_after: now - rangeDays * 86_400,
         time_before: now,
       });
+    },
+    enabled: isAuthenticated && !!provider,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: shouldRetryQuery,
+  });
+}
+
+export function useBillingLimits() {
+  const { provider, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.billingLimits,
+    queryFn: async () => {
+      if (!provider) throw new Error('Not authenticated');
+      const orgId = (await provider.orgPath()).replace('/v3/organizations/', '');
+      const [cycles, limits] = await Promise.all([
+        listConsumptionCycles(provider),
+        listDevinAcuLimits(provider),
+      ]);
+      const now = Math.floor(Date.now() / 1000);
+      return {
+        currentCycle: cycles.find((cycle) => cycle.after <= now && cycle.before > now),
+        orgLimit: limits.find((limit) => limit.org_id === orgId),
+      };
     },
     enabled: isAuthenticated && !!provider,
     staleTime: 5 * 60_000,
@@ -591,45 +629,6 @@ export function useTriggerPrReview() {
 }
 
 // ---------------------------------------------------------------------------
-// Code scans (Devin Security — enterprise-scoped)
-// ---------------------------------------------------------------------------
-
-export function useCodeScanFindings() {
-  const { provider, isAuthenticated } = useAuth();
-  return useQuery({
-    queryKey: queryKeys.codeScanFindings,
-    queryFn: async () => {
-      if (!provider) throw new Error('Not authenticated');
-      return listCodeScanFindings(provider);
-    },
-    enabled: isAuthenticated && !!provider,
-    staleTime: 5 * 60_000,
-    // This query doubles as the enterprise-access probe for the Security nav
-    // item. For org-level keys it always 403s — without these flags the
-    // failed probe refires on every home mount/focus. Pull-to-refresh on the
-    // Security screen still refetches manually.
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    retry: shouldRetryQuery,
-  });
-}
-
-export function useRemediateFinding() {
-  const queryClient = useQueryClient();
-  const { provider } = useAuth();
-  return useMutation({
-    mutationFn: async (params: { scanId: string; findingId: string }) => {
-      if (!provider) throw new Error('Not authenticated');
-      await remediateFinding(provider, params.scanId, params.findingId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.codeScanFindings });
-      queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Resource management (Knowledge / Playbooks / Secrets)
 // ---------------------------------------------------------------------------
 
@@ -641,7 +640,10 @@ export function useCreateKnowledgeNote() {
       if (!provider) throw new Error('Not authenticated');
       return createKnowledgeNote(provider, body);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge });
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeFolders });
+    },
   });
 }
 
@@ -653,7 +655,10 @@ export function useUpdateKnowledgeNote() {
       if (!provider) throw new Error('Not authenticated');
       return updateKnowledgeNote(provider, params.noteId, params.body);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge });
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeFolders });
+    },
   });
 }
 
@@ -665,7 +670,10 @@ export function useDeleteKnowledgeNote() {
       if (!provider) throw new Error('Not authenticated');
       await deleteKnowledgeNote(provider, noteId);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledge }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge });
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeFolders });
+    },
   });
 }
 
@@ -822,35 +830,5 @@ export function useSessionConsumption(sessionId: string | undefined) {
     enabled: isAuthenticated && !!provider && !!sessionId,
     staleTime: 60_000,
     retry: shouldRetryQuery,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Repository indexing (v3beta1)
-// ---------------------------------------------------------------------------
-
-export function useIndexedRepositories() {
-  const { provider, isAuthenticated } = useAuth();
-  return useQuery({
-    queryKey: queryKeys.repoIndexing,
-    queryFn: async () => {
-      if (!provider) throw new Error('Not authenticated');
-      return listIndexedRepositories(provider);
-    },
-    enabled: isAuthenticated && !!provider,
-    staleTime: 5 * 60_000,
-    retry: shouldRetryQuery,
-  });
-}
-
-export function useIndexRepository() {
-  const queryClient = useQueryClient();
-  const { provider } = useAuth();
-  return useMutation({
-    mutationFn: async (params: { repoPath: string; branches?: string[] }) => {
-      if (!provider) throw new Error('Not authenticated');
-      return indexRepository(provider, params.repoPath, params.branches);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.repoIndexing }),
   });
 }

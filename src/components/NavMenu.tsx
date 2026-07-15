@@ -1,7 +1,7 @@
 /**
  * NavMenu — slide-over navigation panel (top-left menu), the pattern used by
  * Cursor / Perplexity / ChatGPT / Claude on mobile. Replaces a bottom tab bar.
- * Pure-ish UI: takes visibility + a Security gate flag; navigates via router.
+ * Pure navigation UI. Authorization remains enforced at each destination.
  */
 import { View, Text, Pressable, Modal, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,11 +21,9 @@ interface NavItem {
 export function NavMenu({
   visible,
   onClose,
-  showSecurity,
 }: {
   visible: boolean;
   onClose: () => void;
-  showSecurity: boolean;
 }) {
   const router = useRouter();
   const { name, tokens } = useTheme();
@@ -38,10 +36,8 @@ export function NavMenu({
     { icon: 'add', label: 'New session', route: '/(main)/compose' },
     { icon: 'chatbubbles-outline', label: 'Sessions', route: '/(main)/sessions' },
     { icon: 'time-outline', label: 'Automations', route: '/(main)/automations' },
+    { icon: 'shield-checkmark-outline', label: 'Security Work', route: '/(main)/security-work' },
     { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review' },
-    ...(showSecurity
-      ? [{ icon: 'shield-outline' as const, label: 'Security', route: '/(main)/security' as Href }]
-      : []),
   ];
 
   function go(route: Href) {

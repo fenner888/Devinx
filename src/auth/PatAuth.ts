@@ -6,9 +6,9 @@
  * No org ID needed (the token implies the org); no create_as_user_id needed.
  */
 
-import * as Sentry from '@sentry/react-native';
+import { captureDiagnostic } from '@lib/diagnostics';
 import { branding } from '@lib/branding';
-import { storeSecret, loadCredentials, wipeAllSecrets, type StoredCredentials } from './keychain';
+import { storeSecret, loadCredentials, wipeCloudSecrets, type StoredCredentials } from './keychain';
 import type { AuthProvider, ValidationResult } from './AuthProvider';
 
 let cached: StoredCredentials | null = null;
@@ -82,7 +82,7 @@ export class PatAuth implements AuthProvider {
       if (/timeout|abort|network/i.test(msg)) {
         return { ok: false, code: 'network', detail: 'Could not reach api.devin.ai.' };
       }
-      Sentry.captureException(e);
+      captureDiagnostic(e);
       return { ok: false, code: 'network', detail: msg };
     }
   }
@@ -90,5 +90,5 @@ export class PatAuth implements AuthProvider {
 
 export async function disconnectPat(): Promise<void> {
   cached = null;
-  await wipeAllSecrets();
+  await wipeCloudSecrets();
 }

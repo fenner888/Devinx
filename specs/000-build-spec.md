@@ -52,14 +52,16 @@ Devin Teams/Enterprise users (engineers, EMs, solo builders) who run multiple as
 - Payments: none (free app / pitch artifact)
 - Email: none
 - Storage: iOS Keychain via expo-secure-store; SQLite for read cache
-- Errors: Sentry (React Native SDK)
-- Analytics: PostHog (opt-in only, no session content ever)
+- Errors: local-only safe diagnostic boundary; no crash-reporting SDK in v1
+- Analytics: none in v1; any future opt-in analytics requires a separate privacy/security review
 - Phase 2: APNs via Expo Push + thin Vercel notifier
 
 **DATA CLASSIFICATION:**
 - **Public:** none
 - **Internal:** session titles, statuses, tags, message content (belongs to user's org; lives on device only, in memory + encrypted cache)
 - **Sensitive:** Devin API key / future PAT (Keychain only, never logged, never leaves device in v1), org ID, session secrets composer fields (never persisted)
+- **Sensitive (voice):** raw microphone audio exists only in memory or a protected temporary directory while transcription is active. It is deleted after finalization, never cached or backed up, and never leaves the device. Transcripts become ordinary prompt content and inherit every prompt-content rule in this specification. Vocabulary hints contain only non-secret cached names and a static developer vocabulary.
+- **Public artifacts:** optional on-device speech model files. They contain no user data and are excluded from iCloud backup.
 - **Regulated:** none directly; note that session content MAY contain user's proprietary code → treat all fetched content as sensitive-by-default
 
 **SECURITY FLAGS:**
@@ -79,7 +81,7 @@ Devin Teams/Enterprise users (engineers, EMs, solo builders) who run multiple as
 - Storage: expo-secure-store (secrets) + expo-sqlite (read cache)
 - Hosting: none for v1; Vercel for Phase 2 notifier
 - CI/CD: GitHub + GitHub Actions + EAS Build/Submit
-- Errors: Sentry; Analytics: PostHog (opt-in)
+- Errors: local-only diagnostics; Analytics: none in v1
 
 **CONSTRAINTS / DEADLINES:**
 - MVP TestFlight before CLTivate Devin meetup
@@ -93,7 +95,7 @@ Devin Teams/Enterprise users (engineers, EMs, solo builders) who run multiple as
 
 - Disclaimer is now load-bearing, not boilerplate. In-app (Settings → About), on the App Store listing, AND on the onboarding Welcome screen: *"DevinX is an independent, unofficial client for the Devin API. Not affiliated with, endorsed by, or a product of Cognition AI."*
 - App Store subtitle uses the unofficial-client framing explicitly: "Unofficial mission control for Devin sessions."
-- Do not use Cognition's logo, Devin's logomark, or their mascot anywhere. Extracted design tokens (colors/type) are aesthetic alignment; logos are trademark use. Hard line.
+- Do not use Cognition's logo, Devin's logomark, or their mascot as DevinX branding. Extracted design tokens (colors/type) are aesthetic alignment; logos are trademark use. Hard line. **Narrow model-picker exception:** a verified first-party provider/model mark may appear as a subordinate identifier beside a model returned by the live catalog, including Cognition's symbol for an SWE-family model. It must not create a model, change routing, be recolored or distorted, imply endorsement, or appear as DevinX product branding. Asset origin and scope must be recorded in `assets/model-marks/README.md`.
 - **Raise the name directly in the Cognition pitch conversation, early.** Best case: they bless it or suggest an alternative — either way the exposure resolves. If they push back, renaming is a one-file token/string change plus repo rename; the architecture never references the name.
 - App Store review note: Apple sometimes rejects apps with third-party trademarks in the name absent authorization. Have the fallback name ready BEFORE submission. Fallbacks: **Cockpit**, **Dispatch**, **Overwatch**.
 - Keep all name strings in a single constants file (`/src/lib/branding.ts`) so a rename is a one-line change. Deep link scheme `devinx://` also lives there.
@@ -119,8 +121,10 @@ Hermex = native iOS thin client → self-hosted bridge server (hermes-webui) →
 
 ### 2.2 Devin's Three Surfaces
 - **Devin Cloud** — hosted REST API at `api.devin.ai`. Full session lifecycle. **This is the v1 target.**
-- **Devin CLI** — local agent, no hosted API. The Hermex bridge pattern WOULD apply here (Phase 3, only if demand exists). Pragmatic v1 answer: the CLI's `/handoff` escalates local work to a cloud session, which DevinX then picks up. CLI coverage for free.
-- **Devin Desktop** (formerly Windsurf) — local IDE; only analytics API. Out of scope. Positioning line: "Desktop is the hands-on surface; DevinX is the async surface."
+- **Devin CLI** — local agent with a supported ACP JSON-RPC server over stdio (`devin acp`), machine-readable session listing, ATIF export, lifecycle hooks, and `/handoff`. Phase 3 adds a user-controlled Desktop Bridge that adapts this supported CLI surface to an authenticated mobile connection; it never scrapes CLI storage or private process state.
+- **Devin Desktop** (formerly Windsurf) — may install the `devin` CLI, but direct Desktop session access remains out of scope until Cognition publishes a supported interface. DevinX connects to the CLI surface, not private Desktop data, databases, or IPC.
+
+**Public-release scope decision (July 10, 2026):** public distribution waits until users can choose Cloud only, Computer only, or both. Development and internal TestFlight builds still ship in phases so each trust boundary is reviewed independently.
 
 ### 2.3 API Facts That Drive Design
 - **Base:** `https://api.devin.ai/v3/organizations/{org_id}/...` for sessions, knowledge, playbooks, secrets. v1 (`/v1/sessions`) remains available; use v3 as primary.
@@ -167,8 +171,8 @@ Hermex = native iOS thin client → self-hosted bridge server (hermes-webui) →
 | Styling | NativeWind (Tailwind for RN) + tokens file | Matches Mark's Tailwind muscle memory; tokens in §5 |
 | Animation/haptics | Reanimated 3 + expo-haptics | Native feel — the Hermex bar |
 | Validation | zod | Every API response parsed at the boundary (§8.3) |
-| Errors | Sentry RN (`beforeSend` scrubber, §10) | Day-1 requirement |
-| Analytics | PostHog (opt-in, events only, never content) | Usage learning without custody risk |
+| Errors | Local-only diagnostic boundary + tested scrubber (§10) | Avoids crash-data custody and package-level privacy ambiguity in v1 |
+| Analytics | None in v1 | Any future opt-in provider requires a new spec, consent flow, and privacy review |
 | CI/CD | GitHub Actions + EAS Build + EAS Submit | PR checks + TestFlight automation |
 | Backend (v1) | **None** | ADR-001 |
 | Backend (Phase 2) | Vercel serverless + Vercel KV + Expo Push/APNs | Notifier only |
@@ -289,10 +293,16 @@ devinx/
 
 ## 7. Screens & Flows
 
-### 7.1 Onboarding / Connect (3 steps)
-1. **Welcome** — value prop, disclaimer footer (§1.4), "Connect your Devin account."
-2. **Credentials** — segmented control: `Service user key` | `Personal token (beta)`. Service path: API key field (secure entry, paste-first UX), org ID field, optional "attribute sessions to me" user picker (uses `create_as_user_id`; fetch member list if permission allows, else free-text user ID). Inline help links to Devin docs for creating a least-privilege service user (`UseDevinSessions` + read permissions only — the app should TELL users to scope down; that's the GRC DNA).
-3. **Validate** — live check: authenticated `GET` self/sessions call. Success → store in Keychain → land on Board with a one-time coach-mark tour. Failure → specific error (401 invalid key / 403 missing permission, with which permission to add / network).
+### 7.1 Onboarding / Connect
+Onboarding opens with a concise three-page orientation, then enters the existing provider-specific secure setup. The orientation is screenshot-ready but remains product UI, not an unsupported marketing promise:
+
+1. **Welcome** — transparent theme-aware product wordmark without a decorative frame or opaque icon tile, value proposition, Cloud/Computer and on-device-voice proof points, independent-client disclaimer, and one primary CTA.
+2. **What DevinX supports** — create/steer sessions, Cloud or paired Computer, on-device dictation and prompt organization, genuine Code Scan session inspection, and credential-storage boundaries. Do not advertise unsupported file, approval, scan-creation, billing, or integration mutations.
+3. **Connection choice** — `Devin Cloud`, `Computer`, or `Cloud + Computer`, with distinct truthful descriptions. A Computer connection uses the user-controlled Connector and never copies Devin credentials to the phone.
+4. **Provider setup** — Cloud onboarding uses a `Service user key` only. Personal-token authentication is not presented until that product path is explicitly approved for release. The API key field is secure-entry and paste-first; the org ID and optional attribution ID follow the existing validated contract. Inline help links to Devin documentation for least-privilege service users. Computer setup uses the Tailscale-only QR flow and explicit Mac approval. Combined mode must make the sequence explicit on both provider screens: `Step 1 of 2 — Connect Devin Cloud`, followed by `Step 2 of 2 — Pair your computer`. Cloud-only and Computer-only setup retain their single-provider headings.
+5. **Validate** — Cloud performs a live authenticated sessions call before Keychain persistence. Combined mode continues to Computer pairing and explains that the Cloud connection is complete; Cloud-only lands on Home. Failures remain specific enough to recover without exposing secrets or remote response bodies.
+
+The orientation requests no microphone, camera, notification, or network permission. Every page supports VoiceOver, Dynamic Type, small-screen scrolling, and dismissal/back navigation where applicable. Unavailable modes are omitted rather than shown as dead or "soon" controls.
 
 ### 7.2 Session Board (home)
 - Sections: **Needs input** (blocked, always top, amber), **Working**, **Recent** (finished/failed, grouped Today / Yesterday / Earlier), **Sleeping/Archived** (collapsed).
@@ -304,7 +314,7 @@ devinx/
 
 ### 7.3 Session Detail
 - Header: title (editable if API allows), status chip, ACU spend, created/updated times, origin badge (API/Slack/web).
-- **Timeline tab:** chronological messages (cursor-paginated, infinite scroll upward), Devin vs user styling, markdown rendering, code blocks with copy, attachment tiles (download via attachments endpoint). Composer at bottom: sending a message auto-resumes a suspended session — surface that: "Session is sleeping — sending will wake it."
+- **Timeline tab:** chronological messages (cursor-paginated, infinite scroll upward), Devin vs user styling, markdown rendering, code blocks with copy, attachment tiles (download via attachments endpoint). Sending a message auto-resumes a suspended session. The canonical header status communicates that the session is sleeping; do not repeat a passive wake helper beside the composer.
 - **Output tab:** PR list (deep-link to GitHub app/web + Devin Review link if present), structured output viewer (pretty JSON + copy + share), session insights (trigger on-demand generation, render results).
 - Actions menu: Archive, Terminate, Generate insights, Manage tags, Share (public session URL only if session is not unlisted — warn before sharing).
 
@@ -331,6 +341,57 @@ When Devin needs input (question, secret request, decision), that session is pur
 - Appearance: theme (System/Dark/Light).
 - Privacy: analytics opt-in toggle (default OFF), "What data leaves your device?" explainer screen (answer in v1: "Only requests to api.devin.ai. Optionally, anonymous usage events to PostHog if you opt in. That's the whole list.").
 - About: version, disclaimer, licenses, link to Devin docs & status.
+
+### 7.8 Voice Spec (Dictation + Scribe)
+
+**Status:** Session 4a approved July 12, 2026; Session 4b authorized. The selected v1 engine is an app-owned Expo module around Apple SpeechAnalyzer/SpeechTranscriber. Whisper is deferred to a later compatibility/accuracy build. V1 bundles no Whisper model; unsupported devices retain ordinary typing with a clear voice-unavailable state. Scribe uses the deterministic template on every device and Apple Foundation Models only as an availability-checked progressive enhancement. All §7.8.4 security gates remain mandatory before merge or release.
+
+Voice Spec removes the mobile prompt-authoring bottleneck without changing Devin into a voice assistant:
+
+1. **Dictation:** explicit-tap, on-device speech-to-text in both New Session and Session Detail composers. Interim text streams dimmed at the cursor and becomes normal editable text when finalized; typing and dictation mix freely and dictation never replaces the entire field.
+2. **Scribe:** an optional, user-confirmed “Structure into work order” pass for dictations of at least 15 words. It produces editable plain text with **Goal**, **Scope / repo**, **Acceptance criteria**, and **Constraints / non-goals**. It never auto-applies.
+
+#### 7.8.1 Session 4a analysis gate
+
+Evaluate `whisper.rn`, a Swift-native WhisperKit Expo module, and an app-owned Expo module using Apple SpeechAnalyzer/SpeechTranscriber. Use five 30–90 second fixtures with realistic technical vocabulary (including TypeScript, Zod, Expo Router, TanStack Query, RLS, OAuth, PR, monorepo, auth middleware, kebab-case, and `api.devin.ai`). Record technical-term word error rate, end-to-end latency, real-time factor, peak memory, supported hardware/OS, maintenance health, Expo/EAS compatibility, and interruption behavior. Measure vocabulary biasing using repo, playbook, and tag names plus a capped static developer vocabulary; secret names and values are forbidden. Documentary evaluation is sufficient for candidates explicitly deferred by the decision authority; a later Whisper build must run the same physical protocol before it can replace or supplement SpeechAnalyzer.
+
+Decide whether models are bundled or downloaded on first use. Evaluate binary/cellular impact, progress/retry UX, Settings → Storage deletion, iCloud-backup exclusion, and whether a tiny instant fallback plus an optional higher-accuracy model is justified. The approved v1 uses only Apple’s system-managed language asset and therefore ships no app-managed speech model.
+
+Evaluate scribe in this order: Apple Foundation Models on supported iOS 26 devices; a deterministic template and filler/punctuation cleanup that ships for every device; cloud LLM scribe as a documented Phase 2 option only. Cloud STT and cloud scribe are out of v1.
+
+#### 7.8.2 Build architecture (after 4a approval only)
+
+```text
+components/VoiceInput/   -> mic button, waveform strip, scribe chip (pure UI)
+lib/voice/
+  engine.ts              -> TranscriptionEngine interface + approved implementation
+  hints.ts               -> capped, secret-safe vocabulary hint assembly
+  scribe.ts              -> ScribeEngine interface: foundationModel | template
+  models.ts              -> optional model download/manage
+```
+
+No component imports an engine implementation directly. Native modules require an EAS development/TestFlight build and are not supported in Expo Go. The first-use permission copy is: “DevinX uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded.” Permission is never requested during onboarding.
+
+#### 7.8.3 Recording UX
+
+- A mic target sits in every composer accessory row. During recording, the row expands into a `brand` waveform on `surface2`, a JetBrains Mono `textMid` timer, and cancel/stop targets of at least 44pt. The visible recording indicator remains on screen whenever the microphone is live.
+- Respect Reduce Motion with static level bars. Warn with haptics after five minutes.
+- On backgrounding, interruption, or phone call: stop recording and preserve partial transcript. Support Bluetooth/AirPods routing and design explicit no-speech, permission-denied, model-missing, download/retry, and interruption states.
+- Permission denial includes a deep link to iOS Settings. After finalization, insert at the current cursor and preserve all existing typed text.
+
+#### 7.8.4 Voice security and privacy gates
+
+1. Audio is on-device only. Add a CI test proving `lib/voice/` has no network imports and no request may contain audio bytes.
+2. Any temporary audio uses a dedicated directory with `NSFileProtectionComplete`; deletion after finalization is verified by a test asserting the directory is empty.
+3. Recording starts only from an explicit tap. No wake word, background listening, or onboarding permission request. Backgrounding stops recording and preserves text.
+4. Transcript-bearing state is excluded from logs, analytics, and diagnostics. Extend the diagnostic scrubber test before any future reporting provider is enabled.
+5. Settings → Privacy states: “Voice is transcribed on your device. Audio never leaves your phone.” App Store privacy remains “Data Not Collected.”
+6. Optional model artifacts are public, excluded from backup, removable, and never mixed with user content.
+7. Any future cloud scribe is a separately reviewed, opt-in, per-use Phase 2 feature with a distinct consent screen and updated privacy disclosures.
+
+#### 7.8.5 Explicit voice non-goals (v1)
+
+No voice conversation, wake word, cloud STT, cloud scribe, response TTS, Android voice work before the Android build exists, or Willow dependency. Third-party dictation keyboards continue to work as standard text input.
 
 ---
 
@@ -359,7 +420,7 @@ interface AuthProvider {
 `PatAuth` behind `EXPO_PUBLIC_ENABLE_PAT` until GA. Key retrieval is lazy + memoized per app foreground; never held in module-level state longer than needed; zeroized on disconnect.
 
 ### 8.3 Boundary Validation
-Every response parses through zod schemas in `/src/api/devin/schemas.ts`. Unknown fields pass through (API evolves monthly); missing REQUIRED fields fail closed with a typed `ApiSchemaError` logged to Sentry (scrubbed). Devin: generate schemas from live docs (§2.3 note), then hand-tighten.
+Every response parses through zod schemas in `/src/api/devin/schemas.ts`. Unknown fields pass through (API evolves monthly); missing REQUIRED fields fail closed with a typed `ApiSchemaError` passed to a local no-op diagnostic boundary without logging content. Devin: generate schemas from live docs (§2.3 note), then hand-tighten.
 
 ### 8.4 Polling Policy & Resilience
 - `pollingPolicy(sessionStatus, appState, screen)` → interval or `false`. Defaults: watched-session messages 5s, board 15s, background OS-scheduled, terminal statuses never.
@@ -372,8 +433,8 @@ Every response parses through zod schemas in `/src/api/devin/schemas.ts`. Unknow
 Sessions: create, list (with status/tag filters, pagination), detail, messages list (cursor), message send, archive, terminate, tags add/remove, insights generate/get.
 Reference data: playbooks list, knowledge list, secrets list (names/IDs only — never values), org members (for attribution picker, permission-gated).
 Attachments: upload, download.
-Consumption: org cycle + daily.
-Explicitly NOT called in v1: any write to playbooks/knowledge/secrets, any enterprise/* endpoint, audit logs.
+Consumption: org daily; read-only enterprise billing cycle and ACU-limit endpoints when the credential has `ManageBilling`, with graceful permission-gated fallback. Self-serve quota and credit-balance values remain web-only until Devin publishes an API.
+Explicitly NOT called in v1: any write to enterprise billing/limit endpoints, audit logs, or undocumented endpoint; playbook/knowledge/secret writes are separately permission-gated features and never required for the core session flow.
 
 ---
 
@@ -394,8 +455,8 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 ## 10. Security Requirements (Gates — every one blocks ship)
 
 1. **Secrets:** API key/PAT only ever in Keychain with `WHEN_UNLOCKED_THIS_DEVICE_ONLY` accessibility; excluded from iCloud/device backups. Grep-gate in CI: no `cog_` pattern, no key variable names outside `/src/auth`.
-2. **No secret leakage:** Sentry `beforeSend` scrubs Authorization headers, key-shaped strings, and message bodies; network breadcrumbs disabled for `api.devin.ai` request headers. PostHog receives event names + counts ONLY — never prompts, messages, titles, or IDs.
-3. **Transport:** TLS only; block cleartext (ATS default, no exceptions in Info.plist). Optional certificate pinning evaluated in Phase 2 (tradeoff: Cognition cert rotation breaks the app — document decision either way).
+2. **No secret leakage:** v1 bundles no crash-reporting or analytics SDK. The local diagnostic boundary never logs or transmits errors. Its tested scrubber removes Authorization headers, key-shaped strings, identifiers, and message content and is mandatory before any future reporting provider can be proposed.
+3. **Transport:** Devin Cloud remains TLS-only. The v1 Connector uses Tailscale only and may use HTTP solely to a canonical explicit-port `100.64.0.0/10` address because Tailscale WireGuard encrypts that path; the sole ATS exception is scoped to that range, and signed device requests, replay protection, rate limits, and server-side authorization remain mandatory. The Connector never falls back to LAN or public transport.
 4. **Least privilege by design:** onboarding actively instructs users to create a scoped service user (session-use + read perms only). The app must function gracefully when permissions are missing (feature-gated UI, not crashes).
 5. **Session content is code:** treat every fetched message as potentially containing the user's proprietary source. Never in analytics, never in logs, cache encrypted / OS file-protected, cache purged on disconnect and verifiably so (test asserts empty DB + empty Keychain after logout).
 6. **Screen privacy:** mark credential fields `secureTextEntry`; add app-switcher snapshot blur on screens showing session content (privacy overlay on background).
@@ -403,6 +464,7 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 8. **Supply chain:** lockfile committed, Dependabot on, `npm audit` gate in CI (fail on high/critical), no dependency added without CI passing, secret scanning + push protection on the repo.
 9. **Deep links:** `devinx://session/{id}` validates the ID format and requires an authenticated state; no auth material ever accepted via URL.
 10. **Phase 2 notifier (when built):** separate read-only service key, provided by the user, stored server-side encrypted (KMS/env), org ID hashed in KV, device tokens purgeable via in-app toggle, notifier holds NO message content — payloads are "Session {title} needs input," never the question text. Its own mini spec + review before build.
+11. **Voice:** every §7.8.4 gate blocks Session 4b release. Audio never leaves the device; temp files are protected and verifiably deleted; transcript content is scrubbed from diagnostics; microphone access is explicit and visible.
 
 ---
 
@@ -414,16 +476,24 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 | Unit | zod schemas, polling policy, backoff math, auth strategies, cache purge | All schemas + all policy branches |
 | Integration | endpoint functions vs MSW mock of Devin API (fixtures from real doc examples) | Every endpoint in §8.5, incl. 401/403/429/5xx paths |
 | E2E (Maestro) | onboard → validate → board → open session → send message → archive → disconnect-wipes-everything | The golden path + the wipe test |
-| Security | key-leak grep gate, Sentry scrub test, logout wipe assertion, deep-link fuzz | All pass in CI |
+| Security | key-leak grep gate, diagnostic scrub/no-transmission test, logout wipe assertion, deep-link fuzz | All pass in CI |
 | Performance | cold start <2s to cached board; 60fps list scroll with 200 sessions; battery: Balanced polling <2%/hr foreground | Measured on a real mid-tier device |
+| Voice unit | hint caps/secret exclusion, filler cleanup, template output, engine interface conformance | Every branch |
+| Voice integration | five technical fixtures end-to-end with WER compared to the approved 4a record | No regression beyond approved bounds |
+| Voice security | no-network-imports, temp-audio deletion, transcript scrubber | All pass in CI |
+| Voice E2E | mic → injected fixture → transcript → scribe preview → send; denial and interruption paths | Golden path + both failures |
+| Voice performance/accessibility | real-time factor ≤1.0 on iPhone 13-class, 60fps streaming, memory ceiling recorded, VoiceOver/Switch Control/Reduce Motion | Measured on device |
 
 ### 11.2 Release Checklist (App Store additions to standard gates)
 - [ ] All §10 gates green in CI
 - [ ] Disconnect verifiably wipes Keychain + SQLite + query cache
 - [ ] Rate-limit behavior tested against real API (burst + sustained)
+- [ ] Cloud mode controls expose only values accepted by the reviewed public API, and a harmless real session proves the selected supported mode reaches Devin
+- [ ] Computer model controls come only from the live ACP catalog, and a harmless real session proves the exact selected model (including Adaptive when offered) is confirmed before prompting
 - [ ] App Privacy label accurate: Data Not Collected (or "Usage Data, opt-in" if PostHog on) — this label is a marketing asset, protect it
 - [ ] Trademark disclaimer present in listing + in-app
 - [ ] TestFlight external group live; crash-free rate >99.5% over 7 days before App Store submit
+- [ ] Mark completes the final design review, supplies the requested design direction, approves the implemented changes on the release build, and explicitly freezes the UI before App Review submission
 - [ ] Screenshots: dark theme, Board with a blocked session visible (show the killer feature)
 - [ ] Rollback plan: EAS Update (OTA) for JS-level issues, <15min
 
@@ -434,31 +504,39 @@ Keychain (expo-secure-store): `devin_api_key`, `devin_org_id`, `attribution_user
 One session per phase. Each session: reads `/specs/000-build-spec.md` + its phase spec + the `/specs/reference-ui/` screenshots, works on a branch `devin/phase-N-*`, ends in ONE PR with passing CI **and side-by-side parity screenshots per §5.4.6**. Create a Playbook from Phase 1's session prompt once it succeeds. Add a Knowledge note: "DevinX repo: TypeScript strict, no raw hex outside tokens.ts, secrets only in /src/auth, every API boundary zod-parsed, follow /specs."
 
 **Session 0 — Foundation & Ground Truth** (small, do first)
-> Read /specs/000-build-spec.md. Tasks: (1) Execute the full §5.0 UI audit of app.devin.ai and cognition.com — tokens, component anatomy, status vocabulary, and reference screenshots to /specs/reference-ui/; write /specs/design-tokens.md and /src/theme/tokens.ts. This audit is the design spec for the entire build (§5.4). (2) Fetch docs.devin.ai/llms.txt, crawl v3 API reference, generate /src/api/devin/types.ts + zod schemas per §8.3; note any deltas from §2.3/§8.5 in /specs/api-deltas.md. (3) Scaffold the Expo project per §6 with CI workflow, branch protection config note, .env.example, ESLint/Prettier/strict tsconfig, NativeWind + tokens wired, Sentry initialized with the §10.2 scrubber. PR with all three.
+> Read /specs/000-build-spec.md. Tasks: (1) Execute the full §5.0 UI audit of app.devin.ai and cognition.com — tokens, component anatomy, status vocabulary, and reference screenshots to /specs/reference-ui/; write /specs/design-tokens.md and /src/theme/tokens.ts. This audit is the design spec for the entire build (§5.4). (2) Fetch docs.devin.ai/llms.txt, crawl v3 API reference, generate /src/api/devin/types.ts + zod schemas per §8.3; note any deltas from §2.3/§8.5 in /specs/api-deltas.md. (3) Scaffold the Expo project per §6 with CI workflow, branch protection config note, .env.example, ESLint/Prettier/strict tsconfig, NativeWind + tokens wired, and the local §10.2 diagnostic boundary. PR with all three.
 
 **Session 1 — Auth + Golden Path** (proves the architecture)
 > Build §7.1 onboarding, §8.2 auth strategies (ServiceUserAuth live, PatAuth flag-gated), the client layer (§8.1, §8.4), and a minimal Session Board reading the real list endpoint. Golden path: connect → validate → see real sessions → disconnect wipes everything (write the wipe test). Every §10 gate that applies must have a test. One PR.
 
 **Session 2 — Session Board complete** — filters, sections, blocked-first treatment (§7.4 list half), context menus, pins, pull-to-refresh, adaptive polling, offline cache + staleness banner, empty/error/unauth states.
 
-**Session 3 — Session Detail + Steering** — timeline with cursor pagination, markdown/code rendering, composer with wake-warning, attachments download, Output tab (PRs, structured output, insights), archive/terminate flows.
+**Session 3 — Session Detail + Steering** — timeline with cursor pagination, markdown/code rendering, compact translucent composer, attachments download, Output tab (PRs, structured output, insights), archive/terminate flows.
 
 **Session 4 — Composer + Usage + Settings** — §7.5 full composer with attachments upload and session-secret hygiene, §7.6 consumption views with permission-gating, §7.7 settings incl. privacy explainer.
+
+**Session 4a — Voice Spec Analysis** — execute §7.8.1. Deliver only `/specs/007-voice-spec-analysis.md` plus throwaway `/spikes/voice/` benchmark assets. Mark reviews and approves the engine, packaging, and scribe-tier decision before implementation.
+
+**Session 4b — Voice Spec Build** — after Session 4a approval, implement §7.8.2–§7.8.4, make the voice matrix green, and attach a speak → structure → send demo video to the PR. Add the voice golden path to Maestro and the on-device mic explanation to TestFlight review notes.
 
 **Session 5 — Ship** — §11 testing matrix to green, Maestro E2E, performance passes, EAS build profiles, TestFlight submission config, App Store metadata drafts (with disclaimer), release checklist run. Output: TestFlight build.
 
 **Session 6 (Phase 2, post-meetup, demand-gated)** — Notifier mini-spec first (§10.10), then Vercel service + Expo Push integration + in-app watch toggles.
 
-**Session 7 (Phase 3, optional)** — CLI bridge exploration per §2.2: hermes-webui-style local server wrapping Devin CLI hooks + Tailscale. Only if real users ask.
+**Session 7 (Phase 3A, required before public release)** — ACP discovery and threat model: negotiate `devin acp` capabilities, verify read-only session discovery on pinned CLI versions, specify pairing/auth/permissions, and build a localhost-only probe. No network listener or session mutation until the threat-model gate passes.
+
+**Session 8 (Phase 3B, required before public release)** — macOS Computer Connection: a user-controlled bridge wrapping the supported ACP subprocess, QR pairing, per-device credentials and permissions, read-only session browsing first, then explicitly authorized message steering. LAN/Tailscale follows localhost validation; public tunnels and relays remain deferred.
+
+**Session 9 (Phase 4A, required before public local-computer release)** — DevinX Connector: replace the terminal-only development runner with a signed, notarized macOS companion that detects Devin for Terminal and Tailscale, renders QR pairing locally, handles explicit device permissions, and provides visible per-user background lifecycle controls. Keep the bridge core platform-neutral and define secure-storage/service adapters for required Windows and Linux follow-up releases. No manual server URL or shared-password flow.
 
 ---
 
 ## 13. MoSCoW Summary
 
-**Must (MVP/TestFlight):** connect/validate/Keychain, session board with blocked-first triage, session detail + message steering, new session composer (prompt/playbook/tags/ACU), archive/terminate, adaptive polling, offline cache, disconnect-wipe, dark theme with extracted tokens, all §10 gates.
+**Must (MVP/TestFlight):** connect/validate/Keychain, session board with blocked-first triage, session detail + message steering, new session composer (prompt/playbook/tags/ACU), archive/terminate, adaptive polling, offline cache, disconnect-wipe, dark theme with extracted tokens, approved on-device dictation + deterministic scribe fallback, all §10 gates.
 **Should (≤30 days post):** consumption view, insights, attachments both directions, light theme polish, Android build, composer templates.
 **Could:** push notifier (Phase 2), scheduled sessions management, PAT mode GA flip, iPad layout, widgets (blocked-session count on home screen — sleeper hit), Apple Watch glance.
-**Won't (write it down):** any Devin Desktop integration, enterprise/* endpoints, playbook/knowledge/secret WRITES, multi-org switching in v1, storing any user data server-side in v1, Android-first anything.
+**Won't (write it down):** undocumented Devin Desktop integration, scraping CLI/Desktop files or IPC, enterprise/* endpoints, playbook/knowledge/secret WRITES, a DevinX-operated relay in v1, storing bridge session content on DevinX infrastructure, Android-first anything.
 
 ---
 

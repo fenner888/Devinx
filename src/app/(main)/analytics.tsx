@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useOrgMetrics } from '@api/devin/queries';
 import { ApiError } from '@api/devin/client';
+import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 
 const RANGES = [
@@ -150,7 +151,9 @@ export default function AnalyticsScreen() {
       {error && !isPermissionError && (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-failed text-text14 mb-2">Could not load analytics</Text>
-          <Text className="text-text-mid text-text13 text-center mb-4">{error.message}</Text>
+          <Text className="text-text-mid text-text13 text-center mb-4">
+            {userFacingError(error, 'Analytics are unavailable right now.')}
+          </Text>
           <Pressable className="bg-tint-secondary rounded-button px-buttonPrimaryX py-buttonPrimaryY" onPress={() => refetch()}>
             <Text className="text-brand-text text-text14 font-medium">Try again</Text>
           </Pressable>
