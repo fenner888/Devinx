@@ -8,7 +8,10 @@ on:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    # The release gate exercises the macOS Connector's Security.framework,
+    # Keychain, TLS identity, and platform-specific Tailscale behavior. Running
+    # those checks on Linux produces false failures for supported macOS paths.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
 
