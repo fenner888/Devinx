@@ -34,7 +34,7 @@
 | ------------------------------ | --------------- | ------------------------------------------------------------------------------------------------- |
 | **DevinX for iPhone**          | `0.1.0 (67)`    | [External TestFlight beta](https://testflight.apple.com/join/KBD25apN) · up to 100 testers        |
 | **Public App Store version**   | `1.0`           | Submitted to Apple and waiting for App Review · manual release after approval                     |
-| **DevinX Connector for macOS** | `0.1.0`         | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
+| **DevinX Connector for macOS** | `0.1.1`         | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
 
 TestFlight access does not include a Devin account or shared Devin data. Each tester connects their
 own Devin organization, pairs a computer they control, or uses both.
@@ -198,7 +198,7 @@ official Devin MCP tool, or approved local ACP capability.
   server passwords are outside the Connector grant model.
 - Personal profile/OAuth settings, plan and invoice management, organization administration, and
   unsupported Web-only mutations remain owned by Devin Web.
-- The initial mobile release is iPhone-only. Android and iPad are not supported. Connector `0.1.0`
+- The initial mobile release is iPhone-only. Android and iPad are not supported. Connector `0.1.1`
   supports Apple-silicon Macs; Windows, Linux, and Intel Mac packages are planned but unavailable.
 
 The maintained parity inventory is in

@@ -15,7 +15,7 @@ The separate Connector application is the current supported way to install and o
 
 ## User experience
 
-1. Download the supported signed connector from the official DevinX release page. Connector 0.1.0 currently supports Apple-silicon Macs; Windows, Linux, and Intel Mac packages are planned but are not available yet.
+1. Download the supported signed connector from the official DevinX release page. Connector 0.1.1 currently supports Apple-silicon Macs; Windows, Linux, and Intel Mac packages are planned but are not available yet.
 2. Install and open **DevinX Connector**.
 3. Connect the computer and iPhone to the same Tailscale network, then confirm that the connector shows Tailscale and Devin for Terminal.
 4. In the iPhone app, open **Settings → Computers → Add Mac/PC → Scan pairing code**.
