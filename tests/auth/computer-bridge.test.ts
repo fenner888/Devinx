@@ -312,6 +312,37 @@ describe('authenticated mobile Computer Bridge client', () => {
     expect(mockDeleteDeviceIdentity).toHaveBeenCalledWith(KEY_ID);
   });
 
+  it('finishes local cleanup when the Mac already revoked the device', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({ status: 404, body: { error: 'not_found' } });
+
+    await expect(disconnectComputer(BRIDGE_ID)).resolves.toBeUndefined();
+    expect(mockStorePairedComputers).toHaveBeenCalledWith([]);
+    expect(mockDeleteDeviceIdentity).toHaveBeenCalledWith(KEY_ID);
+  });
+
+  it('preserves the local credential when secure revocation has an availability failure', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({
+      status: 503,
+      body: { error: 'temporarily_unavailable' },
+    });
+
+    await expect(disconnectComputer(BRIDGE_ID)).rejects.toMatchObject({ code: 'unavailable' });
+    expect(mockStorePairedComputers).not.toHaveBeenCalled();
+    expect(mockDeleteDeviceIdentity).not.toHaveBeenCalled();
+  });
+
+  it('classifies Connector conflicts without retrying the prompt', async () => {
+    mockLoadPairedComputers.mockResolvedValue([
+      { ...COMPUTER, permissions: [...COMPUTER.permissions, 'session:prompt:send'] },
+    ]);
+    mockPostPinnedBridgeJson.mockResolvedValue({ status: 409, body: { error: 'conflict' } });
+
+    await expect(
+      promptComputerSession(BRIDGE_ID, `local_${'L'.repeat(43)}`, 'Continue.'),
+    ).rejects.toMatchObject({ code: 'busy' });
+    expect(mockPostPinnedBridgeJson).toHaveBeenCalledTimes(1);
+  });
+
   it('can remove the local pairing without claiming or attempting Mac revocation', async () => {
     await expect(removeComputerFromThisIPhone(BRIDGE_ID)).resolves.toBeUndefined();
 

@@ -36,9 +36,13 @@ const mockVerifyComputerBridgeCredential = jest.fn(async (_input: unknown) => ({
   capabilities: { sessionList: true, sessionLoad: true, sessionPrompt: false },
 }));
 
-jest.mock('../../src/auth/computerBridge', () => ({
-  verifyComputerBridgeCredential: (input: unknown) => mockVerifyComputerBridgeCredential(input),
-}));
+jest.mock('../../src/auth/computerBridge', () => {
+  const actual = jest.requireActual('../../src/auth/computerBridge');
+  return {
+    ...actual,
+    verifyComputerBridgeCredential: (input: unknown) => mockVerifyComputerBridgeCredential(input),
+  };
+});
 
 jest.mock('../../src/auth/pairedComputers', () => {
   const actual = jest.requireActual('../../src/auth/pairedComputers');
@@ -50,6 +54,7 @@ jest.mock('../../src/auth/pairedComputers', () => {
 });
 
 import { canonicalJson } from '../../src/auth/canonicalJson';
+import { ComputerBridgeError } from '../../src/auth/computerBridge';
 import { canonicalJson as bridgeCanonicalJson } from '../../bridge/src/canonical';
 import {
   pairComputerFromQrPayload,
@@ -245,6 +250,77 @@ describe('mobile computer pairing orchestration', () => {
       'saving',
       'complete',
     ]);
+  });
+
+  it('replaces only a same-identity pairing confirmed revoked by the Mac', async () => {
+    const existing = {
+      version: 2 as const,
+      bridgeId: OFFER.bridgeId,
+      computerName: 'Old Mac name',
+      endpoint: OFFER.bridgeEndpoint,
+      tlsCertificateFingerprint: OFFER.tlsCertificateFingerprint,
+      bridgePublicKeySpki: OFFER.bridgePublicKeySpki,
+      bridgeKeyFingerprint: OFFER.bridgeKeyFingerprint,
+      deviceId: 'device_old1234567890',
+      deviceKeyId: 'b3ae9387-d86c-47d2-bbd9-32bd445edc55',
+      devicePublicKeySpki: 'E'.repeat(59),
+      permissions: ['bridge:health', 'session:metadata:read'] as const,
+      pairedAt: NOW - 60_000,
+    };
+    mockLoadPairedComputers
+      .mockResolvedValueOnce([existing])
+      .mockResolvedValueOnce([existing])
+      .mockResolvedValueOnce([]);
+    mockVerifyComputerBridgeCredential.mockRejectedValueOnce(
+      new ComputerBridgeError('Device revoked', 'authorization_failed'),
+    );
+
+    await expect(
+      pairComputerFromQrPayload(JSON.stringify(OFFER), { computerName: 'Recovered Mac' }),
+    ).resolves.toMatchObject({
+      bridgeId: OFFER.bridgeId,
+      computerName: 'Recovered Mac',
+      pairedAt: RECEIPT.pairedAt,
+    });
+
+    expect(mockStorePairedComputers).toHaveBeenNthCalledWith(1, []);
+    expect(mockDeleteDeviceIdentity).toHaveBeenCalledWith(existing.deviceKeyId);
+    expect(mockCreateDeviceIdentity).toHaveBeenCalledTimes(1);
+    expect(mockStorePairedComputers).toHaveBeenLastCalledWith([
+      expect.objectContaining({
+        bridgeId: OFFER.bridgeId,
+        computerName: 'Recovered Mac',
+        deviceKeyId: '3e399a5d-79c4-4a23-8aa7-a418565d974d',
+      }),
+    ]);
+  });
+
+  it('does not replace an existing pairing after an ordinary transport failure', async () => {
+    const existing = {
+      version: 2 as const,
+      bridgeId: OFFER.bridgeId,
+      computerName: 'Existing Mac',
+      endpoint: OFFER.bridgeEndpoint,
+      tlsCertificateFingerprint: OFFER.tlsCertificateFingerprint,
+      bridgePublicKeySpki: OFFER.bridgePublicKeySpki,
+      bridgeKeyFingerprint: OFFER.bridgeKeyFingerprint,
+      deviceId: DEVICE_ID,
+      deviceKeyId: 'b3ae9387-d86c-47d2-bbd9-32bd445edc55',
+      devicePublicKeySpki: 'E'.repeat(59),
+      permissions: ['bridge:health', 'session:metadata:read'] as const,
+      pairedAt: NOW - 60_000,
+    };
+    mockLoadPairedComputers.mockResolvedValue([existing]);
+    mockVerifyComputerBridgeCredential.mockRejectedValueOnce(
+      new ComputerBridgeError('Unavailable', 'unavailable'),
+    );
+
+    await expect(
+      pairComputerFromQrPayload(JSON.stringify(OFFER), { computerName: 'Replacement' }),
+    ).rejects.toMatchObject({ code: 'unavailable' });
+    expect(mockStorePairedComputers).not.toHaveBeenCalled();
+    expect(mockDeleteDeviceIdentity).not.toHaveBeenCalled();
+    expect(mockCreateDeviceIdentity).not.toHaveBeenCalled();
   });
 
   it('erases the temporary device key when approval is denied or forged', async () => {

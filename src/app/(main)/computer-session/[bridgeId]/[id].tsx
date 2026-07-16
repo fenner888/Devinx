@@ -90,6 +90,28 @@ function publicErrorMessage(error: unknown): string {
   return 'Open DevinX Connector and confirm the secure computer connection is available.';
 }
 
+export function promptErrorMessage(error: unknown): string {
+  if (!(error instanceof ComputerBridgeError)) {
+    return 'The message could not be sent. Try again.';
+  }
+  if (error.code === 'busy') {
+    return 'Devin is finishing the previous turn. Try again in a moment.';
+  }
+  if (error.code === 'authorization_failed') {
+    return 'This iPhone is no longer authorized. Re-pair this computer in Settings.';
+  }
+  if (error.code === 'permission_denied') {
+    return 'This iPhone does not have permission to steer this session.';
+  }
+  if (error.code === 'rate_limited') {
+    return 'Too many requests were sent. Wait a moment and try again.';
+  }
+  if (error.code === 'unavailable') {
+    return 'DevinX Connector is temporarily unavailable. Confirm it is running on your Mac.';
+  }
+  return 'The message could not be sent. Try again.';
+}
+
 function BackButton({ onPress }: { onPress: () => void }) {
   const { tokens } = useTheme();
   return (
@@ -167,6 +189,7 @@ export default function ComputerSessionDetailScreen() {
   );
   const prompt = usePromptComputerSession(bridgeId, sessionId);
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
+  const sessionBusy = Boolean(sessionActivity.data?.active);
   const composerOverlayHeight = canPrompt && mayReadContent ? Math.max(composerHeight, 160) : 0;
   const localOptions = useComputerCreateOptions(bridgeId, canPrompt && Boolean(computer));
   const localModels = useMemo(() => localOptions.data?.models ?? [], [localOptions.data?.models]);
@@ -183,7 +206,7 @@ export default function ComputerSessionDetailScreen() {
   const voice = useVoiceComposer({
     value: draft,
     onChangeText: setDraft,
-    disabled: !canPrompt || prompt.isPending || steeringActive,
+    disabled: !canPrompt || prompt.isPending || steeringActive || sessionBusy,
     hints: {
       repositories: query.data?.session.workspaceName ? [query.data.session.workspaceName] : [],
     },
@@ -256,7 +279,7 @@ export default function ComputerSessionDetailScreen() {
 
   function sendPrompt() {
     const text = draft.trim();
-    if (!text || !canPrompt || prompt.isPending || steeringActive) return;
+    if (!text || !canPrompt || prompt.isPending || steeringActive || sessionBusy) return;
     Keyboard.dismiss();
     setSteeringActive(true);
     setPendingText(text);
@@ -500,7 +523,7 @@ export default function ComputerSessionDetailScreen() {
           >
             {prompt.error && (
               <Text className="mb-2 text-failed text-text12">
-                The message could not be sent. Confirm steering is enabled on the Mac.
+                {promptErrorMessage(prompt.error)}
               </Text>
             )}
             <View
@@ -517,7 +540,7 @@ export default function ComputerSessionDetailScreen() {
                 placeholderTextColor={tokens.textLow.hex}
                 multiline
                 textAlignVertical="top"
-                editable={!prompt.isPending && !steeringActive}
+                editable={!prompt.isPending && !steeringActive && !sessionBusy}
                 accessibilityLabel="Computer session message"
                 onSelectionChange={voice.onSelectionChange}
                 onFocus={() => setKeyboardVisible(true)}
@@ -529,7 +552,7 @@ export default function ComputerSessionDetailScreen() {
                 <Pressable
                   className="mr-1 min-w-0 flex-row items-center rounded-full px-2 py-2"
                   onPress={() => canChooseModel && setShowModelPicker(true)}
-                  disabled={!canChooseModel || steeringActive}
+                  disabled={!canChooseModel || steeringActive || sessionBusy}
                   accessibilityRole="button"
                   accessibilityLabel={`Model: ${modelLabel}`}
                 >
@@ -549,7 +572,10 @@ export default function ComputerSessionDetailScreen() {
                     setShowVariantPicker(true)
                   }
                   disabled={
-                    !selectedFamily || selectedFamily.variants.length <= 1 || steeringActive
+                    !selectedFamily ||
+                    selectedFamily.variants.length <= 1 ||
+                    steeringActive ||
+                    sessionBusy
                   }
                   accessibilityRole="button"
                   accessibilityLabel={`Reasoning and speed: ${variantLabel}`}
@@ -566,12 +592,12 @@ export default function ComputerSessionDetailScreen() {
                   <KeyboardDismissButton visible={keyboardVisible} />
                   <VoiceMicButton
                     voice={voice}
-                    disabled={!canPrompt || prompt.isPending || steeringActive}
+                    disabled={!canPrompt || prompt.isPending || steeringActive || sessionBusy}
                   />
                   <Pressable
-                    className={`h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive ? 'bg-brand' : 'bg-tint-secondary'}`}
+                    className={`h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive && !sessionBusy ? 'bg-brand' : 'bg-tint-secondary'}`}
                     onPress={sendPrompt}
-                    disabled={!draft.trim() || prompt.isPending || steeringActive}
+                    disabled={!draft.trim() || prompt.isPending || steeringActive || sessionBusy}
                     accessibilityRole="button"
                     accessibilityLabel="Send computer session message"
                   >

@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import {
+  connectionModeAfterComputerRefresh,
   connectionModeUsesCloud,
   isConnectionModeConfigured,
   type ConnectionMode,
@@ -49,7 +50,14 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
   const refreshComputers = useCallback(async () => {
     setIsComputerLoading(true);
     try {
-      setComputers(await loadPairedComputerSummaries());
+      const nextComputers = await loadPairedComputerSummaries();
+      const nextMode = connectionModeAfterComputerRefresh(
+        mode,
+        hasCloudCredentials,
+        nextComputers.length,
+      );
+      if (nextMode !== mode) setConnectionMode(nextMode);
+      setComputers(nextComputers);
       setConnectionError(null);
     } catch {
       setComputers([]);
@@ -57,7 +65,7 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsComputerLoading(false);
     }
-  }, []);
+  }, [hasCloudCredentials, mode, setConnectionMode]);
 
   useEffect(() => {
     refreshComputers().catch(() => {});

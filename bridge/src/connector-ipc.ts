@@ -97,6 +97,7 @@ export const connectorEventSchema = z.discriminatedUnion('type', [
         z.literal(202),
         z.literal(400),
         z.literal(404),
+        z.literal(409),
         z.literal(413),
         z.literal(415),
         z.literal(429),

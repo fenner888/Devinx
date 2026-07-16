@@ -1,6 +1,11 @@
 import { generateKeyPairSync, randomBytes, randomUUID, sign } from 'node:crypto';
 
-import type { AcpLoadedSession, AcpSessionActivity, AcpSessionPage } from '../../bridge/src/acp';
+import {
+  AcpBusyError,
+  type AcpLoadedSession,
+  type AcpSessionActivity,
+  type AcpSessionPage,
+} from '../../bridge/src/acp';
 import { FixedWindowRateLimiter } from '../../bridge/src/rate-limit';
 import { InMemoryReplayGuard } from '../../bridge/src/replay';
 import { BridgeService, type SessionDiscoveryAdapter } from '../../bridge/src/service';
@@ -58,6 +63,7 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   };
   prompts: Array<{ sessionId: string; text: string; modelId?: string }> = [];
   continuedSessionId: string | null = null;
+  promptFailure: Error | null = null;
   createSupported = true;
   createOptions = {
     workspaces: [{ path: '/Users/frank/Secret Project' }],
@@ -117,6 +123,7 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     modelId?: string,
   ): Promise<void | { continuedSessionId: string }> {
     this.prompts.push({ sessionId, text, ...(modelId ? { modelId } : {}) });
+    if (this.promptFailure) throw this.promptFailure;
     return this.continuedSessionId
       ? { continuedSessionId: this.continuedSessionId }
       : undefined;
@@ -282,6 +289,25 @@ describe('authenticated Desktop Bridge service', () => {
       body: { accepted: true, sessionId: expect.stringMatching(/^local_[A-Za-z0-9_-]{43}$/) },
     });
     expect(JSON.stringify(result)).not.toContain('raw-private-continuation-id');
+  });
+
+  it('returns a minimized conflict when ACP is finishing the previous prompt', async () => {
+    adapter.promptFailure = new AcpBusyError();
+    const bridge = service();
+    const permissions: BridgePermission[] = [
+      'session:metadata:read',
+      'session:prompt:send',
+    ];
+    const listed = await bridge.handle(envelope('session.list', {}, permissions), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+
+    const result = await bridge.handle(
+      envelope('session.prompt', { sessionId: handle, text: 'Continue.' }, permissions),
+      context(),
+    );
+
+    expect(result).toEqual({ status: 409, body: { error: 'conflict' } });
+    expect(JSON.stringify(result)).not.toContain('ACP');
   });
 
   it('returns opaque, namespaced, minimized session metadata by default', async () => {

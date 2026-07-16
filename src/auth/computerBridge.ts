@@ -254,6 +254,7 @@ export type ComputerBridgeErrorCode =
   | 'not_paired'
   | 'permission_denied'
   | 'authorization_failed'
+  | 'busy'
   | 'rate_limited'
   | 'unavailable'
   | 'invalid_response';
@@ -304,6 +305,9 @@ function publicResponseError(status: number): ComputerBridgeError {
       'The paired Mac is receiving requests too quickly.',
       'rate_limited',
     );
+  }
+  if (status === 409) {
+    return new ComputerBridgeError('Devin is finishing the previous turn.', 'busy');
   }
   if (status === 503) {
     return new ComputerBridgeError('The paired Mac is temporarily unavailable.', 'unavailable');
@@ -618,7 +622,13 @@ export async function disconnectComputer(bridgeIdInput: string): Promise<void> {
   if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {
     throw new ComputerBridgeError('This Mac is not paired through Tailscale.', 'not_paired');
   }
-  await requestDeviceRevocation(computer);
+  try {
+    await requestDeviceRevocation(computer);
+  } catch (error) {
+    if (!(error instanceof ComputerBridgeError) || error.code !== 'authorization_failed') {
+      throw error;
+    }
+  }
   await storePairedComputers(computers.filter((candidate) => candidate.bridgeId !== bridgeId));
   await deleteDeviceIdentity(computer.deviceKeyId);
 }

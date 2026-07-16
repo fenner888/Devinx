@@ -44,6 +44,15 @@ export function connectionModeUsesComputer(mode: ConnectionMode): boolean {
   return mode === 'computer' || mode === 'both';
 }
 
+export function connectionModeAfterComputerRefresh(
+  mode: ConnectionMode,
+  hasCloudConnection: boolean,
+  computerCount: number,
+): ConnectionMode {
+  if (mode === 'both' && hasCloudConnection && computerCount === 0) return 'cloud';
+  return mode;
+}
+
 export function shouldEnableCloudRequests(
   mode: ConnectionMode,
   hasCloudCredentials: boolean,

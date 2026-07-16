@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { canonicalJson } from './canonicalJson';
-import { verifyComputerBridgeCredential } from './computerBridge';
+import { ComputerBridgeError, verifyComputerBridgeCredential } from './computerBridge';
 import {
   createDeviceIdentity,
   deleteDeviceIdentity,
@@ -342,6 +342,21 @@ async function migratePairedComputerEndpoint(
   return summary(updated);
 }
 
+async function removeRevokedComputerForFreshPairing(
+  current: PairedComputerCredential,
+  offer: ComputerPairingOffer,
+): Promise<PairedComputerCredential[]> {
+  const latestComputers = await loadPairedComputers();
+  const latest = latestComputers.find((computer) => computer.bridgeId === offer.bridgeId);
+  if (!latest || !bridgeIdentityMatches(current, offer) || !bridgeIdentityMatches(latest, offer)) {
+    throw new Error('The paired Mac changed while its authorization was being recovered');
+  }
+  const remaining = latestComputers.filter((computer) => computer.bridgeId !== offer.bridgeId);
+  await storePairedComputers(remaining);
+  await deleteDeviceIdentity(latest.deviceKeyId);
+  return remaining;
+}
+
 function postPairingJson(
   offer: ComputerPairingOffer,
   path: '/v1/pair/submit' | '/v1/pair/status',
@@ -368,12 +383,19 @@ async function performComputerPairing(
     throw new Error('The pairing code has an invalid bridge identity');
   }
   notify(options, 'loading_existing_pairing');
-  const initialComputers = await loadPairedComputers();
+  let initialComputers = await loadPairedComputers();
   const existingComputer = initialComputers.find(
     (computer) => computer.bridgeId === offer.bridgeId,
   );
   if (existingComputer) {
-    return migratePairedComputerEndpoint(existingComputer, offer, options);
+    try {
+      return await migratePairedComputerEndpoint(existingComputer, offer, options);
+    } catch (error) {
+      if (!(error instanceof ComputerBridgeError) || error.code !== 'authorization_failed') {
+        throw error;
+      }
+      initialComputers = await removeRevokedComputerForFreshPairing(existingComputer, offer);
+    }
   }
   if (initialComputers.length >= 8) throw new Error('Remove a paired Mac before adding another');
 
