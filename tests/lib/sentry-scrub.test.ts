@@ -20,8 +20,9 @@ describe('diagnostic secret scrubber (§10.2 gate)', () => {
     );
   });
 
-  it('redacts org- and devin- IDs', () => {
+  it('redacts both org ID forms and devin- IDs', () => {
     expect(scrubDiagnosticString('org-abc123def456789')).toBe('[org_redacted]');
+    expect(scrubDiagnosticString('org_abc123def456789')).toBe('[org_redacted]');
     expect(scrubDiagnosticString('devin-xyz789abc123456')).toBe('[devin_redacted]');
   });
 

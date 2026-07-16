@@ -4,6 +4,7 @@
  */
 
 import {
+  orgIdSchema,
   sessionResponseSchema,
   sessionListResponseSchema,
   sessionMessageSchema,
@@ -51,6 +52,17 @@ const sessionFixture = {
 };
 
 describe('API schema boundary validation (§8.3)', () => {
+  it('accepts both server-issued organization ID separators without rewriting them', () => {
+    expect(orgIdSchema.parse('org-abc123')).toBe('org-abc123');
+    expect(orgIdSchema.parse('org_abc123')).toBe('org_abc123');
+  });
+
+  it('rejects malformed organization IDs', () => {
+    for (const value of ['orgabc123', 'org/abc123', 'org-', 'org_', 'other-abc123']) {
+      expect(orgIdSchema.safeParse(value).success).toBe(false);
+    }
+  });
+
   it('parses a valid SessionResponse and passes through unknown fields', () => {
     const out = sessionResponseSchema.parse({ ...sessionFixture, future_field: 'ok' });
     expect(out.session_id).toBe('devin-123');

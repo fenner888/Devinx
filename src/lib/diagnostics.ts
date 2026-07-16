@@ -13,7 +13,7 @@ export function captureDiagnostic(_error: unknown): void {
 const KEY_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
   { pattern: /Bearer\s+[A-Za-z0-9._~+/=-]+/gi, replacement: '[bearer_redacted]' },
   { pattern: /cog_[A-Za-z0-9_-]+/g, replacement: '[cog_redacted]' },
-  { pattern: /org-[A-Za-z0-9_-]+/g, replacement: '[org_redacted]' },
+  { pattern: /org[-_][A-Za-z0-9]+/g, replacement: '[org_redacted]' },
   { pattern: /devin-[A-Za-z0-9_-]+/g, replacement: '[devin_redacted]' },
   { pattern: /[A-Za-z0-9_-]{24,}/g, replacement: '[token_redacted]' },
 ];

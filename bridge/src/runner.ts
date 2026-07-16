@@ -6,8 +6,10 @@ import { z } from 'zod';
 import {
   AcpSessionClient,
   isAcpSessionInUseError,
+  type AcpElicitationResponse,
   type AcpHistoryMessage,
   type AcpModelCatalog,
+  type AcpPendingElicitation,
   type AcpSessionActivity,
 } from './acp';
 import {
@@ -138,6 +140,11 @@ const unavailableSessions: SessionDiscoveryAdapter = {
   loadSession: () => Promise.reject(new Error('Session loading is not enabled')),
   isSessionActivitySupported: () => false,
   getSessionActivity: () => Promise.resolve(null),
+  isSessionElicitationSupported: () => false,
+  getPendingElicitation: () => null,
+  respondToElicitation: () => {
+    throw new Error('Session questions are not enabled');
+  },
   isSessionPromptSupported: () => false,
   promptSession: () => Promise.reject(new Error('Session prompting is not enabled')),
   isSessionCreateSupported: () => false,
@@ -223,6 +230,30 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     return this.current.getSessionActivity?.(input) ?? null;
   }
 
+  isSessionElicitationSupported(): boolean {
+    return Boolean(
+      this.current.isSessionElicitationSupported?.() &&
+      this.current.getPendingElicitation &&
+      this.current.respondToElicitation,
+    );
+  }
+
+  getPendingElicitation(sessionId: string): AcpPendingElicitation | null {
+    if (!this.isSessionElicitationSupported() || !this.current.getPendingElicitation) return null;
+    return this.current.getPendingElicitation(sessionId);
+  }
+
+  respondToElicitation(
+    sessionId: string,
+    interactionId: string,
+    response: AcpElicitationResponse,
+  ): void {
+    if (!this.isSessionElicitationSupported() || !this.current.respondToElicitation) {
+      throw new Error('Session questions are not enabled');
+    }
+    this.current.respondToElicitation(sessionId, interactionId, response);
+  }
+
   async loadSession(input: string): ReturnType<SessionDiscoveryAdapter['loadSession']> {
     await this.ensureSessionListed(input);
     if (this.history?.isSessionLoadSupported()) {
@@ -293,7 +324,10 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     }
     const sessionId = await this.current.createSession(cwd, modelId, text);
     this.listedSessionIds.add(sessionId);
-    this.acpLoadedSessionIds.add(sessionId);
+    // ACP releases ownership after the asynchronous prompt settles. Do not
+    // cache that process-local load beyond the accepted prompt, or the next
+    // steering request will skip the required session/load handshake.
+    this.acpLoadedSessionIds.delete(sessionId);
     return sessionId;
   }
 
@@ -323,13 +357,20 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
           ? await createContinuation.call(this.current, history.cwd, context, text, modelId)
           : await createContinuation.call(this.current, history.cwd, context, text);
         this.listedSessionIds.add(continuedSessionId);
-        this.acpLoadedSessionIds.add(continuedSessionId);
+        this.acpLoadedSessionIds.delete(continuedSessionId);
         return { continuedSessionId };
       }
     }
-    return modelId
-      ? this.current.promptSession(sessionId, text, modelId)
-      : this.current.promptSession(sessionId, text);
+    try {
+      return modelId
+        ? await this.current.promptSession(sessionId, text, modelId)
+        : await this.current.promptSession(sessionId, text);
+    } finally {
+      // AcpSessionClient releases the lock when this accepted prompt finishes.
+      // Force a fresh load before every later prompt instead of retaining a
+      // stale cross-process ownership marker.
+      this.acpLoadedSessionIds.delete(sessionId);
+    }
   }
 
   private async ensureSessionListed(sessionId: string): Promise<void> {

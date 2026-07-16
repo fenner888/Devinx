@@ -3,6 +3,8 @@ import { generateKeyPairSync, randomBytes, randomUUID, sign } from 'node:crypto'
 import {
   AcpBusyError,
   type AcpLoadedSession,
+  type AcpElicitationResponse,
+  type AcpPendingElicitation,
   type AcpSessionActivity,
   type AcpSessionPage,
 } from '../../bridge/src/acp';
@@ -61,6 +63,31 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     label: 'Editing\nsrc/session.ts',
     updatedAt: NOW,
   };
+  elicitationSupported = true;
+  elicitation: AcpPendingElicitation | null = {
+    id: `interaction_${'Q'.repeat(43)}`,
+    sessionId: 'raw-private-session-id',
+    message: 'Which implementation should I use?',
+    title: 'Choose an approach',
+    fields: [
+      {
+        key: 'approach',
+        type: 'single_select',
+        title: 'Approach',
+        required: true,
+        options: [
+          { value: 'safe', label: 'Preserve the current API' },
+          { value: 'migrate', label: 'Migrate the API' },
+        ],
+      },
+    ],
+    createdAt: NOW,
+  };
+  elicitationResponses: Array<{
+    sessionId: string;
+    interactionId: string;
+    response: AcpElicitationResponse;
+  }> = [];
   prompts: Array<{ sessionId: string; text: string; modelId?: string }> = [];
   continuedSessionId: string | null = null;
   promptFailure: Error | null = null;
@@ -113,6 +140,23 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     return this.activity;
   }
 
+  isSessionElicitationSupported(): boolean {
+    return this.elicitationSupported;
+  }
+
+  getPendingElicitation(): AcpPendingElicitation | null {
+    return this.elicitation;
+  }
+
+  respondToElicitation(
+    sessionId: string,
+    interactionId: string,
+    response: AcpElicitationResponse,
+  ): void {
+    this.elicitationResponses.push({ sessionId, interactionId, response });
+    this.elicitation = null;
+  }
+
   isSessionPromptSupported(): boolean {
     return this.promptSupported;
   }
@@ -124,9 +168,7 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   ): Promise<void | { continuedSessionId: string }> {
     this.prompts.push({ sessionId, text, ...(modelId ? { modelId } : {}) });
     if (this.promptFailure) throw this.promptFailure;
-    return this.continuedSessionId
-      ? { continuedSessionId: this.continuedSessionId }
-      : undefined;
+    return this.continuedSessionId ? { continuedSessionId: this.continuedSessionId } : undefined;
   }
 
   isSessionCreateSupported(): boolean {
@@ -215,8 +257,28 @@ describe('authenticated Desktop Bridge service', () => {
       body: {
         protocolVersion: 2,
         status: 'ready',
-        capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+        capabilities: {
+          sessionList: true,
+          sessionLoad: false,
+          sessionPrompt: false,
+        },
       },
+    });
+  });
+
+  it('advertises structured question support through the additive feature handshake', async () => {
+    await expect(service().handle(envelope('bridge.features', {}), context())).resolves.toEqual({
+      status: 200,
+      body: { sessionElicitation: true },
+    });
+
+    const unavailable = new FakeSessionAdapter();
+    unavailable.elicitationSupported = false;
+    await expect(
+      service({ sessions: unavailable }).handle(envelope('bridge.features', {}), context()),
+    ).resolves.toEqual({
+      status: 200,
+      body: { sessionElicitation: false },
     });
   });
 
@@ -294,10 +356,7 @@ describe('authenticated Desktop Bridge service', () => {
   it('returns a minimized conflict when ACP is finishing the previous prompt', async () => {
     adapter.promptFailure = new AcpBusyError();
     const bridge = service();
-    const permissions: BridgePermission[] = [
-      'session:metadata:read',
-      'session:prompt:send',
-    ];
+    const permissions: BridgePermission[] = ['session:metadata:read', 'session:prompt:send'];
     const listed = await bridge.handle(envelope('session.list', {}, permissions), context());
     const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
 
@@ -579,6 +638,94 @@ describe('authenticated Desktop Bridge service', () => {
         envelope('session.activity', { sessionId: `local_${'U'.repeat(43)}` }, [
           'session:content:read',
         ]),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
+  });
+
+  it('returns and answers only the current validated session question', async () => {
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+    const readPermissions: BridgePermission[] = ['session:content:read'];
+
+    await expect(
+      bridge.handle(
+        envelope('session.elicitation', { sessionId: handle }, readPermissions),
+        context(),
+      ),
+    ).resolves.toMatchObject({
+      status: 200,
+      body: {
+        interaction: {
+          id: `interaction_${'Q'.repeat(43)}`,
+          message: 'Which implementation should I use?',
+          fields: [{ key: 'approach', type: 'single_select' }],
+        },
+      },
+    });
+    const responsePermissions: BridgePermission[] = ['session:prompt:send'];
+    await expect(
+      bridge.handle(
+        envelope(
+          'session.elicitation.respond',
+          {
+            sessionId: handle,
+            interactionId: `interaction_${'Q'.repeat(43)}`,
+            action: 'accept',
+            content: { approach: 'safe' },
+          },
+          responsePermissions,
+        ),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 200, body: { accepted: true } });
+    expect(adapter.elicitationResponses).toEqual([
+      {
+        sessionId: 'raw-private-session-id',
+        interactionId: `interaction_${'Q'.repeat(43)}`,
+        response: { action: 'accept', content: { approach: 'safe' } },
+      },
+    ]);
+
+    await expect(
+      bridge.handle(
+        envelope(
+          'session.elicitation.respond',
+          {
+            sessionId: handle,
+            interactionId: `interaction_${'Q'.repeat(43)}`,
+            action: 'decline',
+          },
+          responsePermissions,
+        ),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
+  });
+
+  it('conceals session questions without the exact read or response permission', async () => {
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+
+    await expect(
+      bridge.handle(
+        envelope('session.elicitation', { sessionId: handle }, ['bridge:health']),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
+    await expect(
+      bridge.handle(
+        envelope(
+          'session.elicitation.respond',
+          {
+            sessionId: handle,
+            interactionId: `interaction_${'Q'.repeat(43)}`,
+            action: 'decline',
+          },
+          ['session:content:read'],
+        ),
         context(),
       ),
     ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });

@@ -23,7 +23,7 @@ const outputRoot = resolve(repositoryRoot, 'artifacts', 'connector');
 const architecture = arch() === 'arm64' ? 'arm64' : arch() === 'x64' ? 'x64' : null;
 const appName = 'DevinX Connector.app';
 const appRoot = resolve(outputRoot, appName);
-const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.0-macos-${architecture}.dmg`);
+const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.1-macos-${architecture}.dmg`);
 const checksumPath = `${dmgPath}.sha256`;
 const auditPath = resolve(outputRoot, 'verification-audit.json');
 const expectedLicense = readFileSync(resolve(repositoryRoot, 'LICENSE'), 'utf8');
@@ -101,7 +101,7 @@ function validateApp(app) {
   if (plistValue(app, 'CFBundleIdentifier') !== 'com.devinx.connector') {
     throw new Error('Unexpected Connector bundle identifier');
   }
-  if (plistValue(app, 'CFBundleShortVersionString') !== '0.1.0') {
+  if (plistValue(app, 'CFBundleShortVersionString') !== '0.1.1') {
     throw new Error('Unexpected Connector marketing version');
   }
   if (plistValue(app, 'LSMinimumSystemVersion') !== '13.0') {

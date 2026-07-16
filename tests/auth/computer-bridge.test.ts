@@ -32,6 +32,7 @@ import {
   ComputerBridgeError,
   createComputerSession,
   disconnectComputer,
+  getComputerBridgeFeatures,
   getComputerBridgeHealth,
   getComputerCreateOptions,
   listComputerSessions,
@@ -85,14 +86,22 @@ describe('authenticated mobile Computer Bridge client', () => {
       body: {
         protocolVersion: 2,
         status: 'ready',
-        capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+        capabilities: {
+          sessionList: true,
+          sessionLoad: false,
+          sessionPrompt: false,
+        },
       },
     });
 
     await expect(getComputerBridgeHealth(BRIDGE_ID)).resolves.toEqual({
       protocolVersion: 2,
       status: 'ready',
-      capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+      capabilities: {
+        sessionList: true,
+        sessionLoad: false,
+        sessionPrompt: false,
+      },
     });
 
     expect(mockSign).toHaveBeenCalledTimes(1);
@@ -112,6 +121,25 @@ describe('authenticated mobile Computer Bridge client', () => {
     expect(mockPostPinnedBridgeJson).toHaveBeenCalledWith(COMPUTER.endpoint, '/v1/request', {
       ...unsigned,
       signature: SIGNATURE,
+    });
+  });
+
+  it('discovers structured question support without changing the health contract', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({
+      status: 200,
+      body: { sessionElicitation: true },
+    });
+
+    await expect(getComputerBridgeFeatures(BRIDGE_ID)).resolves.toEqual({
+      sessionElicitation: true,
+    });
+  });
+
+  it('fails closed when an older Connector does not implement the feature handshake', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({ status: 400, body: {} });
+
+    await expect(getComputerBridgeFeatures(BRIDGE_ID)).resolves.toEqual({
+      sessionElicitation: false,
     });
   });
 
@@ -398,7 +426,11 @@ describe('authenticated mobile Computer Bridge client', () => {
         body: {
           protocolVersion: 2,
           status: 'ready',
-          capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+          capabilities: {
+            sessionList: true,
+            sessionLoad: false,
+            sessionPrompt: false,
+          },
         },
       })
       .mockResolvedValueOnce({ status: 200, body: { sessions: [] } });

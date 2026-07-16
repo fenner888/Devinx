@@ -37,7 +37,7 @@ Highlights:
 
 DevinX is an independent, unofficial client for the Devin API. It is not affiliated with, endorsed
 by, or a product of Cognition AI. A Devin account and appropriate API access are required for cloud
-features. Computer features require the separately installed DevinX Connector 0.1.0, Devin for
+features. Computer features require the separately installed DevinX Connector 0.1.1, Devin for
 Terminal, and Tailscale on an Apple-silicon Mac.
 
 ## Review constraints

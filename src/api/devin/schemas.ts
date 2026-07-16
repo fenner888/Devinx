@@ -20,7 +20,17 @@ import { z } from 'zod';
 export const cursorSchema = z.string();
 export const unixTimestampSchema = z.number().int();
 export const acuCountSchema = z.number().min(0);
-export const orgIdSchema = z.string().regex(/^org-/);
+/**
+ * Devin's current v3 reference documents `org-...`, while some live
+ * organization accounts expose the legacy `org_...` form. Preserve the
+ * server-issued identifier exactly; authenticated API validation remains the
+ * source of truth.
+ */
+export const orgIdSchema = z
+  .string()
+  .min(5)
+  .max(128)
+  .regex(/^org[-_][A-Za-z0-9]+$/);
 export const devinIdSchema = z.string().regex(/^devin-/);
 
 export const sessionStatusSchema = z.enum([

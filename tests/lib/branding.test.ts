@@ -22,6 +22,11 @@ describe('branding (§1.4)', () => {
     expect(branding.linkPrefix).toBe('devinx://');
   });
 
+  it('recognizes both server-issued organization ID forms', () => {
+    expect(branding.orgIdPrefix).toBe('org-');
+    expect(branding.orgIdPrefixes).toEqual(['org-', 'org_']);
+  });
+
   it('has fallback names for Apple rejection', () => {
     expect(branding.fallbackNames).toContain('Cockpit');
     expect(branding.fallbackNames).toContain('Dispatch');

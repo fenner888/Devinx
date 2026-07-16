@@ -145,7 +145,7 @@ describe('active session composer', () => {
     const composer = getByTestId('cloud-session-composer');
     expect(composer.props.className).toContain('rounded-card');
     expect(composer.props.className).not.toContain('bg-surface1');
-    expect(composer.props.style.backgroundColor).toBe('#FFFFFF14');
+    expect(composer.props.style.backgroundColor).toBe('#1F1F1F');
     expect(getByLabelText('Cloud session message').props.textAlignVertical).toBe('top');
     expect(getByLabelText('Cloud session message').props.className).toContain('min-h-[44px]');
     expect(getByTestId('cloud-session-timeline').props.keyboardDismissMode).toBe('interactive');

@@ -82,7 +82,6 @@ function BackButton({ onPress }: { onPress: () => void }) {
     </Pressable>
   );
 }
-
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -470,7 +469,7 @@ export default function SessionDetailScreen() {
             )}
             <View
               className="rounded-card border border-border px-3 pt-2 pb-2"
-              style={{ backgroundColor: tokens.tintPrimary.hex }}
+              style={{ backgroundColor: tokens.composerSurface.hex }}
               testID="cloud-session-composer"
             >
               <TextInput

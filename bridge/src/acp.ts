@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 
@@ -17,6 +18,9 @@ const MAX_REPLAY_NOTIFICATIONS = 10_000;
 const MAX_REPLAY_MESSAGES = 200;
 const MAX_REPLAY_TEXT_BYTES = 160 * 1024;
 const MAX_MESSAGE_TEXT_BYTES = 100 * 1024;
+const MAX_ELICITATION_FIELDS = 16;
+const MAX_ELICITATION_OPTIONS = 100;
+const MAX_ELICITATION_TEXT_LENGTH = 10_000;
 const SAFE_ENVIRONMENT_KEYS = [
   'HOME',
   'LANG',
@@ -193,14 +197,178 @@ const toolActivityUpdateSchema = z
   })
   .passthrough();
 
+const elicitationOptionSchema = z
+  .object({
+    const: z.string().max(500),
+    title: z.string().min(1).max(500),
+  })
+  .passthrough();
+
+const commonElicitationPropertyShape = {
+  title: z.string().min(1).max(500).nullable().optional(),
+  description: z.string().min(1).max(2_000).nullable().optional(),
+};
+
+const stringElicitationPropertySchema = z
+  .object({
+    type: z.literal('string'),
+    ...commonElicitationPropertyShape,
+    minLength: z.number().int().min(0).max(MAX_ELICITATION_TEXT_LENGTH).nullable().optional(),
+    maxLength: z.number().int().min(0).max(MAX_ELICITATION_TEXT_LENGTH).nullable().optional(),
+    pattern: z.null().optional(),
+    format: z.null().optional(),
+    default: z.string().max(MAX_ELICITATION_TEXT_LENGTH).nullable().optional(),
+    enum: z.array(z.string().max(500)).min(1).max(MAX_ELICITATION_OPTIONS).nullable().optional(),
+    oneOf: z
+      .array(elicitationOptionSchema)
+      .min(1)
+      .max(MAX_ELICITATION_OPTIONS)
+      .nullable()
+      .optional(),
+  })
+  .passthrough()
+  .superRefine((value, context) => {
+    if (value.enum && value.oneOf) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Choose enum or oneOf' });
+    }
+    const values = value.oneOf?.map((option) => option.const) ?? value.enum ?? [];
+    if (new Set(values).size !== values.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Options must be unique' });
+    }
+    if ((value.minLength ?? 0) > (value.maxLength ?? MAX_ELICITATION_TEXT_LENGTH)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid string bounds' });
+    }
+  });
+
+const numericElicitationPropertySchema = z
+  .object({
+    type: z.enum(['number', 'integer']),
+    ...commonElicitationPropertyShape,
+    minimum: z.number().finite().nullable().optional(),
+    maximum: z.number().finite().nullable().optional(),
+    default: z.number().finite().nullable().optional(),
+  })
+  .passthrough()
+  .superRefine((value, context) => {
+    if ((value.minimum ?? -Infinity) > (value.maximum ?? Infinity)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid numeric bounds' });
+    }
+    if (
+      value.type === 'integer' &&
+      value.default !== null &&
+      value.default !== undefined &&
+      !Number.isInteger(value.default)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Integer default must be an integer',
+      });
+    }
+  });
+
+const booleanElicitationPropertySchema = z
+  .object({
+    type: z.literal('boolean'),
+    ...commonElicitationPropertyShape,
+    default: z.boolean().nullable().optional(),
+  })
+  .passthrough();
+
+const multiSelectItemsSchema = z.union([
+  z
+    .object({
+      type: z.literal('string'),
+      enum: z.array(z.string().max(500)).min(1).max(MAX_ELICITATION_OPTIONS),
+    })
+    .passthrough(),
+  z
+    .object({
+      anyOf: z.array(elicitationOptionSchema).min(1).max(MAX_ELICITATION_OPTIONS),
+    })
+    .passthrough(),
+]);
+
+const arrayElicitationPropertySchema = z
+  .object({
+    type: z.literal('array'),
+    ...commonElicitationPropertyShape,
+    minItems: z.number().int().min(0).max(MAX_ELICITATION_OPTIONS).nullable().optional(),
+    maxItems: z.number().int().min(0).max(MAX_ELICITATION_OPTIONS).nullable().optional(),
+    items: multiSelectItemsSchema,
+    default: z.array(z.string().max(500)).max(MAX_ELICITATION_OPTIONS).nullable().optional(),
+  })
+  .passthrough()
+  .superRefine((value, context) => {
+    if ((value.minItems ?? 0) > (value.maxItems ?? MAX_ELICITATION_OPTIONS)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid selection bounds' });
+    }
+    const values: string[] =
+      'enum' in value.items && Array.isArray(value.items.enum)
+        ? (value.items.enum as string[])
+        : (value.items as { anyOf: Array<{ const: string }> }).anyOf.map((option) => option.const);
+    if (new Set(values).size !== values.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Options must be unique' });
+    }
+  });
+
+const elicitationPropertySchema = z.union([
+  stringElicitationPropertySchema,
+  numericElicitationPropertySchema,
+  booleanElicitationPropertySchema,
+  arrayElicitationPropertySchema,
+]);
+
+const formElicitationRequestSchema = z
+  .object({
+    mode: z.literal('form'),
+    message: z.string().min(1).max(4_000),
+    sessionId: sessionIdSchema,
+    toolCallId: z.string().min(1).max(512).nullable().optional(),
+    requestedSchema: z
+      .object({
+        type: z.literal('object').optional(),
+        title: z.string().min(1).max(500).nullable().optional(),
+        description: z.string().min(1).max(2_000).nullable().optional(),
+        properties: z.record(elicitationPropertySchema),
+        required: z
+          .array(z.string().min(1).max(160))
+          .max(MAX_ELICITATION_FIELDS)
+          .nullable()
+          .optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough()
+  .superRefine((value, context) => {
+    const keys = Object.keys(value.requestedSchema.properties);
+    if (keys.length === 0 || keys.length > MAX_ELICITATION_FIELDS) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid field count' });
+    }
+    for (const key of keys) {
+      const hasControlCharacter = [...key].some((character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return codePoint <= 31 || codePoint === 127;
+      });
+      if ([...key].length > 160 || hasControlCharacter) {
+        context.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid field name' });
+      }
+    }
+    const required = value.requestedSchema.required ?? [];
+    if (new Set(required).size !== required.length || required.some((key) => !keys.includes(key))) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid required fields' });
+    }
+  });
+
+const permissionRequestSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    toolCall: z.object({ toolCallId: z.string().min(1).max(512) }).passthrough(),
+    options: z.array(z.object({ optionId: z.string().min(1).max(512) }).passthrough()).max(100),
+  })
+  .passthrough();
+
 export type AcpActivityKind =
-  | 'thinking'
-  | 'reading'
-  | 'editing'
-  | 'executing'
-  | 'searching'
-  | 'fetching'
-  | 'responding';
+  'thinking' | 'reading' | 'editing' | 'executing' | 'searching' | 'fetching' | 'responding';
 
 export interface AcpSessionActivity {
   kind: AcpActivityKind;
@@ -259,6 +427,46 @@ export interface AcpHistoryMessage {
   source: 'user' | 'devin';
   text: string;
 }
+
+export type AcpElicitationFieldType =
+  'text' | 'single_select' | 'multi_select' | 'number' | 'integer' | 'boolean';
+
+export interface AcpElicitationOption {
+  value: string;
+  label: string;
+}
+
+export interface AcpElicitationField {
+  key: string;
+  type: AcpElicitationFieldType;
+  title: string;
+  description?: string;
+  required: boolean;
+  options?: AcpElicitationOption[];
+  minimum?: number;
+  maximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
+  defaultValue?: string | number | boolean | string[];
+}
+
+export interface AcpPendingElicitation {
+  id: string;
+  sessionId: string;
+  message: string;
+  title?: string;
+  description?: string;
+  fields: AcpElicitationField[];
+  createdAt: number;
+}
+
+export type AcpElicitationContentValue = string | number | boolean | string[];
+
+export type AcpElicitationResponse =
+  | { action: 'accept'; content: Record<string, AcpElicitationContentValue> }
+  | { action: 'decline' | 'cancel' };
 
 export interface AcpLoadedSession {
   sessionId: string;
@@ -339,6 +547,164 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
+interface PendingElicitationRecord {
+  rpcId: string | number;
+  public: AcpPendingElicitation;
+}
+
+function enumOptions(
+  property: z.infer<typeof elicitationPropertySchema>,
+): AcpElicitationOption[] | undefined {
+  if (property.type === 'string') {
+    if (property.oneOf) {
+      return property.oneOf.map((option) => ({ value: option.const, label: option.title }));
+    }
+    return property.enum?.map((value) => ({ value, label: value }));
+  }
+  if (property.type !== 'array') return undefined;
+  if ('enum' in property.items && Array.isArray(property.items.enum)) {
+    return (property.items.enum as string[]).map((value) => ({ value, label: value }));
+  }
+  return (property.items as { anyOf: Array<{ const: string; title: string }> }).anyOf.map(
+    (option) => ({ value: option.const, label: option.title }),
+  );
+}
+
+function publicField(
+  key: string,
+  property: z.infer<typeof elicitationPropertySchema>,
+  required: boolean,
+): AcpElicitationField {
+  const base = {
+    key,
+    title: property.title ?? key,
+    ...(property.description ? { description: property.description } : {}),
+    required,
+  };
+  if (property.type === 'string') {
+    const options = enumOptions(property);
+    return {
+      ...base,
+      type: options ? 'single_select' : 'text',
+      ...(options ? { options } : {}),
+      ...(property.minLength !== null && property.minLength !== undefined
+        ? { minLength: property.minLength }
+        : {}),
+      ...(property.maxLength !== null && property.maxLength !== undefined
+        ? { maxLength: property.maxLength }
+        : {}),
+      ...(property.default !== null && property.default !== undefined
+        ? { defaultValue: property.default }
+        : {}),
+    };
+  }
+  if (property.type === 'array') {
+    return {
+      ...base,
+      type: 'multi_select',
+      options: enumOptions(property),
+      ...(property.minItems !== null && property.minItems !== undefined
+        ? { minItems: property.minItems }
+        : {}),
+      ...(property.maxItems !== null && property.maxItems !== undefined
+        ? { maxItems: property.maxItems }
+        : {}),
+      ...(property.default ? { defaultValue: [...property.default] } : {}),
+    };
+  }
+  if (property.type === 'boolean') {
+    return {
+      ...base,
+      type: 'boolean',
+      ...(property.default !== null && property.default !== undefined
+        ? { defaultValue: property.default }
+        : {}),
+    };
+  }
+  return {
+    ...base,
+    type: property.type,
+    ...(property.minimum !== null && property.minimum !== undefined
+      ? { minimum: property.minimum }
+      : {}),
+    ...(property.maximum !== null && property.maximum !== undefined
+      ? { maximum: property.maximum }
+      : {}),
+    ...(property.default !== null && property.default !== undefined
+      ? { defaultValue: property.default }
+      : {}),
+  };
+}
+
+function validateElicitationContent(
+  elicitation: AcpPendingElicitation,
+  input: unknown,
+): Record<string, AcpElicitationContentValue> {
+  const content = z.record(z.unknown()).parse(input);
+  const fields = new Map(elicitation.fields.map((field) => [field.key, field]));
+  if (Object.keys(content).some((key) => !fields.has(key))) {
+    throw new Error('Elicitation response contains an unknown field');
+  }
+  const validated: Record<string, AcpElicitationContentValue> = {};
+  for (const field of elicitation.fields) {
+    const value = content[field.key];
+    if (value === undefined) {
+      if (field.required) throw new Error('Elicitation response is missing a required field');
+      continue;
+    }
+    if (field.type === 'text' || field.type === 'single_select') {
+      const parsed = z.string().max(MAX_ELICITATION_TEXT_LENGTH).parse(value);
+      if (field.minLength !== undefined && [...parsed].length < field.minLength) {
+        throw new Error('Elicitation response is shorter than allowed');
+      }
+      if (field.maxLength !== undefined && [...parsed].length > field.maxLength) {
+        throw new Error('Elicitation response is longer than allowed');
+      }
+      if (field.options && !field.options.some((option) => option.value === parsed)) {
+        throw new Error('Elicitation response selected an unavailable option');
+      }
+      validated[field.key] = parsed;
+      continue;
+    }
+    if (field.type === 'multi_select') {
+      const parsed = z.array(z.string().max(500)).max(MAX_ELICITATION_OPTIONS).parse(value);
+      if (new Set(parsed).size !== parsed.length) {
+        throw new Error('Elicitation response contains duplicate selections');
+      }
+      if (field.minItems !== undefined && parsed.length < field.minItems) {
+        throw new Error('Elicitation response has too few selections');
+      }
+      if (field.maxItems !== undefined && parsed.length > field.maxItems) {
+        throw new Error('Elicitation response has too many selections');
+      }
+      if (
+        field.options &&
+        parsed.some((item) => !field.options?.some((option) => option.value === item))
+      ) {
+        throw new Error('Elicitation response selected an unavailable option');
+      }
+      validated[field.key] = parsed;
+      continue;
+    }
+    if (field.type === 'boolean') {
+      validated[field.key] = z.boolean().parse(value);
+      continue;
+    }
+    const parsed = z.number().finite().parse(value);
+    if (field.type === 'integer' && !Number.isInteger(parsed)) {
+      throw new Error('Elicitation response must be an integer');
+    }
+    if (field.minimum !== undefined && parsed < field.minimum) {
+      throw new Error('Elicitation response is below the minimum');
+    }
+    if (field.maximum !== undefined && parsed > field.maximum) {
+      throw new Error('Elicitation response is above the maximum');
+    }
+    validated[field.key] = parsed;
+  }
+  return validated;
+}
+
 function safeChildEnvironment(): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
@@ -414,7 +780,10 @@ export function parseAcpModelCatalog(
 }
 
 function cloneModelCatalog(catalog: AcpModelCatalog): AcpModelCatalog {
-  return { defaultModelId: catalog.defaultModelId, models: catalog.models.map((model) => ({ ...model })) };
+  return {
+    defaultModelId: catalog.defaultModelId,
+    models: catalog.models.map((model) => ({ ...model })),
+  };
 }
 
 function utf8Tail(value: string, maximumBytes: number): { text: string; truncated: boolean } {
@@ -450,6 +819,7 @@ export class AcpSessionClient {
   private activeLoad: ReplayCollector | null = null;
   private activePromptSessionId: string | null = null;
   private activeActivity: ActiveAcpSessionActivity | null = null;
+  private readonly pendingElicitations = new Map<string, PendingElicitationRecord>();
   private creatingContinuation = false;
   private modelCatalog: AcpModelCatalog | null = null;
   private readonly sessionModelSelectors = new Map<string, AcpModelSelector>();
@@ -473,6 +843,7 @@ export class AcpSessionClient {
     this.activeLoad = null;
     this.activePromptSessionId = null;
     this.activeActivity = null;
+    this.pendingElicitations.clear();
     this.creatingContinuation = false;
     this.modelCatalog = null;
     this.sessionModelSelectors.clear();
@@ -498,7 +869,7 @@ export class AcpSessionClient {
         'initialize',
         {
           protocolVersion: ACP_PROTOCOL_VERSION,
-          clientCapabilities: {},
+          clientCapabilities: { elicitation: { form: {} } },
           clientInfo: { name: 'devinx-desktop-bridge', version: '1' },
         },
         initializeResultSchema,
@@ -507,16 +878,12 @@ export class AcpSessionClient {
       this.canListSessions = supportsSessionList(initialization.agentCapabilities);
       this.canLoadSessions = supportsSessionLoad(initialization.agentCapabilities);
       this.canEmbedContext =
-        (
-          initialization.agentCapabilities.promptCapabilities as
-            | Record<string, unknown>
-            | undefined
-        )?.embeddedContext === true;
+        (initialization.agentCapabilities.promptCapabilities as Record<string, unknown> | undefined)
+          ?.embeddedContext === true;
       this.canCloseSessions = Boolean(
         (
           initialization.agentCapabilities.sessionCapabilities as
-            | Record<string, unknown>
-            | undefined
+            Record<string, unknown> | undefined
         )?.close,
       );
     } catch (error) {
@@ -574,11 +941,74 @@ export class AcpSessionClient {
     return Boolean(this.child);
   }
 
+  isSessionElicitationSupported(): boolean {
+    return Boolean(this.child);
+  }
+
   async getSessionActivity(sessionIdInput: unknown): Promise<AcpSessionActivity | null> {
     const sessionId = sessionIdSchema.parse(sessionIdInput);
     if (this.activeActivity?.sessionId !== sessionId) return null;
     const { kind, label, active, updatedAt } = this.activeActivity;
     return { kind, label, active, updatedAt };
+  }
+
+  getPendingElicitation(sessionIdInput: unknown): AcpPendingElicitation | null {
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    const pending = this.pendingElicitations.get(sessionId)?.public;
+    return pending
+      ? {
+          ...pending,
+          fields: pending.fields.map((field) => ({
+            ...field,
+            options: field.options?.map((option) => ({ ...option })),
+            defaultValue: Array.isArray(field.defaultValue)
+              ? [...field.defaultValue]
+              : field.defaultValue,
+          })),
+        }
+      : null;
+  }
+
+  respondToElicitation(
+    sessionIdInput: unknown,
+    interactionIdInput: unknown,
+    responseInput: unknown,
+  ): void {
+    const child = this.child;
+    if (!child) throw new Error('ACP client is not started');
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    const interactionId = z
+      .string()
+      .regex(/^interaction_[A-Za-z0-9_-]{43}$/)
+      .parse(interactionIdInput);
+    const response = z
+      .union([
+        z.object({ action: z.literal('accept'), content: z.record(z.unknown()) }).strict(),
+        z.object({ action: z.enum(['decline', 'cancel']) }).strict(),
+      ])
+      .parse(responseInput);
+    const pending = this.pendingElicitations.get(sessionId);
+    if (!pending || pending.public.id !== interactionId) {
+      throw new Error('ACP elicitation is unavailable');
+    }
+    const result: AcpElicitationResponse =
+      response.action === 'accept'
+        ? {
+            action: 'accept',
+            content: validateElicitationContent(pending.public, response.content),
+          }
+        : { action: response.action };
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: pending.rpcId, result })}\n`);
+    this.pendingElicitations.delete(sessionId);
+    if (this.activeActivity?.sessionId === sessionId) {
+      this.activeActivity = {
+        sessionId,
+        kind: 'responding',
+        label: 'Working on your task',
+        active: true,
+        updatedAt: Date.now(),
+      };
+    }
   }
 
   isSessionCreateSupported(): boolean {
@@ -690,7 +1120,11 @@ export class AcpSessionClient {
     if (!this.child) throw new Error('ACP client is not started');
     if (!this.canEmbedContext) throw new Error('ACP agent does not support embedded context');
     const cwd = absolutePathSchema.parse(cwdInput);
-    const context = z.string().min(1).max(160 * 1024).parse(contextInput);
+    const context = z
+      .string()
+      .min(1)
+      .max(160 * 1024)
+      .parse(contextInput);
     const text = z.string().trim().min(1).max(100_000).parse(textInput);
     if (this.activeLoad || this.activePromptSessionId || this.creatingContinuation) {
       throw new AcpBusyError();
@@ -736,9 +1170,13 @@ export class AcpSessionClient {
   async createSession(cwdInput: unknown, modelInput: unknown, textInput: unknown): Promise<string> {
     if (!this.child) throw new Error('ACP client is not started');
     const cwd = absolutePathSchema.parse(cwdInput);
-    const modelId = z.string().min(1).max(160).regex(/^[A-Za-z0-9._:+-]+$/).nullable().parse(
-      modelInput,
-    );
+    const modelId = z
+      .string()
+      .min(1)
+      .max(160)
+      .regex(/^[A-Za-z0-9._:+-]+$/)
+      .nullable()
+      .parse(modelInput);
     const text = z.string().trim().min(1).max(100_000).parse(textInput);
     if (this.activeLoad || this.activePromptSessionId || this.creatingContinuation) {
       throw new AcpBusyError();
@@ -805,7 +1243,12 @@ export class AcpSessionClient {
   }
 
   private async selectSessionModel(sessionId: string, modelInput: unknown): Promise<void> {
-    const modelId = z.string().min(1).max(160).regex(/^[A-Za-z0-9._:+-]+$/).parse(modelInput);
+    const modelId = z
+      .string()
+      .min(1)
+      .max(160)
+      .regex(/^[A-Za-z0-9._:+-]+$/)
+      .parse(modelInput);
     const selector = this.sessionModelSelectors.get(sessionId);
     if (!selector?.catalog.models.some((model) => model.id === modelId)) {
       throw new Error('ACP model is not available');
@@ -850,6 +1293,7 @@ export class AcpSessionClient {
 
   private async finishPrompt(sessionId: string): Promise<void> {
     if (this.activePromptSessionId !== sessionId) return;
+    this.pendingElicitations.delete(sessionId);
     this.activePromptSessionId = null;
     await this.releaseSessionOwnership(sessionId).catch(() => this.stop().catch(() => {}));
     if (!this.activePromptSessionId) {
@@ -876,6 +1320,7 @@ export class AcpSessionClient {
     this.activeLoad = null;
     this.activePromptSessionId = null;
     this.activeActivity = null;
+    this.pendingElicitations.clear();
     this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
@@ -954,6 +1399,89 @@ export class AcpSessionClient {
     }
   }
 
+  private sendAgentResult(
+    child: ChildProcessWithoutNullStreams,
+    id: string | number,
+    result: unknown,
+  ): void {
+    if (child !== this.child) return;
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, result })}\n`);
+  }
+
+  private sendAgentError(
+    child: ChildProcessWithoutNullStreams,
+    id: string | number,
+    code: number,
+    message: string,
+  ): void {
+    if (child !== this.child) return;
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } })}\n`);
+  }
+
+  private handleAgentRequest(
+    child: ChildProcessWithoutNullStreams,
+    id: string | number,
+    method: string,
+    params: unknown,
+  ): void {
+    if (method === 'session/request_permission') {
+      const parsed = permissionRequestSchema.safeParse(params);
+      if (!parsed.success) {
+        this.sendAgentError(child, id, -32602, 'Invalid permission request');
+        return;
+      }
+      this.sendAgentResult(child, id, { outcome: { outcome: 'cancelled' } });
+      return;
+    }
+    if (method !== 'elicitation/create') {
+      this.sendAgentError(child, id, -32601, 'Method not supported');
+      return;
+    }
+    const mode = z
+      .object({ mode: z.string(), message: z.string() })
+      .passthrough()
+      .safeParse(params);
+    if (!mode.success) {
+      this.sendAgentError(child, id, -32602, 'Invalid elicitation request');
+      return;
+    }
+    if (mode.data.mode !== 'form') {
+      this.sendAgentResult(child, id, { action: 'decline' });
+      return;
+    }
+    const parsed = formElicitationRequestSchema.safeParse(params);
+    if (!parsed.success || parsed.data.sessionId !== this.activePromptSessionId) {
+      this.sendAgentError(child, id, -32602, 'Invalid elicitation request');
+      return;
+    }
+    if (this.pendingElicitations.has(parsed.data.sessionId)) {
+      this.sendAgentResult(child, id, { action: 'decline' });
+      return;
+    }
+    const required = new Set(parsed.data.requestedSchema.required ?? []);
+    const pending: AcpPendingElicitation = {
+      id: `interaction_${randomBytes(32).toString('base64url')}`,
+      sessionId: parsed.data.sessionId,
+      message: parsed.data.message,
+      ...(parsed.data.requestedSchema.title ? { title: parsed.data.requestedSchema.title } : {}),
+      ...(parsed.data.requestedSchema.description
+        ? { description: parsed.data.requestedSchema.description }
+        : {}),
+      fields: Object.entries(parsed.data.requestedSchema.properties).map(([key, property]) =>
+        publicField(key, property, required.has(key)),
+      ),
+      createdAt: Date.now(),
+    };
+    this.pendingElicitations.set(parsed.data.sessionId, { rpcId: id, public: pending });
+    this.activeActivity = {
+      sessionId: parsed.data.sessionId,
+      kind: 'thinking',
+      label: 'Waiting for your answer',
+      active: true,
+      updatedAt: pending.createdAt,
+    };
+  }
+
   private handleLine(child: ChildProcessWithoutNullStreams, line: string): void {
     let decoded: unknown;
     try {
@@ -973,7 +1501,7 @@ export class AcpSessionClient {
       return;
     }
     if (message.method && message.id !== undefined) {
-      this.abort(child, new Error('ACP agent requests are not supported'));
+      this.handleAgentRequest(child, message.id, message.method, message.params);
       return;
     }
     if (message.id === undefined || !this.pending.has(message.id)) {
@@ -1090,7 +1618,7 @@ export class AcpSessionClient {
       }
       const kind = parsed.data.kind
         ? activityKindForTool(parsed.data.kind)
-        : previous?.kind ?? 'thinking';
+        : (previous?.kind ?? 'thinking');
       const title = parsed.data.title?.replace(/\s+/g, ' ').trim();
       this.activeActivity = {
         sessionId,
@@ -1141,9 +1669,7 @@ export class AcpSessionClient {
     const shouldMerge =
       last?.source === input.source &&
       ((last.messageId !== undefined && last.messageId === input.messageId) ||
-        (last.messageId === undefined &&
-          input.messageId === undefined &&
-          !collector.mergeBarrier));
+        (last.messageId === undefined && input.messageId === undefined && !collector.mergeBarrier));
     if (shouldMerge && last) {
       collector.textBytes -= messageBytes(last);
       const merged = utf8Tail(`${last.text}${clipped.text}`, MAX_MESSAGE_TEXT_BYTES);
@@ -1191,6 +1717,8 @@ export class AcpSessionClient {
     if (this.activeLoad) this.activeLoad.failed = true;
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.activeActivity = null;
+    this.pendingElicitations.clear();
     this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
@@ -1217,6 +1745,8 @@ export class AcpSessionClient {
     if (this.activeLoad) this.activeLoad.failed = true;
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.activeActivity = null;
+    this.pendingElicitations.clear();
     this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');

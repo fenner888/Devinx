@@ -6,6 +6,7 @@ import {
   AcpBusyError,
   type AcpLoadedSession,
   type AcpModelCatalog,
+  type AcpPendingElicitation,
   type AcpSessionActivity,
   type AcpSessionPage,
 } from './acp';
@@ -24,6 +25,8 @@ import {
   sessionCreateBodySchema,
   sessionCreateOptionsBodySchema,
   sessionActivityBodySchema,
+  sessionElicitationBodySchema,
+  sessionElicitationResponseBodySchema,
   sessionListBodySchema,
   sessionLoadBodySchema,
   sessionPromptBodySchema,
@@ -86,6 +89,12 @@ const healthResponseSchema = z
   })
   .strict();
 
+const featuresResponseSchema = z
+  .object({
+    sessionElicitation: z.boolean(),
+  })
+  .strict();
+
 const localSessionPageSchema = z
   .object({
     sessions: z.array(localSessionSchema).max(5_000),
@@ -136,6 +145,67 @@ const localSessionActivitySchema = z
   })
   .strict();
 
+const elicitationValueSchema = z.union([
+  z.string().max(10_000),
+  z.number().finite(),
+  z.boolean(),
+  z.array(z.string().max(500)).max(100),
+]);
+
+const localSessionElicitationSchema = z
+  .object({
+    interaction: z
+      .object({
+        id: z.string().regex(/^interaction_[A-Za-z0-9_-]{43}$/),
+        message: z.string().min(1).max(4_000),
+        title: z.string().min(1).max(500).optional(),
+        description: z.string().min(1).max(2_000).optional(),
+        fields: z
+          .array(
+            z
+              .object({
+                key: z.string().min(1).max(160),
+                type: z.enum([
+                  'text',
+                  'single_select',
+                  'multi_select',
+                  'number',
+                  'integer',
+                  'boolean',
+                ]),
+                title: z.string().min(1).max(500),
+                description: z.string().min(1).max(2_000).optional(),
+                required: z.boolean(),
+                options: z
+                  .array(
+                    z
+                      .object({
+                        value: z.string().max(500),
+                        label: z.string().min(1).max(500),
+                      })
+                      .strict(),
+                  )
+                  .max(100)
+                  .optional(),
+                minimum: z.number().finite().optional(),
+                maximum: z.number().finite().optional(),
+                minLength: z.number().int().min(0).max(10_000).optional(),
+                maxLength: z.number().int().min(0).max(10_000).optional(),
+                minItems: z.number().int().min(0).max(100).optional(),
+                maxItems: z.number().int().min(0).max(100).optional(),
+                defaultValue: elicitationValueSchema.optional(),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(16),
+        createdAt: z.number().int().nonnegative(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
 type LocalLoadedSession = z.infer<typeof localLoadedSessionSchema>;
 
 export interface SessionDiscoveryAdapter {
@@ -145,13 +215,26 @@ export interface SessionDiscoveryAdapter {
   loadSession(sessionId: string): Promise<AcpLoadedSession>;
   isSessionActivitySupported?(): boolean;
   getSessionActivity?(sessionId: string): Promise<AcpSessionActivity | null>;
+  isSessionElicitationSupported?(): boolean;
+  getPendingElicitation?(sessionId: string): AcpPendingElicitation | null;
+  respondToElicitation?(
+    sessionId: string,
+    interactionId: string,
+    response:
+      { action: 'accept'; content: Record<string, unknown> } | { action: 'decline' | 'cancel' },
+  ): void;
   isSessionPromptSupported(): boolean;
   promptSession(
     sessionId: string,
     text: string,
     modelId?: string,
   ): Promise<void | { continuedSessionId: string }>;
-  createContinuation?(cwd: string, context: string, text: string, modelId?: string): Promise<string>;
+  createContinuation?(
+    cwd: string,
+    context: string,
+    text: string,
+    modelId?: string,
+  ): Promise<string>;
   releaseSessionOwnership?(sessionId: string): Promise<void>;
   isSessionCreateSupported?(): boolean;
   listModelCatalog?(): Promise<AcpModelCatalog>;
@@ -229,10 +312,10 @@ function modelDisplayName(modelId: string): string {
     }
     labels.push(
       (() => {
-      if (/^\d+(?:\.\d+)*$/.test(word)) return word;
-      if (word.toLowerCase() === 'gpt') return 'GPT';
-      if (word.toLowerCase() === 'glm') return 'GLM';
-      return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
+        if (/^\d+(?:\.\d+)*$/.test(word)) return word;
+        if (word.toLowerCase() === 'gpt') return 'GPT';
+        if (word.toLowerCase() === 'glm') return 'GLM';
+        return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
       })(),
     );
   }
@@ -347,7 +430,8 @@ export class BridgeService {
         ? this.rates.sessionListLimit
         : authorization.request.method === 'session.load'
           ? this.rates.sessionLoadLimit
-          : authorization.request.method === 'session.activity'
+          : authorization.request.method === 'session.activity' ||
+              authorization.request.method === 'session.elicitation'
             ? this.rates.sessionActivityLimit
             : authorization.request.method === 'bridge.health'
               ? this.rates.healthLimit
@@ -380,6 +464,18 @@ export class BridgeService {
         }),
       };
     }
+    if (authorization.request.method === 'bridge.features') {
+      return {
+        status: 200,
+        body: featuresResponseSchema.parse({
+          sessionElicitation: Boolean(
+            this.dependencies.sessions.isSessionElicitationSupported?.() &&
+              this.dependencies.sessions.getPendingElicitation &&
+              this.dependencies.sessions.respondToElicitation,
+          ),
+        }),
+      };
+    }
     if (authorization.request.method === 'device.revoke') {
       try {
         const revoked = await this.dependencies.devices.revoke?.(
@@ -400,6 +496,12 @@ export class BridgeService {
     }
     if (authorization.request.method === 'session.activity') {
       return this.sessionActivity(authorization, context.now);
+    }
+    if (authorization.request.method === 'session.elicitation') {
+      return this.sessionElicitation(authorization, context.now);
+    }
+    if (authorization.request.method === 'session.elicitation.respond') {
+      return this.respondToSessionElicitation(authorization, context.now);
     }
     if (authorization.request.method === 'session.prompt') {
       return this.promptSession(authorization, context.now);
@@ -533,6 +635,87 @@ export class BridgeService {
     }
   }
 
+  private async sessionElicitation(
+    authorization: RequestAuthorization,
+    now: number,
+  ): Promise<BridgeServiceResponse> {
+    if (
+      !this.dependencies.sessions.isSessionElicitationSupported?.() ||
+      !this.dependencies.sessions.getPendingElicitation
+    ) {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+    const body = sessionElicitationBodySchema.parse(authorization.request.body);
+    const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
+    if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
+    try {
+      const pending = this.dependencies.sessions.getPendingElicitation(rawSessionId);
+      return {
+        status: 200,
+        body: localSessionElicitationSchema.parse({
+          interaction: pending
+            ? {
+                id: pending.id,
+                message: cleanDisplayText(pending.message, 4_000, 'Devin needs your input'),
+                title: pending.title
+                  ? cleanDisplayText(pending.title, 500, 'Question from Devin')
+                  : undefined,
+                description: pending.description
+                  ? cleanDisplayText(pending.description, 2_000, 'Additional input requested')
+                  : undefined,
+                fields: pending.fields.map((field) => ({
+                  ...field,
+                  title: cleanDisplayText(field.title, 500, field.key),
+                  description: field.description
+                    ? cleanDisplayText(field.description, 2_000, 'Additional input requested')
+                    : undefined,
+                  options: field.options?.map((option) => ({
+                    value: option.value,
+                    label: cleanDisplayText(option.label, 500, option.value),
+                  })),
+                })),
+                createdAt: pending.createdAt,
+              }
+            : null,
+        }),
+      };
+    } catch {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+  }
+
+  private async respondToSessionElicitation(
+    authorization: RequestAuthorization,
+    now: number,
+  ): Promise<BridgeServiceResponse> {
+    if (
+      !this.dependencies.sessions.isSessionElicitationSupported?.() ||
+      !this.dependencies.sessions.getPendingElicitation ||
+      !this.dependencies.sessions.respondToElicitation
+    ) {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+    const body = sessionElicitationResponseBodySchema.parse(authorization.request.body);
+    const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
+    if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
+    const pending = this.dependencies.sessions.getPendingElicitation(rawSessionId);
+    if (!pending || pending.id !== body.interactionId) {
+      return { status: 404, body: { error: 'not_found' } };
+    }
+    try {
+      this.dependencies.sessions.respondToElicitation(
+        rawSessionId,
+        body.interactionId,
+        body.action === 'accept'
+          ? { action: 'accept', content: body.content }
+          : { action: body.action },
+      );
+      return { status: 200, body: { accepted: true } };
+    } catch {
+      return { status: 404, body: { error: 'not_found' } };
+    }
+  }
+
   private async promptSession(
     authorization: RequestAuthorization,
     now: number,
@@ -625,9 +808,7 @@ export class BridgeService {
             }
             if (
               value.defaultModelId !== null &&
-              !value.models.some(
-                (model) => model.id === value.defaultModelId && model.recommended,
-              )
+              !value.models.some((model) => model.id === value.defaultModelId && model.recommended)
             ) {
               context.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -689,7 +870,10 @@ export class BridgeService {
       const sessionId = await this.dependencies.sessions.createSession(cwd, modelId, body.text);
       return {
         status: 200,
-        body: { accepted: true, sessionId: this.dependencies.sessionHandles.register(sessionId, now) },
+        body: {
+          accepted: true,
+          sessionId: this.dependencies.sessionHandles.register(sessionId, now),
+        },
       };
     } catch {
       return { status: 503, body: { error: 'temporarily_unavailable' } };

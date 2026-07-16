@@ -122,7 +122,8 @@ export class ServiceUserAuth implements AuthProvider {
         return {
           ok: false,
           code: 'invalid_key',
-          detail: 'Organization not found. Check your org ID (should start with org-).',
+          detail:
+            'Organization not found. Check the exact org ID shown by Devin (org-… or org_…).',
         };
       }
       return { ok: false, code: 'network', detail: `Unexpected response: ${res.status}` };

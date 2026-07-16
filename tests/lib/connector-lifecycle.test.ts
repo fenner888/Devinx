@@ -30,4 +30,9 @@ describe('macOS Connector lifecycle', () => {
       /if process\?\.isRunning == true \{[\s\S]*?type": "reset"[\s\S]*?\} else \{[\s\S]*?removeProtectedStateWithHelper\(\)/,
     );
   });
+
+  it('shows the newest paired iPhone first and marks that row as most recent', () => {
+    expect(connectorSource).toContain('$0.pairedAt > $1.pairedAt');
+    expect(connectorSource).toContain('device.id == model.devices.first?.id');
+  });
 });

@@ -19,13 +19,14 @@ sharing the same visual language.
 
 ## Existing-session composers
 
-- Cloud and Computer session composers use the translucent semantic
+- Cloud and Computer session composers use the opaque semantic
   `composerSurface` token with the same radius, border, prompt spacing, and
   send-button placement. The surrounding safe-area shell stays transparent.
-  The composer is a true floating overlay rather than a normal opaque layout
-  row, so conversation content is visibly present behind the translucent
-  surface. The history includes measured transparent tail clearance so its
-  final line can still scroll completely above both the composer and Devin.
+  The composer is a true floating overlay rather than a normal full-width
+  layout row, but its own surface must fully occlude conversation text while it
+  scrolls underneath. The history includes measured transparent tail clearance
+  so its final line can still scroll completely above both the composer and
+  Devin.
 - The composer supports a comfortable two-to-three-line draft and grows only to
   a bounded maximum height.
 - The prompt occupies the upper portion of the surface. Existing actions occupy
