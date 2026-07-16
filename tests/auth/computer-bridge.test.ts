@@ -32,6 +32,7 @@ import {
   ComputerBridgeError,
   createComputerSession,
   disconnectComputer,
+  getComputerBridgeFeatures,
   getComputerBridgeHealth,
   getComputerCreateOptions,
   listComputerSessions,
@@ -120,6 +121,25 @@ describe('authenticated mobile Computer Bridge client', () => {
     expect(mockPostPinnedBridgeJson).toHaveBeenCalledWith(COMPUTER.endpoint, '/v1/request', {
       ...unsigned,
       signature: SIGNATURE,
+    });
+  });
+
+  it('discovers structured question support without changing the health contract', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({
+      status: 200,
+      body: { sessionElicitation: true },
+    });
+
+    await expect(getComputerBridgeFeatures(BRIDGE_ID)).resolves.toEqual({
+      sessionElicitation: true,
+    });
+  });
+
+  it('fails closed when an older Connector does not implement the feature handshake', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({ status: 400, body: {} });
+
+    await expect(getComputerBridgeFeatures(BRIDGE_ID)).resolves.toEqual({
+      sessionElicitation: false,
     });
   });
 

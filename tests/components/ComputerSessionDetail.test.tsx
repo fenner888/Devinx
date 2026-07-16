@@ -8,6 +8,7 @@ const mockCompanionProps = jest.fn();
 const mockAnswerMutate = jest.fn();
 const mockReact = React;
 let mockPromptError: Error | null = null;
+let mockSessionElicitationSupported = true;
 let mockSessionActivity:
   { active: boolean; kind: 'thinking'; label: string; updatedAt: number } | undefined;
 let mockInteraction: {
@@ -43,6 +44,9 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../src/api/bridge/queries', () => ({
+  useComputerBridgeFeatures: () => ({
+    data: { sessionElicitation: mockSessionElicitationSupported },
+  }),
   useComputerSessionAccess: () => ({
     data: {
       capabilities: {
@@ -160,6 +164,7 @@ describe('Computer session detail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPromptError = null;
+    mockSessionElicitationSupported = true;
     mockSessionActivity = undefined;
     mockInteraction = null;
   });
@@ -203,6 +208,39 @@ describe('Computer session detail', () => {
       expect.any(Object),
     );
     expect(mockMutate).not.toHaveBeenCalled();
+  });
+
+  it('does not call the question endpoint when the installed Connector lacks the feature', () => {
+    mockSessionElicitationSupported = false;
+    mockSessionActivity = {
+      active: true,
+      kind: 'thinking',
+      label: 'Waiting for your answer',
+      updatedAt: Date.now(),
+    };
+    mockInteraction = {
+      id: `interaction_${'Q'.repeat(43)}`,
+      message: 'Which implementation should I use?',
+      fields: [
+        {
+          key: 'approach',
+          type: 'single_select',
+          title: 'Approach',
+          required: true,
+          options: [{ value: 'safe', label: 'Preserve the API' }],
+        },
+      ],
+      createdAt: 1_800_000_000_000,
+    };
+
+    const screen = render(<ComputerSessionDetailScreen />);
+
+    expect(screen.queryByText('Devin needs your input')).toBeNull();
+    expect(
+      screen.getByText(
+        'Update DevinX Connector on this Mac to answer structured Devin questions from your iPhone.',
+      ),
+    ).toBeTruthy();
   });
 
   it('uses authoritative Mac capabilities to show and submit the steering composer', () => {

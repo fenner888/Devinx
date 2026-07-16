@@ -89,6 +89,12 @@ const healthResponseSchema = z
   })
   .strict();
 
+const featuresResponseSchema = z
+  .object({
+    sessionElicitation: z.literal(true),
+  })
+  .strict();
+
 const localSessionPageSchema = z
   .object({
     sessions: z.array(localSessionSchema).max(5_000),
@@ -456,6 +462,12 @@ export class BridgeService {
               authorization.request.device.permissions.includes('session:prompt:send'),
           },
         }),
+      };
+    }
+    if (authorization.request.method === 'bridge.features') {
+      return {
+        status: 200,
+        body: featuresResponseSchema.parse({ sessionElicitation: true }),
       };
     }
     if (authorization.request.method === 'device.revoke') {

@@ -18,6 +18,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  useComputerBridgeFeatures,
   useComputerSessionAccess,
   useComputerSessionActivity,
   useComputerSessionElicitation,
@@ -180,6 +181,10 @@ export default function ComputerSessionDetailScreen() {
     BRIDGE_ID_PATTERN.test(bridgeId) && LOCAL_SESSION_ID_PATTERN.test(sessionId);
   const computer = computers.find((item) => item.bridgeId === bridgeId);
   const access = useComputerSessionAccess(bridgeId, validParameters && Boolean(computer));
+  const bridgeFeatures = useComputerBridgeFeatures(
+    bridgeId,
+    validParameters && Boolean(computer) && Boolean(access.data),
+  );
   const mayReadContent = validParameters && Boolean(access.data?.capabilities.sessionLoad);
   const query = useComputerSessionDetail(bridgeId, sessionId, mayReadContent);
   const sessionActivity = useComputerSessionActivity(bridgeId, sessionId, mayReadContent);
@@ -188,10 +193,16 @@ export default function ComputerSessionDetailScreen() {
   const mayAnswerQuestions =
     mayReadContent &&
     canPrompt &&
+    Boolean(bridgeFeatures.data?.sessionElicitation) &&
     Boolean(sessionActivity.data?.active) &&
     sessionActivity.data?.label === 'Waiting for your answer';
   const elicitation = useComputerSessionElicitation(bridgeId, sessionId, mayAnswerQuestions);
   const activeElicitation = mayAnswerQuestions ? elicitation.data?.interaction : null;
+  const connectorQuestionUpdateRequired =
+    mayReadContent &&
+    canPrompt &&
+    sessionActivity.data?.label === 'Waiting for your answer' &&
+    bridgeFeatures.data?.sessionElicitation === false;
   const answerElicitation = useRespondComputerSessionElicitation(bridgeId, sessionId);
   const sessionBusy = Boolean(sessionActivity.data?.active);
   const composerOverlayHeight = canPrompt && mayReadContent ? Math.max(composerHeight, 160) : 0;
@@ -536,6 +547,15 @@ export default function ComputerSessionDetailScreen() {
                       <Text className="text-text-hi text-text14">{pendingText}</Text>
                     </View>
                     <Text className="mt-1 text-text-low text-text11">Sending…</Text>
+                  </View>
+                )}
+                {connectorQuestionUpdateRequired && (
+                  <View className="mb-4 flex-row items-start rounded-card border border-border-subtle bg-surface1 px-3 py-3">
+                    <Ionicons name="download-outline" size={16} color={tokens.brandText.hex} />
+                    <Text className="ml-2 flex-1 text-text-mid text-text12 leading-4">
+                      Update DevinX Connector on this Mac to answer structured Devin questions from
+                      your iPhone.
+                    </Text>
                   </View>
                 )}
                 {activeElicitation && (

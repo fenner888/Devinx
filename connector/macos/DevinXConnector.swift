@@ -362,7 +362,10 @@ private final class ConnectorModel: ObservableObject {
             protectedStateRemovalConfirmed = true
             finishUninstall()
         case "devices":
-            devices = event.devices ?? []
+            devices = (event.devices ?? []).sorted {
+                if $0.pairedAt != $1.pairedAt { return $0.pairedAt > $1.pairedAt }
+                return $0.deviceId > $1.deviceId
+            }
         case "error":
             let message: String
             switch event.code {
@@ -546,7 +549,7 @@ private struct ConnectorView: View {
                                         Label(device.deviceName, systemImage: "iphone")
                                             .font(.headline)
                                         Spacer()
-                                        if device.id == model.devices.last?.id {
+                                        if device.id == model.devices.first?.id {
                                             Text("Most recent")
                                                 .font(.caption)
                                                 .foregroundStyle(.blue)

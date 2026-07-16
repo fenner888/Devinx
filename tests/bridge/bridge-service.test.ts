@@ -266,6 +266,13 @@ describe('authenticated Desktop Bridge service', () => {
     });
   });
 
+  it('advertises structured question support through the additive feature handshake', async () => {
+    await expect(service().handle(envelope('bridge.features', {}), context())).resolves.toEqual({
+      status: 200,
+      body: { sessionElicitation: true },
+    });
+  });
+
   it('revokes the authenticated device through the server-authoritative registry', async () => {
     const revoke = jest.fn(async () => true);
     const bridge = service({ devices: { get: devices.get, revoke } });

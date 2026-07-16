@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { useConnections } from '@auth/ConnectionContext';
 import {
   ComputerBridgeError,
+  getComputerBridgeFeatures,
   getComputerBridgeHealth,
   getComputerSessionActivity,
   getComputerSessionElicitation,
@@ -270,6 +271,16 @@ export function useComputerSessionAccess(bridgeId: string, enabled = true) {
     queryFn: () => getComputerBridgeHealth(bridgeId),
     enabled,
     staleTime: 5_000,
+    retry: false,
+  });
+}
+
+export function useComputerBridgeFeatures(bridgeId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['computerBridgeFeatures', bridgeId],
+    queryFn: () => getComputerBridgeFeatures(bridgeId),
+    enabled,
+    staleTime: 60_000,
     retry: false,
   });
 }

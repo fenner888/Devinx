@@ -53,6 +53,7 @@ const computerModelSchema = z
   .strict();
 const bridgeMethodSchema = z.enum([
   'bridge.health',
+  'bridge.features',
   'device.revoke',
   'session.list',
   'session.load',
@@ -64,6 +65,10 @@ const bridgeMethodSchema = z.enum([
   'session.create',
 ]);
 const bridgeHealthBodySchema = z.object({}).strict();
+const bridgeFeaturesBodySchema = z.object({}).strict();
+const computerBridgeFeaturesSchema = z
+  .object({ sessionElicitation: z.boolean() })
+  .strict();
 const deviceRevokeBodySchema = z.object({}).strict();
 const deviceRevokeResponseSchema = z.object({ revoked: z.literal(true) }).strict();
 const sessionListBodySchema = z.object({ cursor: cursorSchema.optional() }).strict();
@@ -323,6 +328,7 @@ export const computerSessionPageSchema = z
   });
 
 export type ComputerBridgeHealth = z.infer<typeof computerBridgeHealthSchema>;
+export type ComputerBridgeFeatures = z.infer<typeof computerBridgeFeaturesSchema>;
 export type ComputerSessionSummary = z.infer<typeof computerSessionSummarySchema>;
 export type ComputerSessionPage = z.infer<typeof computerSessionPageSchema>;
 export type ComputerLoadedSession = z.infer<typeof computerLoadedSessionSchema>;
@@ -363,6 +369,7 @@ type SupportedMethod = z.infer<typeof bridgeMethodSchema>;
 
 const permissionByMethod = {
   'bridge.health': 'bridge:health',
+  'bridge.features': 'bridge:health',
   'device.revoke': 'bridge:health',
   'session.list': 'session:metadata:read',
   'session.load': 'session:content:read',
@@ -376,6 +383,7 @@ const permissionByMethod = {
 
 function bodyForMethod(method: SupportedMethod, input: unknown): object {
   if (method === 'bridge.health') return bridgeHealthBodySchema.parse(input);
+  if (method === 'bridge.features') return bridgeFeaturesBodySchema.parse(input);
   if (method === 'device.revoke') return deviceRevokeBodySchema.parse(input);
   if (method === 'session.list') return sessionListBodySchema.parse(input);
   if (method === 'session.load') return sessionLoadBodySchema.parse(input);
@@ -483,6 +491,27 @@ async function requestHealth(credential: PairedComputerCredential): Promise<Comp
     );
   }
   return result.data;
+}
+
+async function requestFeatures(
+  credential: PairedComputerCredential,
+): Promise<ComputerBridgeFeatures> {
+  try {
+    const response = await requestComputer(credential, 'bridge.features', {});
+    const result = computerBridgeFeaturesSchema.safeParse(response.body);
+    if (!result.success) {
+      throw new ComputerBridgeError(
+        'The paired Mac returned invalid feature information.',
+        'invalid_response',
+      );
+    }
+    return result.data;
+  } catch (error) {
+    if (error instanceof ComputerBridgeError && error.code === 'invalid_response') {
+      return { sessionElicitation: false };
+    }
+    throw error;
+  }
 }
 
 async function requestDeviceRevocation(credential: PairedComputerCredential): Promise<void> {
@@ -631,6 +660,7 @@ async function requestSessionCreate(
 export interface ComputerBridgeConnection {
   bridgeId: string;
   getHealth(): Promise<ComputerBridgeHealth>;
+  getFeatures(): Promise<ComputerBridgeFeatures>;
   listSessions(input?: { cursor?: string }): Promise<ComputerSessionPage>;
   loadSession(sessionId: string): Promise<ComputerLoadedSession>;
   getSessionActivity(sessionId: string): Promise<ComputerSessionActivity>;
@@ -653,6 +683,7 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
   return {
     bridgeId: credential.bridgeId,
     getHealth: () => requestHealth(credential),
+    getFeatures: () => requestFeatures(credential),
     listSessions: (input = {}) => requestSessionList(credential, input),
     loadSession: (sessionId) => requestSessionLoad(credential, { sessionId }),
     getSessionActivity: (sessionId) => requestSessionActivity(credential, { sessionId }),
@@ -701,6 +732,12 @@ export async function openComputerBridge(bridgeId: string): Promise<ComputerBrid
 
 export async function getComputerBridgeHealth(bridgeId: string): Promise<ComputerBridgeHealth> {
   return (await openComputerBridge(bridgeId)).getHealth();
+}
+
+export async function getComputerBridgeFeatures(
+  bridgeId: string,
+): Promise<ComputerBridgeFeatures> {
+  return (await openComputerBridge(bridgeId)).getFeatures();
 }
 
 export async function listComputerSessions(

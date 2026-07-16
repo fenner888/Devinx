@@ -29,6 +29,13 @@ exact `Waiting for your answer` activity transition so it can fail closed if the
 changes. The existing bridge health shape remains unchanged; this preserves compatibility between
 the updated Connector and iOS builds that predate question support.
 
+Question support is negotiated through a separate authenticated `bridge.features` request. An
+updated mobile client treats a missing `bridge.features` method as an older Connector with question
+support disabled; it must not call the elicitation endpoints or present that condition as a general
+Connector outage. Updated Connectors return only bounded boolean feature flags. This additive
+handshake lets older iOS builds continue using the unchanged health response while newer iOS builds
+can fail closed against Connector 0.1.0.
+
 ## Authorization and privacy
 
 - Reading a pending question requires `session:content:read`.
