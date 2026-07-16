@@ -2,7 +2,13 @@ import { basename } from 'node:path';
 
 import { z } from 'zod';
 
-import type { AcpLoadedSession, AcpModelCatalog, AcpSessionActivity, AcpSessionPage } from './acp';
+import {
+  AcpBusyError,
+  type AcpLoadedSession,
+  type AcpModelCatalog,
+  type AcpSessionActivity,
+  type AcpSessionPage,
+} from './acp';
 import type { RateLimiter, RateLimitRule } from './rate-limit';
 import type { ReplayGuard } from './replay';
 import {
@@ -189,7 +195,7 @@ export interface BridgeRequestContext {
 }
 
 export interface BridgeServiceResponse {
-  status: 200 | 400 | 404 | 429 | 503;
+  status: 200 | 400 | 404 | 409 | 429 | 503;
   body: unknown;
 }
 
@@ -519,7 +525,10 @@ export class BridgeService {
           updatedAt: activity?.updatedAt ?? now,
         }),
       };
-    } catch {
+    } catch (error) {
+      if (error instanceof AcpBusyError) {
+        return { status: 409, body: { error: 'conflict' } };
+      }
       return { status: 503, body: { error: 'temporarily_unavailable' } };
     }
   }
@@ -550,7 +559,10 @@ export class BridgeService {
             : {}),
         },
       };
-    } catch {
+    } catch (error) {
+      if (error instanceof AcpBusyError) {
+        return { status: 409, body: { error: 'conflict' } };
+      }
       return { status: 503, body: { error: 'temporarily_unavailable' } };
     }
   }

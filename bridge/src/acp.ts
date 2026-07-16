@@ -301,6 +301,13 @@ export class AcpOperationError extends Error {
   }
 }
 
+export class AcpBusyError extends Error {
+  constructor() {
+    super('ACP is finishing another session operation');
+    this.name = 'AcpBusyError';
+  }
+}
+
 export function isAcpSessionInUseError(error: unknown): boolean {
   return error instanceof AcpOperationError && error.kind === 'session_in_use';
 }
@@ -585,7 +592,7 @@ export class AcpSessionClient {
       throw new Error('ACP agent does not support model discovery');
     }
     if (this.activeLoad || this.activePromptSessionId || this.creatingContinuation) {
-      throw new Error('ACP model discovery is busy');
+      throw new AcpBusyError();
     }
     let cursor: string | undefined;
     let attempts = 0;
@@ -614,8 +621,7 @@ export class AcpSessionClient {
   async loadSession(input: unknown): Promise<AcpLoadedSession> {
     if (!this.child) throw new Error('ACP client is not started');
     if (!this.canLoadSessions) throw new Error('ACP agent does not support session loading');
-    if (this.activeLoad) throw new Error('ACP session loading is busy');
-    if (this.activePromptSessionId) throw new Error('ACP session prompting is busy');
+    if (this.activeLoad || this.activePromptSessionId) throw new AcpBusyError();
     const sessionId = sessionIdSchema.parse(input);
     const metadata = this.listedSessions.get(sessionId);
     if (!metadata) throw new Error('ACP session must be listed before loading');
@@ -687,7 +693,7 @@ export class AcpSessionClient {
     const context = z.string().min(1).max(160 * 1024).parse(contextInput);
     const text = z.string().trim().min(1).max(100_000).parse(textInput);
     if (this.activeLoad || this.activePromptSessionId || this.creatingContinuation) {
-      throw new Error('ACP session continuation is busy');
+      throw new AcpBusyError();
     }
     this.creatingContinuation = true;
     try {
@@ -735,7 +741,7 @@ export class AcpSessionClient {
     );
     const text = z.string().trim().min(1).max(100_000).parse(textInput);
     if (this.activeLoad || this.activePromptSessionId || this.creatingContinuation) {
-      throw new Error('ACP session creation is busy');
+      throw new AcpBusyError();
     }
     this.creatingContinuation = true;
     try {
@@ -820,7 +826,7 @@ export class AcpSessionClient {
 
   private startPrompt(sessionId: string, prompt: unknown[]): void {
     if (this.activeLoad || this.activePromptSessionId) {
-      throw new Error('ACP session prompting is busy');
+      throw new AcpBusyError();
     }
     this.activePromptSessionId = sessionId;
     this.activeActivity = {

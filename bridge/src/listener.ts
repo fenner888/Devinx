@@ -150,17 +150,17 @@ export interface HttpsBridgeListenerAddress {
   certificateFingerprint: string;
 }
 
-type TransportStatus = 400 | 404 | 413 | 415 | 429 | 503;
+type TransportStatus = 400 | 404 | 409 | 413 | 415 | 429 | 503;
 type TransportRoute = 'request' | 'pairing.submit' | 'pairing.status';
 
 export interface PairingTransportDiagnostic {
   route: 'request' | 'pairing.submit' | 'pairing.status';
   phase: 'metadata' | 'body' | 'handler';
-  status: 202 | 200 | 400 | 404 | 413 | 415 | 429 | 503;
+  status: 202 | 200 | 400 | 404 | 409 | 413 | 415 | 429 | 503;
 }
 
 interface TransportHandlerResponse {
-  status: 200 | 202 | 400 | 404 | 429 | 503;
+  status: 200 | 202 | 400 | 404 | 409 | 429 | 503;
   body: unknown;
 }
 
@@ -253,6 +253,7 @@ function publicBody(status: TransportStatus): { error: string } {
   if (status === 413) return { error: 'request_too_large' };
   if (status === 415) return { error: 'unsupported_media_type' };
   if (status === 429) return { error: 'rate_limited' };
+  if (status === 409) return { error: 'conflict' };
   if (status === 503) return { error: 'temporarily_unavailable' };
   if (status === 404) return { error: 'not_found' };
   return { error: 'invalid_request' };

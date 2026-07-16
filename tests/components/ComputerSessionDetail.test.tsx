@@ -6,6 +6,8 @@ const mockMutate = jest.fn();
 const mockRefetch = jest.fn(async () => {});
 const mockCompanionProps = jest.fn();
 const mockReact = React;
+let mockPromptError: Error | null = null;
+let mockSessionActivity: { active: boolean; kind: 'thinking'; label: string; updatedAt: number } | undefined;
 
 jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) =>
@@ -48,11 +50,11 @@ jest.mock('../../src/api/bridge/queries', () => ({
     error: null,
     refetch: mockRefetch,
   }),
-  useComputerSessionActivity: () => ({ data: undefined }),
+  useComputerSessionActivity: () => ({ data: mockSessionActivity }),
   usePromptComputerSession: () => ({
     mutate: mockMutate,
     isPending: false,
-    error: null,
+    error: mockPromptError,
   }),
   useComputerCreateOptions: () => ({
     data: {
@@ -125,10 +127,16 @@ jest.mock('../../src/theme/index', () => ({
 import ComputerSessionDetailScreen, {
   devinReplySignature,
   hasSettledNewDevinReply,
+  promptErrorMessage,
 } from '../../src/app/(main)/computer-session/[bridgeId]/[id]';
+import { ComputerBridgeError } from '../../src/auth/computerBridge';
 
 describe('Computer session detail', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPromptError = null;
+    mockSessionActivity = undefined;
+  });
 
   it('uses authoritative Mac capabilities to show and submit the steering composer', () => {
     const screen = render(<ComputerSessionDetailScreen />);
@@ -220,5 +228,29 @@ describe('Computer session detail', () => {
     expect(hasSettledNewDevinReply(baseline, null, baseline)).toBe(false);
     expect(hasSettledNewDevinReply(baseline, null, changed)).toBe(false);
     expect(hasSettledNewDevinReply(baseline, changed, changed)).toBe(true);
+  });
+
+  it('explains Connector conflicts without falsely claiming steering is disabled', () => {
+    expect(promptErrorMessage(new ComputerBridgeError('Busy', 'busy'))).toBe(
+      'Devin is finishing the previous turn. Try again in a moment.',
+    );
+    expect(promptErrorMessage(new ComputerBridgeError('Revoked', 'authorization_failed'))).toBe(
+      'This iPhone is no longer authorized. Re-pair this computer in Settings.',
+    );
+  });
+
+  it('keeps the composer read-only while the Connector reports active work', () => {
+    mockSessionActivity = {
+      active: true,
+      kind: 'thinking',
+      label: 'Working',
+      updatedAt: Date.now(),
+    };
+    const screen = render(<ComputerSessionDetailScreen />);
+
+    expect(screen.getByLabelText('Computer session message').props.editable).toBe(false);
+    fireEvent.changeText(screen.getByLabelText('Computer session message'), 'Do not send yet');
+    fireEvent.press(screen.getByLabelText('Send computer session message'));
+    expect(mockMutate).not.toHaveBeenCalled();
   });
 });

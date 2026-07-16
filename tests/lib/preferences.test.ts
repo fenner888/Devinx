@@ -5,6 +5,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import {
+  connectionModeAfterComputerRefresh,
   normalizeConnectionMode,
   connectionModeUsesComputer,
   isConnectionModeConfigured,
@@ -57,6 +58,13 @@ describe('preferences', () => {
     expect(connectionModeUsesComputer('cloud')).toBe(false);
     expect(connectionModeUsesComputer('computer')).toBe(true);
     expect(connectionModeUsesComputer('both')).toBe(true);
+  });
+
+  it('keeps cloud users configured after their final combined-mode computer is removed', () => {
+    expect(connectionModeAfterComputerRefresh('both', true, 0)).toBe('cloud');
+    expect(connectionModeAfterComputerRefresh('both', true, 1)).toBe('both');
+    expect(connectionModeAfterComputerRefresh('computer', true, 0)).toBe('computer');
+    expect(connectionModeAfterComputerRefresh('both', false, 0)).toBe('both');
   });
 
   it('resets all persisted user-scoped preferences on disconnect', () => {
