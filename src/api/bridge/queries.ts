@@ -6,14 +6,17 @@ import {
   ComputerBridgeError,
   getComputerBridgeHealth,
   getComputerSessionActivity,
+  getComputerSessionElicitation,
   getComputerCreateOptions,
   createComputerSession,
   loadComputerSession,
   promptComputerSession,
+  respondToComputerSessionElicitation,
   openComputerBridges,
   type ComputerLoadedSession,
   type ComputerBridgeConnection,
   type ComputerSessionSummary,
+  type ComputerElicitationAnswer,
 } from '@auth/computerBridge';
 import type { PairedComputerSummary } from '@auth/pairedComputers';
 import { connectionModeUsesComputer } from '@lib/connections';
@@ -216,11 +219,7 @@ export function useComputerSessionDetail(bridgeId: string, sessionId: string, en
   });
 }
 
-export function useComputerSessionActivity(
-  bridgeId: string,
-  sessionId: string,
-  enabled = true,
-) {
+export function useComputerSessionActivity(bridgeId: string, sessionId: string, enabled = true) {
   return useQuery({
     queryKey: ['computerSessionActivity', bridgeId, sessionId],
     queryFn: () => getComputerSessionActivity(bridgeId, sessionId),
@@ -230,6 +229,38 @@ export function useComputerSessionActivity(
     refetchInterval: () => (AppState.currentState === 'active' ? 1_500 : false),
     refetchOnWindowFocus: true,
     retry: false,
+  });
+}
+
+export function useComputerSessionElicitation(bridgeId: string, sessionId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['computerSessionElicitation', bridgeId, sessionId],
+    queryFn: () => getComputerSessionElicitation(bridgeId, sessionId),
+    enabled,
+    staleTime: 500,
+    gcTime: 60_000,
+    refetchInterval: () => (AppState.currentState === 'active' ? 1_500 : false),
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+}
+
+export function useRespondComputerSessionElicitation(bridgeId: string, sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ComputerElicitationAnswer) =>
+      respondToComputerSessionElicitation(bridgeId, { ...input, sessionId }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['computerSessionElicitation', bridgeId, sessionId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['computerSessionActivity', bridgeId, sessionId],
+        }),
+        queryClient.invalidateQueries({ queryKey: ['computerSession', bridgeId, sessionId] }),
+      ]);
+    },
   });
 }
 

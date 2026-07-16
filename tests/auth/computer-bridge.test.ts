@@ -85,14 +85,22 @@ describe('authenticated mobile Computer Bridge client', () => {
       body: {
         protocolVersion: 2,
         status: 'ready',
-        capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+        capabilities: {
+          sessionList: true,
+          sessionLoad: false,
+          sessionPrompt: false,
+        },
       },
     });
 
     await expect(getComputerBridgeHealth(BRIDGE_ID)).resolves.toEqual({
       protocolVersion: 2,
       status: 'ready',
-      capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+      capabilities: {
+        sessionList: true,
+        sessionLoad: false,
+        sessionPrompt: false,
+      },
     });
 
     expect(mockSign).toHaveBeenCalledTimes(1);
@@ -398,7 +406,11 @@ describe('authenticated mobile Computer Bridge client', () => {
         body: {
           protocolVersion: 2,
           status: 'ready',
-          capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+          capabilities: {
+            sessionList: true,
+            sessionLoad: false,
+            sessionPrompt: false,
+          },
         },
       })
       .mockResolvedValueOnce({ status: 200, body: { sessions: [] } });

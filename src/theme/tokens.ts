@@ -38,7 +38,7 @@ export interface ThemeTokens {
   surface2Wax: ColorToken;
   /** Transparent elevated (over-content overlays). */
   surface2Transparent: ColorToken;
-  /** Translucent floating composer surface. */
+  /** Opaque floating composer surface; the surrounding shell remains transparent. */
   composerSurface: ColorToken;
   /** Home companion stage: quiet planetary surface behind Devin. */
   companionStageSurface: ColorToken;
@@ -143,7 +143,7 @@ export const dark: ThemeTokens = {
   surface2: c('31 31 31', '#1F1F1F'),
   surface2Wax: c('31 31 31 / .94', '#1F1F1FF0'),
   surface2Transparent: c('255 255 255 / .05', '#FFFFFF0D'),
-  composerSurface: c('31 31 31 / .72', '#1F1F1FB8'),
+  composerSurface: c('31 31 31', '#1F1F1F'),
   companionStageSurface: c('4 16 43', '#04102B'),
   companionStageGlow: c('68 137 255 / .14', '#4489FF24'),
   companionStageLine: c('73 176 255 / .72', '#49B0FFB8'),
@@ -213,7 +213,7 @@ export const light: ThemeTokens = {
   surface2: c('255 255 255', '#FFFFFF'),
   surface2Wax: c('255 255 255 / .94', '#FFFFFFF0'),
   surface2Transparent: c('255 255 255', '#FFFFFF'),
-  composerSurface: c('255 255 255 / .84', '#FFFFFFD6'),
+  composerSurface: c('255 255 255', '#FFFFFF'),
   companionStageSurface: c('230 239 255', '#E6EFFF'),
   companionStageGlow: c('49 124 255 / .1', '#317CFF1A'),
   companionStageLine: c('49 124 255 / .42', '#317CFF6B'),

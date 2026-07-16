@@ -5,9 +5,23 @@ import { fireEvent, render } from '@testing-library/react-native';
 const mockMutate = jest.fn();
 const mockRefetch = jest.fn(async () => {});
 const mockCompanionProps = jest.fn();
+const mockAnswerMutate = jest.fn();
 const mockReact = React;
 let mockPromptError: Error | null = null;
-let mockSessionActivity: { active: boolean; kind: 'thinking'; label: string; updatedAt: number } | undefined;
+let mockSessionActivity:
+  { active: boolean; kind: 'thinking'; label: string; updatedAt: number } | undefined;
+let mockInteraction: {
+  id: string;
+  message: string;
+  fields: Array<{
+    key: string;
+    type: 'single_select';
+    title: string;
+    required: boolean;
+    options: Array<{ value: string; label: string }>;
+  }>;
+  createdAt: number;
+} | null = null;
 
 jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) =>
@@ -31,7 +45,11 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('../../src/api/bridge/queries', () => ({
   useComputerSessionAccess: () => ({
     data: {
-      capabilities: { sessionList: true, sessionLoad: true, sessionPrompt: true },
+      capabilities: {
+        sessionList: true,
+        sessionLoad: true,
+        sessionPrompt: true,
+      },
     },
   }),
   useComputerSessionDetail: () => ({
@@ -51,6 +69,12 @@ jest.mock('../../src/api/bridge/queries', () => ({
     refetch: mockRefetch,
   }),
   useComputerSessionActivity: () => ({ data: mockSessionActivity }),
+  useComputerSessionElicitation: () => ({ data: { interaction: mockInteraction } }),
+  useRespondComputerSessionElicitation: () => ({
+    mutate: mockAnswerMutate,
+    isPending: false,
+    error: null,
+  }),
   usePromptComputerSession: () => ({
     mutate: mockMutate,
     isPending: false,
@@ -120,6 +144,7 @@ jest.mock('../../src/theme/index', () => ({
       merged: { hex: '#9966dd' },
       textAlwaysWhite: { hex: '#ffffff' },
       tintPrimary: { hex: '#FFFFFF14' },
+      composerSurface: { hex: '#1F1F1F' },
     },
   }),
 }));
@@ -136,6 +161,48 @@ describe('Computer session detail', () => {
     jest.clearAllMocks();
     mockPromptError = null;
     mockSessionActivity = undefined;
+    mockInteraction = null;
+  });
+
+  it('renders and submits a structured Devin question without using the chat composer', () => {
+    mockSessionActivity = {
+      active: true,
+      kind: 'thinking',
+      label: 'Waiting for your answer',
+      updatedAt: Date.now(),
+    };
+    mockInteraction = {
+      id: `interaction_${'Q'.repeat(43)}`,
+      message: 'Which implementation should I use?',
+      fields: [
+        {
+          key: 'approach',
+          type: 'single_select',
+          title: 'Approach',
+          required: true,
+          options: [
+            { value: 'safe', label: 'Preserve the API' },
+            { value: 'migrate', label: 'Migrate the API' },
+          ],
+        },
+      ],
+      createdAt: 1_800_000_000_000,
+    };
+    const screen = render(<ComputerSessionDetailScreen />);
+
+    expect(screen.getByText('Devin needs your input')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Approach: Preserve the API'));
+    fireEvent.press(screen.getByLabelText('Send answer to Devin'));
+
+    expect(mockAnswerMutate).toHaveBeenCalledWith(
+      {
+        interactionId: `interaction_${'Q'.repeat(43)}`,
+        action: 'accept',
+        content: { approach: 'safe' },
+      },
+      expect.any(Object),
+    );
+    expect(mockMutate).not.toHaveBeenCalled();
   });
 
   it('uses authoritative Mac capabilities to show and submit the steering composer', () => {
@@ -163,7 +230,7 @@ describe('Computer session detail', () => {
     const composer = screen.getByTestId('computer-session-composer');
     expect(composer.props.className).toContain('rounded-card');
     expect(composer.props.className).not.toContain('bg-surface1');
-    expect(composer.props.style.backgroundColor).toBe('#FFFFFF14');
+    expect(composer.props.style.backgroundColor).toBe('#1F1F1F');
     expect(screen.getByLabelText('Computer session message').props.textAlignVertical).toBe('top');
     expect(screen.getByLabelText('Computer session message').props.className).toContain(
       'min-h-[44px]',

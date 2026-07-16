@@ -33,8 +33,13 @@ const bridgeIdListSchema = z
     }
   });
 const localSessionIdSchema = z.string().regex(/^local_[A-Za-z0-9_-]{43}$/);
+const interactionIdSchema = z.string().regex(/^interaction_[A-Za-z0-9_-]{43}$/);
 const workspaceIdSchema = z.string().regex(/^workspace_[A-Za-z0-9_-]{43}$/);
-const modelIdSchema = z.string().min(1).max(160).regex(/^[A-Za-z0-9._:+-]+$/);
+const modelIdSchema = z
+  .string()
+  .min(1)
+  .max(160)
+  .regex(/^[A-Za-z0-9._:+-]+$/);
 const computerModelSchema = z
   .object({
     id: modelIdSchema,
@@ -52,6 +57,8 @@ const bridgeMethodSchema = z.enum([
   'session.list',
   'session.load',
   'session.activity',
+  'session.elicitation',
+  'session.elicitation.respond',
   'session.prompt',
   'session.create_options',
   'session.create',
@@ -78,6 +85,81 @@ const computerSessionActivitySchema = z
     updatedAt: z.number().int().nonnegative(),
   })
   .strict();
+const sessionElicitationBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
+const elicitationValueSchema = z.union([
+  z.string().max(10_000),
+  z.number().finite(),
+  z.boolean(),
+  z.array(z.string().max(500)).max(100),
+]);
+const computerSessionElicitationSchema = z
+  .object({
+    interaction: z
+      .object({
+        id: interactionIdSchema,
+        message: z.string().min(1).max(4_000),
+        title: z.string().min(1).max(500).optional(),
+        description: z.string().min(1).max(2_000).optional(),
+        fields: z
+          .array(
+            z
+              .object({
+                key: z.string().min(1).max(160),
+                type: z.enum([
+                  'text',
+                  'single_select',
+                  'multi_select',
+                  'number',
+                  'integer',
+                  'boolean',
+                ]),
+                title: z.string().min(1).max(500),
+                description: z.string().min(1).max(2_000).optional(),
+                required: z.boolean(),
+                options: z
+                  .array(
+                    z
+                      .object({ value: z.string().max(500), label: z.string().min(1).max(500) })
+                      .strict(),
+                  )
+                  .max(100)
+                  .optional(),
+                minimum: z.number().finite().optional(),
+                maximum: z.number().finite().optional(),
+                minLength: z.number().int().min(0).max(10_000).optional(),
+                maxLength: z.number().int().min(0).max(10_000).optional(),
+                minItems: z.number().int().min(0).max(100).optional(),
+                maxItems: z.number().int().min(0).max(100).optional(),
+                defaultValue: elicitationValueSchema.optional(),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(16),
+        createdAt: z.number().int().nonnegative(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+const sessionElicitationResponseBodySchema = z.union([
+  z
+    .object({
+      sessionId: localSessionIdSchema,
+      interactionId: interactionIdSchema,
+      action: z.literal('accept'),
+      content: z.record(elicitationValueSchema),
+    })
+    .strict(),
+  z
+    .object({
+      sessionId: localSessionIdSchema,
+      interactionId: interactionIdSchema,
+      action: z.enum(['decline', 'cancel']),
+    })
+    .strict(),
+]);
+const sessionElicitationResponseSchema = z.object({ accepted: z.literal(true) }).strict();
 const sessionPromptBodySchema = z
   .object({
     sessionId: localSessionIdSchema,
@@ -110,9 +192,7 @@ const sessionCreateOptionsResponseSchema = z
     }
     if (
       value.defaultModelId !== null &&
-      !value.models.some(
-        (model) => model.id === value.defaultModelId && model.recommended,
-      )
+      !value.models.some((model) => model.id === value.defaultModelId && model.recommended)
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -247,6 +327,16 @@ export type ComputerSessionSummary = z.infer<typeof computerSessionSummarySchema
 export type ComputerSessionPage = z.infer<typeof computerSessionPageSchema>;
 export type ComputerLoadedSession = z.infer<typeof computerLoadedSessionSchema>;
 export type ComputerSessionActivity = z.infer<typeof computerSessionActivitySchema>;
+export type ComputerSessionElicitation = z.infer<typeof computerSessionElicitationSchema>;
+export type ComputerElicitationInteraction = NonNullable<ComputerSessionElicitation['interaction']>;
+export type ComputerElicitationResponse = z.infer<typeof sessionElicitationResponseBodySchema>;
+export type ComputerElicitationAnswer =
+  | {
+      interactionId: string;
+      action: 'accept';
+      content: Record<string, string | number | boolean | string[]>;
+    }
+  | { interactionId: string; action: 'decline' | 'cancel' };
 export type ComputerCreateOptions = z.infer<typeof sessionCreateOptionsResponseSchema>;
 export type ComputerModel = z.infer<typeof computerModelSchema>;
 
@@ -277,6 +367,8 @@ const permissionByMethod = {
   'session.list': 'session:metadata:read',
   'session.load': 'session:content:read',
   'session.activity': 'session:content:read',
+  'session.elicitation': 'session:content:read',
+  'session.elicitation.respond': 'session:prompt:send',
   'session.prompt': 'session:prompt:send',
   'session.create_options': 'session:metadata:read',
   'session.create': 'session:create',
@@ -288,6 +380,10 @@ function bodyForMethod(method: SupportedMethod, input: unknown): object {
   if (method === 'session.list') return sessionListBodySchema.parse(input);
   if (method === 'session.load') return sessionLoadBodySchema.parse(input);
   if (method === 'session.activity') return sessionActivityBodySchema.parse(input);
+  if (method === 'session.elicitation') return sessionElicitationBodySchema.parse(input);
+  if (method === 'session.elicitation.respond') {
+    return sessionElicitationResponseBodySchema.parse(input);
+  }
   if (method === 'session.prompt') return sessionPromptBodySchema.parse(input);
   if (method === 'session.create_options') return sessionCreateOptionsBodySchema.parse(input);
   return sessionCreateBodySchema.parse(input);
@@ -333,6 +429,7 @@ async function requestComputer(
   const requiredPermission = permissionByMethod[method];
   if (
     method !== 'session.prompt' &&
+    method !== 'session.elicitation.respond' &&
     method !== 'session.create' &&
     !credential.permissions.includes(requiredPermission)
   ) {
@@ -455,6 +552,36 @@ async function requestSessionActivity(
   return result.data;
 }
 
+async function requestSessionElicitation(
+  credential: PairedComputerCredential,
+  input: { sessionId: string },
+): Promise<ComputerSessionElicitation> {
+  const body = sessionElicitationBodySchema.parse(input);
+  const response = await requestComputer(credential, 'session.elicitation', body);
+  const result = computerSessionElicitationSchema.safeParse(response.body);
+  if (!result.success) {
+    throw new ComputerBridgeError(
+      'The paired Mac returned an invalid question.',
+      'invalid_response',
+    );
+  }
+  return result.data;
+}
+
+async function requestSessionElicitationResponse(
+  credential: PairedComputerCredential,
+  input: ComputerElicitationResponse,
+): Promise<void> {
+  const body = sessionElicitationResponseBodySchema.parse(input);
+  const response = await requestComputer(credential, 'session.elicitation.respond', body);
+  if (!sessionElicitationResponseSchema.safeParse(response.body).success) {
+    throw new ComputerBridgeError(
+      'The paired Mac returned an invalid question response.',
+      'invalid_response',
+    );
+  }
+}
+
 async function requestSessionPrompt(
   credential: PairedComputerCredential,
   input: { sessionId: string; text: string; modelId?: string },
@@ -507,6 +634,8 @@ export interface ComputerBridgeConnection {
   listSessions(input?: { cursor?: string }): Promise<ComputerSessionPage>;
   loadSession(sessionId: string): Promise<ComputerLoadedSession>;
   getSessionActivity(sessionId: string): Promise<ComputerSessionActivity>;
+  getSessionElicitation(sessionId: string): Promise<ComputerSessionElicitation>;
+  respondToSessionElicitation(input: ComputerElicitationResponse): Promise<void>;
   promptSession(
     sessionId: string,
     text: string,
@@ -527,6 +656,8 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
     listSessions: (input = {}) => requestSessionList(credential, input),
     loadSession: (sessionId) => requestSessionLoad(credential, { sessionId }),
     getSessionActivity: (sessionId) => requestSessionActivity(credential, { sessionId }),
+    getSessionElicitation: (sessionId) => requestSessionElicitation(credential, { sessionId }),
+    respondToSessionElicitation: (input) => requestSessionElicitationResponse(credential, input),
     promptSession: (sessionId, text, modelId) =>
       requestSessionPrompt(credential, {
         sessionId,
@@ -593,6 +724,20 @@ export async function getComputerSessionActivity(
   return (await openComputerBridge(bridgeId)).getSessionActivity(sessionId);
 }
 
+export async function getComputerSessionElicitation(
+  bridgeId: string,
+  sessionId: string,
+): Promise<ComputerSessionElicitation> {
+  return (await openComputerBridge(bridgeId)).getSessionElicitation(sessionId);
+}
+
+export async function respondToComputerSessionElicitation(
+  bridgeId: string,
+  input: ComputerElicitationResponse,
+): Promise<void> {
+  return (await openComputerBridge(bridgeId)).respondToSessionElicitation(input);
+}
+
 export async function promptComputerSession(
   bridgeId: string,
   sessionId: string,
@@ -602,9 +747,7 @@ export async function promptComputerSession(
   return (await openComputerBridge(bridgeId)).promptSession(sessionId, text, modelId);
 }
 
-export async function getComputerCreateOptions(
-  bridgeId: string,
-): Promise<ComputerCreateOptions> {
+export async function getComputerCreateOptions(bridgeId: string): Promise<ComputerCreateOptions> {
   return (await openComputerBridge(bridgeId)).getCreateOptions();
 }
 

@@ -13,7 +13,12 @@ export const opaqueIdSchema = z
 
 export const sessionIdSchema = z.string().min(1).max(512);
 export const workspaceHandleSchema = z.string().regex(/^workspace_[A-Za-z0-9_-]{43}$/);
-export const modelIdSchema = z.string().min(1).max(160).regex(/^[A-Za-z0-9._:+-]+$/);
+export const modelIdSchema = z
+  .string()
+  .min(1)
+  .max(160)
+  .regex(/^[A-Za-z0-9._:+-]+$/);
+export const interactionIdSchema = z.string().regex(/^interaction_[A-Za-z0-9_-]{43}$/);
 const cursorSchema = z.string().min(1).max(4096);
 export const deviceNameSchema = z
   .string()
@@ -35,6 +40,8 @@ export const bridgeMethodSchema = z.enum([
   'session.list',
   'session.load',
   'session.activity',
+  'session.elicitation',
+  'session.elicitation.respond',
   'session.prompt',
   'session.create_options',
   'session.create',
@@ -97,6 +104,46 @@ export const sessionActivityBodySchema = z
   })
   .strict();
 
+export const sessionElicitationBodySchema = z
+  .object({
+    sessionId: sessionIdSchema,
+  })
+  .strict();
+
+const elicitationContentValueSchema = z.union([
+  z.string().max(10_000),
+  z.number().finite(),
+  z.boolean(),
+  z.array(z.string().max(500)).max(100),
+]);
+
+const elicitationContentSchema = z
+  .record(elicitationContentValueSchema)
+  .superRefine((value, context) => {
+    const keys = Object.keys(value);
+    if (keys.length > 16 || keys.some((key) => [...key].length > 160)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid elicitation content' });
+    }
+  });
+
+export const sessionElicitationResponseBodySchema = z.union([
+  z
+    .object({
+      sessionId: sessionIdSchema,
+      interactionId: interactionIdSchema,
+      action: z.literal('accept'),
+      content: elicitationContentSchema,
+    })
+    .strict(),
+  z
+    .object({
+      sessionId: sessionIdSchema,
+      interactionId: interactionIdSchema,
+      action: z.enum(['decline', 'cancel']),
+    })
+    .strict(),
+]);
+
 export const sessionPromptBodySchema = z
   .object({
     sessionId: sessionIdSchema,
@@ -149,6 +196,8 @@ export const bodySchemas = {
   'session.list': sessionListBodySchema,
   'session.load': sessionLoadBodySchema,
   'session.activity': sessionActivityBodySchema,
+  'session.elicitation': sessionElicitationBodySchema,
+  'session.elicitation.respond': sessionElicitationResponseBodySchema,
   'session.prompt': sessionPromptBodySchema,
   'session.create_options': sessionCreateOptionsBodySchema,
   'session.create': sessionCreateBodySchema,
@@ -160,6 +209,8 @@ export const permissionByMethod = {
   'session.list': 'session:metadata:read',
   'session.load': 'session:content:read',
   'session.activity': 'session:content:read',
+  'session.elicitation': 'session:content:read',
+  'session.elicitation.respond': 'session:prompt:send',
   'session.prompt': 'session:prompt:send',
   'session.create_options': 'session:metadata:read',
   'session.create': 'session:create',
@@ -174,6 +225,8 @@ export type DeviceRevokeBody = z.infer<typeof deviceRevokeBodySchema>;
 export type SessionListBody = z.infer<typeof sessionListBodySchema>;
 export type SessionLoadBody = z.infer<typeof sessionLoadBodySchema>;
 export type SessionActivityBody = z.infer<typeof sessionActivityBodySchema>;
+export type SessionElicitationBody = z.infer<typeof sessionElicitationBodySchema>;
+export type SessionElicitationResponseBody = z.infer<typeof sessionElicitationResponseBodySchema>;
 export type SessionPromptBody = z.infer<typeof sessionPromptBodySchema>;
 export type SessionCreateOptionsBody = z.infer<typeof sessionCreateOptionsBodySchema>;
 export type SessionCreateBody = z.infer<typeof sessionCreateBodySchema>;
@@ -184,6 +237,8 @@ export type BridgeBodyByMethod = {
   'session.list': SessionListBody;
   'session.load': SessionLoadBody;
   'session.activity': SessionActivityBody;
+  'session.elicitation': SessionElicitationBody;
+  'session.elicitation.respond': SessionElicitationResponseBody;
   'session.prompt': SessionPromptBody;
   'session.create_options': SessionCreateOptionsBody;
   'session.create': SessionCreateBody;

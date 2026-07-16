@@ -67,7 +67,11 @@ describe('Computer session board query', () => {
     mockGetComputerBridgeHealth.mockResolvedValue({
       protocolVersion: 2,
       status: 'ready',
-      capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+      capabilities: {
+        sessionList: true,
+        sessionLoad: false,
+        sessionPrompt: false,
+      },
     });
   });
 
@@ -115,7 +119,11 @@ describe('Computer session board query', () => {
     mockGetComputerBridgeHealth.mockResolvedValue({
       protocolVersion: 2,
       status: 'ready',
-      capabilities: { sessionList: true, sessionLoad: true, sessionPrompt: false },
+      capabilities: {
+        sessionList: true,
+        sessionLoad: true,
+        sessionPrompt: false,
+      },
     });
     mockListComputerSessions.mockResolvedValue({
       sessions: [session('A', '2027-01-15T10:00:00.000Z')],
@@ -137,7 +145,11 @@ describe('Computer session board query', () => {
     mockGetComputerBridgeHealth.mockResolvedValue({
       protocolVersion: 2,
       status: 'ready',
-      capabilities: { sessionList: false, sessionLoad: false, sessionPrompt: false },
+      capabilities: {
+        sessionList: false,
+        sessionLoad: false,
+        sessionPrompt: false,
+      },
     });
 
     await expect(loadComputerSessionBoard([FIRST])).resolves.toEqual({
@@ -161,7 +173,11 @@ describe('Computer session board query', () => {
       return {
         protocolVersion: 2,
         status: 'ready',
-        capabilities: { sessionList: true, sessionLoad: false, sessionPrompt: false },
+        capabilities: {
+          sessionList: true,
+          sessionLoad: false,
+          sessionPrompt: false,
+        },
       };
     });
     mockListComputerSessions.mockResolvedValue({

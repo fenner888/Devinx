@@ -33,7 +33,11 @@ const mockStorePairedComputers = jest.fn(async (_input: unknown) => {});
 const mockVerifyComputerBridgeCredential = jest.fn(async (_input: unknown) => ({
   protocolVersion: 2,
   status: 'ready',
-  capabilities: { sessionList: true, sessionLoad: true, sessionPrompt: false },
+  capabilities: {
+    sessionList: true,
+    sessionLoad: true,
+    sessionPrompt: false,
+  },
 }));
 
 jest.mock('../../src/auth/computerBridge', () => {

@@ -32,7 +32,7 @@ the toggle. Light theme follows system preference.
 | `--bg-elevated`      | `31 31 31`              | `255 255 255`           | `#1F1F1F`  | `#FFFFFF`   | `surface2`           |
 | `--bg-elevated-wax`  | `31 31 31 / .94`        | `255 255 255 / .94`     | `#1F1F1FF0`| `#FFFFFFF0` | `surface2Wax`        |
 | `--bg-elevated-transparent` | `255 255 255 / .05` | `255 255 255`        | `#FFFFFF0D`| `#FFFFFF`   | `surface2Transparent`|
-| DevinX floating composer | `31 31 31 / .72` | `255 255 255 / .84` | `#1F1F1FB8` | `#FFFFFFD6` | `composerSurface` |
+| DevinX floating composer | `31 31 31` | `255 255 255` | `#1F1F1F` | `#FFFFFF` | `composerSurface` |
 | `--bg-scrim`         | `0 0 0 / .32`           | `0 0 0 / .12`           | `#00000052`| `#0000001F` | `scrim`              |
 | `--bg-accent-neutral`| `249 249 249`           | `54 54 54`              | `#F9F9F9`  | `#363636`   | `surfaceAccentNeutral`|
 
@@ -378,9 +378,9 @@ class="notranslate w-full rounded-sm bg-transparent text-14 text-text-primary
 - container provides `bg-tint-tertiary` + `rounded-[16px]` (the input area
   wrapper, not the editor itself)
 - placeholder rendered via Slate `[data-slate-placeholder]` pseudo-element
-- DevinX existing-session composers use the semantic translucent
-  `composerSurface` token. Their outer safe-area shell remains transparent so
-  it never reads as a separate opaque bottom bar.
+- DevinX existing-session composers use the semantic opaque `composerSurface`
+  token so timeline text cannot show through the input. Their outer safe-area
+  shell remains transparent so it never reads as a separate opaque bottom bar.
 
 **Settings inputs:** `--form-input-bg #00000008`, `--form-input-padding 6px 8px`,
 `--form-input-font-size 16px`, `--form-label-font-size 13px`.

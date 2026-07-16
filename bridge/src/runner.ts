@@ -6,8 +6,10 @@ import { z } from 'zod';
 import {
   AcpSessionClient,
   isAcpSessionInUseError,
+  type AcpElicitationResponse,
   type AcpHistoryMessage,
   type AcpModelCatalog,
+  type AcpPendingElicitation,
   type AcpSessionActivity,
 } from './acp';
 import {
@@ -138,6 +140,11 @@ const unavailableSessions: SessionDiscoveryAdapter = {
   loadSession: () => Promise.reject(new Error('Session loading is not enabled')),
   isSessionActivitySupported: () => false,
   getSessionActivity: () => Promise.resolve(null),
+  isSessionElicitationSupported: () => false,
+  getPendingElicitation: () => null,
+  respondToElicitation: () => {
+    throw new Error('Session questions are not enabled');
+  },
   isSessionPromptSupported: () => false,
   promptSession: () => Promise.reject(new Error('Session prompting is not enabled')),
   isSessionCreateSupported: () => false,
@@ -221,6 +228,30 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   async getSessionActivity(input: string): Promise<AcpSessionActivity | null> {
     await this.ensureSessionListed(input);
     return this.current.getSessionActivity?.(input) ?? null;
+  }
+
+  isSessionElicitationSupported(): boolean {
+    return Boolean(
+      this.current.isSessionElicitationSupported?.() &&
+      this.current.getPendingElicitation &&
+      this.current.respondToElicitation,
+    );
+  }
+
+  getPendingElicitation(sessionId: string): AcpPendingElicitation | null {
+    if (!this.isSessionElicitationSupported() || !this.current.getPendingElicitation) return null;
+    return this.current.getPendingElicitation(sessionId);
+  }
+
+  respondToElicitation(
+    sessionId: string,
+    interactionId: string,
+    response: AcpElicitationResponse,
+  ): void {
+    if (!this.isSessionElicitationSupported() || !this.current.respondToElicitation) {
+      throw new Error('Session questions are not enabled');
+    }
+    this.current.respondToElicitation(sessionId, interactionId, response);
   }
 
   async loadSession(input: string): ReturnType<SessionDiscoveryAdapter['loadSession']> {

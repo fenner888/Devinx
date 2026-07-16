@@ -363,6 +363,151 @@ if (request.method === 'initialize') {
     }
   });
 
+  it('surfaces a validated form question and resumes only after an explicit answer', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  if (!request.params.clientCapabilities?.elicitation?.form) process.exit(31);
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-question', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  globalThis.promptRequestId = request.id;
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: 'agent-question-1', method: 'elicitation/create', params: {
+      mode: 'form', sessionId: 'session-question', message: 'Which approach should I use?',
+      requestedSchema: {
+        type: 'object', required: ['approach'], properties: {
+          approach: {
+            type: 'string', title: 'Approach', oneOf: [
+              { const: 'safe', title: 'Preserve the API' },
+              { const: 'migrate', title: 'Migrate the API' }
+            ]
+          }
+        }
+      }
+    }
+  }) + '\\n');
+} else if (request.id === 'agent-question-1') {
+  if (request.result?.action !== 'accept' || request.result?.content?.approach !== 'safe') {
+    process.exit(32);
+  }
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: globalThis.promptRequestId, result: { stopReason: 'end_turn' }
+  }) + '\\n');
+}`);
+    const client = new AcpSessionClient({
+      executablePath,
+      requestTimeoutMs: 1_000,
+      promptTimeoutMs: 2_000,
+    });
+
+    try {
+      await client.start();
+      await client.listSessions();
+      await client.loadSession('session-question');
+      await client.promptSession('session-question', 'Implement the feature.');
+      let question = client.getPendingElicitation('session-question');
+      for (let attempt = 0; attempt < 20 && !question; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        question = client.getPendingElicitation('session-question');
+      }
+      expect(question).toMatchObject({
+        message: 'Which approach should I use?',
+        fields: [
+          {
+            key: 'approach',
+            type: 'single_select',
+            required: true,
+            options: [
+              { value: 'safe', label: 'Preserve the API' },
+              { value: 'migrate', label: 'Migrate the API' },
+            ],
+          },
+        ],
+      });
+      client.respondToElicitation('session-question', question?.id, {
+        action: 'accept',
+        content: { approach: 'safe' },
+      });
+      expect(client.getPendingElicitation('session-question')).toBeNull();
+      let activity = await client.getSessionActivity('session-question');
+      for (let attempt = 0; attempt < 20 && activity?.active; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        activity = await client.getSessionActivity('session-question');
+      }
+      expect(activity?.active ?? false).toBe(false);
+      for (let attempt = 0; attempt < 20 && !client.isSessionListSupported(); attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      await expect(client.listSessions()).resolves.toMatchObject({
+        sessions: [{ sessionId: 'session-question' }],
+      });
+    } finally {
+      await client.stop();
+    }
+  });
+
+  it('cancels agent permission requests instead of auto-approving them', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-permission', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  globalThis.promptRequestId = request.id;
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: 'permission-1', method: 'session/request_permission', params: {
+      sessionId: 'session-permission',
+      toolCall: { toolCallId: 'dangerous-tool' },
+      options: [{ optionId: 'allow_once' }]
+    }
+  }) + '\\n');
+} else if (request.id === 'permission-1') {
+  if (request.result?.outcome?.outcome !== 'cancelled') process.exit(33);
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: globalThis.promptRequestId, result: { stopReason: 'end_turn' }
+  }) + '\\n');
+}`);
+    const client = new AcpSessionClient({
+      executablePath,
+      requestTimeoutMs: 1_000,
+      promptTimeoutMs: 2_000,
+    });
+
+    try {
+      await client.start();
+      await client.listSessions();
+      await client.loadSession('session-permission');
+      await client.promptSession('session-permission', 'Use a tool.');
+      let activity = await client.getSessionActivity('session-permission');
+      for (let attempt = 0; attempt < 20 && activity?.active; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        activity = await client.getSessionActivity('session-permission');
+      }
+      expect(activity?.active ?? false).toBe(false);
+      for (let attempt = 0; attempt < 20 && !client.isSessionListSupported(); attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      await expect(client.listSessions()).resolves.toMatchObject({
+        sessions: [{ sessionId: 'session-permission' }],
+      });
+    } finally {
+      await client.stop();
+    }
+  });
+
   it('applies an exact loaded-session model before prompting and rejects stale IDs', async () => {
     const executablePath = fakeCli(`
 if (request.method === 'initialize') {
@@ -553,9 +698,9 @@ if (request.method === 'initialize') {
 
     try {
       await client.start();
-      await expect(
-        client.createSession('/tmp/project', 'adaptive', 'Build it.'),
-      ).resolves.toBe('session-created');
+      await expect(client.createSession('/tmp/project', 'adaptive', 'Build it.')).resolves.toBe(
+        'session-created',
+      );
     } finally {
       await new Promise((resolve) => setTimeout(resolve, 20));
       await client.stop();
