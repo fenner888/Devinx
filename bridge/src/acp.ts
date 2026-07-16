@@ -941,6 +941,10 @@ export class AcpSessionClient {
     return Boolean(this.child);
   }
 
+  isSessionElicitationSupported(): boolean {
+    return Boolean(this.child);
+  }
+
   async getSessionActivity(sessionIdInput: unknown): Promise<AcpSessionActivity | null> {
     const sessionId = sessionIdSchema.parse(sessionIdInput);
     if (this.activeActivity?.sessionId !== sessionId) return null;

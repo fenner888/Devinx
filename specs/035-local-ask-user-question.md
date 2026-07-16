@@ -32,9 +32,10 @@ the updated Connector and iOS builds that predate question support.
 Question support is negotiated through a separate authenticated `bridge.features` request. An
 updated mobile client treats a missing `bridge.features` method as an older Connector with question
 support disabled; it must not call the elicitation endpoints or present that condition as a general
-Connector outage. Updated Connectors return only bounded boolean feature flags. This additive
-handshake lets older iOS builds continue using the unchanged health response while newer iOS builds
-can fail closed against Connector 0.1.0.
+Connector outage. Updated Connectors return only bounded boolean feature flags derived from the
+running ACP client; they never advertise question support when the production session adapter
+cannot serve it. This additive handshake lets older iOS builds continue using the unchanged health
+response while newer iOS builds can fail closed against Connector 0.1.0.
 
 ## Authorization and privacy
 

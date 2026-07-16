@@ -409,6 +409,7 @@ if (request.method === 'initialize') {
 
     try {
       await client.start();
+      expect(client.isSessionElicitationSupported()).toBe(true);
       await client.listSessions();
       await client.loadSession('session-question');
       await client.promptSession('session-question', 'Implement the feature.');
@@ -450,6 +451,7 @@ if (request.method === 'initialize') {
       });
     } finally {
       await client.stop();
+      expect(client.isSessionElicitationSupported()).toBe(false);
     }
   });
 

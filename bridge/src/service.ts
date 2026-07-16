@@ -91,7 +91,7 @@ const healthResponseSchema = z
 
 const featuresResponseSchema = z
   .object({
-    sessionElicitation: z.literal(true),
+    sessionElicitation: z.boolean(),
   })
   .strict();
 
@@ -467,7 +467,13 @@ export class BridgeService {
     if (authorization.request.method === 'bridge.features') {
       return {
         status: 200,
-        body: featuresResponseSchema.parse({ sessionElicitation: true }),
+        body: featuresResponseSchema.parse({
+          sessionElicitation: Boolean(
+            this.dependencies.sessions.isSessionElicitationSupported?.() &&
+              this.dependencies.sessions.getPendingElicitation &&
+              this.dependencies.sessions.respondToElicitation,
+          ),
+        }),
       };
     }
     if (authorization.request.method === 'device.revoke') {

@@ -271,6 +271,15 @@ describe('authenticated Desktop Bridge service', () => {
       status: 200,
       body: { sessionElicitation: true },
     });
+
+    const unavailable = new FakeSessionAdapter();
+    unavailable.elicitationSupported = false;
+    await expect(
+      service({ sessions: unavailable }).handle(envelope('bridge.features', {}), context()),
+    ).resolves.toEqual({
+      status: 200,
+      body: { sessionElicitation: false },
+    });
   });
 
   it('revokes the authenticated device through the server-authoritative registry', async () => {
