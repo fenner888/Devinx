@@ -444,6 +444,19 @@ describe('authenticated mobile Computer Bridge client', () => {
     expect(mockSign).toHaveBeenCalledTimes(2);
   });
 
+  it('validates Connector version information and treats an unsupported method as legacy', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: { version: '0.1.2' },
+    });
+
+    const connection = await openComputerBridge(BRIDGE_ID);
+    await expect(connection.getVersion()).resolves.toEqual({ kind: 'supported', version: '0.1.2' });
+
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({ status: 400, body: { error: 'invalid' } });
+    await expect(connection.getVersion()).resolves.toEqual({ kind: 'legacy' });
+  });
+
   it('opens all selected paired Macs from one validated credential-registry read', async () => {
     const second = {
       ...COMPUTER,

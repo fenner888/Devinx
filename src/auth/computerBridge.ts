@@ -54,6 +54,7 @@ const computerModelSchema = z
 const bridgeMethodSchema = z.enum([
   'bridge.health',
   'bridge.features',
+  'bridge.version',
   'device.revoke',
   'session.list',
   'session.load',
@@ -66,8 +67,12 @@ const bridgeMethodSchema = z.enum([
 ]);
 const bridgeHealthBodySchema = z.object({}).strict();
 const bridgeFeaturesBodySchema = z.object({}).strict();
+const bridgeVersionBodySchema = z.object({}).strict();
 const computerBridgeFeaturesSchema = z
   .object({ sessionElicitation: z.boolean() })
+  .strict();
+export const computerBridgeVersionSchema = z
+  .object({ version: z.string().regex(/^\d+\.\d+\.\d+$/) })
   .strict();
 const deviceRevokeBodySchema = z.object({}).strict();
 const deviceRevokeResponseSchema = z.object({ revoked: z.literal(true) }).strict();
@@ -329,6 +334,9 @@ export const computerSessionPageSchema = z
 
 export type ComputerBridgeHealth = z.infer<typeof computerBridgeHealthSchema>;
 export type ComputerBridgeFeatures = z.infer<typeof computerBridgeFeaturesSchema>;
+export type ComputerBridgeVersionStatus =
+  | { kind: 'supported'; version: string }
+  | { kind: 'legacy' };
 export type ComputerSessionSummary = z.infer<typeof computerSessionSummarySchema>;
 export type ComputerSessionPage = z.infer<typeof computerSessionPageSchema>;
 export type ComputerLoadedSession = z.infer<typeof computerLoadedSessionSchema>;
@@ -353,6 +361,7 @@ export type ComputerBridgeErrorCode =
   | 'busy'
   | 'rate_limited'
   | 'unavailable'
+  | 'unsupported_method'
   | 'invalid_response';
 
 export class ComputerBridgeError extends Error {
@@ -370,6 +379,7 @@ type SupportedMethod = z.infer<typeof bridgeMethodSchema>;
 const permissionByMethod = {
   'bridge.health': 'bridge:health',
   'bridge.features': 'bridge:health',
+  'bridge.version': 'bridge:health',
   'device.revoke': 'bridge:health',
   'session.list': 'session:metadata:read',
   'session.load': 'session:content:read',
@@ -384,6 +394,7 @@ const permissionByMethod = {
 function bodyForMethod(method: SupportedMethod, input: unknown): object {
   if (method === 'bridge.health') return bridgeHealthBodySchema.parse(input);
   if (method === 'bridge.features') return bridgeFeaturesBodySchema.parse(input);
+  if (method === 'bridge.version') return bridgeVersionBodySchema.parse(input);
   if (method === 'device.revoke') return deviceRevokeBodySchema.parse(input);
   if (method === 'session.list') return sessionListBodySchema.parse(input);
   if (method === 'session.load') return sessionLoadBodySchema.parse(input);
@@ -397,7 +408,7 @@ function bodyForMethod(method: SupportedMethod, input: unknown): object {
   return sessionCreateBodySchema.parse(input);
 }
 
-function publicResponseError(status: number): ComputerBridgeError {
+function publicResponseError(status: number, method: SupportedMethod): ComputerBridgeError {
   if (status === 404) {
     return new ComputerBridgeError(
       'This iPhone is no longer authorized by the paired Mac.',
@@ -415,6 +426,12 @@ function publicResponseError(status: number): ComputerBridgeError {
   }
   if (status === 503) {
     return new ComputerBridgeError('The paired Mac is temporarily unavailable.', 'unavailable');
+  }
+  if (status === 400 && method === 'bridge.version') {
+    return new ComputerBridgeError(
+      'The paired Mac does not support version negotiation.',
+      'unsupported_method',
+    );
   }
   return new ComputerBridgeError('The paired Mac rejected an invalid request.', 'invalid_response');
 }
@@ -473,7 +490,7 @@ async function requestComputer(
             credential.tlsCertificateFingerprint,
             envelope,
           );
-    if (response.status !== 200) throw publicResponseError(response.status);
+    if (response.status !== 200) throw publicResponseError(response.status, method);
     return { body: response.body, credential };
   } catch (error) {
     if (error instanceof ComputerBridgeError) throw error;
@@ -509,6 +526,27 @@ async function requestFeatures(
   } catch (error) {
     if (error instanceof ComputerBridgeError && error.code === 'invalid_response') {
       return { sessionElicitation: false };
+    }
+    throw error;
+  }
+}
+
+async function requestVersion(
+  credential: PairedComputerCredential,
+): Promise<ComputerBridgeVersionStatus> {
+  try {
+    const response = await requestComputer(credential, 'bridge.version', {});
+    const result = computerBridgeVersionSchema.safeParse(response.body);
+    if (!result.success) {
+      throw new ComputerBridgeError(
+        'The paired Mac returned invalid version information.',
+        'invalid_response',
+      );
+    }
+    return { kind: 'supported', version: result.data.version };
+  } catch (error) {
+    if (error instanceof ComputerBridgeError && error.code === 'unsupported_method') {
+      return { kind: 'legacy' };
     }
     throw error;
   }
@@ -661,6 +699,7 @@ export interface ComputerBridgeConnection {
   bridgeId: string;
   getHealth(): Promise<ComputerBridgeHealth>;
   getFeatures(): Promise<ComputerBridgeFeatures>;
+  getVersion(): Promise<ComputerBridgeVersionStatus>;
   listSessions(input?: { cursor?: string }): Promise<ComputerSessionPage>;
   loadSession(sessionId: string): Promise<ComputerLoadedSession>;
   getSessionActivity(sessionId: string): Promise<ComputerSessionActivity>;
@@ -684,6 +723,7 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
     bridgeId: credential.bridgeId,
     getHealth: () => requestHealth(credential),
     getFeatures: () => requestFeatures(credential),
+    getVersion: () => requestVersion(credential),
     listSessions: (input = {}) => requestSessionList(credential, input),
     loadSession: (sessionId) => requestSessionLoad(credential, { sessionId }),
     getSessionActivity: (sessionId) => requestSessionActivity(credential, { sessionId }),
@@ -738,6 +778,12 @@ export async function getComputerBridgeFeatures(
   bridgeId: string,
 ): Promise<ComputerBridgeFeatures> {
   return (await openComputerBridge(bridgeId)).getFeatures();
+}
+
+export async function getComputerBridgeVersion(
+  bridgeId: string,
+): Promise<ComputerBridgeVersionStatus> {
+  return (await openComputerBridge(bridgeId)).getVersion();
 }
 
 export async function listComputerSessions(

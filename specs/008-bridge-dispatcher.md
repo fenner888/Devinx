@@ -25,6 +25,8 @@ No client-side state can bypass a server-side grant. Authentication, authorizati
 ## Enabled methods
 
 - `bridge.health`: authenticated health and negotiated feature availability.
+- `bridge.features`: authenticated additive feature negotiation.
+- `bridge.version`: authenticated Connector compatibility negotiation.
 - `session.list`: authenticated, grant-gated, rate-limited, single-flight read-only discovery.
 
 `session.load` and `session.prompt` remain schema-reserved but return 404 because their handlers and safety gates are not enabled.

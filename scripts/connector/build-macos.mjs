@@ -276,7 +276,7 @@ signOwnedCode(appRoot, identity);
 run('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', appRoot]);
 
 const stagingRoot = resolve(outputRoot, 'dmg-staging');
-const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.1-macos-${architecture}.dmg`);
+const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.2-macos-${architecture}.dmg`);
 rmSync(stagingRoot, { recursive: true, force: true });
 rmSync(dmgPath, { force: true });
 mkdirSync(stagingRoot, { recursive: true });

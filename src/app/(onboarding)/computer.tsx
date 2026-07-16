@@ -23,6 +23,7 @@ import { useConnections } from '@auth/ConnectionContext';
 import {
   ComputerBridgeError,
   disconnectComputer,
+  getComputerBridgeVersion,
   removeComputerFromThisIPhone,
 } from '@auth/computerBridge';
 import { pairComputerFromQrPayload, type ComputerPairingStatus } from '@auth/computerPairing';
@@ -33,6 +34,10 @@ import {
 } from '@auth/deviceSigning';
 import { DevinXQrScanner } from '@components/connections/DevinXQrScanner';
 import { CONNECTOR_RELEASE_PAGE, CONNECTOR_SETUP_PROMPT } from '@lib/connectorSetup';
+import {
+  isConnectorUpdateRequired,
+  MINIMUM_SUPPORTED_CONNECTOR_VERSION,
+} from '@lib/connectorVersion';
 import { useAppPreferences } from '@store/preferences';
 import { useTheme } from '@theme/index';
 
@@ -112,6 +117,7 @@ export default function ComputerConnectionScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [removingBridgeId, setRemovingBridgeId] = useState<string | null>(null);
+  const [updateRequiredBridgeIds, setUpdateRequiredBridgeIds] = useState<Set<string>>(new Set());
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const scrollRef = useRef<ScrollView>(null);
@@ -127,6 +133,28 @@ export default function ComputerConnectionScreen() {
       keyboardSubscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (computers.length === 0) return undefined;
+    let cancelled = false;
+    Promise.all(
+      computers.map(async (computer) => {
+        try {
+          const status = await getComputerBridgeVersion(computer.bridgeId);
+          return status.kind === 'legacy' || isConnectorUpdateRequired(status.version)
+            ? computer.bridgeId
+            : null;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((bridgeIds) => {
+      if (!cancelled) setUpdateRequiredBridgeIds(new Set(bridgeIds.filter(Boolean) as string[]));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [computers]);
 
   function resetForRetry(message?: string) {
     abortRef.current?.abort();
@@ -445,6 +473,36 @@ export default function ComputerConnectionScreen() {
                   </View>
                 ))}
               </View>
+              {updateRequiredBridgeIds.size > 0 && (
+                <View className="bg-tint-blue border border-border-subtle rounded-card px-4 py-3 mt-3">
+                  <View className="flex-row items-start">
+                    <Ionicons
+                      name="arrow-up-circle-outline"
+                      size={18}
+                      color={tokens.brandText.hex}
+                    />
+                    <View className="ml-2 flex-1">
+                      <Text className="text-text-hi text-text13 font-semibold">
+                        Connector update required
+                      </Text>
+                      <Text className="text-text-mid text-text12 leading-4 mt-1">
+                        Install DevinX Connector {MINIMUM_SUPPORTED_CONNECTOR_VERSION} or later to
+                        keep computer sessions compatible.
+                      </Text>
+                      <Pressable
+                        className="mt-2 self-start"
+                        onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
+                        accessibilityRole="link"
+                        accessibilityLabel="Open official DevinX Connector update"
+                      >
+                        <Text className="text-link text-text12 font-medium">
+                          Open official release
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              )}
             </View>
           )}
 

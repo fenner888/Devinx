@@ -1,6 +1,6 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: Apple-silicon macOS Connector 0.1.0 is publicly released with confirmed protected-state uninstall, automated clean-copy packaging/replacement validation, Developer ID signing, Apple notarization, stapling, Gatekeeper verification, and independent public-download checksum verification complete. A separate fresh-account physical lifecycle exercise remains a documented hardening follow-up. Windows, Linux, and Intel Mac packages remain roadmap targets.
+Status: Apple-silicon macOS Connector 0.1.2 adds explicit official-release awareness to the established protected-state uninstall, automated clean-copy packaging/replacement validation, Developer ID signing, Apple notarization, stapling, Gatekeeper verification, and independent public-download checksum workflow. Windows, Linux, and Intel Mac packages remain roadmap targets.
 
 ## Product decision
 
