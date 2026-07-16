@@ -1,13 +1,16 @@
 # Local AskUserQuestion support
 
-Status: Implemented direction for the next Connector and iOS build.
+Status: Protocol-compatible, but not available from the tested production Devin CLI agent.
 
 ## Problem
 
-Devin for Terminal can pause a prompt turn to request structured user input. In ACP this is an
-agent-to-client `elicitation/create` request. DevinX Connector previously advertised no form
-elicitation capability and treated every agent-to-client request as fatal, which ended the ACP
-process instead of letting the iPhone answer the question.
+ACP defines an agent-to-client `elicitation/create` request for structured user input. DevinX
+Connector previously advertised no form elicitation capability and treated every agent-to-client
+request as fatal. The Connector now implements that bounded protocol safely. However, production
+verification with Devin CLI 3000.1.27 found that explicitly requesting `AskUserQuestion` completes
+as an ordinary text response and does not emit `elicitation/create`. DevinX therefore must not
+claim that Devin for Terminal currently exposes native AskUserQuestion cards. The implementation
+remains dormant unless the running agent sends the documented ACP event.
 
 ## Supported contract
 
@@ -29,13 +32,17 @@ exact `Waiting for your answer` activity transition so it can fail closed if the
 changes. The existing bridge health shape remains unchanged; this preserves compatibility between
 the updated Connector and iOS builds that predate question support.
 
-Question support is negotiated through a separate authenticated `bridge.features` request. An
+Protocol handling is negotiated through a separate authenticated `bridge.features` request. An
 updated mobile client treats a missing `bridge.features` method as an older Connector with question
 support disabled; it must not call the elicitation endpoints or present that condition as a general
 Connector outage. Updated Connectors return only bounded boolean feature flags derived from the
 running ACP client; they never advertise question support when the production session adapter
 cannot serve it. This additive handshake lets older iOS builds continue using the unchanged health
 response while newer iOS builds can fail closed against Connector 0.1.0.
+
+The boolean means that Connector can safely serve an elicitation if one arrives. It is not a claim
+that the selected Devin agent or model provides an AskUserQuestion tool. Product copy and release
+notes must keep that distinction explicit until Cognition documents and ships the agent behavior.
 
 ## Authorization and privacy
 
@@ -64,4 +71,8 @@ native structured AskUserQuestion support for Cloud until Cognition documents th
 - Cancel ACP permission requests rather than auto-approving or terminating the process.
 - Bridge authorization tests for read versus response grants and generic 404 non-disclosure.
 - Mobile response-schema and interaction-state tests.
+- Two consecutive prompts against one local session must reload ACP ownership between sends.
+- Production smoke test records whether the installed Devin CLI actually emits
+  `elicitation/create`; a normal text response is treated as unsupported agent behavior, not
+  synthesized into a fake question card.
 - Full lint, typecheck, test, build, dependency audit, and secret scan before release.

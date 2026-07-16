@@ -169,10 +169,15 @@ describe('Desktop Bridge development runner', () => {
     expect(replacementLoad).toHaveBeenCalledWith('session-kept');
     expect(replacementPrompt).toHaveBeenCalledWith('session-kept', 'Continue.', 'swe-1.7-high');
 
+    await expect(adapter.promptSession('session-kept', 'Again.')).resolves.toBeUndefined();
+    expect(replacementList).toHaveBeenCalledTimes(2);
+    expect(replacementLoad).toHaveBeenCalledTimes(2);
+    expect(replacementPrompt).toHaveBeenLastCalledWith('session-kept', 'Again.');
+
     await expect(adapter.loadSession('session-missing')).rejects.toThrow(
       'not available in the current ACP process',
     );
-    expect(replacementLoad).toHaveBeenCalledTimes(1);
+    expect(replacementLoad).toHaveBeenCalledTimes(2);
   });
 
   it('continues a Desktop-owned session without mutating the locked original', async () => {

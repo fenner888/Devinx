@@ -324,7 +324,10 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     }
     const sessionId = await this.current.createSession(cwd, modelId, text);
     this.listedSessionIds.add(sessionId);
-    this.acpLoadedSessionIds.add(sessionId);
+    // ACP releases ownership after the asynchronous prompt settles. Do not
+    // cache that process-local load beyond the accepted prompt, or the next
+    // steering request will skip the required session/load handshake.
+    this.acpLoadedSessionIds.delete(sessionId);
     return sessionId;
   }
 
@@ -354,13 +357,20 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
           ? await createContinuation.call(this.current, history.cwd, context, text, modelId)
           : await createContinuation.call(this.current, history.cwd, context, text);
         this.listedSessionIds.add(continuedSessionId);
-        this.acpLoadedSessionIds.add(continuedSessionId);
+        this.acpLoadedSessionIds.delete(continuedSessionId);
         return { continuedSessionId };
       }
     }
-    return modelId
-      ? this.current.promptSession(sessionId, text, modelId)
-      : this.current.promptSession(sessionId, text);
+    try {
+      return modelId
+        ? await this.current.promptSession(sessionId, text, modelId)
+        : await this.current.promptSession(sessionId, text);
+    } finally {
+      // AcpSessionClient releases the lock when this accepted prompt finishes.
+      // Force a fresh load before every later prompt instead of retaining a
+      // stale cross-process ownership marker.
+      this.acpLoadedSessionIds.delete(sessionId);
+    }
   }
 
   private async ensureSessionListed(sessionId: string): Promise<void> {
