@@ -8,6 +8,17 @@ import SwiftUI
 private let ipcVersion = 1
 private let keychainService = "com.devinx.desktop-bridge"
 private let keychainAccount = "bridge-state-v1"
+private let connectorReleaseApi = URL(string: "https://api.github.com/repos/fenner888/Devinx/releases/latest")!
+
+private struct ConnectorRelease: Decodable, Equatable, Sendable {
+    let tagName: String
+    let htmlUrl: String
+
+    enum CodingKeys: String, CodingKey {
+        case tagName = "tag_name"
+        case htmlUrl = "html_url"
+    }
+}
 
 private struct ConnectorDevice: Decodable, Identifiable {
     let deviceId: String
@@ -84,6 +95,7 @@ private final class ConnectorModel: ObservableObject {
     @Published var pairingDiagnostic: String?
     @Published var devices: [ConnectorDevice] = []
     @Published var showingUninstallConfirmation = false
+    @Published var availableUpdate: ConnectorRelease?
 
     private var process: Process?
     private var inputPipe: Pipe?
@@ -96,6 +108,73 @@ private final class ConnectorModel: ObservableObject {
     init() {
         refreshLaunchAtLogin()
         start()
+        checkForUpdate()
+    }
+
+    var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+    }
+
+    func checkForUpdate() {
+        let installedVersion = currentVersion
+        var request = URLRequest(url: connectorReleaseApi)
+        request.timeoutInterval = 10
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("DevinX-Connector/\(installedVersion)", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
+            guard
+                let data,
+                let http = response as? HTTPURLResponse,
+                http.statusCode == 200,
+                data.count <= 64_000,
+                let release = try? JSONDecoder().decode(ConnectorRelease.self, from: data),
+                let releaseVersion = Self.version(from: release.tagName),
+                let currentParts = Self.versionParts(installedVersion),
+                Self.isNewer(releaseVersion, than: currentParts),
+                Self.isOfficialReleaseUrl(release.htmlUrl)
+            else { return }
+            Task { @MainActor in self?.availableUpdate = release }
+        }.resume()
+    }
+
+    func openAvailableUpdate() {
+        guard
+            let value = availableUpdate?.htmlUrl,
+            Self.isOfficialReleaseUrl(value),
+            let url = URL(string: value)
+        else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    nonisolated private static func version(from tag: String) -> [Int]? {
+        guard tag.hasPrefix("connector-v") else { return nil }
+        return versionParts(String(tag.dropFirst("connector-v".count)))
+    }
+
+    nonisolated private static func versionParts(_ value: String) -> [Int]? {
+        let parts = value.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3 else { return nil }
+        let numbers = parts.compactMap { Int($0) }
+        guard numbers.count == 3, numbers.allSatisfy({ $0 >= 0 }) else { return nil }
+        return numbers
+    }
+
+    nonisolated private static func isNewer(_ candidate: [Int], than current: [Int]) -> Bool {
+        for index in 0..<3 where candidate[index] != current[index] {
+            return candidate[index] > current[index]
+        }
+        return false
+    }
+
+    nonisolated private static func isOfficialReleaseUrl(_ value: String) -> Bool {
+        guard let components = URLComponents(string: value) else { return false }
+        return components.scheme == "https" &&
+            components.host == "github.com" &&
+            components.path.hasPrefix("/fenner888/Devinx/releases/") &&
+            components.user == nil &&
+            components.password == nil &&
+            components.query == nil &&
+            components.fragment == nil
     }
 
     func start() {
@@ -493,6 +572,24 @@ private struct ConnectorView: View {
                     .padding(6)
                 }
 
+                if let update = model.availableUpdate {
+                    GroupBox {
+                        HStack(spacing: 12) {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .foregroundStyle(.blue)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Update available").font(.headline)
+                                Text("\(update.tagName) is available from the official DevinX release page.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("View update") { model.openAvailableUpdate() }
+                        }
+                        .padding(6)
+                    }
+                }
+
                 if let deviceName = model.pendingDeviceName {
                     GroupBox("Pairing request") {
                         VStack(alignment: .leading, spacing: 14) {
@@ -611,6 +708,10 @@ private struct ConnectorView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+
+                Text("Version \(model.currentVersion)")
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.tertiary)
 
                 Button("Uninstall DevinX Connector", role: .destructive) {
                     model.showingUninstallConfirmation = true

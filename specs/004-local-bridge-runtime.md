@@ -34,6 +34,8 @@ The final artifact must not bundle the Devin CLI unless Cognition's supported di
 | Method | Required grant | Mutation | Initial status |
 |---|---|---:|---|
 | `bridge.health` | `bridge:health` | No | Core contract |
+| `bridge.features` | `bridge:health` | No | Additive feature negotiation |
+| `bridge.version` | `bridge:health` | No | Additive Connector compatibility negotiation |
 | `session.list` | `session:metadata:read` | No | Core contract; ACP execution pending approved probe |
 | `session.load` | `session:content:read` | No | Schema reserved; handler blocked until disposable-session test |
 | `session.prompt` | `session:prompt:send` | Yes | Schema reserved; handler blocked until explicit mutation phase |

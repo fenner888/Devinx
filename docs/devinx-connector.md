@@ -42,10 +42,16 @@ The local development build is ad-hoc signed. It is suitable for development and
 
 ## Update and uninstall
 
-The macOS v1 update path is an explicit signed-DMG replacement: quit DevinX Connector, open the
-newer official signed DMG, and replace the existing app in Applications. The stable Developer ID
-identity preserves the Connector's Keychain access across legitimate replacements. DevinX does not
-silently download or execute Connector updates.
+The macOS v1 update path is an explicit signed-DMG replacement. Connector checks the public
+official GitHub release feed and shows **Update available** when it validates a newer release tag
+and official release URL. The user still chooses when to open the release page, quit Connector,
+open the newer signed DMG, and replace the existing app in Applications. The stable Developer ID
+identity preserves Connector's Keychain access across legitimate replacements. DevinX never
+silently downloads or executes Connector updates.
+
+The iPhone app also performs an authenticated version handshake with each paired Connector. An old
+Connector produces a visible **Connector update required** action that opens only the official
+latest-release page; an offline or revoked Connector retains its separate recovery message.
 
 To remove the Connector, choose **Uninstall DevinX Connector** in the native app and confirm. The
 Connector stops its private listener before deleting its own Keychain identity and paired-iPhone

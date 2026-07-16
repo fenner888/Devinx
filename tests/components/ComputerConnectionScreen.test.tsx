@@ -9,6 +9,17 @@ const mockText = Text;
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockRefreshComputers = jest.fn(async () => {});
+const mockGetComputerBridgeVersion = jest.fn<
+  Promise<{ kind: 'supported'; version: string } | { kind: 'legacy' }>,
+  []
+>(async () => ({ kind: 'supported', version: '0.1.2' }));
+let mockComputers: Array<{
+  bridgeId: string;
+  computerName: string;
+  pairedAt: number;
+  permissions: Array<'bridge:health' | 'session:metadata:read'>;
+  transportKind: 'tailscale_vpn';
+}> = [];
 const mockPairComputer = jest.fn(
   async (_payload: string, options: { onStatus?: (status: string) => void }) => {
     options.onStatus?.('waiting_for_approval');
@@ -38,8 +49,16 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 jest.mock('../../src/auth/ConnectionContext', () => ({
-  useConnections: () => ({ refreshComputers: mockRefreshComputers }),
+  useConnections: () => ({ computers: mockComputers, refreshComputers: mockRefreshComputers }),
 }));
+
+jest.mock('../../src/auth/computerBridge', () => {
+  const actual = jest.requireActual('../../src/auth/computerBridge');
+  return {
+    ...actual,
+    getComputerBridgeVersion: () => mockGetComputerBridgeVersion(),
+  };
+});
 
 jest.mock('../../src/auth/computerPairing', () => ({
   pairComputerFromQrPayload: (payload: string, options: { onStatus?: (status: string) => void }) =>
@@ -87,6 +106,8 @@ describe('Computer connection onboarding', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockConnectionMode = 'computer';
+    mockComputers = [];
+    mockGetComputerBridgeVersion.mockResolvedValue({ kind: 'supported', version: '0.1.2' });
     mockGetPermission.mockResolvedValue('authorized');
     mockRequestPermission.mockResolvedValue('authorized');
   });
@@ -132,6 +153,25 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByText('Pair your computer')).toBeTruthy();
     expect(screen.getByText(/Devin Cloud is connected/)).toBeTruthy();
     expect(screen.queryByText('Connect your Mac')).toBeNull();
+  });
+
+  it('shows an official update action for a legacy Connector', async () => {
+    mockComputers = [
+      {
+        bridgeId: 'bridge_1234567890',
+        computerName: 'My Mac',
+        pairedAt: 1_800_000_000_000,
+        permissions: ['bridge:health', 'session:metadata:read'],
+        transportKind: 'tailscale_vpn',
+      },
+    ];
+    mockGetComputerBridgeVersion.mockResolvedValueOnce({ kind: 'legacy' });
+
+    const screen = render(<ComputerConnectionScreen />);
+
+    await waitFor(() => expect(screen.getByText('Connector update required')).toBeTruthy());
+    expect(screen.getByLabelText('Open official DevinX Connector update')).toBeTruthy();
+    expect(screen.getByText(/0.1.2 or later/)).toBeTruthy();
   });
 
   it('keeps the Mac name reachable above the keyboard and supports dismissal', () => {

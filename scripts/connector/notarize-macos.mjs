@@ -20,7 +20,7 @@ const outputRoot = resolve(repositoryRoot, 'artifacts', 'connector');
 const appRoot = resolve(outputRoot, 'DevinX Connector.app');
 const nodeRuntimePath = resolve(appRoot, 'Contents', 'Resources', 'runtime', 'node');
 const architecture = arch() === 'arm64' ? 'arm64' : arch() === 'x64' ? 'x64' : null;
-const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.1-macos-${architecture}.dmg`);
+const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.2-macos-${architecture}.dmg`);
 const zipPath = resolve(outputRoot, 'DevinX-Connector-notarization.zip');
 const stagingRoot = resolve(outputRoot, 'notarization-dmg-staging');
 const auditPath = resolve(outputRoot, 'notarization-audit.json');

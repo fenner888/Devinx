@@ -282,6 +282,13 @@ describe('authenticated Desktop Bridge service', () => {
     });
   });
 
+  it('returns the authenticated Connector version without changing the health contract', async () => {
+    await expect(service().handle(envelope('bridge.version', {}), context())).resolves.toEqual({
+      status: 200,
+      body: { version: '0.1.2' },
+    });
+  });
+
   it('revokes the authenticated device through the server-authoritative registry', async () => {
     const revoke = jest.fn(async () => true);
     const bridge = service({ devices: { get: devices.get, revoke } });

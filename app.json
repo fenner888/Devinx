@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fenner888.devinx",
-      "buildNumber": "72",
+      "buildNumber": "73",
       "infoPlist": {
         "NSFileProtection": "NSFileProtectionComplete",
         "NSCameraUsageDescription": "Allow DevinX to scan a pairing code shown by DevinX Connector.",

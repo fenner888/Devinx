@@ -31,6 +31,7 @@ import {
   sessionLoadBodySchema,
   sessionPromptBodySchema,
 } from './schemas';
+import { CONNECTOR_VERSION } from './version';
 import type { SessionHandleRegistry } from './session-handles';
 import type { WorkspaceHandleRegistry } from './workspace-handles';
 
@@ -93,6 +94,10 @@ const featuresResponseSchema = z
   .object({
     sessionElicitation: z.boolean(),
   })
+  .strict();
+
+const versionResponseSchema = z
+  .object({ version: z.string().regex(/^\d+\.\d+\.\d+$/) })
   .strict();
 
 const localSessionPageSchema = z
@@ -433,7 +438,8 @@ export class BridgeService {
           : authorization.request.method === 'session.activity' ||
               authorization.request.method === 'session.elicitation'
             ? this.rates.sessionActivityLimit
-            : authorization.request.method === 'bridge.health'
+            : authorization.request.method === 'bridge.health' ||
+                authorization.request.method === 'bridge.version'
               ? this.rates.healthLimit
               : this.rates.mutationLimit;
     if (
@@ -474,6 +480,12 @@ export class BridgeService {
               this.dependencies.sessions.respondToElicitation,
           ),
         }),
+      };
+    }
+    if (authorization.request.method === 'bridge.version') {
+      return {
+        status: 200,
+        body: versionResponseSchema.parse({ version: CONNECTOR_VERSION }),
       };
     }
     if (authorization.request.method === 'device.revoke') {
