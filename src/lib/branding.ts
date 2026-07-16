@@ -21,8 +21,10 @@ export const branding = {
   linkPrefix: 'devinx://',
   /** API key prefix for the service-user auth strategy. */
   serviceKeyPrefix: 'cog_',
-  /** Org ID prefix. */
+  /** Preferred org ID prefix in current Devin v3 documentation. */
   orgIdPrefix: 'org-',
+  /** Accepted server-issued forms; legacy/live accounts may expose org_. */
+  orgIdPrefixes: ['org-', 'org_'] as const,
   /** Session ID prefix. */
   sessionIdPrefix: 'devin-',
   /** Keychain keys (spec §9 — ONLY these, nowhere else). */

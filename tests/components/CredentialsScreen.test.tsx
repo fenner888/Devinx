@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -32,6 +32,10 @@ jest.mock('../../src/theme/index', () => ({
   }),
 }));
 
+const mockSetPendingCredentials = jest.requireMock(
+  '../../src/auth/pendingCredentials',
+).setPendingCredentials as jest.Mock;
+
 import CredentialsScreen from '../../src/app/(onboarding)/credentials';
 
 describe('Cloud credential onboarding', () => {
@@ -55,5 +59,21 @@ describe('Cloud credential onboarding', () => {
     expect(screen.getByText('STEP 1 OF 2')).toBeTruthy();
     expect(screen.getByText('Connect Cloud & continue')).toBeTruthy();
     expect(screen.getByText(/Next, you’ll pair your computer/)).toBeTruthy();
+  });
+
+  it('preserves and submits an org_ identifier for authenticated validation', () => {
+    const screen = render(<CredentialsScreen />);
+
+    fireEvent.changeText(screen.getByTestId('api-key-input'), 'cog_testkey');
+    fireEvent.changeText(screen.getByTestId('org-id-input'), '  org_legacy123  ');
+    fireEvent.press(screen.getByLabelText('Validate and connect Devin Cloud'));
+
+    expect(mockSetPendingCredentials).toHaveBeenCalledWith({
+      apiKey: 'cog_testkey',
+      attributionUserId: undefined,
+      kind: 'service_user',
+      orgId: 'org_legacy123',
+    });
+    expect(mockPush).toHaveBeenCalledWith('/(onboarding)/validate');
   });
 });

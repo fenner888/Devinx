@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
+import { orgIdSchema } from '@api/devin/schemas';
 import { setPendingCredentials } from '@auth/pendingCredentials';
 import { OnboardingBackButton } from '@components/onboarding/OnboardingBackButton';
 import { branding } from '@lib/branding';
@@ -42,15 +43,16 @@ export default function CredentialsScreen() {
       setError(`API key must start with ${branding.serviceKeyPrefix}`);
       return;
     }
-    if (!orgId.startsWith(branding.orgIdPrefix)) {
-      setError(`Org ID must start with ${branding.orgIdPrefix}`);
+    const trimmedOrgId = orgId.trim();
+    if (!orgIdSchema.safeParse(trimmedOrgId).success) {
+      setError('Org ID must use the org-… or org_… format');
       return;
     }
 
     setPendingCredentials({
       kind: 'service_user',
       apiKey,
-      orgId,
+      orgId: trimmedOrgId,
       attributionUserId: attributionUserId || undefined,
     });
     router.push('/(onboarding)/validate');
@@ -111,7 +113,7 @@ export default function CredentialsScreen() {
               className="min-h-13 bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
               value={orgId}
               onChangeText={setOrgId}
-              placeholder="org-..."
+              placeholder="org-... or org_..."
               placeholderTextColor={tokens.textLow.hex}
               autoCapitalize="none"
               autoCorrect={false}
