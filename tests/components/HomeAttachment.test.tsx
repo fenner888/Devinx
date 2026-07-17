@@ -121,7 +121,7 @@ jest.mock('expo-document-picker', () => ({
 }));
 
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import HomeScreen from '../../src/app/(main)/index';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
@@ -659,6 +659,27 @@ describe('home attachment control', () => {
 
     expect(queryByLabelText('Use repository fenner888/Devinx')).toBeNull();
     expect(getByText('No repositories match your search.')).toBeTruthy();
+  });
+
+  it('keeps matching repositories and the result viewport available while searching', () => {
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Repository: Any repository'));
+    fireEvent.changeText(screen.getByLabelText('Search repositories'), '  DEVINX  ');
+
+    expect(screen.getByLabelText('Use repository fenner888/Devinx')).toBeTruthy();
+    expect(screen.getByTestId('repository-picker-keyboard-avoider')).toBeTruthy();
+    expect(screen.getByTestId('repository-picker-results').props.keyboardDismissMode).toBe(
+      Platform.OS === 'ios' ? 'interactive' : 'on-drag',
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Search repositories'), 'fenner888/devinx');
+    fireEvent.press(screen.getByLabelText('Use repository fenner888/Devinx'));
+    expect(screen.getByLabelText('Repository: fenner888/Devinx')).toBeTruthy();
   });
 
   it('does not present a partial Cloud repository result as complete', () => {
