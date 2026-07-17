@@ -28,6 +28,7 @@ import {
   generateInsights,
   replaceTags,
   uploadAttachment,
+  listSessionAttachments,
   listSchedules,
   createSchedule,
   updateSchedule,
@@ -46,6 +47,9 @@ import {
   getPrMetrics,
   getSearchMetrics,
   getWeeklyActiveUsers,
+  getActiveUsers,
+  getDailyActiveUsers,
+  getMonthlyActiveUsers,
   listRepositories,
   getSelf,
   getSessionConsumption,
@@ -257,6 +261,21 @@ export function useMessages(sessionId: string | undefined) {
   });
 }
 
+export function useSessionAttachments(sessionId: string | undefined) {
+  const { provider, isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: sessionId ? queryKeys.sessionAttachments(sessionId) : ['sessionAttachments', 'none'],
+    queryFn: async () => {
+      if (!provider || !sessionId) throw new Error('Not authenticated');
+      return listSessionAttachments(provider, sessionId);
+    },
+    enabled: isAuthenticated && !!provider && !!sessionId,
+    staleTime: 30_000,
+    retry: shouldRetryQuery,
+  });
+}
+
 export function useSendMessage(sessionId: string | undefined) {
   const queryClient = useQueryClient();
   const { provider } = useAuth();
@@ -341,7 +360,8 @@ async function reconcileAmbiguousSessionCreate(
       const result = await listSessions(provider, {
         first: 100,
         created_after: startedAt - 5,
-        search: body.title || undefined,
+        service_user_ids: identity.service_user_id ? [identity.service_user_id] : undefined,
+        user_ids: identity.user_id ? [identity.user_id] : undefined,
       });
       const match = findPotentialCreatedSession(body, result.items, startedAt, identity);
       if (match) return match;
@@ -746,6 +766,9 @@ export interface OrgMetricsBundle {
   prs: Awaited<ReturnType<typeof getPrMetrics>>;
   searches: Awaited<ReturnType<typeof getSearchMetrics>>;
   weeklyActiveUsers: Awaited<ReturnType<typeof getWeeklyActiveUsers>>;
+  activeUsers: Awaited<ReturnType<typeof getActiveUsers>> | null;
+  dailyActiveUsers: Awaited<ReturnType<typeof getDailyActiveUsers>>;
+  monthlyActiveUsers: Awaited<ReturnType<typeof getMonthlyActiveUsers>>;
 }
 
 export function useOrgMetrics(rangeDays: number) {
@@ -757,21 +780,40 @@ export function useOrgMetrics(rangeDays: number) {
       // Both bounds are REQUIRED by the metrics API — omitting time_before
       // returns a 422 and blanks the screen.
       const now = Math.floor(Date.now() / 1000);
-      const query: MetricsQuery = {
+      const query: Required<MetricsQuery> = {
         time_after: now - rangeDays * 86_400,
         time_before: now,
       };
-      // Fire the four metric calls together; WAU/searches may be unavailable
+      // Fire the metric calls together; some analytics endpoints may be unavailable
       // on some plans — degrade those to empty rather than failing the screen.
-      const [sessions, prs, searches, weeklyActiveUsers] = await Promise.all([
+      const [
+        sessions,
+        prs,
+        searches,
+        weeklyActiveUsers,
+        activeUsers,
+        dailyActiveUsers,
+        monthlyActiveUsers,
+      ] = await Promise.all([
         getSessionMetrics(provider, query),
         getPrMetrics(provider, query).catch(() => ({}) as Awaited<ReturnType<typeof getPrMetrics>>),
         getSearchMetrics(provider, query).catch(
           () => ({}) as Awaited<ReturnType<typeof getSearchMetrics>>,
         ),
         getWeeklyActiveUsers(provider, query).catch(() => []),
+        getActiveUsers(provider, query).catch(() => null),
+        getDailyActiveUsers(provider, query).catch(() => []),
+        getMonthlyActiveUsers(provider, query).catch(() => []),
       ]);
-      return { sessions, prs, searches, weeklyActiveUsers };
+      return {
+        sessions,
+        prs,
+        searches,
+        weeklyActiveUsers,
+        activeUsers,
+        dailyActiveUsers,
+        monthlyActiveUsers,
+      };
     },
     enabled: isAuthenticated && !!provider,
     staleTime: 5 * 60_000,

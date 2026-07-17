@@ -1,12 +1,12 @@
 /**
  * Devin API v3 TypeScript types — generated from live docs.devin.ai reference
- * (crawled 2026-07-07). See /specs/api-deltas.md for divergences from the
+ * (OpenAPI contract refreshed 2026-07-17). See /specs/api-deltas.md for divergences from the
  * build spec's §2.3/§8.5 assumptions.
  *
  * Base URL: https://api.devin.ai
  * Org-scoped paths: /v3/organizations/{org_id}/...
  * Enterprise paths: /v3/enterprise/...
- * Auth: `Authorization: Bearer cog_*` (service-user keys; PATs "coming soon").
+ * Auth: `Authorization: Bearer cog_*` (service-user keys; PATs remain closed beta).
  */
 
 // ---------------------------------------------------------------------------
@@ -16,7 +16,7 @@
 /** Service-user API key prefix. PATs not yet GA. */
 export type ApiKey = string;
 
-/** Organization ID with `org-` prefix. */
+/** Server-issued organization ID (`org-` or legacy `org_`). */
 export type OrgId = string;
 
 /** Session ID with `devin-` prefix. */
@@ -82,7 +82,7 @@ export type SessionCategory =
   | 'unit_test_generation';
 
 /** Modes accepted by the documented v3 create-session contract. */
-export type DevinMode = 'normal' | 'fast';
+export type DevinMode = 'normal' | 'fast' | 'lite' | 'ultra' | 'fusion';
 
 export type SessionSize = 'xs' | 's' | 'm' | 'l' | 'xl';
 
@@ -125,27 +125,32 @@ export interface PullRequest {
 export interface SessionSecretInput {
   key: string;
   value: string;
+  sensitive?: boolean;
 }
 
 export interface SessionCreateRequest {
   prompt: string;
-  attachment_urls?: string[];
-  bypass_approval?: boolean;
-  child_playbook_id?: string;
-  create_as_user_id?: string;
-  devin_mode?: DevinMode;
-  knowledge_ids?: string[];
-  max_acu_limit?: number;
-  playbook_id?: string;
+  attachment_urls?: string[] | null;
+  bypass_approval?: boolean | null;
+  child_playbook_id?: string | null;
+  create_as_user_id?: string | null;
+  devin_mode?: DevinMode | null;
+  knowledge_ids?: string[] | null;
+  max_acu_limit?: number | null;
+  /** Must match an organization-configured platform label. */
+  platform?: string | null;
+  playbook_id?: string | null;
   /** Repos the session should work in (host-prefixed paths). */
-  repos?: string[];
-  secret_ids?: string[];
-  session_secrets?: SessionSecretInput[];
-  snapshot_id?: string;
-  structured_output_schema?: Record<string, unknown>;
-  tags?: string[];
-  title?: string;
-  unlisted?: boolean;
+  repos?: string[] | null;
+  /** Preserve VM state after the session stops. Defaults to true server-side. */
+  resumable?: boolean;
+  secret_ids?: string[] | null;
+  session_links?: string[] | null;
+  session_secrets?: SessionSecretInput[] | null;
+  structured_output_required?: boolean | null;
+  structured_output_schema?: Record<string, unknown> | null;
+  tags?: string[] | null;
+  title?: string | null;
 }
 
 export interface SessionResponse {
@@ -164,6 +169,7 @@ export interface SessionResponse {
   session_id: string;
   status: SessionStatus;
   status_detail?: SessionStatusDetail | null;
+  structured_output?: Record<string, unknown> | null;
   tags: string[];
   title: string | null;
   updated_at: UnixTimestamp;
@@ -202,9 +208,9 @@ export interface SessionsQueryParams {
   origins?: SessionOrigin[] | null;
   playbook_id?: string | null;
   repo_names?: string[] | null;
-  pr_states?: string[] | null;
-  search?: string | null;
-  status?: SessionStatus | null;
+  schedule_id?: string | null;
+  service_user_ids?: string[] | null;
+  session_ids?: string[] | null;
   tags?: string[] | null;
   updated_after?: UnixTimestamp | null;
   updated_before?: UnixTimestamp | null;
@@ -315,14 +321,14 @@ export interface PlaybookResponse {
   playbook_id: string;
   title: string;
   body: string;
-  macro?: string | null;
-  access_type?: AccessType;
-  created_at?: UnixTimestamp;
-  created_by?: string;
-  org_id?: string | null;
+  macro: string | null;
+  access_type: 'enterprise' | 'org';
+  created_at: UnixTimestamp;
+  created_by: string;
+  org_id: string | null;
   structured_output_schema?: Record<string, unknown> | null;
-  updated_at?: UnixTimestamp;
-  updated_by?: string;
+  updated_at: UnixTimestamp;
+  updated_by: string;
 }
 
 export interface KnowledgeNoteResponse {
@@ -330,31 +336,28 @@ export interface KnowledgeNoteResponse {
   name: string;
   body: string;
   trigger: string;
-  access_type?: AccessType;
-  created_at?: UnixTimestamp;
-  updated_at?: UnixTimestamp;
-  folder_id?: string | null;
-  folder_path?: string;
-  is_enabled?: boolean | null;
-  macro?: string | null;
-  org_id?: string | null;
-  pinned_repo?: string | null;
-  created_by?: string;
-  updated_by?: string;
+  access_type: 'enterprise' | 'org';
+  created_at: UnixTimestamp;
+  updated_at: UnixTimestamp;
+  folder_id: string | null;
+  folder_path: string;
+  is_enabled: boolean;
+  macro: string | null;
+  org_id: string | null;
+  pinned_repo: string | null;
 }
 
 export interface SecretResponse {
   secret_id: string;
-  key: string;
-  note?: string | null;
+  key: string | null;
+  note: string | null;
   secret_type: SecretType;
-  access_type?: AccessType;
-  created_at?: UnixTimestamp;
-  created_by?: string;
-  is_sensitive?: boolean;
-  org_id?: string | null;
-  updated_at?: UnixTimestamp;
-  updated_by?: string;
+  access_type: 'org' | 'personal';
+  created_at: UnixTimestamp;
+  created_by: string;
+  is_sensitive: boolean;
+  updated_at?: UnixTimestamp | null;
+  updated_by?: string | null;
   /** VALUES ARE NEVER RETURNED — only metadata. */
 }
 
@@ -372,6 +375,11 @@ export interface AttachmentResponse {
   attachment_id: string;
   name: string;
   url: string;
+}
+
+export interface SessionAttachment extends AttachmentResponse {
+  source: 'devin' | 'user';
+  content_type?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -395,10 +403,11 @@ export interface ConsumptionCycle {
 
 export interface DevinAcuLimit {
   cycle_acu_limit: AcuCount;
+  scope: 'enterprise' | 'org' | 'user';
   /** Present for organization-level limits. */
-  org_id?: string;
+  org_id?: string | null;
   /** Present for user-level limits if Devin adds them to this response. */
-  user_id?: string;
+  user_id?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -424,6 +433,8 @@ export const paths = {
   session: (orgId: OrgId, devinId: DevinId) => `/v3/organizations/${orgId}/sessions/${devinId}`,
   messages: (orgId: OrgId, devinId: DevinId) =>
     `/v3/organizations/${orgId}/sessions/${devinId}/messages`,
+  sessionAttachments: (orgId: OrgId, devinId: DevinId) =>
+    `/v3/organizations/${orgId}/sessions/${devinId}/attachments`,
   archive: (orgId: OrgId, devinId: DevinId) =>
     `/v3/organizations/${orgId}/sessions/${devinId}/archive`,
   tags: (orgId: OrgId, devinId: DevinId) => `/v3/organizations/${orgId}/sessions/${devinId}/tags`,
@@ -455,6 +466,9 @@ export const paths = {
   metricsSessions: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/sessions`,
   metricsPrs: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/prs`,
   metricsSearches: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/searches`,
+  metricsActiveUsers: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/active-users`,
+  metricsDau: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/dau`,
+  metricsMau: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/mau`,
   metricsWau: (orgId: OrgId) => `/v3/organizations/${orgId}/metrics/wau`,
   repositories: (orgId: OrgId) => `/v3beta1/organizations/${orgId}/repositories`,
   self: () => `/v3/self`,
@@ -485,15 +499,24 @@ export interface ScheduleResponse {
   frequency: string | null;
   /** ISO 8601 datetime (one-time schedules). */
   scheduled_at: string | null;
-  /** Read path remains forward-compatible with agent values not yet accepted by the write schema. */
-  agent?: string;
-  notify_on?: ScheduleNotifyOn;
-  playbook?: { playbook_id: string; title: string } | null;
-  consecutive_failures?: number;
-  last_executed_at?: string | null;
-  last_error_message?: string | null;
-  created_at?: string;
-  updated_at?: string;
+  agent: ScheduleAgent;
+  bypass_approval?: boolean;
+  interval_count?: number;
+  notify_on: ScheduleNotifyOn;
+  platform?: string | null;
+  playbook: { playbook_id: string; title: string | null } | null;
+  slack_channel_id?: string | null;
+  slack_team_id?: string | null;
+  target_devin_id?: string | null;
+  consecutive_failures: number;
+  created_by: string | null;
+  last_edited_by?: string | null;
+  last_error_at: string | null;
+  last_executed_at: string | null;
+  last_error_message: string | null;
+  org_id: string;
+  created_at: string;
+  updated_at: string;
   tags?: string[] | null;
 }
 
@@ -503,24 +526,40 @@ export interface ScheduleCreateRequest {
   schedule_type?: ScheduleType;
   frequency?: string | null;
   scheduled_at?: string | null;
-  tags?: string[];
+  tags?: string[] | null;
   playbook_id?: string | null;
   notify_on?: ScheduleNotifyOn;
   /** Which agent runs the schedule (the API supports both). */
   agent?: ScheduleAgent;
+  /** Advanced API fields are modeled for exact request validation but remain
+   * hidden until mobile has a safe discovery and permission flow. */
+  bypass_approval?: boolean;
+  create_as_user_id?: string | null;
+  interval_count?: number;
+  platform?: string | null;
+  slack_channel_id?: string | null;
+  slack_team_id?: string | null;
+  target_devin_id?: string | null;
 }
 
 export interface ScheduleUpdateRequest {
-  name?: string;
-  prompt?: string;
-  enabled?: boolean;
+  name?: string | null;
+  prompt?: string | null;
+  enabled?: boolean | null;
   frequency?: string | null;
   scheduled_at?: string | null;
-  schedule_type?: ScheduleType;
+  schedule_type?: ScheduleType | null;
   tags?: string[] | null;
   playbook_id?: string | null;
-  notify_on?: ScheduleNotifyOn;
+  notify_on?: ScheduleNotifyOn | null;
   agent?: ScheduleAgent | null;
+  bypass_approval?: boolean | null;
+  interval_count?: number | null;
+  platform?: string | null;
+  run_as_user_id?: string | null;
+  slack_channel_id?: string | null;
+  slack_team_id?: string | null;
+  target_devin_id?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -547,7 +586,7 @@ export interface KnowledgeNoteCreateRequest {
   body: string;
   trigger: string;
   folder_id?: string | null;
-  is_enabled?: boolean;
+  is_enabled?: boolean | null;
   pinned_repo?: string | null;
 }
 
@@ -570,6 +609,7 @@ export interface PlaybookCreateRequest {
   title: string;
   body: string;
   macro?: string | null;
+  structured_output_schema?: Record<string, unknown> | null;
 }
 
 export type PlaybookUpdateRequest = Partial<PlaybookCreateRequest>;
@@ -609,8 +649,8 @@ export interface SearchMetrics {
 }
 
 export interface ActiveUserPeriod {
-  start_time: number | string;
-  end_time: number | string;
+  start_time: number;
+  end_time: number;
   active_users: number;
 }
 

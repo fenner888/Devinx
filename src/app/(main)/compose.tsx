@@ -1,7 +1,7 @@
 /**
  * Compose screen — spec §7.4.
- * Prompt textarea, optional title, playbook picker, knowledge attachments,
- * mode toggle (normal/fast), tag input, submit → createSession → session detail.
+ * Prompt textarea, optional title, documented session settings, resource
+ * pickers, tag input, submit → createSession → session detail.
  * Draft persistence via AsyncStorage.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -17,6 +17,7 @@ import {
   Platform,
   Alert,
   Image,
+  Switch,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -33,13 +34,18 @@ import {
 import { ModeSettings } from '@components/ModeSettings';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
 import { VoiceComposerStatus, VoiceMicButton, useVoiceComposer } from '@components/VoiceInput';
-import type { DevinMode } from '@api/devin/types';
+import type { DevinMode, SessionSecretInput } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
 import { COMPOSE_DRAFT_KEY } from '@lib/localUserData';
 import { useAppPreferences } from '@store/preferences';
 import { userFacingError } from '@lib/user-facing-error';
 import { repositoryIndexPresentation } from '@lib/repository-indexing';
+import {
+  normalizeSessionSecrets,
+  parseSessionLinks,
+  parseStructuredOutputSchema,
+} from '@lib/session-create-options';
 
 const MAX_PROMPT = 10000;
 const MAX_TITLE = 200;
@@ -54,7 +60,15 @@ interface Draft {
   mode: DevinMode;
   tags: string[];
   maxAcuLimit: string;
-  unlisted: boolean;
+  platform: string;
+  resumable: boolean;
+  sessionLinks: string;
+  structuredOutputRequired: boolean;
+  structuredOutputSchema: string;
+}
+
+interface TransientSessionSecret extends SessionSecretInput {
+  id: number;
 }
 
 const emptyDraft: Draft = {
@@ -67,7 +81,11 @@ const emptyDraft: Draft = {
   mode: 'normal',
   tags: [],
   maxAcuLimit: '',
-  unlisted: false,
+  platform: '',
+  resumable: true,
+  sessionLinks: '',
+  structuredOutputRequired: true,
+  structuredOutputSchema: '',
 };
 
 export default function ComposeScreen() {
@@ -94,6 +112,10 @@ export default function ComposeScreen() {
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [tagInput, setTagInput] = useState('');
+  // Session-secret values deliberately never enter the persisted Draft. They
+  // exist in component memory only and disappear on success or unmount.
+  const [sessionSecrets, setSessionSecrets] = useState<TransientSessionSecret[]>([]);
+  const sessionSecretSequence = useRef(0);
   const defaultTagsRef = useRef(defaultTags);
 
   // Load draft from AsyncStorage on mount.
@@ -197,10 +219,30 @@ export default function ComposeScreen() {
     setAttachments((prev) => prev.filter((a) => a.url !== url));
   }
 
+  function addSessionSecret() {
+    sessionSecretSequence.current += 1;
+    setSessionSecrets((current) => [
+      ...current,
+      { id: sessionSecretSequence.current, key: '', value: '', sensitive: true },
+    ]);
+  }
+
+  function updateSessionSecret(id: number, patch: Partial<SessionSecretInput>) {
+    setSessionSecrets((current) =>
+      current.map((secret) => (secret.id === id ? { ...secret, ...patch } : secret)),
+    );
+  }
+
+  function removeSessionSecret(id: number) {
+    setSessionSecrets((current) => current.filter((secret) => secret.id !== id));
+  }
+
   async function handleSubmit() {
     if (!draft.prompt.trim()) return;
     try {
-      const acuLimit = parseFloat(draft.maxAcuLimit);
+      const acuLimit = Number(draft.maxAcuLimit);
+      const structuredOutputSchema = parseStructuredOutputSchema(draft.structuredOutputSchema);
+      const transientSecrets = normalizeSessionSecrets(sessionSecrets);
       const session = await createSession.mutateAsync({
         prompt: draft.prompt.trim(),
         title: draft.title.trim() || undefined,
@@ -210,9 +252,16 @@ export default function ComposeScreen() {
         secret_ids: draft.secretIds.length > 0 ? draft.secretIds : undefined,
         devin_mode: draft.mode,
         tags: draft.tags.length > 0 ? draft.tags : undefined,
-        max_acu_limit: Number.isFinite(acuLimit) && acuLimit > 0 ? acuLimit : undefined,
-        unlisted: draft.unlisted || undefined,
+        max_acu_limit: Number.isInteger(acuLimit) && acuLimit > 0 ? acuLimit : undefined,
         attachment_urls: attachments.length > 0 ? attachments.map((a) => a.url) : undefined,
+        platform: draft.platform.trim() || undefined,
+        resumable: draft.resumable,
+        session_links: parseSessionLinks(draft.sessionLinks),
+        session_secrets: transientSecrets,
+        structured_output_schema: structuredOutputSchema,
+        structured_output_required: structuredOutputSchema
+          ? draft.structuredOutputRequired
+          : undefined,
       });
       await Promise.all([
         rememberSessionRepository(session.session_id, draft.repos[0]),
@@ -221,6 +270,7 @@ export default function ComposeScreen() {
       // Clear draft on success.
       await AsyncStorage.removeItem(COMPOSE_DRAFT_KEY);
       setDraft(emptyDraft);
+      setSessionSecrets([]);
       router.replace(`/(main)/session/${session.session_id}`);
     } catch (e) {
       Alert.alert('Could not create session', userFacingError(e, 'Could not create this session.'));
@@ -361,7 +411,9 @@ export default function ComposeScreen() {
             <View className="flex-1">
               <Text className="text-text-low text-text12 mb-0.5">Secrets</Text>
               <Text className="text-text14 text-text-hi" numberOfLines={1}>
-                {selectedSecrets.length > 0 ? selectedSecrets.map((s) => s.key).join(', ') : 'None'}
+                {selectedSecrets.length > 0
+                  ? selectedSecrets.map((s) => s.key ?? 'Unnamed secret').join(', ')
+                  : 'None'}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
@@ -458,34 +510,159 @@ export default function ComposeScreen() {
               <TextInput
                 className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-1"
                 value={draft.maxAcuLimit}
-                onChangeText={(v) => updateDraft({ maxAcuLimit: v.replace(/[^0-9.]/g, '') })}
+                onChangeText={(v) => updateDraft({ maxAcuLimit: v.replace(/[^0-9]/g, '') })}
                 placeholder="No limit"
                 placeholderTextColor={tokens.textLow.hex}
-                keyboardType="decimal-pad"
+                keyboardType="number-pad"
               />
               <Text className="text-text-low text-text12 mb-4">
                 Session stops when it consumes this many ACUs. Leave empty for no cap.
               </Text>
 
-              {/* Unlisted toggle */}
-              <Pressable
-                className="flex-row items-center justify-between bg-surface1 rounded-input px-3 py-3"
-                onPress={() => updateDraft({ unlisted: !draft.unlisted })}
-              >
+              <Text className="text-text-low text-text12 font-medium uppercase mb-1">
+                Platform label
+              </Text>
+              <TextInput
+                className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-1"
+                value={draft.platform}
+                onChangeText={(value) => updateDraft({ platform: value.slice(0, 128) })}
+                placeholder="Organization default"
+                placeholderTextColor={tokens.textLow.hex}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Text className="text-text-low text-text12 mb-4">
+                Optional. Must exactly match a platform configured for your Devin organization.
+              </Text>
+
+              <View className="flex-row items-center justify-between mb-1">
                 <View className="flex-1 mr-3">
-                  <Text className="text-text14 text-text-hi mb-0.5">Unlisted</Text>
-                  <Text className="text-text-low text-text12">
-                    Only visible to you and people with the link.
+                  <Text className="text-text-hi text-text14 font-medium">Preserve VM state</Text>
+                  <Text className="text-text-low text-text12 mt-0.5">
+                    Keep this session resumable after it stops.
                   </Text>
                 </View>
-                <View
-                  className={`w-12 h-7 rounded-chip p-0.5 ${draft.unlisted ? 'bg-brand' : 'bg-tint-primary'}`}
+                <Switch
+                  value={draft.resumable}
+                  onValueChange={(resumable) => updateDraft({ resumable })}
+                  trackColor={{ false: tokens.tintSecondary.hex, true: tokens.brand.hex }}
+                  thumbColor={tokens.surface2.hex}
+                  accessibilityLabel="Preserve VM state"
+                />
+              </View>
+
+              <Text className="text-text-low text-text12 font-medium uppercase mb-1 mt-4">
+                Related session links
+              </Text>
+              <TextInput
+                className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-1 min-h-20"
+                value={draft.sessionLinks}
+                onChangeText={(sessionLinks) => updateDraft({ sessionLinks })}
+                placeholder="One link per line"
+                placeholderTextColor={tokens.textLow.hex}
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+                textAlignVertical="top"
+              />
+              <Text className="text-text-low text-text12 mb-4">
+                Attach relevant session or work links to the new session.
+              </Text>
+
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-1 mr-3">
+                  <Text className="text-text-low text-text12 font-medium uppercase">
+                    Per-session secrets
+                  </Text>
+                  <Text className="text-text-low text-text12 mt-0.5">
+                    Kept only in memory until this session is created.
+                  </Text>
+                </View>
+                <Pressable
+                  className="rounded-button bg-tint-secondary px-3 py-2"
+                  onPress={addSessionSecret}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add per-session secret"
                 >
-                  <View
-                    className={`w-6 h-6 rounded-chip bg-surface2 ${draft.unlisted ? 'ml-auto' : ''}`}
+                  <Text className="text-brand-text text-text12 font-medium">Add secret</Text>
+                </Pressable>
+              </View>
+              {sessionSecrets.map((secret) => (
+                <View
+                  key={secret.id}
+                  className="bg-surface1 rounded-card border border-border-subtle px-3 py-3 mb-2"
+                >
+                  <View className="flex-row items-center mb-2">
+                    <TextInput
+                      className="flex-1 text-text14 text-text-hi font-mono"
+                      value={secret.key}
+                      onChangeText={(key) =>
+                        updateSessionSecret(secret.id, { key: key.slice(0, 256) })
+                      }
+                      placeholder="SECRET_NAME"
+                      placeholderTextColor={tokens.textLow.hex}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                    />
+                    <Pressable
+                      className="w-9 h-9 items-center justify-center ml-2"
+                      onPress={() => removeSessionSecret(secret.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove session secret ${secret.key || 'row'}`}
+                    >
+                      <Ionicons name="trash-outline" size={15} color={tokens.failed.hex} />
+                    </Pressable>
+                  </View>
+                  <TextInput
+                    className="text-text14 text-text-hi border-t border-border-subtle pt-2"
+                    value={secret.value}
+                    onChangeText={(value) =>
+                      updateSessionSecret(secret.id, { value: value.slice(0, 65_536) })
+                    }
+                    placeholder="Secret value"
+                    placeholderTextColor={tokens.textLow.hex}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
                   />
                 </View>
-              </Pressable>
+              ))}
+
+              <Text className="text-text-low text-text12 font-medium uppercase mb-1 mt-3">
+                Structured output schema
+              </Text>
+              <TextInput
+                className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi font-mono mb-2 min-h-28"
+                value={draft.structuredOutputSchema}
+                onChangeText={(structuredOutputSchema) => updateDraft({ structuredOutputSchema })}
+                placeholder={'{"type":"object","properties":{}}'}
+                placeholderTextColor={tokens.textLow.hex}
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+                textAlignVertical="top"
+              />
+              <View className="flex-row items-center justify-between mb-1">
+                <View className="flex-1 mr-3">
+                  <Text className="text-text-hi text-text14 font-medium">
+                    Require final structured output
+                  </Text>
+                  <Text className="text-text-low text-text12 mt-0.5">
+                    Applies when a JSON Schema is provided above.
+                  </Text>
+                </View>
+                <Switch
+                  value={draft.structuredOutputRequired}
+                  onValueChange={(structuredOutputRequired) =>
+                    updateDraft({ structuredOutputRequired })
+                  }
+                  disabled={!draft.structuredOutputSchema.trim()}
+                  trackColor={{ false: tokens.tintSecondary.hex, true: tokens.brand.hex }}
+                  thumbColor={tokens.surface2.hex}
+                  accessibilityLabel="Require final structured output"
+                />
+              </View>
             </View>
           )}
         </ScrollView>
@@ -736,7 +913,7 @@ export default function ComposeScreen() {
                       <Text
                         className={`text-text14 ${draft.secretIds.includes(sec.secret_id) ? 'text-brand font-medium' : 'text-text-hi'}`}
                       >
-                        {sec.key}
+                        {sec.key ?? 'Unnamed secret'}
                       </Text>
                       {sec.note && (
                         <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>

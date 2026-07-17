@@ -9,7 +9,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { arch } from 'node:os';
+import { arch, homedir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -62,6 +62,22 @@ function requiredEnvironment(name) {
   return value;
 }
 
+function optionalKeychainPath() {
+  const configured = process.env.DEVINX_NOTARYTOOL_KEYCHAIN?.trim();
+  if (!configured) return null;
+  if (configured === '~') return homedir();
+  if (configured.startsWith('~/')) return resolve(homedir(), configured.slice(2));
+  return resolve(configured);
+}
+
+function notaryCredentials(profile, keychainPath) {
+  return [
+    '--keychain-profile',
+    profile,
+    ...(keychainPath ? ['--keychain', keychainPath] : []),
+  ];
+}
+
 function validateIdentityFormat(identity) {
   if (!identity.startsWith('Developer ID Application: ')) {
     throw new Error('DEVINX_CODESIGN_IDENTITY must be a Developer ID Application identity');
@@ -75,12 +91,11 @@ function validateIdentityAvailability(identity) {
   }
 }
 
-function validateNotaryProfile(profile) {
+function validateNotaryProfile(profile, keychainPath) {
   run('/usr/bin/xcrun', [
     'notarytool',
     'history',
-    '--keychain-profile',
-    profile,
+    ...notaryCredentials(profile, keychainPath),
     '--output-format',
     'json',
   ]);
@@ -120,13 +135,12 @@ function verifyDeveloperIdApp(identity) {
   }
 }
 
-function submitAndReview(path, profile, label) {
+function submitAndReview(path, profile, keychainPath, label) {
   const submission = runJson('/usr/bin/xcrun', [
     'notarytool',
     'submit',
     path,
-    '--keychain-profile',
-    profile,
+    ...notaryCredentials(profile, keychainPath),
     '--wait',
     '--output-format',
     'json',
@@ -141,8 +155,7 @@ function submitAndReview(path, profile, label) {
     'notarytool',
     'log',
     submission.id,
-    '--keychain-profile',
-    profile,
+    ...notaryCredentials(profile, keychainPath),
     logPath,
   ]);
   const log = JSON.parse(readFileSync(logPath, 'utf8'));
@@ -179,12 +192,13 @@ function rebuildSignedDmg(identity) {
 
 const identity = requiredEnvironment('DEVINX_CODESIGN_IDENTITY');
 const profile = requiredEnvironment('DEVINX_NOTARYTOOL_PROFILE');
+const keychainPath = optionalKeychainPath();
 validateIdentityFormat(identity);
 if (process.platform !== 'darwin' || !architecture) {
   throw new Error('Connector notarization requires an arm64 or x64 Mac');
 }
 validateIdentityAvailability(identity);
-validateNotaryProfile(profile);
+validateNotaryProfile(profile, keychainPath);
 
 if (checkOnly) {
   process.stdout.write('Developer ID identity and notarytool profile are ready.\n');
@@ -196,14 +210,14 @@ verifyDeveloperIdApp(identity);
 
 rmSync(zipPath, { force: true });
 run('/usr/bin/ditto', ['-c', '-k', '--keepParent', appRoot, zipPath]);
-const appSubmission = submitAndReview(zipPath, profile, 'App');
+const appSubmission = submitAndReview(zipPath, profile, keychainPath, 'App');
 run('/usr/bin/xcrun', ['stapler', 'staple', appRoot]);
 run('/usr/bin/xcrun', ['stapler', 'validate', appRoot]);
 run('/usr/sbin/spctl', ['--assess', '--type', 'execute', '--verbose=4', appRoot]);
 rmSync(zipPath, { force: true });
 
 rebuildSignedDmg(identity);
-const dmgSubmission = submitAndReview(dmgPath, profile, 'Dmg');
+const dmgSubmission = submitAndReview(dmgPath, profile, keychainPath, 'Dmg');
 run('/usr/bin/xcrun', ['stapler', 'staple', dmgPath]);
 run('/usr/bin/xcrun', ['stapler', 'validate', dmgPath]);
 run('/usr/sbin/spctl', [

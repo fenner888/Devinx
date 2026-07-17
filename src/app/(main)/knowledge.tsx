@@ -38,6 +38,7 @@ interface EditorState {
   trigger: string;
   body: string;
   folderId: string | null;
+  pinnedRepo: string;
 }
 
 export default function KnowledgeScreen() {
@@ -67,6 +68,7 @@ export default function KnowledgeScreen() {
         note.name.toLowerCase().includes(q) ||
         note.trigger.toLowerCase().includes(q) ||
         note.body.toLowerCase().includes(q) ||
+        (note.pinned_repo ?? '').toLowerCase().includes(q) ||
         (note.folder_path ?? '').toLowerCase().includes(q);
       return matchesFolder && matchesSearch;
     });
@@ -77,7 +79,7 @@ export default function KnowledgeScreen() {
 
   function openCreate() {
     setEditorError(null);
-    setEditor({ noteId: null, name: '', trigger: '', body: '', folderId: null });
+    setEditor({ noteId: null, name: '', trigger: '', body: '', folderId: null, pinnedRepo: '' });
   }
 
   function openEdit(note: KnowledgeNoteResponse) {
@@ -88,6 +90,7 @@ export default function KnowledgeScreen() {
       trigger: note.trigger,
       body: note.body,
       folderId: note.folder_id ?? null,
+      pinnedRepo: note.pinned_repo ?? '',
     });
   }
 
@@ -99,6 +102,7 @@ export default function KnowledgeScreen() {
       trigger: editor.trigger.trim(),
       body: editor.body.trim(),
       folder_id: editor.folderId,
+      pinned_repo: editor.pinnedRepo.trim() || null,
     };
     const opts = {
       onSuccess: () => {
@@ -261,6 +265,11 @@ export default function KnowledgeScreen() {
                   <Text className="text-text-low text-text12 mt-0.5" numberOfLines={1}>
                     {n.folder_path ? `${n.folder_path} · ` : ''}Trigger: {n.trigger}
                   </Text>
+                  {n.pinned_repo ? (
+                    <Text className="text-text-low text-text11 mt-0.5" numberOfLines={1}>
+                      Repository: {n.pinned_repo}
+                    </Text>
+                  ) : null}
                 </View>
                 <Pressable
                   onPress={() => handleToggle(n)}
@@ -367,6 +376,27 @@ export default function KnowledgeScreen() {
                     </ScrollView>
                   </>
                 )}
+                <Text className="text-text-low text-text12 font-medium uppercase mb-1">
+                  Pinned repository
+                </Text>
+                <TextInput
+                  className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-1"
+                  value={editor?.pinnedRepo ?? ''}
+                  onChangeText={(value) =>
+                    setEditor((current) =>
+                      current ? { ...current, pinnedRepo: value.slice(0, 1_024) } : current,
+                    )
+                  }
+                  placeholder="github.com/owner/repository"
+                  placeholderTextColor={tokens.textLow.hex}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={1_024}
+                  accessibilityLabel="Pinned repository path"
+                />
+                <Text className="text-text-low text-text12 mb-3">
+                  Optional. Restricts this note to the exact host-prefixed repository path.
+                </Text>
                 <Text className="text-text-low text-text12 font-medium uppercase mb-1">Content</Text>
                 <TextInput
                   className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-3 min-h-28"

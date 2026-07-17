@@ -23,6 +23,7 @@ import { EmptyState, ErrorState } from '@components/Skeletons';
 import { hapticSuccess, hapticError, hapticWarning } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
 import { normalizePlaybookMacro, validatePlaybookMacro } from '@lib/playbook-macro';
+import { parseStructuredOutputSchema } from '@lib/session-create-options';
 import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 import type { PlaybookResponse } from '@api/devin/types';
@@ -32,6 +33,7 @@ interface EditorState {
   title: string;
   body: string;
   macro: string;
+  structuredOutputSchema: string;
 }
 
 export default function PlaybooksScreen() {
@@ -64,10 +66,20 @@ export default function PlaybooksScreen() {
   function handleSave() {
     if (!editor || !canSave) return;
     setEditorError(null);
+    let structuredOutputSchema: Record<string, unknown> | undefined;
+    try {
+      structuredOutputSchema = parseStructuredOutputSchema(editor.structuredOutputSchema);
+    } catch (schemaError) {
+      setEditorError(
+        schemaError instanceof Error ? schemaError.message : 'Structured output schema is invalid.',
+      );
+      return;
+    }
     const body = {
       title: editor.title.trim(),
       body: editor.body.trim(),
       macro: normalizePlaybookMacro(editor.macro),
+      structured_output_schema: structuredOutputSchema ?? null,
     };
     const opts = {
       onSuccess: () => {
@@ -116,7 +128,13 @@ export default function PlaybooksScreen() {
           className="flex-row items-center bg-brand rounded-button px-3 py-2"
           onPress={() => {
             setEditorError(null);
-            setEditor({ playbookId: null, title: '', body: '', macro: '' });
+            setEditor({
+              playbookId: null,
+              title: '',
+              body: '',
+              macro: '',
+              structuredOutputSchema: '',
+            });
           }}
           accessibilityRole="button"
           accessibilityLabel="Create playbook"
@@ -187,6 +205,9 @@ export default function PlaybooksScreen() {
                   title: pb.title,
                   body: pb.body,
                   macro: pb.macro ?? '',
+                  structuredOutputSchema: pb.structured_output_schema
+                    ? JSON.stringify(pb.structured_output_schema, null, 2)
+                    : '',
                 });
               }}
               accessibilityRole="button"
@@ -271,6 +292,26 @@ export default function PlaybooksScreen() {
                   multiline
                   textAlignVertical="top"
                 />
+                <Text className="text-text-low text-text12 font-medium uppercase mb-1">
+                  Structured output schema (optional)
+                </Text>
+                <TextInput
+                  className="bg-surface1 rounded-input px-3 py-2 text-text13 text-text-hi font-mono mb-1 min-h-28"
+                  value={editor?.structuredOutputSchema ?? ''}
+                  onChangeText={(v) =>
+                    setEditor((e) => (e ? { ...e, structuredOutputSchema: v } : e))
+                  }
+                  placeholder={'{"type":"object","properties":{}}'}
+                  placeholderTextColor={tokens.textLow.hex}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  multiline
+                  textAlignVertical="top"
+                  accessibilityLabel="Playbook structured output JSON schema"
+                />
+                <Text className="text-text-low text-text12 mb-3">
+                  Optional JSON Schema (Draft 7), up to 64 KB. Sessions using this playbook can return validated structured output.
+                </Text>
                 {editorError && (
                   <View className="flex-row items-start bg-tint-red rounded-card px-3 py-2 mb-3">
                     <Ionicons name="alert-circle-outline" size={13} color={tokens.failed.hex} />

@@ -6,6 +6,7 @@ export const queryKeys = {
   sessions: ['sessions'] as const,
   session: (id: string) => ['session', id] as const,
   messages: (id: string) => ['messages', id] as const,
+  sessionAttachments: (id: string) => ['sessionAttachments', id] as const,
   messageFollowUp: (id: string) => ['messageFollowUp', id] as const,
   playbooks: ['playbooks'] as const,
   knowledge: ['knowledge'] as const,

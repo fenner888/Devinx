@@ -70,6 +70,22 @@ describe('client error handling (§8.4)', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('does not retain a non-auth 4xx response body in the thrown error', async () => {
+    mockFetch.mockResolvedValue({
+      ...errResponse(422),
+      text: async () => JSON.stringify({ detail: 'private prompt and secret metadata' }),
+    });
+
+    const request = apiRequest(mockAuth, '/test', {
+      method: 'POST',
+      body: { prompt: 'private prompt' },
+    });
+
+    await expect(request).rejects.toThrow('Unexpected status: 422');
+    await expect(request).rejects.not.toThrow(/private prompt|secret metadata/);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('retries 5xx errors up to maxRetries', async () => {
     mockFetch.mockResolvedValue(errResponse(503));
     await expect(apiRequest(mockAuth, '/test', { maxRetries: 2 })).rejects.toThrow(/Server error/);

@@ -37,6 +37,7 @@ import {
   useInsights,
   useGenerateInsights,
   useUploadAttachment,
+  useSessionAttachments,
 } from '@api/devin/queries';
 import { isValidSessionId } from '@lib/deepLink';
 import { SessionDetailSkeleton, ErrorState } from '@components/Skeletons';
@@ -943,6 +944,8 @@ function MessageBubble({ message }: { message: SessionMessage }) {
 
 /** Worklog tab — shows session metadata, ACU consumption, timeline summary. */
 function WorklogTab({ session }: { session: NonNullable<ReturnType<typeof useSession>['data']> }) {
+  const { tokens } = useTheme();
+  const attachments = useSessionAttachments(session.session_id);
   const rows: { label: string; value: string }[] = [
     { label: 'Status', value: `${session.status} / ${session.status_detail ?? '—'}` },
     { label: 'Created', value: new Date(session.created_at * 1000).toLocaleString() },
@@ -969,6 +972,52 @@ function WorklogTab({ session }: { session: NonNullable<ReturnType<typeof useSes
           </View>
         ))}
       </View>
+      {session.structured_output && (
+        <View className="bg-surface1 rounded-card px-4 py-3 mb-4">
+          <Text className="text-text-low text-text12 font-medium uppercase mb-3">
+            Structured output
+          </Text>
+          <Text className="text-text-hi text-text13 font-mono" selectable>
+            {JSON.stringify(session.structured_output, null, 2)}
+          </Text>
+        </View>
+      )}
+      {(attachments.isLoading || attachments.isError || (attachments.data?.length ?? 0) > 0) && (
+        <View className="bg-surface1 rounded-card px-4 py-3 mb-4">
+          <Text className="text-text-low text-text12 font-medium uppercase mb-3">
+            Attachments
+          </Text>
+          {attachments.isLoading && (
+            <Text className="text-text-mid text-text13">Loading attachments…</Text>
+          )}
+          {attachments.isError && (
+            <Text className="text-text-mid text-text13">
+              Attachments are unavailable for this credential or session.
+            </Text>
+          )}
+          {attachments.data?.map((attachment, index) => (
+            <Pressable
+              key={attachment.attachment_id}
+              className={`flex-row items-center py-2 ${index < attachments.data.length - 1 ? 'border-b border-border-subtle' : ''}`}
+              onPress={() => Linking.openURL(attachment.url)}
+              accessibilityRole="link"
+              accessibilityLabel={`Open ${attachment.name}`}
+            >
+              <Ionicons name="attach" size={15} color={tokens.textMid.hex} />
+              <View className="flex-1 ml-2">
+                <Text className="text-text-hi text-text13" numberOfLines={1}>
+                  {attachment.name}
+                </Text>
+                <Text className="text-text-low text-text11 mt-0.5">
+                  {attachment.source === 'devin' ? 'Added by Devin' : 'Added by you'}
+                  {attachment.content_type ? ` · ${attachment.content_type}` : ''}
+                </Text>
+              </View>
+              <Ionicons name="open-outline" size={14} color={tokens.textLow.hex} />
+            </Pressable>
+          ))}
+        </View>
+      )}
       {session.url && (
         <Pressable
           className="bg-surface1 rounded-card px-4 py-3 items-center"

@@ -12,6 +12,7 @@ import {
   sessionResponseSchema,
   sessionMessageListResponseSchema,
   sessionMessageCreateRequestSchema,
+  sessionsQueryParamsSchema,
   sessionCreateRequestSchema,
   sessionTagsResponseSchema,
   sessionTagsUpdateRequestSchema,
@@ -44,7 +45,9 @@ import {
   prMetricsSchema,
   searchMetricsSchema,
   activeUsersResponseSchema,
+  activeUserMetricsSchema,
   repositoryListResponseSchema,
+  sessionAttachmentListSchema,
 } from './schemas';
 import type {
   SessionResponse,
@@ -77,6 +80,7 @@ import type {
   ActiveUserPeriod,
   MetricsQuery,
   RepositoryResponse,
+  SessionAttachment,
   SelfResponse,
   Cursor,
 } from './types';
@@ -94,13 +98,14 @@ export async function listSessions(
   params?: SessionsQueryParams,
 ): Promise<{ items: SessionResponse[]; endCursor: Cursor | null; hasNextPage: boolean }> {
   const orgPath = await auth.orgPath();
+  const validatedParams = sessionsQueryParamsSchema.parse(params ?? {});
   const data = await apiRequest<{
     items: SessionResponse[];
     end_cursor: Cursor | null;
     has_next_page: boolean;
   }>(auth, paths.sessions(orgPath.replace('/v3/organizations/', '')), {
     method: 'GET',
-    query: params as Record<string, string | number | boolean | string[] | null | undefined>,
+    query: validatedParams as Record<string, string | number | boolean | string[] | null | undefined>,
     schema: sessionListResponseSchema,
   });
   return { items: data.items, endCursor: data.end_cursor, hasNextPage: data.has_next_page };
@@ -150,6 +155,22 @@ export async function listMessages(
     schema: sessionMessageListResponseSchema,
   });
   return { items: data.items, endCursor: data.end_cursor, hasNextPage: data.has_next_page };
+}
+
+export async function listSessionAttachments(
+  auth: AuthProvider,
+  sessionId: string,
+): Promise<SessionAttachment[]> {
+  const orgPath = await auth.orgPath();
+  const orgId = orgPath.replace('/v3/organizations/', '');
+  return apiRequest<SessionAttachment[]>(
+    auth,
+    paths.sessionAttachments(orgId, toDevinId(sessionId)),
+    {
+      method: 'GET',
+      schema: sessionAttachmentListSchema,
+    },
+  );
 }
 
 export async function sendMessage(
@@ -271,17 +292,28 @@ export async function getInsights(
 }
 
 export async function listPlaybooks(auth: AuthProvider): Promise<PlaybookResponse[]> {
-  const orgPath = await auth.orgPath();
-  const orgId = orgPath.replace('/v3/organizations/', '');
-  const data = await apiRequest<{
-    items: PlaybookResponse[];
-    end_cursor: Cursor | null;
-    has_next_page: boolean;
-  }>(auth, paths.playbooks(orgId), {
-    method: 'GET',
-    schema: playbookListResponseSchema,
-  });
-  return data.items;
+  const items: PlaybookResponse[] = [];
+  const seenCursors = new Set<string>();
+  let cursor: Cursor | null = null;
+  for (let page = 0; page < 10; page++) {
+    const data: {
+      items: PlaybookResponse[];
+      end_cursor: Cursor | null;
+      has_next_page: boolean;
+    } = await apiRequest(auth, paths.playbooks(await orgIdOf(auth)), {
+      method: 'GET',
+      query: { first: 100, after: cursor },
+      schema: playbookListResponseSchema,
+    });
+    items.push(...data.items);
+    if (!data.has_next_page) return items;
+    if (!data.end_cursor || seenCursors.has(data.end_cursor)) {
+      throw new Error('Playbook pagination returned an invalid cursor');
+    }
+    seenCursors.add(data.end_cursor);
+    cursor = data.end_cursor;
+  }
+  throw new Error('Playbook list exceeds the supported pagination limit');
 }
 
 export async function listKnowledge(auth: AuthProvider): Promise<KnowledgeNoteResponse[]> {
@@ -317,17 +349,28 @@ export async function listKnowledgeFolders(auth: AuthProvider): Promise<Knowledg
 }
 
 export async function listSecrets(auth: AuthProvider): Promise<SecretResponse[]> {
-  const orgPath = await auth.orgPath();
-  const orgId = orgPath.replace('/v3/organizations/', '');
-  const data = await apiRequest<{
-    items: SecretResponse[];
-    end_cursor: Cursor | null;
-    has_next_page: boolean;
-  }>(auth, paths.secrets(orgId), {
-    method: 'GET',
-    schema: secretListResponseSchema,
-  });
-  return data.items;
+  const items: SecretResponse[] = [];
+  const seenCursors = new Set<string>();
+  let cursor: Cursor | null = null;
+  for (let page = 0; page < 10; page++) {
+    const data: {
+      items: SecretResponse[];
+      end_cursor: Cursor | null;
+      has_next_page: boolean;
+    } = await apiRequest(auth, paths.secrets(await orgIdOf(auth)), {
+      method: 'GET',
+      query: { first: 100, after: cursor },
+      schema: secretListResponseSchema,
+    });
+    items.push(...data.items);
+    if (!data.has_next_page) return items;
+    if (!data.end_cursor || seenCursors.has(data.end_cursor)) {
+      throw new Error('Secret pagination returned an invalid cursor');
+    }
+    seenCursors.add(data.end_cursor);
+    cursor = data.end_cursor;
+  }
+  throw new Error('Secret list exceeds the supported pagination limit');
 }
 
 export async function uploadAttachment(
@@ -399,6 +442,7 @@ export async function getDailyConsumption(
 /** Read-only enterprise billing cycles. Requires enterprise ManageBilling. */
 export async function listConsumptionCycles(auth: AuthProvider): Promise<ConsumptionCycle[]> {
   const items: ConsumptionCycle[] = [];
+  const seenCursors = new Set<string>();
   let cursor: string | null = null;
   for (let page = 0; page < 5; page++) {
     const data: {
@@ -411,15 +455,20 @@ export async function listConsumptionCycles(auth: AuthProvider): Promise<Consump
       schema: consumptionCycleListResponseSchema,
     });
     items.push(...data.items);
-    if (!data.has_next_page || !data.end_cursor) break;
+    if (!data.has_next_page) return items.sort((a, b) => b.after - a.after);
+    if (!data.end_cursor || seenCursors.has(data.end_cursor)) {
+      throw new Error('Consumption-cycle pagination returned an invalid cursor');
+    }
+    seenCursors.add(data.end_cursor);
     cursor = data.end_cursor;
   }
-  return items.sort((a, b) => b.after - a.after);
+  throw new Error('Consumption-cycle list exceeds the supported pagination limit');
 }
 
 /** Read-only enterprise ACU limits. Requires enterprise ManageBilling. */
 export async function listDevinAcuLimits(auth: AuthProvider): Promise<DevinAcuLimit[]> {
   const items: DevinAcuLimit[] = [];
+  const seenCursors = new Set<string>();
   let cursor: string | null = null;
   for (let page = 0; page < 5; page++) {
     const data: {
@@ -432,10 +481,14 @@ export async function listDevinAcuLimits(auth: AuthProvider): Promise<DevinAcuLi
       schema: devinAcuLimitListResponseSchema,
     });
     items.push(...data.items);
-    if (!data.has_next_page || !data.end_cursor) break;
+    if (!data.has_next_page) return items;
+    if (!data.end_cursor || seenCursors.has(data.end_cursor)) {
+      throw new Error('ACU-limit pagination returned an invalid cursor');
+    }
+    seenCursors.add(data.end_cursor);
     cursor = data.end_cursor;
   }
-  return items;
+  throw new Error('ACU-limit list exceeds the supported pagination limit');
 }
 
 // ---------------------------------------------------------------------------
@@ -452,6 +505,7 @@ export async function listSchedules(auth: AuthProvider): Promise<ScheduleRespons
   const orgPath = await auth.orgPath();
   const orgId = orgPath.replace('/v3/organizations/', '');
   const items: Record<string, unknown>[] = [];
+  const seenCursors = new Set<string>();
   let cursor: string | null = null;
   for (let page = 0; page < 5; page++) {
     const data: {
@@ -464,10 +518,14 @@ export async function listSchedules(auth: AuthProvider): Promise<ScheduleRespons
       schema: scheduleListResponseSchema,
     });
     items.push(...data.items);
-    if (!data.has_next_page || !data.end_cursor) break;
+    if (!data.has_next_page) return items.map(normalizeSchedule);
+    if (!data.end_cursor || seenCursors.has(data.end_cursor)) {
+      throw new Error('Schedule pagination returned an invalid cursor');
+    }
+    seenCursors.add(data.end_cursor);
     cursor = data.end_cursor;
   }
-  return items.map(normalizeSchedule);
+  throw new Error('Schedule list exceeds the supported pagination limit');
 }
 
 export async function createSchedule(
@@ -673,18 +731,54 @@ export async function getSearchMetrics(
 
 export async function getWeeklyActiveUsers(
   auth: AuthProvider,
-  query?: MetricsQuery,
+  query: Required<MetricsQuery>,
 ): Promise<ActiveUserPeriod[]> {
-  const data = await apiRequest<ActiveUserPeriod[] | { items: ActiveUserPeriod[] }>(
+  return apiRequest<ActiveUserPeriod[]>(
     auth,
     paths.metricsWau(await orgIdOf(auth)),
     {
       method: 'GET',
-      query: { time_after: query?.time_after, time_before: query?.time_before },
+      query: { time_after: query.time_after, time_before: query.time_before },
       schema: activeUsersResponseSchema,
     },
   );
-  return Array.isArray(data) ? data : data.items;
+}
+
+export async function getActiveUsers(
+  auth: AuthProvider,
+  query: Required<MetricsQuery>,
+): Promise<ActiveUserPeriod> {
+  return apiRequest<ActiveUserPeriod>(auth, paths.metricsActiveUsers(await orgIdOf(auth)), {
+    method: 'GET',
+    query: { time_after: query.time_after, time_before: query.time_before },
+    schema: activeUserMetricsSchema,
+  });
+}
+
+async function getActiveUserSeries(
+  auth: AuthProvider,
+  path: string,
+  query: Required<MetricsQuery>,
+): Promise<ActiveUserPeriod[]> {
+  return apiRequest<ActiveUserPeriod[]>(auth, path, {
+    method: 'GET',
+    query: { time_after: query.time_after, time_before: query.time_before },
+    schema: activeUsersResponseSchema,
+  });
+}
+
+export async function getDailyActiveUsers(
+  auth: AuthProvider,
+  query: Required<MetricsQuery>,
+): Promise<ActiveUserPeriod[]> {
+  return getActiveUserSeries(auth, paths.metricsDau(await orgIdOf(auth)), query);
+}
+
+export async function getMonthlyActiveUsers(
+  auth: AuthProvider,
+  query: Required<MetricsQuery>,
+): Promise<ActiveUserPeriod[]> {
+  return getActiveUserSeries(auth, paths.metricsMau(await orgIdOf(auth)), query);
 }
 
 // ---------------------------------------------------------------------------

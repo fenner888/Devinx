@@ -40,20 +40,20 @@ because a similarly named Web control exists.
 | Personal profile, language, notifications, git identity, PR defaults    | Theme is device-local; other controls absent                            | Web-owned. No documented standard organization endpoint for personal preferences. Browser, Slack, newsletter, and Web onboarding controls do not belong in the mobile client.                                                                                                                                                      |
 | Personal integrations and Devin Desktop login                           | Computer pairing is separate and user controlled                        | Personal OAuth and Desktop login stay Web/Desktop-owned. Do not copy Web login state, OAuth grants, or integration cookies. Organization integration status may still be shown through the official Devin MCP.                                                                                                                     |
 | Organization general and data-sharing policy                            | In-app privacy disclosure exists                                        | Web-owned until a documented organization-scoped API exists. DevinX's own collection and storage controls remain independent.                                                                                                                                                                                                      |
-| Organization integrations and MCP servers                               | Not exposed                                                             | Add a native read-only catalog using the official Devin MCP `list_integrations` tool. Show native integrations and MCP servers, installed state, and capability/permission errors. Installation, OAuth, custom MCP creation, secret headers, and configuration changes remain unavailable because no documented write tool exists. |
+| Organization integrations and MCP servers                               | Native read-only Connections catalog through official Devin MCP         | Complete for the documented read surface. Installation, OAuth, custom MCP creation, secret headers, and configuration changes remain unavailable because no documented write tool exists. |
 | Plans and invoices                                                      | Not exposed                                                             | Web-owned. The public API does not expose self-serve plan, invoice, daily/weekly quota, on-demand balance, or auto-reload management.                                                                                                                                                                                              |
 | Usage & limits                                                          | Native organization consumption and permission-gated enterprise metrics | Keep. Explain that self-serve quota/balance values remain unavailable rather than linking an internal Web page.                                                                                                                                                                                                                    |
-| Devin organization defaults, commands, deployment, PR, and bot settings | Session creation exposes documented per-session inputs                  | Keep organization mutation out of DevinX until documented management endpoints exist. Continue to expose documented per-session agent, platform, ACU, repository, playbook, knowledge, secret, and tag inputs only. Do not render disabled copies of unsupported organization controls.                                            |
+| Devin organization defaults, commands, deployment, PR, and bot settings | Session creation exposes documented per-session inputs                  | Keep organization mutation out of DevinX until documented management endpoints exist. Continue to expose documented per-session mode, platform, integer ACU, repository, playbook, knowledge, secret, structured-output, and tag inputs only. Do not render disabled copies of unsupported organization controls.                                            |
 | Devin Review                                                            | Native trigger and latest-status lookup                                 | Keep. Organization auto-review, comment-posting, security-analysis, and spend-policy settings remain Web-owned without a documented API.                                                                                                                                                                                           |
-| DeepWiki and Wiki                                                       | Native repository/index status only                                     | Add native repository documentation browsing through official Devin MCP tools: `list_available_repos`, `read_wiki_structure`, `read_wiki_contents`, and `ask_question`. Keep repository indexing and Wiki generation/regeneration unavailable because no documented write tool exists.                                             |
-| Legacy Schedules / Automations                                          | Native recurring schedule CRUD                                          | Complete documented parity for recurring and one-time schedules, agent selection, notification preference, playbook, and tags. Event-driven Web Automations remain a distinct Web product unless an API is published.                                                                                                              |
+| DeepWiki and Wiki                                                       | Native repository/index status plus documented MCP Wiki reads            | Browse repository documentation through official Devin MCP tools: `list_available_repos`, `read_wiki_structure`, `read_wiki_contents`, and `ask_question`. The API now documents beta repository indexing mutations, but DevinX intentionally keeps repository administration read-only in v1 because it is a costly organization mutation that needs its own authorization, progress, retry, and recovery design. |
+| Legacy Schedules / Automations                                          | Native recurring and one-time schedule CRUD                             | Complete for documented mobile-safe inputs, including platform, agent, notification preference, playbook, and tags. Privileged impersonation, approval bypass, Slack-target, and target-Devin controls remain hidden until a separate authorization UX exists. Event-driven Web Automations remain a distinct Web product unless an API is published. |
 | Devin Desktop account settings                                          | DevinX Connector manages its own devices and local sessions             | Web-owned. Anthropic retention consent, provider keys, shared conversations, and Windsurf usage must not be inferred or copied.                                                                                                                                                                                                    |
-| Knowledge                                                               | Native note CRUD and enable toggle                                      | Add documented folder-tree loading, folder filtering, and folder selection when editing or creating a note. Suggestions remain Web-owned because no public endpoint is documented.                                                                                                                                                 |
+| Knowledge                                                               | Native note CRUD, enable state, folder tree/filter/selection, and pinned repository | Complete for the documented note/folder surface. Suggestions remain Web-owned because no public endpoint is documented. |
 | Environment / snapshots                                                 | Not exposed                                                             | Defer mutation. Snapshot setup is a broad beta administrative surface with blueprint files and build actions; it needs its own least-privilege spec and physical recovery tests.                                                                                                                                                   |
-| Playbooks                                                               | Native CRUD; macro displayed but not editable                           | Add validated macro editing. Structured-output schemas require a separate schema-editor design and size/complexity safeguards before exposure.                                                                                                                                                                                     |
+| Playbooks                                                               | Native CRUD, validated macro editing, and bounded structured-output schema editor | Complete for the documented playbook surface. The editor rejects external `$ref` values and enforces the documented 64 KB schema ceiling. |
 | Skills & Rules                                                          | Not exposed                                                             | Web/CLI-owned. The installed CLI exposes `rules`, `skills`, and `plugins`, but current ACP and the documented Devin MCP do not advertise a safe Skills & Rules management capability. Do not show a nonfunctional mobile entry.                                                                                                    |
 | Secrets                                                                 | Native metadata list, write-only create, destructive delete             | Keep. Secret values never return from the API, enter logs, or persist outside the request lifecycle.                                                                                                                                                                                                                               |
-| Repositories                                                            | Composer picker only                                                    | Add the read-only Repositories & Wiki settings screen. Repository integration and indexing mutations remain gated.                                                                                                                                                                                                                 |
+| Repositories                                                            | Composer picker plus read-only Repositories & Wiki settings screen      | Complete for the documented read surface. Repository integration and indexing mutations remain gated. |
 | Membership                                                              | Used only when documented attribution discovery is available            | Do not make DevinX an organization-admin console in v1. Member invitation/role changes are unrelated to mobile mission control and carry material account risk.                                                                                                                                                                    |
 | Devin API / service users                                               | Current credential identity and fingerprint shown                       | Keep credential provisioning and rotation out of the app. Never generate, display, copy, or persist additional API keys.                                                                                                                                                                                                           |
 | Analytics                                                               | Native organization metrics with permission fallback                    | Keep. Enterprise-only dimensions remain unavailable to organization-scoped credentials.                                                                                                                                                                                                                                            |
@@ -76,27 +76,22 @@ content-type, path, lifecycle, and permission rules are specified and tested. CL
 `plugins`, `mcp`, `cloud`, update, setup, and uninstall commands are not ACP capabilities and must not
 be invoked indirectly from the phone.
 
-## Implementation sequence
+## Completed implementation evidence
 
-1. Add a small validated Streamable HTTP client for `https://mcp.devin.ai/mcp`. It must use the
-   existing Keychain-backed auth provider, include `X-Org-Id`, negotiate the MCP session, validate
-   every JSON-RPC envelope and tool result with Zod, bound response sizes, never log tool payloads,
-   and never persist credentials or integration configuration.
-2. Add native Connections & MCP discovery through `list_integrations`. The screen is read-only and
-   must hide unsupported install/edit actions instead of linking private Web routes.
-3. Keep repository discovery and indexing reads on the documented `v3beta1` organization paths,
-   with bounded cursor pagination, identity deduplication, Zod parsing, and explicit partial-result
-   failure. Do not relabel the beta contract as stable v3.
-4. Upgrade Repositories & Wiki with MCP-backed repository documentation structure, content, and
-   questions. Do not expose Generate, Regenerate, Add repository, or indexing mutations.
-5. Add Knowledge folder schemas, endpoint, query, grouping, filter, and editor selection.
-6. Add validated Playbook macro editing without changing structured-output schemas.
-7. Complete the documented Schedule editor options and retain explicit destructive confirmation.
-   The current documentation mentions an `advanced` agent in prose but omits it from the request
-   enum table. DevinX displays unknown read values but offers only the unambiguous documented write
-   values (`devin` and `data_analyst`) until Cognition resolves that contract discrepancy.
-8. Run the full Cloud-resource and authorization matrix with missing-permission fixtures before any
-   TestFlight build.
+1. The Streamable HTTP client uses the Keychain-backed provider, derives `X-Org-Id`, negotiates a
+   bounded MCP session, validates JSON-RPC/tool payloads with Zod, and does not log or cache them.
+2. Connections & MCP discovery is native and read-only through `list_integrations`; unsupported
+   install/edit controls are absent.
+3. Repository discovery remains explicitly `v3beta1`, with bounded cursor pagination, identity
+   deduplication, Zod parsing, and fail-closed partial-result behavior.
+4. Repositories & Wiki uses documented MCP structure/content/question tools without exposing
+   generation or indexing mutations.
+5. Knowledge folders, filtering, selection, enable state, and pinned repositories are implemented.
+6. Playbook macro and bounded self-contained structured-output schema editing are implemented.
+7. Schedule create/update supports documented recurring/one-time inputs and platform selection;
+   privilege-bearing controls remain an intentional boundary.
+8. Cloud-resource, authorization, missing-permission, and response-body non-disclosure tests are
+   release gates before TestFlight.
 
 ## Non-goals
 
@@ -104,7 +99,8 @@ be invoked indirectly from the phone.
 - No plan purchase, invoice, billing, API-key, member-role, integration-OAuth, MCP installation, or
   personal-profile management.
 - No local rules/skills/plugins management through shell execution.
-- No repository indexing, Wiki generation/regeneration, or snapshot mutation in this phase.
+- No repository indexing or Wiki generation/regeneration mutation in this phase. This is an
+  intentional v1 boundary, not a claim that the beta API lacks those routes.
 - No official Code Scan creation until Cognition publishes a supported user-principal route.
 
 ## Sources

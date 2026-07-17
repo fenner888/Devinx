@@ -1,13 +1,8 @@
 /** ModeSettings — pure UI for documented Cloud session modes. */
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-type Mode = 'normal' | 'fast';
-
-const MODES: { key: Mode; label: string; description: string }[] = [
-  { key: 'normal', label: 'Normal', description: 'Default agent mode' },
-  { key: 'fast', label: 'Fast', description: 'About 2× faster and 4× more expensive' },
-];
+import type { DevinMode } from '@api/devin/types';
+import { MODE_OPTIONS } from '@lib/session-utils';
 
 export function ModeSettings({
   mode,
@@ -15,8 +10,8 @@ export function ModeSettings({
   checkColor,
   mutedColor,
 }: {
-  mode: Mode;
-  onChange: (mode: Mode) => void;
+  mode: DevinMode;
+  onChange: (mode: DevinMode) => void;
   /** Hex for the selected checkmark (theme brand text). */
   checkColor: string;
   /** Hex for muted icons. */
@@ -25,7 +20,7 @@ export function ModeSettings({
   return (
     <View>
       <Text className="text-text-low text-text12 py-1.5">Cloud mode</Text>
-      {MODES.map(({ key, label, description }) => {
+      {MODE_OPTIONS.map(({ key, label, description }) => {
         const selected = mode === key;
         return (
           <Pressable
@@ -48,7 +43,8 @@ export function ModeSettings({
       <View className="flex-row items-start mt-2">
         <Ionicons name="information-circle-outline" size={12} color={mutedColor} />
         <Text className="text-text-low text-text11 ml-1.5 flex-1">
-          Fast availability follows your Devin organization settings.
+          Preview mode availability follows your Devin organization settings. Devin returns an
+          error when a selected mode is unavailable to this account.
         </Text>
       </View>
     </View>

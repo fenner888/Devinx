@@ -53,23 +53,20 @@ describe('session repository context', () => {
     await expect(getSessionRepository(session())).resolves.toBe('fenner888/Devinx');
   });
 
-  it('persists and reads the selected session mode', async () => {
-    storage.getItem.mockResolvedValue('fast');
+  it.each(['normal', 'fast', 'lite', 'ultra', 'fusion'] as const)(
+    'persists and reads documented Cloud mode %s',
+    async (mode) => {
+      storage.getItem.mockResolvedValue(mode);
 
-    await rememberSessionMode('session-1', 'fast');
+      await rememberSessionMode('session-1', mode);
 
-    expect(storage.setItem).toHaveBeenCalledWith('@devinx/session-mode/session-1', 'fast');
-    await expect(getSessionMode('session-1')).resolves.toBe('fast');
-  });
+      expect(storage.setItem).toHaveBeenCalledWith('@devinx/session-mode/session-1', mode);
+      await expect(getSessionMode('session-1')).resolves.toBe(mode);
+    },
+  );
 
   it('rejects unknown stored session modes', async () => {
     storage.getItem.mockResolvedValue('unknown');
-
-    await expect(getSessionMode('session-1')).resolves.toBeNull();
-  });
-
-  it('ignores a previously cached preview mode that is not in the public API contract', async () => {
-    storage.getItem.mockResolvedValue('fusion');
 
     await expect(getSessionMode('session-1')).resolves.toBeNull();
   });

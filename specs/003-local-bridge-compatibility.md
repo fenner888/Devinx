@@ -17,6 +17,13 @@ has changed since the original fixture; the product continues to negotiate capab
 connection rather than treating either marketing version as a compatibility guarantee. No session
 schema or account content was requested during the refresh.
 
+The July 17 pre-release audit repeated `npm run bridge:discover` against the installed
+`3000.1.27 (0d4bf12e)` CLI. It again reported exactly `loadSession`, embedded context, image,
+additional directories, and session listing, with zero unknown capabilities. Resume, close,
+delete, fork, audio, and MCP HTTP/SSE remained absent. Connector controls therefore remain gated
+from the live ACP initialization response; no missing capability is emulated through shell or
+private Desktop state.
+
 Two repeated probes after the schema-mode implementation returned the capability set below. An earlier probe from the same reported CLI version also returned audio and MCP HTTP/SSE capabilities. The agent implementation can therefore vary without a CLI marketing-version change; every connection must negotiate and gate features from the live initialization response.
 
 ## Advertised capabilities

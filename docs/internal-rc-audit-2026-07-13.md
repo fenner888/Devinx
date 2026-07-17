@@ -153,7 +153,9 @@ in `docs/authorization-matrix.md`.
   returned by the authenticated Cloud connection, removes the unsupported repository-indexing
   mutation and private billing handoff, and aligns privacy/listing evidence. It is the functional
   baseline for consolidated internal Build 55. Commit `3162a33` then corrects the final model
-  contract: Cloud exposes and submits only the documented `normal`/`fast` modes, while Computer
+  contract at the time of this snapshot: Cloud exposed `normal`/`fast`. The July 17 contract audit
+  supersedes this point and exposes all currently documented Cloud modes (`normal`, `fast`, `lite`,
+  `ultra`, `fusion`), while Computer
   sends the exact live ACP model (including Adaptive) and requires configuration confirmation
   before dispatching the initial prompt. Build 56 supersedes Build 55 for physical testing.
 - Physical Build 50 testing exposed a keyboard-layout regression: the absolute composer was a

@@ -72,6 +72,8 @@ Then select the exact Developer ID Application identity and the Keychain profile
 ```bash
 export DEVINX_CODESIGN_IDENTITY='Developer ID Application: Your Name (TEAMID)'
 export DEVINX_NOTARYTOOL_PROFILE='devinx-notary'
+# Only when the profile is stored in a dedicated Keychain:
+export DEVINX_NOTARYTOOL_KEYCHAIN='~/Library/Keychains/devinx-build.keychain-db'
 npm run connector:notarize:check
 npm run connector:build:macos
 npm run connector:notarize:macos

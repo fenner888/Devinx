@@ -130,8 +130,8 @@ Hermex = native iOS thin client → self-hosted bridge server (hermes-webui) →
 - **Base:** `https://api.devin.ai/v3/organizations/{org_id}/...` for sessions, knowledge, playbooks, secrets. v1 (`/v1/sessions`) remains available; use v3 as primary.
 - **Auth today:** service-user keys (prefix `cog_`), Bearer token. Sessions can be attributed to a human user via `create_as_user_id` (requires impersonation permission). **Personal Access Tokens (PATs) are in closed beta** — they authenticate directly as the user with automatic attribution. Architect auth as a swappable strategy: v1 ships service-user mode; PAT mode is a config flag away (§8.2).
 - **No streaming, no webhooks** in the public API → **polling architecture**. Message list endpoint is cursor-paginated and chronological → incremental polling is cheap (only fetch past the last cursor).
-- **Session lifecycle:** create (with `prompt`, optional `playbook_id`, `snapshot_id`, `knowledge_ids`, `secret_ids`, `session_secrets`, `tags`, `title`, `max_acu_limit`, `structured_output_schema`, `unlisted`) → runs async → may suspend/sleep → **sending a message auto-resumes** → archive (sleep) or terminate. Session detail includes status, PR info, structured output; v3 responses include `origin`, `category`/`subcategory` fields.
-- **Also available:** attachments upload/download, tags CRUD, on-demand session insights, scheduled sessions, consumption endpoints (org + daily), playbooks/knowledge/secrets list.
+- **Session lifecycle:** create with the published v3 request contract (`prompt` plus optional attachments, playbook/knowledge/secret references, repositories, mode, platform, tags, title, integer ACU limit, resumability, links, session secrets, and structured-output controls) → runs async → may suspend/sleep → **sending a message auto-resumes** → archive (sleep) or terminate. `snapshot_id` and `unlisted` are not current create inputs. Session detail includes status, PR info, structured output; v3 responses include `origin`, `category`/`subcategory` fields.
+- **Also available:** attachment upload/download plus session-output attachment listing, tags CRUD, on-demand session insights, scheduled sessions, consumption endpoints (org + daily), and playbooks/knowledge/secrets.
 - **Rate limits exist** (429s documented) → client must implement backoff + jittered adaptive polling (§8.4).
 
 **Devin: during Phase 0, fetch `https://docs.devin.ai/llms.txt` and crawl the v3 API reference. Generate `/src/api/devin/types.ts` from the actual current schemas — do not trust this document's field lists over live docs. This spec was written July 2026; the API ships changes monthly.**
@@ -146,7 +146,7 @@ Hermex = native iOS thin client → self-hosted bridge server (hermes-webui) →
 
 **ADR-003: Polling with adaptive cadence, not sockets.** The API offers neither SSE nor webhooks. TanStack Query `refetchInterval` driven by app state: foreground + watching a running session = 5s on that session's messages; foreground board = 15s on session list; background = OS-scheduled background fetch (~15min, best-effort); terminal-status sessions = never. All polling stops on 401 and backs off exponentially on 429/5xx.
 
-**ADR-004: Auth as a strategy interface.** `AuthProvider` interface with two implementations: `ServiceUserAuth` (key + org ID + optional `create_as_user_id`) and `PatAuth` (token only, auto-attribution). v1 ships the first; the second is wired but flag-gated until PAT GA. Onboarding copy already explains both.
+**ADR-004: Auth as a strategy interface.** `AuthProvider` has `ServiceUserAuth` (key + org ID + optional `create_as_user_id`) and a closed-beta `PatAuth` implementation. v1 presents only service-user setup. PAT setup remains hidden unless the release explicitly sets `EXPO_PUBLIC_ENABLE_PAT=true`; no truthy-default or undocumented login path may expose it.
 
 **ADR-005: SQLite read-cache, memory-first.** Session list + message history cached in expo-sqlite so the app opens instantly offline with last-known state and a staleness banner. Cache is encrypted at rest via SQLCipher if available in the Expo module, else OS file protection (`NSFileProtectionComplete`). Cache is purge-on-logout and holds no secrets ever.
 
@@ -314,9 +314,9 @@ The orientation requests no microphone, camera, notification, or network permiss
 
 ### 7.3 Session Detail
 - Header: title (editable if API allows), status chip, ACU spend, created/updated times, origin badge (API/Slack/web).
-- **Timeline tab:** chronological messages (cursor-paginated, infinite scroll upward), Devin vs user styling, markdown rendering, code blocks with copy, attachment tiles (download via attachments endpoint). Sending a message auto-resumes a suspended session. The canonical header status communicates that the session is sleeping; do not repeat a passive wake helper beside the composer.
-- **Output tab:** PR list (deep-link to GitHub app/web + Devin Review link if present), structured output viewer (pretty JSON + copy + share), session insights (trigger on-demand generation, render results).
-- Actions menu: Archive, Terminate, Generate insights, Manage tags, Share (public session URL only if session is not unlisted — warn before sharing).
+- **Timeline tab:** chronological messages (cursor-paginated, infinite scroll upward), Devin vs user styling, markdown rendering, and code blocks with copy. Sending a message auto-resumes a suspended session. The canonical header status communicates that the session is sleeping; do not repeat a passive wake helper beside the composer.
+- **Worklog/Output:** PR list (deep-link to GitHub app/web + Devin Review link if present), documented session-output attachments, structured output viewer (pretty JSON), and session insights (trigger on-demand generation, render results).
+- Actions menu: Archive, Terminate, Generate insights, Manage tags, and Share the authenticated Devin session URL using normal platform sharing.
 
 ### 7.4 The Killer Interaction: Blocked-Session Triage
 When Devin needs input (question, secret request, decision), that session is pure wasted wall-clock until a human responds. DevinX's entire reason to exist on a phone:
@@ -327,7 +327,7 @@ When Devin needs input (question, secret request, decision), that session is pur
 
 ### 7.5 New Session Composer
 - Prompt (multiline, paste-friendly; large paste → offer to attach as file, matching Devin web behavior).
-- Collapsible "Advanced": playbook picker (fetched list), tags, title, snapshot ID, knowledge selector, secret selector, session-specific secrets (masked entry, never cached, cleared on submit), max ACU limit stepper, unlisted toggle.
+- Collapsible "Advanced": documented Cloud mode picker (`normal`, `fast`, `lite`, `ultra`, `fusion`), playbook picker, tags, title, knowledge selector, secret selector, session-specific secrets (masked entry, never cached, cleared on submit), repository selection, and positive integer max-ACU limit. Preview mode availability is account-controlled and enforced by Devin. Removed `snapshot_id` and `unlisted` inputs are not rendered or submitted.
 - Attachment picker → upload to attachments endpoint → include reference.
 - Submit → optimistic row on Board with "Starting…" state → poll.
 - "Templates" (local): save composer presets on-device (this is a lightweight local playbook feel without API writes).
@@ -417,7 +417,7 @@ interface AuthProvider {
   validate(): Promise<ValidationResult>;             // cheap authed call; maps 401/403 to actionable errors
 }
 ```
-`PatAuth` behind `EXPO_PUBLIC_ENABLE_PAT` until GA. Key retrieval is lazy + memoized per app foreground; never held in module-level state longer than needed; zeroized on disconnect.
+`PatAuth` behind the exact opt-in `EXPO_PUBLIC_ENABLE_PAT=true` until GA. The unset or false flag never presents PAT onboarding. Key retrieval is lazy + memoized per app foreground; never held in module-level state longer than needed; zeroized on disconnect.
 
 ### 8.3 Boundary Validation
 Every response parses through zod schemas in `/src/api/devin/schemas.ts`. Unknown fields pass through (API evolves monthly); missing REQUIRED fields fail closed with a typed `ApiSchemaError` passed to a local no-op diagnostic boundary without logging content. Devin: generate schemas from live docs (§2.3 note), then hand-tighten.
@@ -427,7 +427,7 @@ Every response parses through zod schemas in `/src/api/devin/schemas.ts`. Unknow
 - 429 → exponential backoff with jitter, honor `Retry-After` if present, global cooldown flag so all queries pause together.
 - 401 → hard stop all polling, route to re-auth screen (key may be revoked/rotated).
 - 5xx/network → TanStack retry (3, exponential), then stale-cache mode with banner.
-- All requests: 15s timeout, `Idempotency` on create where supported (`idempotent: true` param exists on session create — use it to make retry-safe creates).
+- All requests: 15s timeout. Current v3 has no create-session idempotency parameter. Ambiguous create failures reconcile with a bounded, authenticated recent-session read and local title/prompt comparison; the client does not send undocumented list filters.
 
 ### 8.5 Endpoint Coverage (v1 app)
 Sessions: create, list (with status/tag filters, pagination), detail, messages list (cursor), message send, archive, terminate, tags add/remove, insights generate/get.
