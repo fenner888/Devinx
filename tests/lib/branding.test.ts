@@ -33,6 +33,14 @@ describe('branding (§1.4)', () => {
     expect(branding.fallbackNames).toContain('Overwatch');
   });
 
+  it('links Cloud onboarding to the current Devin service-user guide', () => {
+    expect(branding.links.devinApp).toBe('https://app.devin.ai');
+    expect(branding.links.createServiceUser).toBe(
+      'https://docs.devin.ai/api-reference/authentication',
+    );
+    expect(branding.links.createServiceUser).not.toContain('/api-reference/api-keys');
+  });
+
   it('keychain keys match spec §9 exactly', () => {
     expect(branding.keychain.apiKey).toBe('devin_api_key');
     expect(branding.keychain.orgId).toBe('devin_org_id');

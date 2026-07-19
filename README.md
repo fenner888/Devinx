@@ -51,6 +51,8 @@ answer a question, or review a result.
   trust and data boundaries never blur.
 - **Keep work moving.** Read bounded history, send steering messages, and respond when a session
   needs input.
+- **Review demos in place.** Devin-produced Cloud screenshots and videos appear in the session when
+  the documented attachment API returns them; videos load only after you tap play.
 - **Use the real available catalog.** Repositories, workspaces, playbooks, Knowledge, attachments,
   modes, and models come from documented Cloud APIs or the live local ACP catalog—not hardcoded
   guesses.
@@ -93,9 +95,10 @@ DevinX operates no relay for normal Cloud or Computer session traffic.
 ### Cloud setup
 
 Cloud mode requires an existing Devin organization and a least-privilege service user created by
-that organization. Enter the service-user key and organization ID only inside DevinX onboarding.
-The credential is validated directly against Devin and stored with device-only protection in iOS
-Keychain.
+that organization. Follow Devin's official
+[service-user authentication guide](https://docs.devin.ai/api-reference/authentication), then enter
+the generated service-user key and organization ID only inside DevinX onboarding. The credential is
+validated directly against Devin and stored with device-only protection in iOS Keychain.
 
 Do not paste Devin credentials into issues, screenshots, setup prompts, shell history, or chat
 messages. TestFlight does not provide a shared Devin credential, and no tester receives access to

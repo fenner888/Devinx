@@ -184,11 +184,11 @@ not unimplemented API parity.
 - <https://docs.devin.ai/api-reference/release-notes>
 - <https://docs.devin.ai/api-reference/v3/sessions/post-organizations-sessions>
 - <https://docs.devin.ai/api-reference/v3/sessions/get-organizations-session-attachments>
-- <https://docs.devin.ai/api-reference/v3/metrics/get-organizations-active-users>
+- <https://docs.devin.ai/api-reference/v3/metrics/organizations-metrics-mau>
 - <https://docs.devin.ai/api-reference/v3/notes/post-organizations-knowledge-notes>
 - <https://docs.devin.ai/api-reference/v3/playbooks/post-organizations-playbooks>
 - <https://docs.devin.ai/api-reference/v3/schedules/post-organizations-schedules>
-- <https://docs.devin.ai/api-reference/v3/secrets/get-organizations-secrets>
+- <https://docs.devin.ai/api-reference/v3/secrets/organizations-secrets>
 - <https://docs.devin.ai/api-reference/v3/repositories/list-organizations-indexed-repositories>
 - <https://docs.devin.ai/work-with-devin/devin-mcp>
 - <https://docs.devin.ai/cli/reference/commands>

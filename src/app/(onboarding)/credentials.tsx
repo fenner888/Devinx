@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   KeyboardAvoidingView,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -20,6 +19,7 @@ import { useRouter } from 'expo-router';
 import { orgIdSchema } from '@api/devin/schemas';
 import { setPendingCredentials } from '@auth/pendingCredentials';
 import { OnboardingBackButton } from '@components/onboarding/OnboardingBackButton';
+import { ServiceUserGuideSheet } from '@components/onboarding/ServiceUserGuideSheet';
 import { branding } from '@lib/branding';
 import { useAppPreferences } from '@store/preferences';
 import { useTheme } from '@theme/index';
@@ -34,6 +34,7 @@ export default function CredentialsScreen() {
   const [orgId, setOrgId] = useState('');
   const [attributionUserId, setAttributionUserId] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showServiceUserGuide, setShowServiceUserGuide] = useState(false);
 
   const canSubmit = apiKey.trim().length > 0 && orgId.trim().length > 0;
 
@@ -147,9 +148,9 @@ export default function CredentialsScreen() {
 
           <Pressable
             className="self-start py-4"
-            onPress={() => Linking.openURL(branding.links.createServiceUser)}
-            accessibilityRole="link"
-            accessibilityLabel="Open Devin service user documentation"
+            onPress={() => setShowServiceUserGuide(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Open service user instructions"
           >
             <Text className="text-link text-text13 font-medium">
               Open service user instructions
@@ -179,6 +180,10 @@ export default function CredentialsScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+      <ServiceUserGuideSheet
+        visible={showServiceUserGuide}
+        onClose={() => setShowServiceUserGuide(false)}
+      />
     </SafeAreaView>
   );
 }
