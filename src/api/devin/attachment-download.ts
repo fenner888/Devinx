@@ -5,7 +5,9 @@ import { isSafeSessionArtifactUrl } from '@lib/session-artifacts';
 
 const CACHE_DIRECTORY_NAME = 'devinx-session-artifacts';
 const MAX_ATTACHMENT_BYTES = 250 * 1024 * 1024;
-const AUTHENTICATED_ATTACHMENT_HOSTS = new Set(['api.devin.ai', 'app.devin.ai']);
+const API_HOST = 'api.devin.ai';
+const WEB_APP_HOST = 'app.devin.ai';
+const WEB_ATTACHMENT_PATH = /^\/attachments\/([^/]+)\/([^/]+)$/;
 
 function cacheDirectory(): Directory {
   const directory = new Directory(Paths.cache, CACHE_DIRECTORY_NAME);
@@ -17,6 +19,46 @@ function safeCacheName(attachment: SessionAttachment): string {
   const id = attachment.attachment_id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 96);
   const extension = attachment.name.match(/\.[a-zA-Z0-9]{1,8}$/)?.[0]?.toLowerCase() ?? '';
   return `${id || 'attachment'}${extension}`;
+}
+
+/**
+ * Session messages may contain a canonical web-app attachment URL. That URL
+ * is intended for an authenticated browser session and does not accept a
+ * service-user bearer token. Convert it to the documented organization API
+ * endpoint, which returns a short-lived presigned download redirect.
+ */
+async function authenticatedDownloadUrl(
+  auth: AuthProvider,
+  attachmentUrl: string,
+): Promise<{ url: string; headers?: Record<string, string> }> {
+  const parsed = new URL(attachmentUrl);
+
+  if (parsed.hostname === WEB_APP_HOST) {
+    const match = WEB_ATTACHMENT_PATH.exec(parsed.pathname);
+    if (!match) throw new Error('Attachment URL is not supported');
+
+    const encodedUuid = match[1];
+    const encodedName = match[2];
+    if (!encodedUuid || !encodedName) throw new Error('Attachment URL is not supported');
+    const uuid = decodeURIComponent(encodedUuid);
+    const name = decodeURIComponent(encodedName);
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(uuid) || !name || name.length > 255) {
+      throw new Error('Attachment URL is not supported');
+    }
+
+    const base = (process.env.EXPO_PUBLIC_API_BASE_URL || `https://${API_HOST}`).replace(/\/$/, '');
+    const orgPath = await auth.orgPath();
+    return {
+      url: `${base}${orgPath}/attachments/${encodeURIComponent(uuid)}/${encodeURIComponent(name)}`,
+      headers: await auth.authHeaders(),
+    };
+  }
+
+  if (parsed.hostname === API_HOST) {
+    return { url: attachmentUrl, headers: await auth.authHeaders() };
+  }
+
+  return { url: attachmentUrl };
 }
 
 /**
@@ -32,15 +74,12 @@ export async function downloadSessionAttachment(
     throw new Error('Attachment URL is not allowed');
   }
 
-  const url = new URL(attachment.url);
-  const headers = AUTHENTICATED_ATTACHMENT_HOSTS.has(url.hostname)
-    ? await auth.authHeaders()
-    : undefined;
+  const request = await authenticatedDownloadUrl(auth, attachment.url);
   const destination = new File(cacheDirectory(), safeCacheName(attachment));
 
   try {
-    const downloaded = await File.downloadFileAsync(attachment.url, destination, {
-      headers,
+    const downloaded = await File.downloadFileAsync(request.url, destination, {
+      headers: request.headers,
       idempotent: true,
     });
     if ((downloaded.size ?? 0) > MAX_ATTACHMENT_BYTES) {

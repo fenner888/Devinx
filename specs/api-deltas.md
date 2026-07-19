@@ -70,13 +70,15 @@ does not expand the Connector's local-session attachment permissions.
 
 Live behavior observed on 2026-07-19: Devin may additionally append
 `ATTACHMENT:{"url":"...","fileSize":...}` transport markers to a Devin
-message, and an `app.devin.ai/attachments/...` URL returns 401 without the
-service-user bearer credential despite the common-flow example describing a
-direct unauthenticated download. DevinX strips only valid HTTPS markers from
-visible message text, uses them to associate session-level attachment records,
-and downloads allowlisted Devin-host media through the auth boundary into the
-temporary OS cache. It never forwards authorization to arbitrary attachment
-hosts.
+message. Those markers use an `app.devin.ai/attachments/{uuid}/{name}` web-app
+URL, which is not the service-user download endpoint. DevinX strips only valid
+HTTPS markers from visible message text, uses them to associate session-level
+attachment records, and converts that exact web-app URL shape to the documented
+`GET /v3/organizations/{org_id}/attachments/{uuid}/{name}` endpoint. The API
+request carries the service-user bearer credential and follows the provider's
+short-lived presigned redirect into the temporary OS cache. DevinX never sends
+authorization to the web-app host, the presigned storage host, or an arbitrary
+attachment host.
 
 ### D3. `bypass_approval` and `child_playbook_id` on session create
 

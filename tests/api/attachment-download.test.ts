@@ -38,7 +38,8 @@ import type { AuthProvider } from '../../src/auth/AuthProvider';
 import type { SessionAttachment } from '../../src/api/devin/types';
 
 const authHeaders = jest.fn(async () => ({ Authorization: 'Bearer redacted-test-key' }));
-const auth = { authHeaders } as unknown as AuthProvider;
+const orgPath = jest.fn(async () => '/v3/organizations/org-test');
+const auth = { authHeaders, orgPath } as unknown as AuthProvider;
 
 function attachment(url: string): SessionAttachment {
   return {
@@ -61,15 +62,16 @@ describe('authenticated attachment downloads', () => {
     }));
   });
 
-  it('uses the provider credential for Devin-owned attachment hosts', async () => {
+  it('converts web-app attachment URLs to the documented organization API endpoint', async () => {
     await downloadSessionAttachment(
       auth,
       attachment('https://app.devin.ai/attachments/id/screen.png'),
     );
 
     expect(authHeaders).toHaveBeenCalledTimes(1);
+    expect(orgPath).toHaveBeenCalledTimes(1);
     expect(mockDownloadFileAsync).toHaveBeenCalledWith(
-      'https://app.devin.ai/attachments/id/screen.png',
+      'https://api.devin.ai/v3/organizations/org-test/attachments/id/screen.png',
       expect.anything(),
       expect.objectContaining({
         headers: { Authorization: 'Bearer redacted-test-key' },
@@ -78,10 +80,33 @@ describe('authenticated attachment downloads', () => {
     );
   });
 
+  it('preserves encoded attachment names when constructing the API endpoint', async () => {
+    await downloadSessionAttachment(
+      auth,
+      attachment('https://app.devin.ai/attachments/id/demo%20video.mp4'),
+    );
+
+    expect(mockDownloadFileAsync).toHaveBeenCalledWith(
+      'https://api.devin.ai/v3/organizations/org-test/attachments/id/demo%20video.mp4',
+      expect.anything(),
+      expect.objectContaining({ headers: { Authorization: 'Bearer redacted-test-key' } }),
+    );
+  });
+
+  it('rejects unsupported web-app paths instead of sending the credential to them', async () => {
+    await expect(
+      downloadSessionAttachment(auth, attachment('https://app.devin.ai/other/id/screen.png')),
+    ).rejects.toThrow('Attachment URL is not supported');
+
+    expect(authHeaders).not.toHaveBeenCalled();
+    expect(mockDownloadFileAsync).not.toHaveBeenCalled();
+  });
+
   it('never forwards the provider credential to an arbitrary attachment host', async () => {
     await downloadSessionAttachment(auth, attachment('https://cdn.example.com/screen.png'));
 
     expect(authHeaders).not.toHaveBeenCalled();
+    expect(orgPath).not.toHaveBeenCalled();
     expect(mockDownloadFileAsync).toHaveBeenCalledWith(
       'https://cdn.example.com/screen.png',
       expect.anything(),
