@@ -272,6 +272,8 @@ export function useSessionAttachments(sessionId: string | undefined) {
     },
     enabled: isAuthenticated && !!provider && !!sessionId,
     staleTime: 30_000,
+    refetchInterval: () => (AppState.currentState === 'active' ? 30_000 : false),
+    refetchOnWindowFocus: true,
     retry: shouldRetryQuery,
   });
 }

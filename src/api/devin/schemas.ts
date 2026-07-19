@@ -494,6 +494,17 @@ export const attachmentResponseSchema = z
   .passthrough();
 
 export const sessionAttachmentSchema = attachmentResponseSchema.extend({
+  url: z
+    .string()
+    .url()
+    .refine((value) => {
+      try {
+        const url = new URL(value);
+        return url.protocol === 'https:' && !url.username && !url.password && !!url.hostname;
+      } catch {
+        return false;
+      }
+    }, 'Expected a secure HTTPS attachment URL without embedded credentials'),
   source: z.enum(['devin', 'user']),
   content_type: z.string().nullable().optional(),
 });

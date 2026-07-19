@@ -310,9 +310,7 @@ describe('API schema boundary validation (§8.3)', () => {
       root_note_count: 3,
     };
     expect(knowledgeFolderTreeSchema.parse(fixture).folders[0]?.name).toBe('Engineering');
-    expect(() =>
-      knowledgeFolderTreeSchema.parse({ ...fixture, root_note_count: -1 }),
-    ).toThrow();
+    expect(() => knowledgeFolderTreeSchema.parse({ ...fixture, root_note_count: -1 })).toThrow();
   });
 
   it('parses an attachment response', () => {
@@ -335,6 +333,31 @@ describe('API schema boundary validation (§8.3)', () => {
       },
     ]);
     expect(out[0]).toEqual(expect.objectContaining({ name: 'report.md', source: 'devin' }));
+  });
+
+  it('rejects non-HTTPS session output attachment URLs', () => {
+    expect(() =>
+      sessionAttachmentListSchema.parse([
+        {
+          attachment_id: 'a1',
+          name: 'demo.mp4',
+          url: 'http://example.com/demo.mp4',
+          source: 'devin',
+          content_type: 'video/mp4',
+        },
+      ]),
+    ).toThrow();
+    expect(() =>
+      sessionAttachmentListSchema.parse([
+        {
+          attachment_id: 'a2',
+          name: 'demo.mp4',
+          url: 'https://user:password@example.com/demo.mp4',
+          source: 'devin',
+          content_type: 'video/mp4',
+        },
+      ]),
+    ).toThrow();
   });
 
   it('parses the documented active-user metric shapes', () => {
@@ -386,7 +409,9 @@ describe('API schema boundary validation (§8.3)', () => {
       end_cursor: null,
       has_next_page: false,
     });
-    expect(out.items[0]).toEqual(expect.objectContaining({ after: 1751342400, before: 1754020800 }));
+    expect(out.items[0]).toEqual(
+      expect.objectContaining({ after: 1751342400, before: 1754020800 }),
+    );
   });
 
   it('parses organization ACU limits with the documented scope discriminator', () => {
@@ -424,9 +449,7 @@ describe('API schema boundary validation (§8.3)', () => {
   );
 
   it('rejects removed create-session fields instead of silently sending stale contract data', () => {
-    expect(() =>
-      sessionCreateRequestSchema.parse({ prompt: 'Try it.', unlisted: true }),
-    ).toThrow();
+    expect(() => sessionCreateRequestSchema.parse({ prompt: 'Try it.', unlisted: true })).toThrow();
     expect(() =>
       sessionCreateRequestSchema.parse({ prompt: 'Try it.', snapshot_id: 'snapshot-1' }),
     ).toThrow();
@@ -446,7 +469,9 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(() =>
       sessionMessageCreateRequestSchema.parse({ message: 'Hello', create_as_user_id: 'user-1' }),
     ).toThrow();
-    expect(() => sessionTagsUpdateRequestSchema.parse({ tags: ['release'], replace: true })).toThrow();
+    expect(() =>
+      sessionTagsUpdateRequestSchema.parse({ tags: ['release'], replace: true }),
+    ).toThrow();
   });
 
   it('strictly validates resource writes and rejects empty updates', () => {
@@ -459,7 +484,9 @@ describe('API schema boundary validation (§8.3)', () => {
       }),
     ).toThrow();
     expect(() => knowledgeNoteUpdateRequestSchema.parse({})).toThrow();
-    expect(() => playbookCreateRequestSchema.parse({ title: 'Bad', body: 'x', macro: 'bad' })).toThrow();
+    expect(() =>
+      playbookCreateRequestSchema.parse({ title: 'Bad', body: 'x', macro: 'bad' }),
+    ).toThrow();
     expect(
       playbookCreateRequestSchema.parse({
         title: 'Structured',

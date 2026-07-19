@@ -58,6 +58,26 @@ Both `POST /sessions` and `POST /sessions/{id}/messages` accept
 attachments for the composer but didn't specify the create-body field.
 **Action:** added to both request schemas.
 
+The separate documented session-output endpoint returns session-scoped items
+with `attachment_id`, `name`, `source`, `url`, and nullable `content_type`.
+It does not associate an attachment with an individual message. DevinX may
+therefore render validated Devin-produced image/video artifacts at the live
+tail of a Cloud timeline and in Worklog, but must not invent a message-level
+association. Media rendering accepts HTTPS only, uses `content_type` before a
+filename-extension fallback, lazy-loads video after an explicit tap, and keeps
+unsupported files labeled for access from the canonical Devin session. This
+does not expand the Connector's local-session attachment permissions.
+
+Live behavior observed on 2026-07-19: Devin may additionally append
+`ATTACHMENT:{"url":"...","fileSize":...}` transport markers to a Devin
+message, and an `app.devin.ai/attachments/...` URL returns 401 without the
+service-user bearer credential despite the common-flow example describing a
+direct unauthenticated download. DevinX strips only valid HTTPS markers from
+visible message text, uses them to associate session-level attachment records,
+and downloads allowlisted Devin-host media through the auth boundary into the
+temporary OS cache. It never forwards authorization to arbitrary attachment
+hosts.
+
 ### D3. `bypass_approval` and `child_playbook_id` on session create
 
 Live v3 exposes both. Not in spec. **Action:** added to types/schemas as
