@@ -93,15 +93,23 @@ async function ensurePinnedNodeRuntime() {
   if (!existsSync(nodePath)) {
     rmSync(extractRoot, { recursive: true, force: true });
     mkdirSync(extractRoot, { recursive: true, mode: 0o700 });
-    run('powershell.exe', [
-      '-NoLogo',
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      'Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force',
-      archivePath,
-      extractRoot,
-    ]);
+    run(
+      'powershell.exe',
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        'Expand-Archive -LiteralPath $env:DEVINX_NODE_ARCHIVE -DestinationPath $env:DEVINX_NODE_EXTRACT -Force',
+      ],
+      {
+        env: {
+          ...process.env,
+          DEVINX_NODE_ARCHIVE: archivePath,
+          DEVINX_NODE_EXTRACT: extractRoot,
+        },
+      },
+    );
   }
   if (!existsSync(nodePath)) throw new Error('The verified Windows Node runtime was not extracted');
   return nodePath;
@@ -191,15 +199,23 @@ copyFileSync(helperExecutable, resolve(resourcesRoot, 'windows-dpapi-helper.exe'
 copyFileSync(await ensurePinnedNodeRuntime(), resolve(runtimeRoot, 'node.exe'));
 copyFileSync(resolve(repositoryRoot, 'LICENSE'), resolve(packageRoot, 'LICENSE.txt'));
 
-run('powershell.exe', [
-  '-NoLogo',
-  '-NoProfile',
-  '-NonInteractive',
-  '-Command',
-  'Compress-Archive -LiteralPath $args[0] -DestinationPath $args[1] -CompressionLevel Optimal -Force',
-  packageRoot,
-  zipPath,
-]);
+run(
+  'powershell.exe',
+  [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    'Compress-Archive -LiteralPath $env:DEVINX_PACKAGE_ROOT -DestinationPath $env:DEVINX_PACKAGE_ZIP -CompressionLevel Optimal -Force',
+  ],
+  {
+    env: {
+      ...process.env,
+      DEVINX_PACKAGE_ROOT: packageRoot,
+      DEVINX_PACKAGE_ZIP: zipPath,
+    },
+  },
+);
 
 const digest = sha256(zipPath);
 writeFileSync(`${zipPath}.sha256`, `${digest}  ${basename(zipPath)}\n`, {
