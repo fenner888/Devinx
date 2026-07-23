@@ -1,6 +1,6 @@
 # DevinX Connector platform roadmap
 
-Last updated: July 11, 2026
+Last updated: July 22, 2026
 
 macOS is the first supported Connector release. Windows and Linux follow without changing the mobile protocol or weakening the security boundary. Neither follow-up platform is advertised as supported until its native adapter, package, and physical test matrix pass.
 
@@ -10,14 +10,25 @@ All platforms reuse protocol version 2, the TypeScript bridge/security core, str
 
 Platform code may implement only secure storage, executable discovery, lifecycle integration, UI, packaging/signing, updates, diagnostics, and uninstall. It may never introduce shared passwords, wildcard/LAN/public listeners, persisted QR payloads, silent privilege escalation, or a DevinX-operated relay.
 
-## Windows follow-up
+## Windows x64 implementation checkpoint
 
-1. Implement a Credential Manager/DPAPI secret store and prove private keys cannot be exported through UI or logs.
-2. Discover official Devin for Terminal and Tailscale installations from allowlisted locations without reading Devin credentials.
-3. Run as a signed per-user application with explicit startup control; do not require an administrator service for normal use.
-4. Bind only to the active `100.64.0.0/10` Tailscale interface and document Windows Firewall behavior.
-5. Produce signed x64 and arm64 installers with deterministic uninstall and upgrade behavior.
-6. Test pairing, denial, expiry, read/send permission separation, endpoint refresh, revocation, reboot startup, repair, update, and uninstall on supported Windows releases.
+The shared Windows adapter, current-user DPAPI helper, native WinForms control surface, pinned-runtime
+package builder, and Windows CI verifier are implemented under `bridge/`, `connector/windows/`, and
+`scripts/connector/`. CI artifacts are deliberately labeled **unsigned and not for release**.
+Windows is not a supported download until an Authenticode-signed package and the physical matrix in
+`specs/037-windows-connector.md` pass.
+
+Remaining public-release gates:
+
+1. Verify that the official Windows Devin product exposes the ACP capabilities required by the
+   shared bridge. Public Windows environment support in Devin Cloud is not evidence of local ACP.
+2. Sign the x64 package with a stable Authenticode code-signing identity and publish its checksum
+   and provenance. Do not distribute the unsigned CI artifact.
+3. Validate Windows Firewall behavior while binding only to the active `100.64.0.0/10` Tailscale
+   interface.
+4. Test pairing, denial, expiry, read/send/create permission separation, endpoint refresh,
+   revocation, reboot startup, repair, update, and uninstall on a physical supported Windows PC.
+5. Add arm64 only after a separate native build and physical matrix pass.
 
 ## Linux follow-up
 

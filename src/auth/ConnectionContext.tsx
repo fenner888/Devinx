@@ -61,7 +61,7 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
       setConnectionError(null);
     } catch {
       setComputers([]);
-      setConnectionError('Paired computer credentials could not be validated.');
+      setConnectionError('Paired local-device credentials could not be validated.');
     } finally {
       setIsComputerLoading(false);
     }

@@ -25,6 +25,10 @@ export {
   type MacOSKeychainOptions,
 } from './macos-keychain';
 export {
+  WindowsDpapiSecretStore,
+  type WindowsDpapiOptions,
+} from './windows-dpapi';
+export {
   HttpsBridgeListener,
   type HttpsBridgeListenerAddress,
   type HttpsBridgeListenerOptions,
@@ -76,9 +80,12 @@ export {
 export {
   createConnectorPlatformAdapter,
   discoverDevinCliFromPath,
+  discoverWindowsDevinCli,
   executableCandidates,
   MacOSConnectorPlatformAdapter,
   selectPreferredConnectorAddress,
+  WindowsConnectorPlatformAdapter,
+  windowsDevinCliCandidates,
 } from './connector-platform';
 export type { SecretStore } from './secret-store';
 export {

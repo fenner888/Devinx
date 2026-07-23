@@ -21,8 +21,8 @@ const FEATURES: ReadonlyArray<{
   },
   {
     icon: 'git-compare-outline',
-    title: 'Cloud or your computer',
-    detail: 'Use Devin Cloud, pair a computer you control, or keep both together.',
+    title: 'Cloud or Local',
+    detail: 'Use Devin Cloud, pair a local device you control, or keep both together.',
     tone: 'green',
   },
   {
@@ -40,7 +40,7 @@ const FEATURES: ReadonlyArray<{
   {
     icon: 'lock-closed-outline',
     title: 'Keep credentials private',
-    detail: 'Cloud keys stay in iOS Keychain; computer credentials stay on your computer.',
+    detail: 'Cloud keys stay in iOS Keychain; local Devin credentials stay on your device.',
     tone: 'blue',
   },
 ];

@@ -84,7 +84,7 @@ async function discoverComputer(
       for (const session of page.sessions) {
         if (sessionIds.has(session.id) || sessions.length >= MAXIMUM_SESSIONS_PER_COMPUTER) {
           throw new ComputerBridgeError(
-            'The paired Mac returned an invalid session sequence.',
+            'The paired local device returned an invalid session sequence.',
             'invalid_response',
           );
         }
@@ -99,13 +99,13 @@ async function discoverComputer(
       if (!page.nextCursor) break;
       if (pageNumber === MAXIMUM_PAGES_PER_COMPUTER - 1) {
         throw new ComputerBridgeError(
-          'The paired Mac exceeded the bounded session page limit.',
+          'The paired local device exceeded the bounded session page limit.',
           'invalid_response',
         );
       }
       if (cursors.has(page.nextCursor)) {
         throw new ComputerBridgeError(
-          'The paired Mac repeated a session cursor.',
+          'The paired local device repeated a session cursor.',
           'invalid_response',
         );
       }

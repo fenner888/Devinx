@@ -1,6 +1,6 @@
 import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
+import { delimiter, isAbsolute, join, win32 } from 'node:path';
 
 import { z } from 'zod';
 
@@ -12,6 +12,7 @@ import {
   isTailscaleIPv4,
 } from './network';
 import type { SecretStore } from './secret-store';
+import { WindowsDpapiSecretStore } from './windows-dpapi';
 
 export type ConnectorPlatformId = 'macos' | 'windows' | 'linux';
 
@@ -52,10 +53,23 @@ export function executableCandidates(environment: NodeJS.ProcessEnv): string[] {
   const pathValue = environment.PATH;
   if (!pathValue) return [];
   const candidates = new Set<string>();
-  for (const rawEntry of pathValue.split(':')) {
+  for (const rawEntry of pathValue.split(delimiter)) {
     const result = pathEntrySchema.safeParse(rawEntry);
     if (!result.success || !isAbsolute(result.data)) continue;
     candidates.add(join(result.data, 'devin'));
+  }
+  return [...candidates];
+}
+
+export function windowsDevinCliCandidates(environment: NodeJS.ProcessEnv): string[] {
+  const pathValue = environment.Path ?? environment.PATH;
+  if (!pathValue) return [];
+  const candidates = new Set<string>();
+  for (const rawEntry of pathValue.split(win32.delimiter)) {
+    const result = pathEntrySchema.safeParse(rawEntry);
+    if (!result.success || !win32.isAbsolute(result.data)) continue;
+    candidates.add(win32.join(result.data, 'devin.exe'));
+    candidates.add(win32.join(result.data, 'devin.cmd'));
   }
   return [...candidates];
 }
@@ -124,6 +138,12 @@ export async function discoverMacOSDevinSessionDb(
   }
 }
 
+export async function discoverWindowsDevinCli(
+  environment: NodeJS.ProcessEnv,
+): Promise<string | null> {
+  return firstExecutable(windowsDevinCliCandidates(environment));
+}
+
 export class MacOSConnectorPlatformAdapter implements ConnectorPlatformAdapter {
   readonly id = 'macos' as const;
 
@@ -144,13 +164,32 @@ export class MacOSConnectorPlatformAdapter implements ConnectorPlatformAdapter {
   }
 }
 
+export class WindowsConnectorPlatformAdapter implements ConnectorPlatformAdapter {
+  readonly id = 'windows' as const;
+
+  createSecretStore(): SecretStore {
+    return new WindowsDpapiSecretStore();
+  }
+
+  discoverPrivateAddresses(interfaces: NetworkInterfaceMap): string[] {
+    return discoverPrivateLanAddresses(interfaces);
+  }
+
+  discoverDevinCli(environment: NodeJS.ProcessEnv): Promise<string | null> {
+    return discoverWindowsDevinCli(environment);
+  }
+
+  async discoverDevinSessionDb(): Promise<string | null> {
+    // No public Windows location has been verified. ACP remains the only supported source.
+    return null;
+  }
+}
+
 export function createConnectorPlatformAdapter(
   platform: NodeJS.Platform = process.platform,
 ): ConnectorPlatformAdapter {
   if (platform === 'darwin') return new MacOSConnectorPlatformAdapter();
-  if (platform === 'win32') {
-    throw new Error('The Windows DevinX Connector adapter is not available yet');
-  }
+  if (platform === 'win32') return new WindowsConnectorPlatformAdapter();
   if (platform === 'linux') {
     throw new Error('The Linux DevinX Connector adapter is not available yet');
   }

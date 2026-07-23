@@ -16,6 +16,7 @@ import {
   executableCandidates,
   macOSDevinCliCandidates,
   selectPreferredConnectorAddress,
+  windowsDevinCliCandidates,
 } from '../../bridge/src/connector-platform';
 import { connectorStartupErrorCode } from '../../bridge/src/connector-cli';
 import { ConnectorController } from '../../bridge/src/connector-controller';
@@ -98,6 +99,21 @@ describe('DevinX Connector platform and IPC boundary', () => {
       '/Users/tester/Applications/Devin.app/Contents/Resources/app/extensions/windsurf/devin/bin/devin',
     );
     expect(candidates.every((candidate) => candidate.startsWith('/'))).toBe(true);
+  });
+
+  it('derives Windows CLI candidates only from absolute Path entries', () => {
+    expect(
+      windowsDevinCliCandidates({
+        NODE_ENV: 'test',
+        Path: 'C:\\Program Files\\Devin;relative;;D:\\Tools',
+      }),
+    ).toEqual([
+      'C:\\Program Files\\Devin\\devin.exe',
+      'C:\\Program Files\\Devin\\devin.cmd',
+      'D:\\Tools\\devin.exe',
+      'D:\\Tools\\devin.cmd',
+    ]);
+    expect(windowsDevinCliCandidates({ NODE_ENV: 'test', Path: 'relative;;' })).toEqual([]);
   });
 
   it('derives the read-only Devin session store only from an absolute home', async () => {
@@ -229,9 +245,9 @@ describe('DevinX Connector platform and IPC boundary', () => {
     ).toEqual({ version: CONNECTOR_IPC_VERSION, type: 'reset_complete' });
   });
 
-  it('fails closed for connector platform adapters that are not implemented yet', () => {
+  it('selects only implemented connector platform adapters', () => {
     expect(createConnectorPlatformAdapter('darwin').id).toBe('macos');
-    expect(() => createConnectorPlatformAdapter('win32')).toThrow('Windows');
+    expect(createConnectorPlatformAdapter('win32').id).toBe('windows');
     expect(() => createConnectorPlatformAdapter('linux')).toThrow('Linux');
   });
 

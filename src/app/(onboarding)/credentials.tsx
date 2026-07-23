@@ -86,7 +86,7 @@ export default function CredentialsScreen() {
           </Text>
           <Text className="text-text-mid text-text14 leading-5 mt-3 mb-7">
             {isCombinedSetup
-              ? 'First connect your Devin Cloud account. Next, you’ll pair your computer. Your scoped credential stays in the iOS Keychain.'
+              ? 'First connect your Devin Cloud account. Next, you’ll pair a local device. Your scoped credential stays in the iOS Keychain.'
               : 'Use a scoped credential for your Devin organization. DevinX stores it in the iOS Keychain and never places it in logs or ordinary app storage.'}
           </Text>
 

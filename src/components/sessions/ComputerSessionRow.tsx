@@ -80,7 +80,7 @@ export function ComputerSessionRow({
 function discoveryMessage(status: ComputerDiscoveryStatus): string | null {
   if (status.state === 'ready') return null;
   if (status.state === 'session_discovery_off') {
-    return `${status.computerName} is paired. Start its bridge with Devin ACP to show sessions.`;
+    return `${status.computerName} is paired. Start its Connector with Devin ACP to show sessions.`;
   }
   if (status.state === 'authorization_failed') {
     return `${status.computerName} needs to be paired again.`;

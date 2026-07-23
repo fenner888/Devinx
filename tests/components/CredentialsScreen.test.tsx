@@ -60,7 +60,7 @@ describe('Cloud credential onboarding', () => {
 
     expect(screen.getByText('STEP 1 OF 2')).toBeTruthy();
     expect(screen.getByText('Connect Cloud & continue')).toBeTruthy();
-    expect(screen.getByText(/Next, you’ll pair your computer/)).toBeTruthy();
+    expect(screen.getByText(/Next, you’ll pair a local device/)).toBeTruthy();
   });
 
   it('opens an in-app service-user walkthrough before external links', () => {

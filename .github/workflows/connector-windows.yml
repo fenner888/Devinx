@@ -1,0 +1,50 @@
+name: Windows Connector
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  windows-connector:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.302'
+
+      - name: Install JavaScript dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Validate shared TypeScript and tests
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test -- --ci --reporters=default
+
+      - name: Build unsigned Windows verification artifact
+        run: npm run connector:build:windows
+
+      - name: Verify package, checksum, pinned runtime, and DPAPI round trip
+        run: npm run connector:verify:windows
+
+      - name: Audit JavaScript dependencies
+        run: npm audit --audit-level=high
+
+      - name: Upload non-release verification artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: devinx-connector-windows-x64-UNSIGNED-NOT-FOR-RELEASE
+          path: |
+            artifacts/connector/windows/DevinX-Connector-0.1.0-windows-x64.zip
+            artifacts/connector/windows/DevinX-Connector-0.1.0-windows-x64.zip.sha256
+            artifacts/connector/windows/verification-audit.json
+          if-no-files-found: error

@@ -42,22 +42,22 @@ import { useAppPreferences } from '@store/preferences';
 import { useTheme } from '@theme/index';
 
 const STEPS = [
-  'Send the assisted setup prompt to an AI assistant on your Mac.',
-  'Approve the signed install, Tailscale login, and visible background setting on your Mac.',
-  'Scan its code, then approve this iPhone on your Mac.',
+  'Send the assisted setup prompt to an AI assistant on your local device.',
+  'Approve the signed install, Tailscale login, and visible background setting there.',
+  'Scan its code, then approve this iPhone in DevinX Connector.',
 ];
 
 const TAILSCALE_IOS_GUIDE = 'https://tailscale.com/docs/install/ios';
 
 const STATUS_COPY: Record<ComputerPairingStatus, string> = {
   validating: 'Checking the pairing code…',
-  checking_bridge_identity: 'Verifying the Mac identity…',
-  loading_existing_pairing: 'Checking saved computer access…',
+  checking_bridge_identity: 'Verifying the local-device identity…',
+  loading_existing_pairing: 'Checking saved local access…',
   creating_device_identity: 'Creating this iPhone’s secure key…',
   preparing_secure_request: 'Preparing the signed pairing request…',
   submitting: 'Making a secure connection…',
-  waiting_for_approval: 'Approve this iPhone on your Mac.',
-  saving: 'Saving the paired Mac securely…',
+  waiting_for_approval: 'Approve this iPhone on your local device.',
+  saving: 'Saving the paired device securely…',
   complete: 'Connected.',
 };
 
@@ -73,7 +73,7 @@ function pairingFailureMessage(error: unknown, stage: ComputerPairingStatus | nu
       ? (error as { code?: unknown }).code
       : undefined;
   if (code === 'ERR_PINNED_HTTPS_NETWORK') {
-    return 'DevinX could not reach DevinX Connector. Confirm Tailscale is connected on this iPhone and Mac, then generate a new code.';
+    return 'DevinX could not reach DevinX Connector. Confirm Tailscale is connected on this iPhone and local device, then generate a new code.';
   }
   if (code === 'unavailable' && stage === 'submitting') {
     return 'The signed request could not reach DevinX Connector through Tailscale.';
@@ -92,10 +92,10 @@ function pairingFailureMessage(error: unknown, stage: ComputerPairingStatus | nu
     return 'This iPhone could not verify the Connector identity in the pairing code.';
   }
   if (stage === 'loading_existing_pairing') {
-    return 'This iPhone could not validate its saved computer-pairing state.';
+    return 'This iPhone could not validate its saved local pairing state.';
   }
   if (stage === 'creating_device_identity') {
-    return 'This iPhone could not create its secure computer-signing key in Keychain.';
+    return 'This iPhone could not create its secure local-device signing key in Keychain.';
   }
   if (stage === 'preparing_secure_request') {
     return 'This iPhone could not prepare the signed pairing request.';
@@ -111,7 +111,7 @@ export default function ComputerConnectionScreen() {
   const mode = useAppPreferences((state) => state.connectionMode);
   const setConnectionMode = useAppPreferences((state) => state.setConnectionMode);
   const isCombinedSetup = mode === 'both';
-  const [computerName, setComputerName] = useState('My Mac');
+  const [computerName, setComputerName] = useState('My local device');
   const [phase, setPhase] = useState<ScreenPhase>('intro');
   const [pairingStatus, setPairingStatus] = useState<ComputerPairingStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -178,7 +178,7 @@ export default function ComputerConnectionScreen() {
   function confirmDisconnect(bridgeId: string, computerLabel: string) {
     Alert.alert(
       `Disconnect ${computerLabel}?`,
-      'This revokes this iPhone on the Mac, then erases its local pairing key.',
+      'This revokes this iPhone on the local device, then erases its local pairing key.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -194,8 +194,8 @@ export default function ComputerConnectionScreen() {
                   disconnectError.code === 'unavailable'
                 ) {
                   Alert.alert(
-                    'Mac unavailable',
-                    'DevinX cannot revoke this iPhone on the Mac while Connector is offline. You can retry later, or remove the pairing key from this iPhone now. The inactive Mac record will remain until you revoke it in DevinX Connector.',
+                    'Local device unavailable',
+                    'DevinX cannot revoke this iPhone on the local device while Connector is offline. You can retry later, or remove the pairing key from this iPhone now. The inactive device record will remain until you revoke it in DevinX Connector.',
                     [
                       { text: 'Cancel', style: 'cancel' },
                       {
@@ -207,7 +207,7 @@ export default function ComputerConnectionScreen() {
                             .then(refreshComputers)
                             .catch(() =>
                               setError(
-                                'The local computer pairing could not be removed securely. Try again.',
+                                'The local-device pairing could not be removed securely. Try again.',
                               ),
                             )
                             .finally(() => setRemovingBridgeId(null));
@@ -218,7 +218,7 @@ export default function ComputerConnectionScreen() {
                   return;
                 }
                 setError(
-                  'The computer could not be securely disconnected. Open DevinX Connector and try again.',
+                  'The local device could not be securely disconnected. Open DevinX Connector and try again.',
                 );
               })
               .finally(() => setRemovingBridgeId(null));
@@ -238,7 +238,7 @@ export default function ComputerConnectionScreen() {
 
   async function startScanning() {
     if (!computerName.trim()) {
-      setError('Enter a name for this Mac.');
+      setError('Enter a name for this local device.');
       return;
     }
     setError(null);
@@ -387,12 +387,12 @@ export default function ComputerConnectionScreen() {
             </Text>
           )}
           <Text className="text-text-hi text-text24 font-semibold mb-2">
-            {isCombinedSetup ? 'Pair your computer' : 'Connect your Mac'}
+            {isCombinedSetup ? 'Pair a local device' : 'Connect locally'}
           </Text>
           <Text className="text-text-mid text-text14 leading-5 mb-7">
             {isCombinedSetup
-              ? 'Devin Cloud is connected. Tailscale provides the private route to your Mac; Connector provides authorized local session access.'
-              : 'Tailscale provides the private route to your Mac. Connector provides authorized local session access; your Devin credentials stay on your Mac.'}
+              ? 'Devin Cloud is connected. Tailscale provides the private route to your local device; Connector provides authorized local session access.'
+              : 'Tailscale provides the private route to your local device. Connector provides authorized local session access; your Devin credentials stay there.'}
           </Text>
 
           {computers.length === 0 && (
@@ -438,14 +438,14 @@ export default function ComputerConnectionScreen() {
               </Pressable>
 
               <Text className="text-text-low text-text11 leading-4 text-center mt-3">
-                Already installed? Continue below to name this Mac and scan its pairing code.
+                Already installed? Continue below to name this device and scan its pairing code.
               </Text>
             </View>
           )}
 
           {computers.length > 0 && (
             <View className="mb-6">
-              <Text className="text-text-mid text-text13 mb-2">Paired computers</Text>
+              <Text className="text-text-mid text-text13 mb-2">Paired local devices</Text>
               <View className="rounded-card border border-border-subtle bg-surface1">
                 {computers.map((computer, index) => (
                   <View
@@ -487,7 +487,7 @@ export default function ComputerConnectionScreen() {
                       </Text>
                       <Text className="text-text-mid text-text12 leading-4 mt-1">
                         Install DevinX Connector {MINIMUM_SUPPORTED_CONNECTOR_VERSION} or later to
-                        keep computer sessions compatible.
+                        keep local sessions compatible.
                       </Text>
                       <Pressable
                         className="mt-2 self-start"
@@ -512,7 +512,7 @@ export default function ComputerConnectionScreen() {
               <Ionicons name="shield-checkmark-outline" size={16} color={tokens.brandText.hex} />
               <Text className="text-brand-text text-text12 leading-4 ml-2 flex-1">
                 Tailscale supplies the private network. Connector supplies the local Devin service,
-                and DevinX verifies the Mac and this iPhone for every request.
+                and DevinX verifies the local device and this iPhone for every request.
               </Text>
             </View>
             <Pressable
@@ -553,7 +553,7 @@ export default function ComputerConnectionScreen() {
               </Text>
               {pairingStatus === 'waiting_for_approval' && (
                 <Text className="text-text-low text-text12 leading-4 text-center mt-2">
-                  Choose metadata-only or read-only session content on the Mac. The request expires
+                  Choose metadata-only or read-only session content in Connector. The request expires
                   automatically if it is not approved.
                 </Text>
               )}
@@ -562,7 +562,7 @@ export default function ComputerConnectionScreen() {
                   className="mt-4 px-4 py-2"
                   onPress={() => resetForRetry('Pairing was cancelled.')}
                   accessibilityRole="button"
-                  accessibilityLabel="Cancel computer pairing"
+                  accessibilityLabel="Cancel local-device pairing"
                 >
                   <Text className="text-link text-text13">Cancel</Text>
                 </Pressable>
@@ -571,20 +571,20 @@ export default function ComputerConnectionScreen() {
           ) : (
             <>
               <View className="mb-4">
-                <Text className="text-text-mid text-text13 mb-2">Name this Mac</Text>
+                <Text className="text-text-mid text-text13 mb-2">Name this local device</Text>
                 <TextInput
                   className="bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
                   value={computerName}
                   onChangeText={setComputerName}
                   onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
                   onSubmitEditing={Keyboard.dismiss}
-                  placeholder="My Mac"
+                  placeholder="My local device"
                   placeholderTextColor={tokens.textLow.hex}
                   maxLength={80}
                   autoCapitalize="words"
                   autoCorrect={false}
                   returnKeyType="done"
-                  accessibilityLabel="Paired Mac name"
+                  accessibilityLabel="Paired local-device name"
                 />
               </View>
 

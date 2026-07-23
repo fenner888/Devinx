@@ -77,7 +77,7 @@ export default function SettingsScreen() {
       {
         title: 'Disconnect?',
         message:
-          'This wipes Devin Cloud credentials, paired-computer keys, and all cached session data from this device. Your Devin sessions are not affected.',
+          'This wipes Devin Cloud credentials, paired-local-device keys, and all cached session data from this iPhone. Your Devin sessions are not affected.',
         confirmLabel: 'Disconnect',
         destructive: true,
       },
@@ -149,7 +149,7 @@ export default function SettingsScreen() {
             className="flex-row items-center px-4 py-3 border-b border-border-subtle"
             onPress={() => router.push('/(main)/computer')}
             accessibilityRole="button"
-            accessibilityLabel="Add or pair a Mac"
+            accessibilityLabel="Add or pair a local device"
           >
             <Ionicons
               name="desktop-outline"
@@ -158,12 +158,12 @@ export default function SettingsScreen() {
             />
             <View className="flex-1 ml-3">
               <Text className="text-text-hi text-text14">
-                {computers.length === 1 ? computers[0]?.computerName : 'Computers'}
+                {computers.length === 1 ? computers[0]?.computerName : 'Local devices'}
               </Text>
               <Text className="text-text-low text-text12 mt-0.5">
                 {hasComputerConnection
-                  ? `${computers.length} paired ${computers.length === 1 ? `computer · ${computerTransportLabel(computers[0]!.transportKind)}` : 'computers'}`
-                  : 'No paired computers'}
+                  ? `${computers.length} paired ${computers.length === 1 ? `local device · ${computerTransportLabel(computers[0]!.transportKind)}` : 'local devices'}`
+                  : 'No paired local devices'}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
@@ -315,7 +315,7 @@ export default function SettingsScreen() {
                   ? provider.kind === 'pat'
                     ? 'Personal access token'
                     : 'Service user key'
-                  : 'Computer-only mode'}
+                  : 'Local-only mode'}
                 {provider && credentialFingerprint ? ` · ending ${credentialFingerprint}` : ''}
               </Text>
             </View>

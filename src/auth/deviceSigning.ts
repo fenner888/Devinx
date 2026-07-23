@@ -138,7 +138,7 @@ function resolveNativeModule(): DevinXDeviceCryptoNativeModule | null {
 function getNativeModule(): DevinXDeviceCryptoNativeModule {
   const nativeModule = resolveNativeModule();
   if (!nativeModule) {
-    throw new Error('Computer pairing requires a DevinX iOS development or release build');
+    throw new Error('Local pairing requires a DevinX iOS development or release build');
   }
   return nativeModule;
 }
@@ -187,7 +187,7 @@ export async function hmacSha256(secret: string, message: string): Promise<strin
 export async function fingerprintPublicKeySpki(publicKeySpki: string): Promise<string> {
   const nativeModule = getNativeModule();
   if (!nativeModule.fingerprintPublicKeySpki) {
-    throw new Error('Computer pairing requires a current DevinX iOS build');
+    throw new Error('Local pairing requires a current DevinX iOS build');
   }
   return certificateFingerprintSchema.parse(
     await nativeModule.fingerprintPublicKeySpki(publicKeySpkiSchema.parse(publicKeySpki)),
@@ -197,7 +197,7 @@ export async function fingerprintPublicKeySpki(publicKeySpki: string): Promise<s
 export async function createRequestIdentity(): Promise<RequestIdentity> {
   const nativeModule = getNativeModule();
   if (!nativeModule.createRequestIdentity) {
-    throw new Error('Computer requests require a current DevinX iOS build');
+    throw new Error('Local requests require a current DevinX iOS build');
   }
   return requestIdentitySchema.parse(await nativeModule.createRequestIdentity());
 }
@@ -259,7 +259,7 @@ export async function postPinnedBridgeJson(
 ): Promise<PinnedBridgeResponse> {
   const nativeModule = getNativeModule();
   if (!nativeModule.postPinnedJson) {
-    throw new Error('Secure computer transport requires a current DevinX iOS build');
+    throw new Error('Secure local transport requires a current DevinX iOS build');
   }
   const parsedInput = z.record(z.unknown()).parse(input);
   const serialized = JSON.stringify(parsedInput);

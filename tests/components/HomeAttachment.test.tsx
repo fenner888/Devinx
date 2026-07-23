@@ -194,7 +194,7 @@ describe('home attachment control', () => {
     );
 
     expect(screen.getByText('What should Devin build?')).toBeTruthy();
-    expect(screen.getByPlaceholderText(/Ask Devin on your Mac/)).toBeTruthy();
+    expect(screen.getByPlaceholderText(/Ask Devin locally/)).toBeTruthy();
     expect(screen.getByText('Studio Mac paired')).toBeTruthy();
     expect(screen.getAllByText('Studio Mac').length).toBeGreaterThan(0);
     expect(screen.getAllByText('DevinX').length).toBeGreaterThan(0);
@@ -551,7 +551,7 @@ describe('home attachment control', () => {
     ).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Workspace: Unavailable'));
     expect(alert).toHaveBeenCalledWith(
-      'Mac options unavailable',
+      'Local options unavailable',
       expect.stringContaining('could not load workspaces and models'),
     );
   });

@@ -537,7 +537,7 @@ describe('authenticated mobile Computer Bridge client', () => {
     await expect(getComputerBridgeHealth(BRIDGE_ID)).rejects.toEqual(
       expect.objectContaining({
         code: 'unavailable',
-        message: 'The paired Mac could not be reached securely.',
+        message: 'The paired local device could not be reached securely.',
       }),
     );
   });

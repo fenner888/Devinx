@@ -1,13 +1,13 @@
 # DevinX Connector
 
-DevinX Connector is the optional computer companion for users who want the DevinX iPhone app to access sessions running through Devin for Terminal. Cloud-only users do not install it.
+DevinX Connector is the optional local companion for users who want the DevinX iPhone app to access supported sessions on a computer they control. Cloud-only users do not install it.
 
 ## Why Tailscale is not enough by itself
 
-Computer mode needs two different layers:
+Local mode needs two different layers:
 
 1. **Tailscale supplies the private network route.** It lets the iPhone reach the computer over an encrypted tailnet.
-2. **DevinX Connector supplies the trusted local service.** It listens on that private route, communicates with Devin for Terminal, stores its identity and grants in macOS Keychain, authenticates each paired iPhone, and enforces separate read, steering, and session-creation permissions.
+2. **DevinX Connector supplies the trusted local service.** It listens on that private route, communicates with a supported local Devin ACP capability, stores its identity and grants in platform-protected storage, authenticates each paired iPhone, and enforces separate read, steering, and session-creation permissions.
 
 Tailscale does not start or provide that local service. Entering a Tailscale IP, server URL, or password would work only if compatible server software were already installed and running at that address. DevinX uses QR pairing instead of a shared password so each phone has its own cryptographic identity, permissions, and revocation path.
 
@@ -15,10 +15,10 @@ The separate Connector application is the current supported way to install and o
 
 ## User experience
 
-1. Download the supported signed connector from the official DevinX release page. Connector 0.1.1 currently supports Apple-silicon Macs; Windows, Linux, and Intel Mac packages are planned but are not available yet.
+1. Download the supported signed connector from the official DevinX release page. Connector 0.1.2 currently supports Apple-silicon Macs. The Windows x64 implementation is in verification and is not a supported download until its signed package and physical test matrix pass; Linux and Intel Mac packages remain unavailable.
 2. Install and open **DevinX Connector**.
 3. Connect the computer and iPhone to the same Tailscale network, then confirm that the connector shows Tailscale and Devin for Terminal.
-4. In the iPhone app, open **Settings → Computers → Add Mac/PC → Scan pairing code**.
+4. In the iPhone app, open **Settings → Local devices → Add local device → Scan pairing code**.
 5. Scan the short-lived QR shown by the connector.
 6. Confirm the requesting iPhone name and choose its permissions on the computer.
 
@@ -85,6 +85,26 @@ The release workflow submits the app ZIP first, requires an accepted response wi
 
 The app bundle and DMG root both include `LICENSE.txt`, byte-for-byte matching the repository's MIT `LICENSE`. Artifact verification fails closed when either notice is missing or changed.
 
+## Windows verification build
+
+On a Windows 11 x64 development machine with Node 24 and .NET 10 installed:
+
+```powershell
+npm ci --legacy-peer-deps
+npm run connector:build:windows
+npm run connector:verify:windows
+```
+
+The build compiles a native per-user Windows control surface and a current-user DPAPI helper,
+bundles the checksum-verified Node runtime pinned by `.nvmrc`, includes the repository MIT license,
+and writes a ZIP plus SHA-256 file. The verifier runs the bundled runtime and an isolated DPAPI
+set/get/delete round trip. GitHub Actions uploads this only as an explicitly unsigned, non-release
+verification artifact. It must never be linked from mobile onboarding or the public release page.
+
+Windows public distribution additionally requires a stable Authenticode signature, provenance,
+clean-account install/update/uninstall tests, Windows Firewall validation, and the complete physical
+matrix in `specs/037-windows-connector.md`.
+
 ## Runtime behavior
 
 - The app bundles a pinned Node LTS runtime rather than depending on the user's Node or shell configuration.
@@ -94,7 +114,7 @@ The app bundle and DMG root both include `LICENSE.txt`, byte-for-byte matching t
 - Scanning a new code for the same computer securely refreshes its Tailscale endpoint after an authenticated bridge check; it does not create a duplicate device.
 - The listener binds only to the selected active Tailscale IPv4 interface.
 - The Devin CLI is discovered from an allowlisted application PATH and launched only through the fixed ACP subcommand.
-- Bridge identity, TLS material, and paired-device records stay in macOS Keychain.
+- Bridge identity, TLS material, and paired-device records stay in macOS Keychain or Windows current-user DPAPI storage.
 - The QR payload crosses only the inherited connector process pipe and the native in-memory renderer.
 - Launch at login is an explicit user toggle and uses the per-user macOS login-item API.
 
@@ -110,4 +130,4 @@ Before publishing a macOS connector release:
 - verify installation, login start, update, repair, and uninstall on a clean macOS account; and
 - publish the checksum and compatibility matrix with the artifact.
 
-Windows and Linux must reuse the same bridge and mobile protocol. Their platform adapters supply secure storage, service lifecycle, packaging, signing, and discovery behavior as specified in `specs/021-devinx-connector.md`.
+Windows and Linux must reuse the same bridge and mobile protocol. Their platform adapters supply secure storage, service lifecycle, packaging, signing, and discovery behavior as specified in `specs/021-devinx-connector.md`. Windows implementation and remaining release gates are specified in `specs/037-windows-connector.md`.

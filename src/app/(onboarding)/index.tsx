@@ -33,14 +33,14 @@ export default function WelcomeScreen() {
             Run Devin from anywhere.
           </Text>
           <Text className="text-text-mid text-text16 leading-6 mt-3">
-            Start and steer cloud sessions, or securely pair a computer you control—all from your
+            Start and steer cloud sessions, or securely pair a local device you control—all from your
             iPhone.
           </Text>
 
           <View className="flex-row flex-wrap gap-2 mt-5">
             <View className="flex-row items-center rounded-chip bg-tint-blue px-3 py-2">
               <View className="w-2 h-2 rounded-dot bg-finished mr-2" />
-              <Text className="text-text-mid text-text12">Cloud + Computer</Text>
+              <Text className="text-text-mid text-text12">Cloud + Local</Text>
             </View>
             <View className="flex-row items-center rounded-chip bg-tint-purple px-3 py-2">
               <View className="w-2 h-2 rounded-dot bg-merged mr-2" />
