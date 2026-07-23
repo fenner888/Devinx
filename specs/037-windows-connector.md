@@ -10,7 +10,19 @@ Windows uses the same DevinX Connector trust model and mobile protocol as macOS.
 
 ## Mandatory capability checkpoint
 
-Before a Windows release can be called functional, the official Devin for Terminal installation on the test PC must expose the ACP capabilities consumed by Connector. The public Devin Windows-environment documentation describes cloud session environments and is not evidence that local Devin for Terminal supports Windows. Connector therefore:
+Official Cognition documentation now provides native Devin CLI installers for Windows x64 and
+arm64, names PowerShell, Windows Terminal, and Git Bash as supported launch environments, and
+documents `devin acp` as a JSON-RPC-over-stdio subprocess for ACP-aware clients:
+
+- [Devin CLI quickstart](https://docs.devin.ai/cli/index)
+- [Terminal compatibility](https://docs.devin.ai/cli/reference/terminal-compatibility)
+- [`devin acp` client behavior](https://docs.devin.ai/cli/acp/zed)
+
+This confirms that the shared Connector architecture has a supported local Windows runtime. It does
+not remove runtime capability negotiation: every installed CLI version remains authoritative for
+the exact methods it advertises. Before a Windows release can be called functional, the installed
+official Devin CLI on the test PC must expose the ACP capabilities consumed by Connector. Connector
+therefore:
 
 - discovers only an allowlisted executable available through the signed-in user's Windows `Path`;
 - executes no shell profile and never guesses a third-party package or download;
@@ -18,6 +30,10 @@ Before a Windows release can be called functional, the official Devin for Termin
 - shows a clear **Devin for Terminal is unavailable on this Windows PC** state without opening a listener that claims session support.
 
 No fallback may scrape credentials, automate the Devin web application, run arbitrary shell commands, or impersonate a user account.
+
+The separately documented [Windows cloud-session
+environment](https://docs.devin.ai/onboard-devin/environment/windows-support) is not used as
+evidence for Local Connector behavior; it remains a different product path.
 
 ## Architecture
 

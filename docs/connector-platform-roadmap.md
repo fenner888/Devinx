@@ -25,8 +25,9 @@ only after that candidate passes the physical matrix in `specs/037-windows-conne
 
 Remaining public-release gates:
 
-1. Verify that the official Windows Devin product exposes the ACP capabilities required by the
-   shared bridge. Public Windows environment support in Devin Cloud is not evidence of local ACP.
+1. Physically verify the exact ACP methods advertised by the installed official Windows Devin CLI.
+   Cognition now documents native Windows x64 and arm64 CLI installers plus `devin acp`; runtime
+   negotiation remains authoritative for the exact methods available on the test PC.
 2. Configure a stable Authenticode code-signing identity, run the protected signed-candidate
    workflow, and publish its checksum and provenance only after the physical matrix passes. Do not
    distribute the unsigned CI artifact.

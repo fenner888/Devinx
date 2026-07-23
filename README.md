@@ -140,6 +140,14 @@ The native per-user Windows application, DPAPI-protected state helper, notificat
 installer, deterministic uninstaller, pinned-runtime package, and automated Windows verification
 are implemented. Windows 11 x64 is an active release target.
 
+The Local runtime is supported by Cognition's official
+[Windows Devin CLI installer](https://docs.devin.ai/cli/index) and documented
+[`devin acp` subprocess](https://docs.devin.ai/cli/acp/zed). Connector still negotiates the
+installed CLI's actual ACP methods at runtime and fails closed rather than inventing unsupported
+controls. Cognition's separate
+[Windows cloud-session environments](https://docs.devin.ai/onboard-devin/environment/windows-support)
+are not the Connector runtime.
+
 The unsigned artifact produced by ordinary CI is deliberately marked **NOT FOR RELEASE**. DevinX
 will offer Windows as a supported download only after an Authenticode-signed candidate passes the
 clean Windows 11 x64 physical matrix in [spec 037](specs/037-windows-connector.md), including
