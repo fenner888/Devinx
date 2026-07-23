@@ -58,7 +58,9 @@ for (const [expected, label] of [
   [`Version="${identity.version}"`, 'four-part package version'],
   [`ProcessorArchitecture="${identity.architecture}"`, 'x64 architecture'],
   [`<PublisherDisplayName>${identity.publisherDisplayName}</PublisherDisplayName>`, 'publisher name'],
+  [`<Resource Language="${identity.defaultLanguage}" />`, 'default package language'],
   ['Name="Windows.Desktop"', 'Windows Desktop target'],
+  ['Executable="DevinXConnector.exe"', 'normalized packaged executable'],
   [`MinVersion="${identity.minimumWindowsVersion}"`, 'Windows 11 minimum'],
   ['<desktop:Extension', 'desktop extension'],
   ['EntryPoint="Windows.FullTrustApplication"', 'startup-task full-trust entry point'],
@@ -104,15 +106,21 @@ if (process.env.DEVINX_REQUIRE_MSIX_ARTIFACT === '1' || existsSync(msixPath)) {
     const packagedManifest = readFileSync(resolve(unpackRoot, 'AppxManifest.xml'), 'utf8');
     if (packagedManifest !== manifest) throw new Error('Packaged manifest differs from source');
     for (const required of [
-      'DevinX Connector.exe',
+      'DevinXConnector.exe',
       'LICENSE.txt',
       'Resources/connector-runtime.cjs',
       'Resources/runtime/node.exe',
       'Resources/windows-dpapi-helper.exe',
+      'Assets/StoreLogo.png',
+      'Assets/Square44x44Logo.png',
+      'Assets/Square150x150Logo.png',
     ]) {
       if (!existsSync(resolve(unpackRoot, required))) {
         throw new Error(`Store MSIX is missing ${required}`);
       }
+    }
+    if (existsSync(resolve(unpackRoot, 'DevinX Connector.exe'))) {
+      throw new Error('Store MSIX contains the ambiguous spaced executable name');
     }
   } finally {
     rmSync(unpackRoot, { recursive: true, force: true });

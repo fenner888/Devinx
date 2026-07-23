@@ -16,6 +16,9 @@
     <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
+  <Resources>
+    <Resource Language="{{DEFAULT_LANGUAGE}}" />
+  </Resources>
   <Dependencies>
     <TargetDeviceFamily
       Name="Windows.Desktop"
@@ -25,7 +28,7 @@
   <Applications>
     <Application
       Id="DevinXConnector"
-      Executable="DevinX Connector.exe"
+      Executable="DevinXConnector.exe"
       uap10:RuntimeBehavior="win32App"
       uap10:TrustLevel="mediumIL">
       <uap:VisualElements
@@ -37,7 +40,7 @@
       <Extensions>
         <desktop:Extension
           Category="windows.startupTask"
-          Executable="DevinX Connector.exe"
+          Executable="DevinXConnector.exe"
           EntryPoint="Windows.FullTrustApplication">
           <desktop:StartupTask
             TaskId="DevinXConnectorStartup"
