@@ -1,0 +1,95 @@
+name: Windows Connector Signed Candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-windows-candidate:
+    runs-on: windows-2025
+    environment: windows-connector-release
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.302'
+
+      - name: Install JavaScript dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Validate repository
+        run: npm run ci
+
+      - name: Import protected Authenticode identity
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_BASE64)) {
+            throw "WINDOWS_SIGNING_PFX_BASE64 is unavailable"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_PASSWORD)) {
+            throw "WINDOWS_SIGNING_PFX_PASSWORD is unavailable"
+          }
+          $certificatePath = Join-Path $env:RUNNER_TEMP "devinx-windows-signing.pfx"
+          [IO.File]::WriteAllBytes(
+            $certificatePath,
+            [Convert]::FromBase64String($env:WINDOWS_SIGNING_PFX_BASE64)
+          )
+          $password = ConvertTo-SecureString $env:WINDOWS_SIGNING_PFX_PASSWORD `
+            -AsPlainText `
+            -Force
+          $certificate = Import-PfxCertificate `
+            -FilePath $certificatePath `
+            -CertStoreLocation Cert:\CurrentUser\My `
+            -Password $password `
+            -Exportable:$false
+          Remove-Item $certificatePath -Force
+          if ($null -eq $certificate -or [string]::IsNullOrWhiteSpace($certificate.Thumbprint)) {
+            throw "The Authenticode identity could not be imported"
+          }
+          "DEVINX_WINDOWS_SIGN_CERT_SHA1=$($certificate.Thumbprint)" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build signed Windows candidate
+        env:
+          DEVINX_WINDOWS_SIGNING_REQUIRED: '1'
+          DEVINX_WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+        run: npm run connector:build:windows
+
+      - name: Verify signatures and installer lifecycle
+        env:
+          DEVINX_WINDOWS_SIGNATURE_REQUIRED: '1'
+        run: npm run connector:verify:windows
+
+      - name: Upload signed verification candidate
+        uses: actions/upload-artifact@v6
+        with:
+          name: devinx-connector-windows-x64-SIGNED-VERIFICATION-CANDIDATE
+          path: |
+            artifacts/connector/windows/DevinX-Connector-0.1.0-windows-x64.zip
+            artifacts/connector/windows/DevinX-Connector-0.1.0-windows-x64.zip.sha256
+            artifacts/connector/windows/DevinX-Connector-Setup-0.1.0-windows-x64.exe
+            artifacts/connector/windows/DevinX-Connector-Setup-0.1.0-windows-x64.exe.sha256
+            artifacts/connector/windows/verification-audit.json
+          if-no-files-found: error
+
+      - name: Remove imported signing identity
+        if: always()
+        shell: pwsh
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:DEVINX_WINDOWS_SIGN_CERT_SHA1)) {
+            Remove-Item `
+              "Cert:\CurrentUser\My\$env:DEVINX_WINDOWS_SIGN_CERT_SHA1" `
+              -Force `
+              -ErrorAction SilentlyContinue
+          }

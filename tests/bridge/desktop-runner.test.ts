@@ -309,6 +309,7 @@ describe('Desktop Bridge development runner', () => {
     const listenerStop = jest.fn<Promise<void>, []>().mockResolvedValue();
     let listenerOptions: HttpsBridgeListenerOptions | undefined;
     const dependencies: DesktopBridgeRunnerDependencies = {
+      platform: 'macos',
       secretStore,
       tlsIdentityGenerator: new OpenSslTlsIdentityGenerator({ validityDays: 1 }),
       qrRenderer: { render: (payload) => renderedPayloads.push(payload) },
@@ -372,6 +373,7 @@ describe('Desktop Bridge development runner', () => {
     const runner = new DesktopBridgeRunner(
       { advertisedHost: '192.168.1.141' },
       {
+        platform: 'macos',
         secretStore,
         tlsIdentityGenerator: new OpenSslTlsIdentityGenerator({ validityDays: 1 }),
         qrRenderer: { render: jest.fn() },
@@ -403,6 +405,7 @@ describe('Desktop Bridge development runner', () => {
   it('binds a proxied bridge to loopback while advertising its Tailscale address', async () => {
     let listenerOptions: HttpsBridgeListenerOptions | undefined;
     const dependencies: DesktopBridgeRunnerDependencies = {
+      platform: 'windows',
       secretStore: new MemorySecretStore(),
       tlsIdentityGenerator: new OpenSslTlsIdentityGenerator({ validityDays: 1 }),
       qrRenderer: { render: jest.fn() },
@@ -475,6 +478,7 @@ describe('Desktop Bridge development runner', () => {
     const runner = new DesktopBridgeRunner(
       { advertisedHost: '192.168.1.141', devinCliPath: '/usr/local/bin/devin' },
       {
+        platform: 'macos',
         secretStore,
         tlsIdentityGenerator: new OpenSslTlsIdentityGenerator({ validityDays: 1 }),
         qrRenderer: { render: jest.fn() },
@@ -521,6 +525,7 @@ describe('Desktop Bridge development runner', () => {
     const runner = new DesktopBridgeRunner(
       { advertisedHost: '100.127.166.87', devinCliPath: '/usr/local/bin/devin' },
       {
+        platform: 'macos',
         secretStore: new MemorySecretStore(),
         tlsIdentityGenerator: new OpenSslTlsIdentityGenerator({ validityDays: 1 }),
         qrRenderer: { render: jest.fn() },

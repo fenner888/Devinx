@@ -37,6 +37,7 @@ export const deviceNameSchema = z
 export const bridgeMethodSchema = z.enum([
   'bridge.health',
   'bridge.features',
+  'bridge.platform',
   'bridge.version',
   'device.revoke',
   'session.list',
@@ -87,6 +88,7 @@ export const signedRequestEnvelopeSchema = z
 
 export const bridgeHealthBodySchema = z.object({}).strict();
 export const bridgeFeaturesBodySchema = z.object({}).strict();
+export const bridgePlatformBodySchema = z.object({}).strict();
 export const bridgeVersionBodySchema = z.object({}).strict();
 export const deviceRevokeBodySchema = z.object({}).strict();
 
@@ -197,6 +199,7 @@ export const deviceRecordSchema = z
 export const bodySchemas = {
   'bridge.health': bridgeHealthBodySchema,
   'bridge.features': bridgeFeaturesBodySchema,
+  'bridge.platform': bridgePlatformBodySchema,
   'bridge.version': bridgeVersionBodySchema,
   'device.revoke': deviceRevokeBodySchema,
   'session.list': sessionListBodySchema,
@@ -212,6 +215,7 @@ export const bodySchemas = {
 export const permissionByMethod = {
   'bridge.health': 'bridge:health',
   'bridge.features': 'bridge:health',
+  'bridge.platform': 'bridge:health',
   'bridge.version': 'bridge:health',
   'device.revoke': 'bridge:health',
   'session.list': 'session:metadata:read',
@@ -230,6 +234,7 @@ export type SignedRequestEnvelope = z.infer<typeof signedRequestEnvelopeSchema>;
 export type DeviceRecord = z.infer<typeof deviceRecordSchema>;
 export type BridgeHealthBody = z.infer<typeof bridgeHealthBodySchema>;
 export type BridgeFeaturesBody = z.infer<typeof bridgeFeaturesBodySchema>;
+export type BridgePlatformBody = z.infer<typeof bridgePlatformBodySchema>;
 export type BridgeVersionBody = z.infer<typeof bridgeVersionBodySchema>;
 export type DeviceRevokeBody = z.infer<typeof deviceRevokeBodySchema>;
 export type SessionListBody = z.infer<typeof sessionListBodySchema>;
@@ -244,6 +249,7 @@ export type SessionCreateBody = z.infer<typeof sessionCreateBodySchema>;
 export type BridgeBodyByMethod = {
   'bridge.health': BridgeHealthBody;
   'bridge.features': BridgeFeaturesBody;
+  'bridge.platform': BridgePlatformBody;
   'bridge.version': BridgeVersionBody;
   'device.revoke': DeviceRevokeBody;
   'session.list': SessionListBody;

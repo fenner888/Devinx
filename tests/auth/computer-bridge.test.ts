@@ -34,6 +34,7 @@ import {
   disconnectComputer,
   getComputerBridgeFeatures,
   getComputerBridgeHealth,
+  getComputerBridgePlatform,
   getComputerCreateOptions,
   listComputerSessions,
   loadComputerSession,
@@ -157,6 +158,7 @@ describe('authenticated mobile Computer Bridge client', () => {
     const sessionHandles = new SessionHandleRegistry(BRIDGE_ID, Buffer.alloc(32, 7));
     const service = new BridgeService({
       bridgeId: BRIDGE_ID,
+      platform: 'windows',
       devices: {
         get: (deviceId) =>
           deviceId === DEVICE_ID
@@ -198,6 +200,17 @@ describe('authenticated mobile Computer Bridge client', () => {
       capabilities: { sessionList: true },
     });
     sessionHandles.destroy();
+  });
+
+  it('discovers the signed connector platform and safely falls back for legacy connectors', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: { platform: 'windows' },
+    });
+    await expect(getComputerBridgePlatform(BRIDGE_ID)).resolves.toBe('windows');
+
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({ status: 400, body: {} });
+    await expect(getComputerBridgePlatform(BRIDGE_ID)).resolves.toBe('unknown');
   });
 
   it('validates a privacy-redacted local session page and optional cursor', async () => {

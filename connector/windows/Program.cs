@@ -22,6 +22,9 @@ internal sealed class ConnectorForm : Form
 {
     private const int MaximumIpcLineCharacters = 16_384;
     private const string StartupValueName = "DevinX Connector";
+    private const string ReleasePage = "https://github.com/fenner888/Devinx/releases/latest";
+    private const string SetupGuide =
+        "https://github.com/fenner888/Devinx/blob/main/docs/devinx-connector.md";
     private readonly Label statusLabel = new() { AutoSize = true, Font = new Font("Segoe UI", 18, FontStyle.Bold) };
     private readonly Label detailLabel = new() { AutoSize = true, ForeColor = Color.DimGray };
     private readonly PictureBox qrImage = new() { Width = 360, Height = 360, SizeMode = PictureBoxSizeMode.Zoom };
@@ -39,6 +42,8 @@ internal sealed class ConnectorForm : Form
     };
     private readonly Button savePermissionsButton = new() { Text = "Save permissions", AutoSize = true };
     private readonly Button revokeButton = new() { Text = "Revoke selected iPhone", AutoSize = true };
+    private readonly Button releasesButton = new() { Text = "Check official releases", AutoSize = true };
+    private readonly Button helpButton = new() { Text = "Setup and uninstall help", AutoSize = true };
     private readonly NotifyIcon trayIcon = new() { Text = "DevinX Connector", Visible = true };
     private readonly SemaphoreSlim writeLock = new(1, 1);
     private Process? runtime;
@@ -84,6 +89,14 @@ internal sealed class ConnectorForm : Form
         var deviceActions = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
         deviceActions.Controls.Add(savePermissionsButton);
         deviceActions.Controls.Add(revokeButton);
+        var supportActions = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 14, 0, 0),
+        };
+        supportActions.Controls.Add(releasesButton);
+        supportActions.Controls.Add(helpButton);
 
         var content = new FlowLayoutPanel
         {
@@ -103,11 +116,14 @@ internal sealed class ConnectorForm : Form
         content.Controls.Add(devicesGrid);
         content.Controls.Add(deviceActions);
         content.Controls.Add(launchAtLogin);
+        content.Controls.Add(supportActions);
         Controls.Add(content);
 
         regenerateButton.Click += async (_, _) => await SendCommandAsync(new { version = 1, type = "regenerate" });
         savePermissionsButton.Click += async (_, _) => await SaveSelectedPermissionsAsync();
         revokeButton.Click += async (_, _) => await RevokeSelectedDeviceAsync();
+        releasesButton.Click += (_, _) => OpenOfficialPage(ReleasePage);
+        helpButton.Click += (_, _) => OpenOfficialPage(SetupGuide);
         launchAtLogin.CheckedChanged += (_, _) => SetLaunchAtLogin(launchAtLogin.Checked);
         FormClosing += HandleFormClosing;
         Shown += async (_, _) => await StartRuntimeAsync();
@@ -326,6 +342,14 @@ internal sealed class ConnectorForm : Form
     private void HandleFormClosing(object? sender, FormClosingEventArgs eventArgs)
     {
         if (exiting) return;
+        if (eventArgs.CloseReason is CloseReason.WindowsShutDown
+            or CloseReason.TaskManagerClosing
+            or CloseReason.ApplicationExitCall)
+        {
+            exiting = true;
+            trayIcon.Visible = false;
+            return;
+        }
         eventArgs.Cancel = true;
         Hide();
         trayIcon.ShowBalloonTip(1500, "DevinX Connector", "Connector remains available from the notification area.", ToolTipIcon.Info);
@@ -359,6 +383,22 @@ internal sealed class ConnectorForm : Form
         using var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
         if (enabled) key.SetValue(StartupValueName, $"\"{Application.ExecutablePath}\"");
         else key.DeleteValue(StartupValueName, throwOnMissingValue: false);
+    }
+
+    private static void OpenOfficialPage(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+        }
+        catch
+        {
+            MessageBox.Show(
+                "The official DevinX page could not be opened.",
+                "DevinX Connector",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
     }
 }
 

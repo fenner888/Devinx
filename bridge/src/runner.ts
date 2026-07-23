@@ -117,6 +117,7 @@ export interface SessionHistoryLifecycle {
 }
 
 export interface DesktopBridgeRunnerDependencies {
+  platform: 'macos' | 'windows' | 'linux';
   secretStore: SecretStore;
   tlsIdentityGenerator: TlsIdentityGenerator;
   qrRenderer: PairingQrRenderer;
@@ -390,8 +391,14 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
 
 export function createProductionRunnerDependencies(
   qrRenderer: PairingQrRenderer,
+  platform: DesktopBridgeRunnerDependencies['platform'] = process.platform === 'darwin'
+    ? 'macos'
+    : process.platform === 'win32'
+      ? 'windows'
+      : 'linux',
 ): DesktopBridgeRunnerDependencies {
   return {
+    platform,
     secretStore: new MacOSKeychainSecretStore(),
     tlsIdentityGenerator: new OpenSslTlsIdentityGenerator(),
     qrRenderer,
@@ -474,6 +481,7 @@ export class DesktopBridgeRunner {
       this.pairing = pairing;
       const service = new BridgeService({
         bridgeId: runtime.bridgeId,
+        platform: this.dependencies.platform,
         devices: runtime.devices,
         replayGuard: new InMemoryReplayGuard(),
         rateLimiter: new FixedWindowRateLimiter(),

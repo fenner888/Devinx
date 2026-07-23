@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AssemblyName>DevinX Connector Setup</AssemblyName>
+    <RootNamespace>DevinX.Connector.WindowsInstaller</RootNamespace>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource
+      Include="$(ConnectorPayload)"
+      LogicalName="DevinXConnectorPayload.zip"
+      Condition="'$(ConnectorPayload)' != ''"
+    />
+  </ItemGroup>
+  <Target Name="RequireConnectorPayload" BeforeTargets="BeforeBuild">
+    <Error
+      Condition="'$(ConnectorPayload)' == '' or !Exists('$(ConnectorPayload)')"
+      Text="ConnectorPayload must identify the generated DevinX Connector ZIP."
+    />
+  </Target>
+</Project>

@@ -1,6 +1,7 @@
 name: Windows Connector
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
   push:
@@ -30,10 +31,10 @@ jobs:
           npm run typecheck
           npm run test -- --ci --reporters=default
 
-      - name: Build unsigned Windows verification artifact
+      - name: Build unsigned Windows installer verification artifacts
         run: npm run connector:build:windows
 
-      - name: Verify package, checksum, pinned runtime, and DPAPI round trip
+      - name: Verify installer lifecycle, package, pinned runtime, and DPAPI
         run: npm run connector:verify:windows
 
       - name: Audit JavaScript dependencies
@@ -46,5 +47,7 @@ jobs:
           path: |
             artifacts/connector/windows/DevinX-Connector-0.1.0-windows-x64.zip
             artifacts/connector/windows/DevinX-Connector-0.1.0-windows-x64.zip.sha256
+            artifacts/connector/windows/DevinX-Connector-Setup-0.1.0-windows-x64.exe
+            artifacts/connector/windows/DevinX-Connector-Setup-0.1.0-windows-x64.exe.sha256
             artifacts/connector/windows/verification-audit.json
           if-no-files-found: error

@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 import { build } from 'esbuild';
+import { signWindowsFile } from './windows-authenticode.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '..', '..');
@@ -28,10 +29,18 @@ if (!/^24\.\d+\.\d+$/.test(pinnedNodeVersion)) {
 const nodeVersion = `v${pinnedNodeVersion}`;
 const nodeArchive = `node-${nodeVersion}-${runtimeIdentifier}.zip`;
 const outputRoot = resolve(repositoryRoot, 'artifacts', 'connector', 'windows');
-const packageRoot = resolve(outputRoot, `DevinX-Connector-${connectorVersion}-windows-${architecture}`);
+const packageRoot = resolve(
+  outputRoot,
+  `DevinX-Connector-${connectorVersion}-windows-${architecture}`,
+);
 const resourcesRoot = resolve(packageRoot, 'Resources');
 const runtimeRoot = resolve(resourcesRoot, 'runtime');
 const zipPath = `${packageRoot}.zip`;
+const installerPath = resolve(
+  outputRoot,
+  `DevinX-Connector-Setup-${connectorVersion}-windows-${architecture}.exe`,
+);
+const signedRelease = process.env.DEVINX_WINDOWS_SIGNING_REQUIRED === '1';
 
 function run(executable, args, options = {}) {
   const result = spawnSync(executable, args, {
@@ -110,6 +119,7 @@ run(process.execPath, [
 
 rmSync(packageRoot, { recursive: true, force: true });
 rmSync(zipPath, { force: true });
+rmSync(installerPath, { force: true });
 mkdirSync(runtimeRoot, { recursive: true });
 
 await build({
@@ -126,8 +136,10 @@ await build({
 
 const helperPublishRoot = resolve(outputRoot, 'dpapi-publish');
 const appPublishRoot = resolve(outputRoot, 'app-publish');
+const installerPublishRoot = resolve(outputRoot, 'installer-publish');
 rmSync(helperPublishRoot, { recursive: true, force: true });
 rmSync(appPublishRoot, { recursive: true, force: true });
+rmSync(installerPublishRoot, { recursive: true, force: true });
 run('dotnet.exe', [
   'restore',
   resolve(repositoryRoot, 'bridge', 'windows-dpapi-helper', 'DevinX.WindowsDpapiHelper.csproj'),
@@ -170,6 +182,10 @@ const helperExecutable = resolve(helperPublishRoot, 'windows-dpapi-helper.exe');
 if (!existsSync(applicationExecutable) || !existsSync(helperExecutable)) {
   throw new Error('The native Windows Connector executables were not published');
 }
+if (signedRelease) {
+  signWindowsFile(applicationExecutable);
+  signWindowsFile(helperExecutable);
+}
 copyFileSync(applicationExecutable, resolve(packageRoot, 'DevinX Connector.exe'));
 copyFileSync(helperExecutable, resolve(resourcesRoot, 'windows-dpapi-helper.exe'));
 copyFileSync(await ensurePinnedNodeRuntime(), resolve(runtimeRoot, 'node.exe'));
@@ -190,4 +206,43 @@ writeFileSync(`${zipPath}.sha256`, `${digest}  ${basename(zipPath)}\n`, {
   encoding: 'utf8',
   mode: 0o644,
 });
-process.stdout.write(`Built ${packageRoot}\nBuilt ${zipPath}\nSHA-256 ${digest}\n`);
+
+run('dotnet.exe', [
+  'restore',
+  resolve(repositoryRoot, 'connector', 'windows-installer', 'DevinXConnectorInstaller.csproj'),
+  '--locked-mode',
+  `-p:ConnectorPayload=${zipPath}`,
+]);
+run('dotnet.exe', [
+  'publish',
+  resolve(repositoryRoot, 'connector', 'windows-installer', 'DevinXConnectorInstaller.csproj'),
+  '--configuration',
+  'Release',
+  '--runtime',
+  runtimeIdentifier,
+  '--self-contained',
+  'true',
+  '--no-restore',
+  '--output',
+  installerPublishRoot,
+  `-p:ConnectorPayload=${zipPath}`,
+]);
+const publishedInstaller = resolve(installerPublishRoot, 'DevinX Connector Setup.exe');
+if (!existsSync(publishedInstaller)) {
+  throw new Error('The native Windows Connector installer was not published');
+}
+copyFileSync(publishedInstaller, installerPath);
+if (signedRelease) signWindowsFile(installerPath);
+const installerDigest = sha256(installerPath);
+writeFileSync(`${installerPath}.sha256`, `${installerDigest}  ${basename(installerPath)}\n`, {
+  encoding: 'utf8',
+  mode: 0o644,
+});
+
+process.stdout.write(
+  `Built ${packageRoot}\n` +
+    `Built ${zipPath}\n` +
+    `ZIP SHA-256 ${digest}\n` +
+    `Built ${installerPath}\n` +
+    `Installer SHA-256 ${installerDigest}\n`,
+);

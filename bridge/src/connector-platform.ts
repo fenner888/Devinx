@@ -26,9 +26,7 @@ export interface ConnectorPlatformAdapter {
 
 const pathEntrySchema = z.string().min(1).max(4_096);
 
-export function selectPreferredConnectorAddress(
-  addressesInput: readonly string[],
-): string {
+export function selectPreferredConnectorAddress(addressesInput: readonly string[]): string {
   const addresses = z
     .array(
       z
@@ -69,7 +67,6 @@ export function windowsDevinCliCandidates(environment: NodeJS.ProcessEnv): strin
     const result = pathEntrySchema.safeParse(rawEntry);
     if (!result.success || !win32.isAbsolute(result.data)) continue;
     candidates.add(win32.join(result.data, 'devin.exe'));
-    candidates.add(win32.join(result.data, 'devin.cmd'));
   }
   return [...candidates];
 }

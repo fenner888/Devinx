@@ -2,7 +2,10 @@
 
 Last updated: July 22, 2026
 
-macOS is the first supported Connector release. Windows and Linux follow without changing the mobile protocol or weakening the security boundary. Neither follow-up platform is advertised as supported until its native adapter, package, and physical test matrix pass.
+macOS is the first supported Connector release. Windows 11 x64 is now an active release
+implementation—not a “coming soon” placeholder—and Linux follows without changing the mobile
+protocol or weakening the security boundary. A platform is advertised as a supported download only
+after its native adapter, signed package, and physical test matrix pass.
 
 ## Shared release contract
 
@@ -12,18 +15,21 @@ Platform code may implement only secure storage, executable discovery, lifecycle
 
 ## Windows x64 implementation checkpoint
 
-The shared Windows adapter, current-user DPAPI helper, native WinForms control surface, pinned-runtime
-package builder, and Windows CI verifier are implemented under `bridge/`, `connector/windows/`, and
-`scripts/connector/`. CI artifacts are deliberately labeled **unsigned and not for release**.
-Windows is not a supported download until an Authenticode-signed package and the physical matrix in
-`specs/037-windows-connector.md` pass.
+The shared Windows adapter, current-user DPAPI helper, native WinForms control surface,
+notification-area lifecycle, pinned-runtime builder, per-user installer/uninstaller, Authenticode
+signing hook, and Windows CI verifier are implemented under `bridge/`, `connector/windows/`,
+`connector/windows-installer/`, and `scripts/connector/`. Ordinary CI remains explicitly unsigned
+and not for release. A protected manual workflow produces a signed verification candidate once a
+publisher-controlled Authenticode identity is configured. Windows becomes a supported download
+only after that candidate passes the physical matrix in `specs/037-windows-connector.md`.
 
 Remaining public-release gates:
 
 1. Verify that the official Windows Devin product exposes the ACP capabilities required by the
    shared bridge. Public Windows environment support in Devin Cloud is not evidence of local ACP.
-2. Sign the x64 package with a stable Authenticode code-signing identity and publish its checksum
-   and provenance. Do not distribute the unsigned CI artifact.
+2. Configure a stable Authenticode code-signing identity, run the protected signed-candidate
+   workflow, and publish its checksum and provenance only after the physical matrix passes. Do not
+   distribute the unsigned CI artifact.
 3. Validate Windows Firewall behavior while binding only to the active `100.64.0.0/10` Tailscale
    interface.
 4. Test pairing, denial, expiry, read/send/create permission separation, endpoint refresh,

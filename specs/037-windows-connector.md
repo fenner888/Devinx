@@ -1,6 +1,6 @@
 # 037 — DevinX Connector for Windows
 
-Status: approved implementation phase; shared adapter and packaging foundation may ship to CI, but Windows must not be advertised as supported until every release gate below passes on physical Windows hardware.
+Status: active release implementation. Windows is an in-scope Local target, not a deferred “coming soon” item. It becomes a supported public download only after every release gate below passes on physical Windows hardware.
 
 ## Product decision
 
@@ -65,17 +65,20 @@ The first supported package is Windows 11 x64. Windows 10 and Windows arm64 rema
 - explicit user-approved update/replacement with no silent installer; and
 - deterministic per-user uninstall that stops Connector and deletes only DevinX Connector state.
 
-Unsigned CI artifacts are verification artifacts only. The mobile assisted setup prompt must ignore them and must stop when no signed Windows release exists.
+Unsigned CI artifacts are verification artifacts only. The mobile assisted setup prompt must ignore them and must stop when no signed Windows release exists. Product copy must describe Windows as an active release target without offering an unsigned artifact or promising that an unavailable package works.
 
 ## Acceptance gates
 
 Automated:
 
 - strict TypeScript and Windows native builds on a pinned Windows CI image;
+- fail-closed Authenticode signing and verification for the application, DPAPI helper, and
+  per-user installer;
 - DPAPI set/get/delete, not-found, size-limit, malformed-input, and wrong-user failure tests;
 - platform discovery tests covering `Path`, invalid/relative entries, absent ACP, and no shell execution;
 - shared pairing, authorization, rate-limit, replay, grant, revoke, endpoint-refresh, and generic-404 suites;
-- package contents, MIT license, pinned runtime checksum, secret scan, dependency audit, and artifact checksum verification; and
+- package contents, installer registration/uninstall lifecycle, MIT license, pinned runtime
+  checksum, secret scan, dependency audit, and artifact checksum verification; and
 - mobile copy tests proving **Local** does not change persisted `computer` identifiers.
 
 Physical Windows 11 x64:
@@ -86,4 +89,4 @@ Physical Windows 11 x64:
 - locked-screen and second-Windows-user isolation; and
 - confirmation that Connector never binds to LAN, wildcard, or public interfaces.
 
-Until those physical gates pass, the iPhone UI may describe Windows as **coming later** but must not offer a Windows download as working functionality.
+Until those physical gates pass, the iPhone UI must not use **coming soon** copy or offer a Windows download as working functionality. The signed-release lookup may report that a verified Windows package is not yet available and provide recovery guidance. Once the gates pass, Windows 11 x64 is presented alongside macOS as a supported Local platform.

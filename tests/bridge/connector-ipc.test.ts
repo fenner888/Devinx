@@ -107,12 +107,7 @@ describe('DevinX Connector platform and IPC boundary', () => {
         NODE_ENV: 'test',
         Path: 'C:\\Program Files\\Devin;relative;;D:\\Tools',
       }),
-    ).toEqual([
-      'C:\\Program Files\\Devin\\devin.exe',
-      'C:\\Program Files\\Devin\\devin.cmd',
-      'D:\\Tools\\devin.exe',
-      'D:\\Tools\\devin.cmd',
-    ]);
+    ).toEqual(['C:\\Program Files\\Devin\\devin.exe', 'D:\\Tools\\devin.exe']);
     expect(windowsDevinCliCandidates({ NODE_ENV: 'test', Path: 'relative;;' })).toEqual([]);
   });
 

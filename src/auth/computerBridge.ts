@@ -54,6 +54,7 @@ const computerModelSchema = z
 const bridgeMethodSchema = z.enum([
   'bridge.health',
   'bridge.features',
+  'bridge.platform',
   'bridge.version',
   'device.revoke',
   'session.list',
@@ -67,9 +68,11 @@ const bridgeMethodSchema = z.enum([
 ]);
 const bridgeHealthBodySchema = z.object({}).strict();
 const bridgeFeaturesBodySchema = z.object({}).strict();
+const bridgePlatformBodySchema = z.object({}).strict();
 const bridgeVersionBodySchema = z.object({}).strict();
-const computerBridgeFeaturesSchema = z
-  .object({ sessionElicitation: z.boolean() })
+const computerBridgeFeaturesSchema = z.object({ sessionElicitation: z.boolean() }).strict();
+const computerBridgePlatformSchema = z
+  .object({ platform: z.enum(['macos', 'windows', 'linux']) })
   .strict();
 export const computerBridgeVersionSchema = z
   .object({ version: z.string().regex(/^\d+\.\d+\.\d+$/) })
@@ -334,9 +337,9 @@ export const computerSessionPageSchema = z
 
 export type ComputerBridgeHealth = z.infer<typeof computerBridgeHealthSchema>;
 export type ComputerBridgeFeatures = z.infer<typeof computerBridgeFeaturesSchema>;
+export type ComputerBridgePlatform = z.infer<typeof computerBridgePlatformSchema>['platform'];
 export type ComputerBridgeVersionStatus =
-  | { kind: 'supported'; version: string }
-  | { kind: 'legacy' };
+  { kind: 'supported'; version: string } | { kind: 'legacy' };
 export type ComputerSessionSummary = z.infer<typeof computerSessionSummarySchema>;
 export type ComputerSessionPage = z.infer<typeof computerSessionPageSchema>;
 export type ComputerLoadedSession = z.infer<typeof computerLoadedSessionSchema>;
@@ -379,6 +382,7 @@ type SupportedMethod = z.infer<typeof bridgeMethodSchema>;
 const permissionByMethod = {
   'bridge.health': 'bridge:health',
   'bridge.features': 'bridge:health',
+  'bridge.platform': 'bridge:health',
   'bridge.version': 'bridge:health',
   'device.revoke': 'bridge:health',
   'session.list': 'session:metadata:read',
@@ -394,6 +398,7 @@ const permissionByMethod = {
 function bodyForMethod(method: SupportedMethod, input: unknown): object {
   if (method === 'bridge.health') return bridgeHealthBodySchema.parse(input);
   if (method === 'bridge.features') return bridgeFeaturesBodySchema.parse(input);
+  if (method === 'bridge.platform') return bridgePlatformBodySchema.parse(input);
   if (method === 'bridge.version') return bridgeVersionBodySchema.parse(input);
   if (method === 'device.revoke') return deviceRevokeBodySchema.parse(input);
   if (method === 'session.list') return sessionListBodySchema.parse(input);
@@ -425,15 +430,21 @@ function publicResponseError(status: number, method: SupportedMethod): ComputerB
     return new ComputerBridgeError('Devin is finishing the previous turn.', 'busy');
   }
   if (status === 503) {
-    return new ComputerBridgeError('The paired local device is temporarily unavailable.', 'unavailable');
+    return new ComputerBridgeError(
+      'The paired local device is temporarily unavailable.',
+      'unavailable',
+    );
   }
-  if (status === 400 && method === 'bridge.version') {
+  if (status === 400 && (method === 'bridge.platform' || method === 'bridge.version')) {
     return new ComputerBridgeError(
       'The paired local device does not support version negotiation.',
       'unsupported_method',
     );
   }
-  return new ComputerBridgeError('The paired local device rejected an invalid request.', 'invalid_response');
+  return new ComputerBridgeError(
+    'The paired local device rejected an invalid request.',
+    'invalid_response',
+  );
 }
 
 async function validatedComputerRegistry(): Promise<PairedComputerCredential[]> {
@@ -497,7 +508,10 @@ async function requestComputer(
     return { body: response.body, credential };
   } catch (error) {
     if (error instanceof ComputerBridgeError) throw error;
-    throw new ComputerBridgeError('The paired local device could not be reached securely.', 'unavailable');
+    throw new ComputerBridgeError(
+      'The paired local device could not be reached securely.',
+      'unavailable',
+    );
   }
 }
 
@@ -529,6 +543,27 @@ async function requestFeatures(
   } catch (error) {
     if (error instanceof ComputerBridgeError && error.code === 'invalid_response') {
       return { sessionElicitation: false };
+    }
+    throw error;
+  }
+}
+
+async function requestPlatform(
+  credential: PairedComputerCredential,
+): Promise<ComputerBridgePlatform | 'unknown'> {
+  try {
+    const response = await requestComputer(credential, 'bridge.platform', {});
+    const result = computerBridgePlatformSchema.safeParse(response.body);
+    if (!result.success) {
+      throw new ComputerBridgeError(
+        'The paired local device returned invalid platform information.',
+        'invalid_response',
+      );
+    }
+    return result.data.platform;
+  } catch (error) {
+    if (error instanceof ComputerBridgeError && error.code === 'unsupported_method') {
+      return 'unknown';
     }
     throw error;
   }
@@ -759,7 +794,10 @@ export async function openComputerBridges(
   for (const bridgeId of bridgeIds) {
     const credential = credentials.get(bridgeId);
     if (!credential || credential.transportSecurity !== 'tailscale_wireguard') {
-      throw new ComputerBridgeError('This local device is not paired through Tailscale.', 'not_paired');
+      throw new ComputerBridgeError(
+        'This local device is not paired through Tailscale.',
+        'not_paired',
+      );
     }
     connections.set(bridgeId, connectionForCredential(credential));
   }
@@ -777,9 +815,7 @@ export async function getComputerBridgeHealth(bridgeId: string): Promise<Compute
   return (await openComputerBridge(bridgeId)).getHealth();
 }
 
-export async function getComputerBridgeFeatures(
-  bridgeId: string,
-): Promise<ComputerBridgeFeatures> {
+export async function getComputerBridgeFeatures(bridgeId: string): Promise<ComputerBridgeFeatures> {
   return (await openComputerBridge(bridgeId)).getFeatures();
 }
 
@@ -787,6 +823,20 @@ export async function getComputerBridgeVersion(
   bridgeId: string,
 ): Promise<ComputerBridgeVersionStatus> {
   return (await openComputerBridge(bridgeId)).getVersion();
+}
+
+export async function getComputerBridgePlatform(
+  bridgeId: string,
+): Promise<ComputerBridgePlatform | 'unknown'> {
+  const computers = await validatedComputerRegistry();
+  const credential = computers.find((computer) => computer.bridgeId === bridgeId);
+  if (!credential || credential.transportSecurity !== 'tailscale_wireguard') {
+    throw new ComputerBridgeError(
+      'This local device is not paired through Tailscale.',
+      'not_paired',
+    );
+  }
+  return requestPlatform(credential);
 }
 
 export async function listComputerSessions(
@@ -849,7 +899,10 @@ export async function disconnectComputer(bridgeIdInput: string): Promise<void> {
   const computers = await validatedComputerRegistry();
   const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
   if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {
-    throw new ComputerBridgeError('This local device is not paired through Tailscale.', 'not_paired');
+    throw new ComputerBridgeError(
+      'This local device is not paired through Tailscale.',
+      'not_paired',
+    );
   }
   try {
     await requestDeviceRevocation(computer);
@@ -867,7 +920,10 @@ export async function removeComputerFromThisIPhone(bridgeIdInput: string): Promi
   const computers = await validatedComputerRegistry();
   const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
   if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {
-    throw new ComputerBridgeError('This local device is not paired through Tailscale.', 'not_paired');
+    throw new ComputerBridgeError(
+      'This local device is not paired through Tailscale.',
+      'not_paired',
+    );
   }
   await storePairedComputers(computers.filter((candidate) => candidate.bridgeId !== bridgeId));
   await deleteDeviceIdentity(computer.deviceKeyId);

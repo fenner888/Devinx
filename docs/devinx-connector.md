@@ -15,7 +15,7 @@ The separate Connector application is the current supported way to install and o
 
 ## User experience
 
-1. Download the supported signed connector from the official DevinX release page. Connector 0.1.2 currently supports Apple-silicon Macs. The Windows x64 implementation is in verification and is not a supported download until its signed package and physical test matrix pass; Linux and Intel Mac packages remain unavailable.
+1. Download the supported signed connector from the official DevinX release page. Connector 0.1.2 currently supports Apple-silicon Macs. Windows 11 x64 is an active release implementation; its public download activates only after the signed installer and physical test matrix pass. Linux and Intel Mac packages remain unavailable.
 2. Install and open **DevinX Connector**.
 3. Connect the computer and iPhone to the same Tailscale network, then confirm that the connector shows Tailscale and Devin for Terminal.
 4. In the iPhone app, open **Settings → Local devices → Add local device → Scan pairing code**.
@@ -85,7 +85,7 @@ The release workflow submits the app ZIP first, requires an accepted response wi
 
 The app bundle and DMG root both include `LICENSE.txt`, byte-for-byte matching the repository's MIT `LICENSE`. Artifact verification fails closed when either notice is missing or changed.
 
-## Windows verification build
+## Windows 11 x64 active release track
 
 On a Windows 11 x64 development machine with Node 24 and .NET 10 installed:
 
@@ -95,14 +95,29 @@ npm run connector:build:windows
 npm run connector:verify:windows
 ```
 
-The build compiles a native per-user Windows control surface and a current-user DPAPI helper,
-bundles the checksum-verified Node runtime pinned by `.nvmrc`, includes the repository MIT license,
-and writes a ZIP plus SHA-256 file. The verifier runs the bundled runtime and an isolated DPAPI
-set/get/delete round trip. GitHub Actions uploads this only as an explicitly unsigned, non-release
-verification artifact. It must never be linked from mobile onboarding or the public release page.
+The build compiles a native per-user Windows control surface, a current-user DPAPI helper, and a
+self-contained per-user installer/uninstaller. It bundles the pinned Node runtime only after
+validating the Node.js Foundation checksum and creates a ZIP, installer EXE, and adjacent checksums
+under `artifacts/connector/windows/`. The verifier rejects missing files, source maps, debug
+symbols, runtime-version drift, checksum drift, and an invalid MIT license; it executes bounded
+DPAPI set/get/delete checks and performs an install/registration/uninstall lifecycle.
 
-Windows public distribution additionally requires a stable Authenticode signature, provenance,
-clean-account install/update/uninstall tests, Windows Firewall validation, and the complete physical
+Ordinary CI uploads only an explicitly named **UNSIGNED-NOT-FOR-RELEASE** artifact. The manual
+**Windows Connector Signed Candidate** workflow fails closed unless the protected
+`windows-connector-release` environment supplies:
+
+- `WINDOWS_SIGNING_PFX_BASE64` and `WINDOWS_SIGNING_PFX_PASSWORD` secrets for the publisher's
+  Authenticode identity; and
+- a `WINDOWS_TIMESTAMP_URL` variable for an RFC 3161 timestamp service.
+
+Repository administrators must restrict that environment to the protected `main` branch, require a
+human reviewer, and prevent self-review where the GitHub plan supports it. The signing identity must
+not be exposed to pull-request workflows or ordinary branch builds.
+
+That workflow signs and verifies every DevinX-owned EXE, verifies the signed installer lifecycle,
+and uploads a candidate for physical testing. It does not publish a GitHub release. Public
+distribution still requires clean-account install/update/uninstall, SmartScreen/signature
+inspection, Windows Firewall validation, official Devin ACP validation, and the complete physical
 matrix in `specs/037-windows-connector.md`.
 
 ## Runtime behavior

@@ -22,14 +22,22 @@ const MAX_ELICITATION_FIELDS = 16;
 const MAX_ELICITATION_OPTIONS = 100;
 const MAX_ELICITATION_TEXT_LENGTH = 10_000;
 const SAFE_ENVIRONMENT_KEYS = [
+  'COMSPEC',
   'HOME',
   'LANG',
   'LC_ALL',
+  'LOCALAPPDATA',
   'LOGNAME',
   'PATH',
+  'Path',
+  'PATHEXT',
   'SHELL',
+  'SystemRoot',
+  'TEMP',
+  'TMP',
   'TMPDIR',
   'USER',
+  'USERPROFILE',
   'XDG_CACHE_HOME',
   'XDG_CONFIG_HOME',
   'XDG_DATA_HOME',
@@ -705,16 +713,27 @@ function validateElicitationContent(
   return validated;
 }
 
-function safeChildEnvironment(): NodeJS.ProcessEnv {
+export function safeAcpChildEnvironment(
+  source: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {
-    NODE_ENV: process.env.NODE_ENV ?? 'production',
+    NODE_ENV: source.NODE_ENV ?? 'production',
     NO_COLOR: '1',
   };
   for (const key of SAFE_ENVIRONMENT_KEYS) {
-    const value = process.env[key];
+    const value = source[key];
     if (value) environment[key] = value;
   }
   return environment;
+}
+
+export function acpWorkingDirectory(environment: NodeJS.ProcessEnv): string {
+  const candidates = [environment.HOME, environment.USERPROFILE];
+  const selected = candidates.find((candidate): candidate is string =>
+    Boolean(candidate && isAbsolute(candidate)),
+  );
+  if (!selected) throw new Error('ACP client requires an absolute user directory');
+  return selected;
 }
 
 function supportsSessionList(agentCapabilities: Record<string, unknown>): boolean {
@@ -830,11 +849,8 @@ export class AcpSessionClient {
 
   async start(): Promise<void> {
     if (this.child) throw new Error('ACP client is already started');
-    const environment = safeChildEnvironment();
-    const workingDirectory = environment.HOME;
-    if (!workingDirectory || !isAbsolute(workingDirectory)) {
-      throw new Error('ACP client requires an absolute home directory');
-    }
+    const environment = safeAcpChildEnvironment();
+    const workingDirectory = acpWorkingDirectory(environment);
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
     this.unmatchedMessages = 0;
