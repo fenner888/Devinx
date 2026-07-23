@@ -276,8 +276,9 @@ notarized, stapled, checksum-published, and available from the guarded official 
 ## Platform scope
 
 macOS is the first Connector release. Windows 11 x64 is an active implementation using the same
-protocol and authorization contract, with native DPAPI storage, process supervision, per-user
-packaging, signing hooks, Tailscale discovery, and update guidance now implemented. Authenticode
-configuration and the physical Windows matrix remain release gates. Linux remains a later
-platform. Neither platform is a supported download until its own threat model and physical tests
-pass.
+protocol and authorization contract, with native DPAPI storage, process supervision, exact-identity
+Microsoft Store packaging, an opt-in packaged startup task, Tailscale discovery, and update
+guidance now implemented. Microsoft Store certification and the physical Windows matrix remain
+release gates; Authenticode applies only to any separately released direct-download package. Linux
+remains a later platform. No platform is presented as supported until its own threat model,
+distribution trust checks, and physical tests pass.

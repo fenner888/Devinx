@@ -33,7 +33,11 @@ import {
   requestQrScannerPermission,
 } from '@auth/deviceSigning';
 import { DevinXQrScanner } from '@components/connections/DevinXQrScanner';
-import { CONNECTOR_RELEASE_PAGE, CONNECTOR_SETUP_PROMPT } from '@lib/connectorSetup';
+import {
+  CONNECTOR_RELEASE_PAGE,
+  CONNECTOR_SETUP_PROMPT,
+  WINDOWS_CONNECTOR_STORE_PAGE,
+} from '@lib/connectorSetup';
 import {
   isConnectorUpdateRequired,
   MINIMUM_SUPPORTED_CONNECTOR_VERSION,
@@ -426,16 +430,28 @@ export default function ComputerConnectionScreen() {
                 </View>
               </Pressable>
 
-              <Pressable
-                className="border border-border rounded-button px-buttonPrimaryX py-buttonPrimaryY mt-3"
-                onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
-                accessibilityRole="link"
-                accessibilityLabel="Open official DevinX Connector releases"
-              >
-                <Text className="text-text-hi text-text13 font-medium text-center">
-                  Open official releases
-                </Text>
-              </Pressable>
+              <View className="flex-row mt-3">
+                <Pressable
+                  className="flex-1 border border-border rounded-button px-3 py-buttonPrimaryY mr-1.5"
+                  onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
+                  accessibilityRole="link"
+                  accessibilityLabel="Open official DevinX Connector release for Mac"
+                >
+                  <Text className="text-text-hi text-text13 font-medium text-center">
+                    Mac release
+                  </Text>
+                </Pressable>
+                <Pressable
+                  className="flex-1 border border-border rounded-button px-3 py-buttonPrimaryY ml-1.5"
+                  onPress={() => Linking.openURL(WINDOWS_CONNECTOR_STORE_PAGE).catch(() => {})}
+                  accessibilityRole="link"
+                  accessibilityLabel="Open DevinX Connector in Microsoft Store"
+                >
+                  <Text className="text-text-hi text-text13 font-medium text-center">
+                    Windows Store
+                  </Text>
+                </Pressable>
+              </View>
 
               <Text className="text-text-low text-text11 leading-4 text-center mt-3">
                 Already installed? Continue below to name this device and scan its pairing code.
@@ -489,16 +505,27 @@ export default function ComputerConnectionScreen() {
                         Install DevinX Connector {MINIMUM_SUPPORTED_CONNECTOR_VERSION} or later to
                         keep local sessions compatible.
                       </Text>
-                      <Pressable
-                        className="mt-2 self-start"
-                        onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
-                        accessibilityRole="link"
-                        accessibilityLabel="Open official DevinX Connector update"
-                      >
-                        <Text className="text-link text-text12 font-medium">
-                          Open official release
-                        </Text>
-                      </Pressable>
+                      <View className="flex-row mt-2">
+                        <Pressable
+                          className="mr-4"
+                          onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
+                          accessibilityRole="link"
+                          accessibilityLabel="Open official DevinX Connector update for Mac"
+                        >
+                          <Text className="text-link text-text12 font-medium">Mac update</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() =>
+                            Linking.openURL(WINDOWS_CONNECTOR_STORE_PAGE).catch(() => {})
+                          }
+                          accessibilityRole="link"
+                          accessibilityLabel="Open DevinX Connector update in Microsoft Store"
+                        >
+                          <Text className="text-link text-text12 font-medium">
+                            Windows update
+                          </Text>
+                        </Pressable>
+                      </View>
                     </View>
                   </View>
                 </View>

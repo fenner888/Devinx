@@ -148,9 +148,12 @@ controls. Cognition's separate
 [Windows cloud-session environments](https://docs.devin.ai/onboard-devin/environment/windows-support)
 are not the Connector runtime.
 
-The unsigned artifact produced by ordinary CI is deliberately marked **NOT FOR RELEASE**. DevinX
-will offer Windows as a supported download only after an Authenticode-signed candidate passes the
-clean Windows 11 x64 physical matrix in [spec 037](specs/037-windows-connector.md), including
+The unsigned EXE and ZIP artifacts produced by ordinary CI are deliberately marked **NOT FOR
+RELEASE**. The public Windows distribution is the reserved
+[Microsoft Store listing](https://apps.microsoft.com/detail/9N52Z3FVMFH8), whose accepted MSIX is
+signed and delivered by Microsoft. DevinX will offer it as a supported download only after the
+Store package passes certification and the clean Windows 11 x64 physical matrix in
+[spec 037](specs/037-windows-connector.md), including
 official Devin ACP discovery, Tailscale routing, pairing, read/send/create grants,
 AskUserQuestion, sleep/reconnect, update, and uninstall. This prevents an unfinished or unsigned
 package from being presented as trustworthy.
@@ -267,6 +270,8 @@ or TestFlight build. Expo Go is not the release test environment.
 | `npm run connector:verify:macos`   | Verify the packaged Connector artifact                 |
 | `npm run connector:build:windows`  | Build the Windows x64 app, installer, and checksums    |
 | `npm run connector:verify:windows` | Verify installer lifecycle, package, and DPAPI storage |
+| `npm run connector:build:windows:store` | Build the exact-identity Microsoft Store MSIX      |
+| `npm run connector:verify:windows:store` | Verify Store identity, manifest, assets, and MSIX  |
 
 No package may be added until it is verified in the official registry, including its publication
 history, download history, and source repository. Dependencies are lockfile-enforced; never use a

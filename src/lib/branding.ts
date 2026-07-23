@@ -44,6 +44,7 @@ export const branding = {
     devinApp: 'https://app.devin.ai',
     createServiceUser: 'https://docs.devin.ai/api-reference/authentication',
     connectorReleases: 'https://github.com/fenner888/Devinx/releases/latest',
+    windowsConnectorStore: 'https://apps.microsoft.com/detail/9N52Z3FVMFH8',
   },
 } as const;
 

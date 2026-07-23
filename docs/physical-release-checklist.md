@@ -48,7 +48,7 @@ installed Build 67 for every remaining check below.
   button can scroll above the keyboard, the typed name remains visible, dragging and Done dismiss the
   keyboard, and neither path clears the name.
 - Starting from the Computer or Cloud + Computer onboarding choice, confirm **Send assisted setup
-  prompt** opens the iOS share sheet with the guarded prompt, **Open official releases** resolves only
+  prompt** opens the iOS share sheet with the guarded prompt, **Mac release** resolves only
   to `github.com/fenner888/Devinx/releases/latest`, and **Already installed? Continue below** reaches
   pairing without claiming that the Connector was installed automatically.
 - With the Mac available, confirm **Disconnect** completes signed Mac-side revocation before local

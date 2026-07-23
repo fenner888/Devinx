@@ -1,6 +1,6 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: macOS Connector 0.1.2 is the supported release. Windows implementation is tracked by spec 037 and remains unavailable to end users until its signed package and physical test matrix pass. Linux and Intel Mac packages remain roadmap targets.
+Status: macOS Connector 0.1.2 is the supported release. Windows implementation is tracked by spec 037 and remains unavailable to end users until its Microsoft Store package passes certification and the physical test matrix. Linux and Intel Mac packages remain roadmap targets.
 
 ## Product decision
 
@@ -21,8 +21,16 @@ DevinX Connector is not an official Cognition component. It uses the supported D
 Before presenting a Connector download or assisted-install action, DevinX and its public documentation must explain that cloud-only use needs no Connector, while computer access needs both Tailscale for private transport and Connector for authorized local Devin session access. The explanation must not imply that Tailscale alone exposes a computer service or that an IP address/password is sufficient without a compatible service listening on the computer.
 
 1. After choosing **Local** or **Cloud + Local**, the user receives an assisted setup prompt as the primary path. The iPhone share sheet lets them send or copy it to an AI assistant running on the local device. **Official releases** and **Already installed** remain visible alternatives.
-2. The assisted prompt references only the official DevinX GitHub Releases page. It tells the computer-side assistant to stop when no signed, notarized release and adjacent checksum are available; it never substitutes a source checkout, guessed package, unsigned artifact, or third-party mirror.
-3. The user downloads and explicitly approves the signed connector for the computer's operating system. iPhone never claims it can silently install or remotely launch an unpaired computer application.
+2. The assisted prompt uses only the official platform distribution: the DevinX GitHub Releases
+   page for the notarized macOS DMG and adjacent checksum, or Microsoft Store ID
+   `9N52Z3FVMFH8` for Windows 11 x64. It tells the computer-side assistant to stop when the
+   platform distribution or required trust checks are unavailable; it never substitutes a source
+   checkout, guessed package, unsigned artifact, or third-party mirror.
+3. The user downloads and explicitly approves the trusted connector for the computer's operating
+   system. The Windows Store package must report identity `DevinXTools.DevinXConnector`,
+   publisher `CN=43D84E24-857C-4C40-9DAA-1A6983913CD9`, and package family
+   `DevinXTools.DevinXConnector_ydtgrt4yd5wrc`. iPhone never claims it can silently install or
+   remotely launch an unpaired computer application.
 4. The connector detects Devin for Terminal and an active Tailscale IPv4 address without reading Devin credentials.
 5. Tailscale is the only v1 connection path. The connector fails closed when no active `100.64.0.0/10` address exists and never falls back to LAN.
 6. On macOS, the bridge binds only to the selected active `100.64.0.0/10` tailnet interface. The connector never binds to a LAN, wildcard, or public interface and reports a bounded health status.
@@ -101,7 +109,8 @@ When a QR identifies a computer already paired on the iPhone, DevinX may update 
 
 - Same shared bridge protocol and mobile pairing contract.
 - Credential Manager/DPAPI-backed secrets.
-- Signed per-user application and appropriate background lifecycle.
+- Microsoft Store-signed per-user application with exact Partner Center identity and appropriate
+  background lifecycle.
 - Tailscale and Devin CLI discovery validated on supported Windows versions.
 
 ### Linux — required follow-up
