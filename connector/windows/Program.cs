@@ -388,9 +388,9 @@ internal sealed class ConnectorForm : Form
                 return;
             }
 
-            var startupTask = await Windows.ApplicationModel.StartupTask.GetAsync(StartupTaskId);
+            var startupTask = await global::Windows.ApplicationModel.StartupTask.GetAsync(StartupTaskId);
             launchAtLogin.Checked =
-                startupTask.State == Windows.ApplicationModel.StartupTaskState.Enabled;
+                startupTask.State == global::Windows.ApplicationModel.StartupTaskState.Enabled;
         }
         catch
         {
@@ -416,7 +416,7 @@ internal sealed class ConnectorForm : Form
         launchAtLoginInitializing = true;
         try
         {
-            var startupTask = await Windows.ApplicationModel.StartupTask.GetAsync(StartupTaskId);
+            var startupTask = await global::Windows.ApplicationModel.StartupTask.GetAsync(StartupTaskId);
             if (!launchAtLogin.Checked)
             {
                 startupTask.Disable();
@@ -424,11 +424,11 @@ internal sealed class ConnectorForm : Form
             }
 
             var state = await startupTask.RequestEnableAsync();
-            if (state == Windows.ApplicationModel.StartupTaskState.Enabled) return;
+            if (state == global::Windows.ApplicationModel.StartupTaskState.Enabled) return;
 
             launchAtLogin.Checked = false;
             var detail =
-                state == Windows.ApplicationModel.StartupTaskState.DisabledByUser
+                state == global::Windows.ApplicationModel.StartupTaskState.DisabledByUser
                     ? "Windows has disabled this startup task. Re-enable DevinX Connector in Settings > Apps > Startup."
                     : "Windows could not enable DevinX Connector at sign in on this PC.";
             MessageBox.Show(
@@ -458,7 +458,8 @@ internal sealed class ConnectorForm : Form
     {
         try
         {
-            return !string.IsNullOrWhiteSpace(Windows.ApplicationModel.Package.Current.Id.Name);
+            return !string.IsNullOrWhiteSpace(
+                global::Windows.ApplicationModel.Package.Current.Id.Name);
         }
         catch (InvalidOperationException)
         {
