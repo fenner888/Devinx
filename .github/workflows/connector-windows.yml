@@ -29,7 +29,7 @@ jobs:
         run: |
           npm run lint
           npm run typecheck
-          npm run test -- --ci --runInBand --reporters=default tests/bridge/bridge-service.test.ts tests/auth/computer-bridge.test.ts tests/lib/connector-version.test.ts
+          npm run test -- --ci --runInBand tests/bridge/bridge-service.test.ts tests/auth/computer-bridge.test.ts tests/lib/connector-version.test.ts
 
       - name: Build unsigned Windows installer verification artifacts
         run: npm run connector:build:windows
