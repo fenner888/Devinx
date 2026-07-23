@@ -19,7 +19,7 @@ const expectedIdentity = Object.freeze({
   publisherDisplayName: 'DevinX Tools',
   packageFamilyName: 'DevinXTools.DevinXConnector_ydtgrt4yd5wrc',
   msaAppId: '7d1237e7-6265-48ab-adf5-2a12f5d81101',
-  version: '0.1.0.1',
+  version: '0.1.1.0',
   architecture: 'x64',
   defaultLanguage: 'en-US',
   minimumWindowsVersion: '10.0.22000.0',
