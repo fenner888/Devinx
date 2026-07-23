@@ -32,6 +32,7 @@ import { BridgeService, type SessionDiscoveryAdapter } from './service';
 import { SessionHandleRegistry } from './session-handles';
 import { WorkspaceHandleRegistry } from './workspace-handles';
 import type { SecretStore } from './secret-store';
+import { WindowsDpapiSecretStore } from './windows-dpapi';
 import {
   DesktopBridgeStateRepository,
   loadDesktopBridgeRuntime,
@@ -40,6 +41,7 @@ import {
 } from './state';
 import {
   OpenSslTlsIdentityGenerator,
+  WindowsTlsIdentityGenerator,
   type TlsIdentity,
   type TlsIdentityGenerator,
 } from './tls-identity';
@@ -399,8 +401,12 @@ export function createProductionRunnerDependencies(
 ): DesktopBridgeRunnerDependencies {
   return {
     platform,
-    secretStore: new MacOSKeychainSecretStore(),
-    tlsIdentityGenerator: new OpenSslTlsIdentityGenerator(),
+    secretStore:
+      platform === 'windows' ? new WindowsDpapiSecretStore() : new MacOSKeychainSecretStore(),
+    tlsIdentityGenerator:
+      platform === 'windows'
+        ? new WindowsTlsIdentityGenerator()
+        : new OpenSslTlsIdentityGenerator(),
     qrRenderer,
     createListener: (options) => new HttpsBridgeListener(options),
     createAcpClient: (executablePath) => new AcpSessionClient({ executablePath }),

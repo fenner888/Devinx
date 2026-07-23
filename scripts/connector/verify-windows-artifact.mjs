@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createPrivateKey, X509Certificate } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
@@ -97,6 +97,20 @@ try {
   const helper = resolve(packageRoot, 'Resources', 'windows-dpapi-helper.exe');
   const secret = `connector-verification-${Date.now()}`;
   const environment = { ...process.env, LOCALAPPDATA: isolatedLocalAppData };
+  const generatedTls = JSON.parse(run(helper, ['generate-tls'], { env: environment }));
+  const generatedCertificate = new X509Certificate(generatedTls.certificatePem);
+  const generatedPrivateKey = createPrivateKey(generatedTls.privateKeyPem);
+  if (
+    generatedPrivateKey.asymmetricKeyType !== 'rsa' ||
+    generatedPrivateKey.asymmetricKeyDetails?.modulusLength !== 2048 ||
+    !generatedCertificate.checkPrivateKey(generatedPrivateKey) ||
+    generatedCertificate.ca ||
+    generatedCertificate.subject !== generatedCertificate.issuer ||
+    !generatedCertificate.verify(generatedCertificate.publicKey) ||
+    !Number.isSafeInteger(generatedTls.createdAt)
+  ) {
+    throw new Error('Windows native TLS identity generation failed cryptographic verification');
+  }
   run(helper, ['set'], { input: secret, env: environment });
   const restored = run(helper, ['get'], { env: environment }).trimEnd();
   if (restored !== secret) throw new Error('DPAPI protected-state round trip failed');
@@ -193,6 +207,7 @@ try {
         dpapiRoundTripVerified: true,
         dpapiBoundsVerified: true,
         dpapiOperationAllowlistVerified: true,
+        nativeTlsIdentityVerified: true,
         signatureStatus: signatureRequired ? 'authenticode-verified' : 'unsigned-ci-artifact',
         publishable: false,
         releaseStage: signatureRequired

@@ -24,10 +24,7 @@ export {
   type KeychainSecretStore,
   type MacOSKeychainOptions,
 } from './macos-keychain';
-export {
-  WindowsDpapiSecretStore,
-  type WindowsDpapiOptions,
-} from './windows-dpapi';
+export { WindowsDpapiSecretStore, type WindowsDpapiOptions } from './windows-dpapi';
 export {
   HttpsBridgeListener,
   type HttpsBridgeListenerAddress,
@@ -35,10 +32,12 @@ export {
 } from './listener';
 export {
   OpenSslTlsIdentityGenerator,
+  WindowsTlsIdentityGenerator,
   parseTlsIdentity,
   tlsIdentityFromPem,
   tlsIdentitySchema,
   type OpenSslTlsIdentityGeneratorOptions,
+  type WindowsTlsIdentityGeneratorOptions,
   type ParseTlsIdentityOptions,
   type TlsIdentity,
   type TlsIdentityGenerator,

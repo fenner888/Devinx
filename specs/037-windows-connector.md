@@ -75,6 +75,8 @@ Automated:
 - fail-closed Authenticode signing and verification for the application, DPAPI helper, and
   per-user installer;
 - DPAPI set/get/delete, not-found, size-limit, malformed-input, and wrong-user failure tests;
+- in-memory .NET TLS identity generation, cryptographic key/certificate matching, bounded helper
+  output, and encrypted persistence without an OpenSSL installation;
 - platform discovery tests covering `Path`, invalid/relative entries, absent ACP, and no shell execution;
 - shared pairing, authorization, rate-limit, replay, grant, revoke, endpoint-refresh, and generic-404 suites;
 - package contents, installer registration/uninstall lifecycle, MIT license, pinned runtime

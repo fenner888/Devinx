@@ -1,6 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
 
 namespace DevinX.WindowsDpapiHelper;
 
@@ -32,6 +34,7 @@ internal static class Program
                 "get" => Get(),
                 "set" => Set(),
                 "delete" => Delete(),
+                "generate-tls" => GenerateTlsIdentity(),
                 _ => 2,
             };
         }
@@ -115,6 +118,54 @@ internal static class Program
             Directory.Delete(directory);
         }
         return 0;
+    }
+
+    private static int GenerateTlsIdentity()
+    {
+        using var privateKey = RSA.Create(2048);
+        var request = new CertificateRequest(
+            "CN=DevinX Desktop Bridge",
+            privateKey,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+        request.CertificateExtensions.Add(
+            new X509BasicConstraintsExtension(
+                certificateAuthority: false,
+                hasPathLengthConstraint: false,
+                pathLengthConstraint: 0,
+                critical: true));
+        request.CertificateExtensions.Add(
+            new X509KeyUsageExtension(
+                X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment,
+                critical: true));
+        var enhancedKeyUsages = new OidCollection
+        {
+            new Oid("1.3.6.1.5.5.7.3.1"),
+        };
+        request.CertificateExtensions.Add(
+            new X509EnhancedKeyUsageExtension(enhancedKeyUsages, critical: true));
+
+        var createdAt = DateTimeOffset.UtcNow;
+        using var certificate = request.CreateSelfSigned(
+            createdAt.AddMinutes(-1),
+            createdAt.AddDays(365));
+        var output = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            certificatePem = certificate.ExportCertificatePem(),
+            privateKeyPem = privateKey.ExportPkcs8PrivateKeyPem(),
+            createdAt = createdAt.ToUnixTimeMilliseconds(),
+        });
+        try
+        {
+            using var stdout = Console.OpenStandardOutput();
+            stdout.Write(output, 0, output.Length);
+            stdout.WriteByte((byte)'\n');
+            return 0;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(output);
+        }
     }
 
     private static byte[] ReadBoundedStandardInput()

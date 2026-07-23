@@ -101,6 +101,9 @@ validating the Node.js Foundation checksum and creates a ZIP, installer EXE, and
 under `artifacts/connector/windows/`. The verifier rejects missing files, source maps, debug
 symbols, runtime-version drift, checksum drift, and an invalid MIT license; it executes bounded
 DPAPI set/get/delete checks and performs an install/registration/uninstall lifecycle.
+The signed native helper also creates the Connector's bounded self-signed TLS identity in memory
+with .NET cryptography. Windows does not need OpenSSL, and the resulting identity is retained only
+inside the current user's DPAPI-protected Connector state.
 
 Ordinary CI uploads only an explicitly named **UNSIGNED-NOT-FOR-RELEASE** artifact. The manual
 **Windows Connector Signed Candidate** workflow fails closed unless the protected

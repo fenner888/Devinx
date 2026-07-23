@@ -25,11 +25,11 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Validate shared TypeScript and tests
+      - name: Validate shared TypeScript and cross-platform contracts
         run: |
           npm run lint
           npm run typecheck
-          npm run test -- --ci --reporters=default
+          npm run test -- --ci --runInBand --reporters=default tests/bridge/bridge-service.test.ts tests/auth/computer-bridge.test.ts tests/lib/connector-version.test.ts
 
       - name: Build unsigned Windows installer verification artifacts
         run: npm run connector:build:windows

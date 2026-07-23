@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
 import { createHash, createPrivateKey, X509Certificate } from 'node:crypto';
-import { isAbsolute } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import type { Readable } from 'node:stream';
 
 import { z } from 'zod';
 
 const DEFAULT_OPENSSL_PATH = '/usr/bin/openssl';
+const DEFAULT_WINDOWS_HELPER_PATH = join(__dirname, 'windows-dpapi-helper.exe');
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAXIMUM_PEM_BYTES = 128 * 1024;
 const MAXIMUM_VALIDITY_MS = 370 * 24 * 60 * 60 * 1_000;
@@ -47,6 +48,26 @@ const generatorOptionsSchema = z
   })
   .strict();
 
+const windowsGeneratorOptionsSchema = z
+  .object({
+    executablePath: z
+      .string()
+      .min(1)
+      .max(4096)
+      .refine(isAbsolute, 'Windows TLS helper path must be absolute')
+      .default(DEFAULT_WINDOWS_HELPER_PATH),
+    timeoutMs: z.number().int().min(1_000).max(60_000).default(DEFAULT_TIMEOUT_MS),
+  })
+  .strict();
+
+const windowsTlsOutputSchema = z
+  .object({
+    certificatePem: z.string().min(1).max(MAXIMUM_PEM_BYTES),
+    privateKeyPem: z.string().min(1).max(MAXIMUM_PEM_BYTES),
+    createdAt: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export type TlsIdentity = z.infer<typeof tlsIdentitySchema>;
 
 export interface TlsIdentityGenerator {
@@ -56,6 +77,11 @@ export interface TlsIdentityGenerator {
 export interface OpenSslTlsIdentityGeneratorOptions {
   executablePath?: string;
   validityDays?: number;
+  timeoutMs?: number;
+}
+
+export interface WindowsTlsIdentityGeneratorOptions {
+  executablePath?: string;
   timeoutMs?: number;
 }
 
@@ -74,6 +100,28 @@ function safeEnvironment(): NodeJS.ProcessEnv {
     NO_COLOR: '1',
   };
   for (const key of ['HOME', 'LANG', 'LC_ALL', 'LOGNAME', 'PATH', 'TMPDIR', 'USER'] as const) {
+    const value = process.env[key];
+    if (value) environment[key] = value;
+  }
+  return environment;
+}
+
+function safeWindowsEnvironment(): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = {
+    NODE_ENV: process.env.NODE_ENV ?? 'production',
+    NO_COLOR: '1',
+  };
+  for (const key of [
+    'APPDATA',
+    'LANG',
+    'LOCALAPPDATA',
+    'Path',
+    'PATHEXT',
+    'TEMP',
+    'TMP',
+    'USERPROFILE',
+    'USERNAME',
+  ] as const) {
     const value = process.env[key];
     if (value) environment[key] = value;
   }
@@ -283,6 +331,97 @@ export class OpenSslTlsIdentityGenerator implements TlsIdentityGenerator {
             key.fill(0);
             certificateBytesBuffer.fill(0);
             reject(new Error('Generated TLS identity failed validation'));
+          }
+        });
+      });
+    });
+  }
+}
+
+export class WindowsTlsIdentityGenerator implements TlsIdentityGenerator {
+  private readonly options: z.infer<typeof windowsGeneratorOptionsSchema>;
+
+  constructor(options: WindowsTlsIdentityGeneratorOptions = {}) {
+    this.options = windowsGeneratorOptionsSchema.parse(options);
+  }
+
+  generate(): Promise<TlsIdentity> {
+    return new Promise((resolve, reject) => {
+      const environment = safeWindowsEnvironment();
+      const workingDirectory = environment.LOCALAPPDATA;
+      if (!workingDirectory || !isAbsolute(workingDirectory)) {
+        reject(new Error('Windows TLS identity generation requires LOCALAPPDATA'));
+        return;
+      }
+
+      const child = spawn(this.options.executablePath, ['generate-tls'], {
+        cwd: workingDirectory,
+        env: environment,
+        shell: false,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const chunks: Buffer[] = [];
+      let outputBytes = 0;
+      let settled = false;
+      const wipe = () => {
+        for (const chunk of chunks) chunk.fill(0);
+        chunks.length = 0;
+      };
+      const terminate = () => {
+        if (child.exitCode === null && child.signalCode === null) child.kill();
+      };
+      const finish = (operation: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        operation();
+      };
+      const fail = (message: string) => {
+        finish(() => {
+          wipe();
+          terminate();
+          reject(new Error(message));
+        });
+      };
+      const timer = setTimeout(
+        () => fail('Windows TLS identity generation timed out'),
+        this.options.timeoutMs,
+      );
+      timer.unref();
+
+      child.stderr?.resume();
+      child.on('error', () => fail('Windows TLS identity helper could not be started'));
+      child.stdout?.on('error', () => fail('Windows TLS identity output failed'));
+      child.stdout?.on('data', (chunk: Buffer) => {
+        if (settled) return;
+        outputBytes += chunk.length;
+        if (outputBytes > MAXIMUM_PEM_BYTES * 2) {
+          fail('Windows TLS identity output exceeded the size limit');
+          return;
+        }
+        chunks.push(Buffer.from(chunk));
+      });
+      child.on('close', (code) => {
+        finish(() => {
+          const output = Buffer.concat(chunks);
+          wipe();
+          try {
+            if (code !== 0 || output.length === 0) {
+              throw new Error('Windows TLS identity generation failed');
+            }
+            const generated = windowsTlsOutputSchema.parse(JSON.parse(output.toString('utf8')));
+            resolve(
+              tlsIdentityFromPem(
+                generated.certificatePem,
+                generated.privateKeyPem,
+                generated.createdAt,
+              ),
+            );
+          } catch {
+            reject(new Error('Generated Windows TLS identity failed validation'));
+          } finally {
+            output.fill(0);
           }
         });
       });
