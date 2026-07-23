@@ -15,7 +15,13 @@ export async function rememberSessionMode(sessionId: string, mode: DevinMode) {
 
 export async function getSessionMode(sessionId: string): Promise<DevinMode | null> {
   const mode = await AsyncStorage.getItem(`${MODE_PREFIX}${sessionId}`);
-  return mode === 'normal' || mode === 'fast' ? mode : null;
+  return mode === 'normal' ||
+    mode === 'fast' ||
+    mode === 'lite' ||
+    mode === 'ultra' ||
+    mode === 'fusion'
+    ? mode
+    : null;
 }
 
 export async function getSessionRepository(session: SessionResponse): Promise<string | null> {

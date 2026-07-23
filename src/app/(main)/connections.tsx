@@ -66,7 +66,7 @@ export default function ConnectionsScreen() {
         </View>
         <ErrorState
           title="Devin Cloud is not active"
-          message="Choose Devin Cloud or Cloud + Computer as the connection mode to inspect organization integrations."
+          message="Choose Devin Cloud or Cloud + Local as the connection mode to inspect organization integrations."
         />
       </SafeAreaView>
     );

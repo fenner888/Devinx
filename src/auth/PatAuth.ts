@@ -14,9 +14,10 @@ import type { AuthProvider, ValidationResult } from './AuthProvider';
 let cached: StoredCredentials | null = null;
 
 export function isPatEnabled(): boolean {
-  // PATs are GA-usable (same cog_ Bearer auth as service keys). Enabled by
-  // default; set EXPO_PUBLIC_ENABLE_PAT=false to hide the option.
-  return process.env.EXPO_PUBLIC_ENABLE_PAT !== 'false';
+  // PATs remain a closed-beta authentication path. Existing stored PATs can
+  // still be loaded, but presenting a new PAT connection requires an explicit
+  // release-time opt-in.
+  return process.env.EXPO_PUBLIC_ENABLE_PAT === 'true';
 }
 
 export async function connectPat(params: { token: string; orgId: string }): Promise<void> {

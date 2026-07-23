@@ -89,11 +89,11 @@ function localOptionsFailureCopy(error: unknown): { title: string; message: stri
   if (code === 'permission_denied' || code === 'authorization_failed' || code === 'not_paired') {
     return {
       title: 'Connector permission required',
-      message: 'Open DevinX Connector on your Mac and enable Create new sessions for this iPhone.',
+      message: 'Open DevinX Connector locally and enable Create new sessions for this iPhone.',
     };
   }
   return {
-    title: 'Mac options unavailable',
+    title: 'Local options unavailable',
     message:
       'DevinX Connector could not load workspaces and models. Confirm Connector and Devin for Terminal are ready, then try again.',
   };
@@ -234,7 +234,7 @@ export default function HomeScreen() {
     usesComputer
       ? computer
         ? `${computer.computerName} paired`
-        : 'No computer paired'
+        : 'No local device paired'
       : null,
   ]
     .filter((part): part is string => Boolean(part))
@@ -284,12 +284,12 @@ export default function HomeScreen() {
   );
   const canUseComposer = isComputerDestination ? canCreateComputerSession : canCreateCloudSession;
   const composerPending = createSession.isPending || createComputerSession.isPending;
-  const normalizedRepoQuery = repoQuery.trim().toLowerCase();
+  const normalizedRepoQuery = repoQuery.normalize('NFKC').trim().toLocaleLowerCase();
   const filteredRepositories = (repositories ?? []).filter(
     (repository) =>
       normalizedRepoQuery.length === 0 ||
-      repository.repo_name.toLowerCase().includes(normalizedRepoQuery) ||
-      repository.repo_path.toLowerCase().includes(normalizedRepoQuery),
+      repository.repo_name.normalize('NFKC').toLocaleLowerCase().includes(normalizedRepoQuery) ||
+      repository.repo_path.normalize('NFKC').toLocaleLowerCase().includes(normalizedRepoQuery),
   );
   const companionSize = Math.round(Math.min(height < 700 ? 184 : 220, Math.max(164, width * 0.54)));
   const voice = useVoiceComposer({
@@ -303,7 +303,7 @@ export default function HomeScreen() {
       tags: defaultTags,
     },
     scribeContext: {
-      destination: isComputerDestination ? computer?.computerName ?? 'Computer' : 'Devin Cloud',
+      destination: isComputerDestination ? computer?.computerName ?? 'Local' : 'Devin Cloud',
       repository: isComputerDestination ? selectedWorkspace?.name : selectedRepo ?? undefined,
     },
   });
@@ -333,7 +333,7 @@ export default function HomeScreen() {
 
   function openLocalPicker(kind: 'workspace' | 'model') {
     if (localOptions.isLoading) {
-      Alert.alert('Loading Mac options', 'DevinX is checking the approved options on your Mac.');
+      Alert.alert('Loading local options', 'DevinX is checking the approved options on your local device.');
       return;
     }
     if (!localOptions.data) {
@@ -345,7 +345,7 @@ export default function HomeScreen() {
       if (localOptions.data.workspaces.length === 0) {
         Alert.alert(
           'No local workspaces yet',
-          'Start or resume a Devin session in a workspace on your Mac, then try again.',
+          'Start or resume a Devin session in a workspace on your local device, then try again.',
         );
         return;
       }
@@ -577,7 +577,7 @@ export default function HomeScreen() {
               editable={canUseComposer}
               placeholder={
                 isComputerDestination
-                  ? 'Ask Devin on your Mac to build, fix, or investigate…'
+                  ? 'Ask Devin locally to build, fix, or investigate…'
                   : 'Ask Devin to build features, fix bugs, or work on your code…'
               }
               placeholderTextColor={tokens.textLow.hex}
@@ -758,7 +758,7 @@ export default function HomeScreen() {
               onPress={() => canChooseDestination && setShowDestinationPicker(true)}
               disabled={!canChooseDestination}
               accessibilityRole="button"
-              accessibilityLabel={`Session destination: ${isComputerDestination ? (computer?.computerName ?? 'Computer') : 'Devin Cloud'}`}
+              accessibilityLabel={`Session destination: ${isComputerDestination ? (computer?.computerName ?? 'Local') : 'Devin Cloud'}`}
             >
               <Ionicons
                 name={isComputerDestination ? 'desktop-outline' : 'cloud-outline'}
@@ -766,7 +766,7 @@ export default function HomeScreen() {
                 color={tokens.textLow.hex}
               />
               <Text className="text-text-mid text-text12 ml-1.5" numberOfLines={1}>
-                {isComputerDestination ? (computer?.computerName ?? 'Computer') : 'Devin Cloud'}
+                {isComputerDestination ? (computer?.computerName ?? 'Local') : 'Devin Cloud'}
               </Text>
               {canChooseDestination && (
                 <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
@@ -897,7 +897,11 @@ export default function HomeScreen() {
         transparent
         onRequestClose={() => setShowRepoPicker(false)}
       >
-        <View className="flex-1 bg-scrim justify-end">
+        <KeyboardAvoidingView
+          className="flex-1 bg-scrim justify-end"
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          testID="repository-picker-keyboard-avoider"
+        >
           <View
             className="bg-surface2 rounded-t-sheet pt-3 max-h-[78%]"
             style={{ paddingBottom: Math.max(insets.bottom, 16) }}
@@ -955,7 +959,12 @@ export default function HomeScreen() {
               )}
             </View>
 
-            <ScrollView contentContainerClassName="px-5 pb-2" keyboardShouldPersistTaps="handled">
+            <ScrollView
+              contentContainerClassName="px-5 pb-2"
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              testID="repository-picker-results"
+            >
               <View className="overflow-hidden rounded-cardLg border border-border-subtle bg-surface1">
                 <Pressable
                   className={`min-h-16 flex-row items-center px-4 py-3 border-b border-border-subtle ${selectedRepo === null ? 'bg-tint-blue' : ''}`}
@@ -1078,7 +1087,7 @@ export default function HomeScreen() {
               </View>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -1099,7 +1108,7 @@ export default function HomeScreen() {
               <View className="flex-1 pr-3">
                 <Text className="text-text-hi text-text17 font-medium">Run this session on</Text>
                 <Text className="mt-1 text-text-low text-text12">
-                  Choose Devin Cloud or a paired computer
+                  Choose Devin Cloud or a paired local device
                 </Text>
               </View>
               <Pressable
@@ -1181,7 +1190,7 @@ export default function HomeScreen() {
                         {computerOption.computerName}
                       </Text>
                       <Text className="mt-0.5 text-text-low text-text12">
-                        Local workspaces and models from this computer
+                        Local workspaces and models from this device
                       </Text>
                     </View>
                     {selected && (
@@ -1289,7 +1298,7 @@ export default function HomeScreen() {
                         {selectedWorkspace.name}
                       </Text>
                       <Text className="mt-0.5 text-text-low text-text12" numberOfLines={1}>
-                        {computer?.computerName ?? 'Paired computer'}
+                        {computer?.computerName ?? 'Paired local device'}
                       </Text>
                     </View>
                     <Ionicons
@@ -1337,7 +1346,7 @@ export default function HomeScreen() {
                               {workspace.name}
                             </Text>
                             <Text className="mt-0.5 text-text-low text-text12" numberOfLines={1}>
-                              {computer?.computerName ?? 'Paired computer'}
+                              {computer?.computerName ?? 'Paired local device'}
                             </Text>
                           </View>
                           <Ionicons

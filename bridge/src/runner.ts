@@ -32,6 +32,7 @@ import { BridgeService, type SessionDiscoveryAdapter } from './service';
 import { SessionHandleRegistry } from './session-handles';
 import { WorkspaceHandleRegistry } from './workspace-handles';
 import type { SecretStore } from './secret-store';
+import { WindowsDpapiSecretStore } from './windows-dpapi';
 import {
   DesktopBridgeStateRepository,
   loadDesktopBridgeRuntime,
@@ -40,6 +41,7 @@ import {
 } from './state';
 import {
   OpenSslTlsIdentityGenerator,
+  WindowsTlsIdentityGenerator,
   type TlsIdentity,
   type TlsIdentityGenerator,
 } from './tls-identity';
@@ -117,6 +119,7 @@ export interface SessionHistoryLifecycle {
 }
 
 export interface DesktopBridgeRunnerDependencies {
+  platform: 'macos' | 'windows' | 'linux';
   secretStore: SecretStore;
   tlsIdentityGenerator: TlsIdentityGenerator;
   qrRenderer: PairingQrRenderer;
@@ -390,10 +393,20 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
 
 export function createProductionRunnerDependencies(
   qrRenderer: PairingQrRenderer,
+  platform: DesktopBridgeRunnerDependencies['platform'] = process.platform === 'darwin'
+    ? 'macos'
+    : process.platform === 'win32'
+      ? 'windows'
+      : 'linux',
 ): DesktopBridgeRunnerDependencies {
   return {
-    secretStore: new MacOSKeychainSecretStore(),
-    tlsIdentityGenerator: new OpenSslTlsIdentityGenerator(),
+    platform,
+    secretStore:
+      platform === 'windows' ? new WindowsDpapiSecretStore() : new MacOSKeychainSecretStore(),
+    tlsIdentityGenerator:
+      platform === 'windows'
+        ? new WindowsTlsIdentityGenerator()
+        : new OpenSslTlsIdentityGenerator(),
     qrRenderer,
     createListener: (options) => new HttpsBridgeListener(options),
     createAcpClient: (executablePath) => new AcpSessionClient({ executablePath }),
@@ -474,6 +487,7 @@ export class DesktopBridgeRunner {
       this.pairing = pairing;
       const service = new BridgeService({
         bridgeId: runtime.bridgeId,
+        platform: this.dependencies.platform,
         devices: runtime.devices,
         replayGuard: new InMemoryReplayGuard(),
         rateLimiter: new FixedWindowRateLimiter(),

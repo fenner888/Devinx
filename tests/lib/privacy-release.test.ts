@@ -83,7 +83,7 @@ describe('release privacy configuration', () => {
       'utf8',
     );
 
-    expect(privacyScreen).toContain('directly from your Mac over Tailscale');
+    expect(privacyScreen).toContain('directly from your local device over Tailscale');
     expect(privacyScreen).toContain('contact Expo over TLS');
     expect(privacyScreen).toContain('randomized installation token');
     expect(privacyScreen).toContain('does not register your iPhone for remote push notifications');

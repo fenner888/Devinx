@@ -12,13 +12,13 @@ export const connectionModeOptions: ReadonlyArray<{
   },
   {
     key: 'computer',
-    label: 'Computer',
-    description: 'Pair securely with DevinX Connector running on your computer.',
+    label: 'Local',
+    description: 'Pair securely with DevinX Connector on a device you control.',
   },
   {
     key: 'both',
-    label: 'Cloud + Computer',
-    description: 'See cloud and paired-computer sessions together with clear origins.',
+    label: 'Cloud + Local',
+    description: 'See cloud and local sessions together with clear origins.',
   },
 ];
 

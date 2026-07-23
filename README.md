@@ -13,7 +13,7 @@
   ·
   <a href="https://github.com/fenner888/Devinx/releases/latest"><strong>Download DevinX Connector</strong></a>
   ·
-  <a href="docs/devinx-connector.md"><strong>Computer setup guide</strong></a>
+  <a href="docs/devinx-connector.md"><strong>Local setup guide</strong></a>
 </p>
 
 <p align="center">
@@ -30,14 +30,15 @@
 
 ## Release status
 
-| Product                        | Current release | Availability                                                                                      |
-| ------------------------------ | --------------- | ------------------------------------------------------------------------------------------------- |
-| **DevinX for iPhone**          | `0.1.0 (73)`    | [External TestFlight beta](https://testflight.apple.com/join/KBD25apN) · up to 100 testers        |
-| **Public App Store version**   | `1.0`           | Submitted to Apple and waiting for App Review · manual release after approval                     |
-| **DevinX Connector for macOS** | `0.1.2`         | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
+| Product                          | Current release     | Availability                                                                                      |
+| -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------- |
+| **DevinX for iPhone**            | `0.1.0 (73)`        | [External TestFlight beta](https://testflight.apple.com/join/KBD25apN) · up to 100 testers        |
+| **Public App Store version**     | `1.0`               | Submitted to Apple and waiting for App Review · manual release after approval                     |
+| **DevinX Connector for macOS**   | `0.1.2`             | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
+| **DevinX Connector for Windows** | active release work | Windows 11 x64 installer is implemented; signing and physical release gates remain                |
 
 TestFlight access does not include a Devin account or shared Devin data. Each tester connects their
-own Devin organization, pairs a computer they control, or uses both.
+own Devin organization, pairs a local device they control, or uses both.
 
 ## What DevinX is
 
@@ -45,12 +46,14 @@ DevinX is mobile mission control for supported Devin Cloud and Devin for Termina
 built for the moments when you are away from your desk but still need to start work, check progress,
 answer a question, or review a result.
 
-- **Start work remotely.** Create supported Cloud or Computer sessions with the context exposed by
+- **Start work remotely.** Create supported Cloud or Local sessions with the context exposed by
   the selected destination.
-- **See sessions in one place.** Cloud and paired-computer sessions remain clearly labeled so their
+- **See sessions in one place.** Cloud and Local sessions remain clearly labeled so their
   trust and data boundaries never blur.
 - **Keep work moving.** Read bounded history, send steering messages, and respond when a session
   needs input.
+- **Review demos in place.** Devin-produced Cloud screenshots and videos appear in the session when
+  the documented attachment API returns them; videos load only after you tap play.
 - **Use the real available catalog.** Repositories, workspaces, playbooks, Knowledge, attachments,
   modes, and models come from documented Cloud APIs or the live local ACP catalog—not hardcoded
   guesses.
@@ -65,13 +68,13 @@ answer a question, or review a result.
 
 ## Choose where Devin runs
 
-| Mode                 | Connects to                                           | Required setup                                                        |
-| -------------------- | ----------------------------------------------------- | --------------------------------------------------------------------- |
-| **Devin Cloud**      | Documented Devin Cloud APIs over TLS                  | DevinX, a Devin organization ID, and a scoped service-user credential |
-| **Computer**         | Devin for Terminal sessions on a computer you control | DevinX, Tailscale, Devin for Terminal, and DevinX Connector           |
-| **Cloud + Computer** | Both sources in one app with explicit origins         | Both setups above                                                     |
+| Mode              | Connects to                                      | Required setup                                                        |
+| ----------------- | ------------------------------------------------ | --------------------------------------------------------------------- |
+| **Devin Cloud**   | Documented Devin Cloud APIs over TLS             | DevinX, a Devin organization ID, and a scoped service-user credential |
+| **Local**         | Supported Devin sessions on a device you control | DevinX, Tailscale, supported local Devin ACP, and DevinX Connector    |
+| **Cloud + Local** | Both sources in one app with explicit origins    | Both setups above                                                     |
 
-Cloud authentication does not pair a computer. Computer pairing does not copy Devin credentials to
+Cloud authentication does not pair a local device. Local pairing does not copy Devin credentials to
 the iPhone. Each connection has its own authentication, permissions, storage, and revocation path.
 
 ```mermaid
@@ -81,31 +84,32 @@ flowchart LR
     X -->|"Bounded ACP operations"| T["Devin for Terminal"]
 ```
 
-DevinX operates no relay for normal Cloud or Computer session traffic.
+DevinX operates no relay for normal Cloud or Local session traffic.
 
 ## Install on iPhone
 
 1. Install Apple's [TestFlight](https://apps.apple.com/app/testflight/id899247664) app.
 2. Open the [DevinX Early Access link](https://testflight.apple.com/join/KBD25apN).
 3. Install Build `0.1.0 (67)` and complete the in-app onboarding.
-4. Choose **Devin Cloud**, **Computer**, or **Cloud + Computer**.
+4. Choose **Devin Cloud**, **Local**, or **Cloud + Local**.
 
 ### Cloud setup
 
 Cloud mode requires an existing Devin organization and a least-privilege service user created by
-that organization. Enter the service-user key and organization ID only inside DevinX onboarding.
-The credential is validated directly against Devin and stored with device-only protection in iOS
-Keychain.
+that organization. Follow Devin's official
+[service-user authentication guide](https://docs.devin.ai/api-reference/authentication), then enter
+the generated service-user key and organization ID only inside DevinX onboarding. The credential is
+validated directly against Devin and stored with device-only protection in iOS Keychain.
 
 Do not paste Devin credentials into issues, screenshots, setup prompts, shell history, or chat
 messages. TestFlight does not provide a shared Devin credential, and no tester receives access to
 another user's sessions through the beta link.
 
-## Install DevinX Connector on macOS
+## Install DevinX Connector for Local mode
 
 Connector is optional. Cloud-only users do not install it.
 
-### Requirements
+### Supported public release
 
 - macOS 13 or later on Apple silicon
 - [Tailscale](https://tailscale.com/download/mac) on the Mac and iPhone, signed into the same tailnet
@@ -119,7 +123,7 @@ Connector is optional. Cloud-only users do not install it.
 2. Verify the checksum published with that release.
 3. Open the DMG and move **DevinX Connector** to Applications.
 4. Open Connector and confirm it detects both Tailscale and Devin for Terminal.
-5. In DevinX, open **Settings → Computers → Add Mac/PC**.
+5. In DevinX, open **Settings → Local devices → Add local device**.
 6. Scan the short-lived code and approve the named iPhone plus its requested permissions on the Mac.
 
 The iPhone onboarding also includes a guarded assisted-setup prompt for an AI assistant on the Mac.
@@ -130,9 +134,30 @@ does not silently install a desktop application.
 For detailed installation, update, uninstall, development, and notarization information, read
 [docs/devinx-connector.md](docs/devinx-connector.md).
 
+### Windows 11 x64 active release track
+
+The native per-user Windows application, DPAPI-protected state helper, notification-area lifecycle,
+installer, deterministic uninstaller, pinned-runtime package, and automated Windows verification
+are implemented. Windows 11 x64 is an active release target.
+
+The Local runtime is supported by Cognition's official
+[Windows Devin CLI installer](https://docs.devin.ai/cli/index) and documented
+[`devin acp` subprocess](https://docs.devin.ai/cli/acp/zed). Connector still negotiates the
+installed CLI's actual ACP methods at runtime and fails closed rather than inventing unsupported
+controls. Cognition's separate
+[Windows cloud-session environments](https://docs.devin.ai/onboard-devin/environment/windows-support)
+are not the Connector runtime.
+
+The unsigned artifact produced by ordinary CI is deliberately marked **NOT FOR RELEASE**. DevinX
+will offer Windows as a supported download only after an Authenticode-signed candidate passes the
+clean Windows 11 x64 physical matrix in [spec 037](specs/037-windows-connector.md), including
+official Devin ACP discovery, Tailscale routing, pairing, read/send/create grants,
+AskUserQuestion, sleep/reconnect, update, and uninstall. This prevents an unfinished or unsigned
+package from being presented as trustworthy.
+
 ## Why Tailscale is not enough
 
-Tailscale and Connector provide two separate required layers for Computer mode:
+Tailscale and Connector provide two separate required layers for Local mode:
 
 1. **Tailscale provides private network reachability** between the iPhone and Mac.
 2. **Connector provides the trusted local service** that talks to Devin for Terminal, authenticates
@@ -143,7 +168,7 @@ software listening on the Mac, there is nothing for the phone to authenticate to
 from. DevinX uses short-lived QR pairing so every phone gets its own cryptographic identity,
 permission set, and revocation path instead of sharing one reusable password.
 
-## Computer permissions and lifecycle
+## Local permissions and lifecycle
 
 Connector grants are per iPhone and enforced on the Mac:
 
@@ -162,11 +187,11 @@ tunnel, analytics SDK, or silent updater.
 ## Security and privacy
 
 - Cloud service-user credentials stay in iOS Keychain with device-only protection.
-- Computer credentials remain on the computer and are never copied to the iPhone.
-- Connector identity, TLS material, and paired-device grants stay in macOS Keychain.
+- Local Devin credentials remain on the paired device and are never copied to the iPhone.
+- Connector identity, TLS material, and paired-device grants stay in platform-protected storage.
 - Every protected Connector request is authenticated, replay checked, rate limited, Zod validated,
   and authorized server-side. Unauthorized resource access receives a generic non-disclosing error.
-- Computer transport pins the Connector certificate and signs requests with a per-install iPhone
+- Local transport pins the Connector certificate and signs requests with a per-install iPhone
   key.
 - Raw dictation audio is processed on device, is not uploaded by DevinX, and is not retained after
   transcription.
@@ -192,14 +217,16 @@ official Devin MCP tool, or approved local ACP capability.
 - **Security Work** opens genuine top-level sessions whose canonical origin is `code_scan`. It is
   not Cognition's enterprise findings dashboard and does not invent a scan-creation endpoint.
 - Wiki and integration/MCP surfaces are read-only where the official Devin MCP exposes them.
-- Computer workspaces and models come from the live local catalog. Exact identifiers are preserved
+- Local workspaces and models come from the live local catalog. Exact identifiers are preserved
   when dispatching work.
 - Local tool approvals, arbitrary file access, arbitrary shell commands, public tunnels, and shared
   server passwords are outside the Connector grant model.
 - Personal profile/OAuth settings, plan and invoice management, organization administration, and
   unsupported Web-only mutations remain owned by Devin Web.
 - The initial mobile release is iPhone-only. Android and iPad are not supported. Connector `0.1.2`
-  supports Apple-silicon Macs; Windows, Linux, and Intel Mac packages are planned but unavailable.
+  supports Apple-silicon Macs. Windows 11 x64 is an active release implementation whose public
+  download activates only after its signature and physical compatibility gates pass; Linux and
+  Intel Mac packages remain unavailable.
 
 The maintained parity inventory is in
 [specs/033-cloud-local-settings-parity.md](specs/033-cloud-local-settings-parity.md).
@@ -211,6 +238,7 @@ The maintained parity inventory is in
 - Node.js `24.18.0` (pinned in `.nvmrc` and `package.json`)
 - Xcode and CocoaPods for native iOS builds
 - macOS for Connector release checks
+- Windows 11 x64 plus .NET 10 for Windows Connector verification
 - A configured Expo/EAS development environment
 
 ```bash
@@ -225,18 +253,20 @@ or TestFlight build. Expo Go is not the release test environment.
 
 ### Common commands
 
-| Command                          | Purpose                                                |
-| -------------------------------- | ------------------------------------------------------ |
-| `npm run start`                  | Start the Expo development server                      |
-| `npm run ios`                    | Build and run the native iOS app                       |
-| `npm run lint`                   | Run ESLint with zero warnings                          |
-| `npm run typecheck`              | Run strict TypeScript validation                       |
-| `npm run test`                   | Run the Jest suite serially with open-handle detection |
-| `npm run build`                  | Validate app TypeScript and build the Connector bridge |
-| `npm run audit`                  | Fail on high or critical dependency findings           |
-| `npm run ci`                     | Run the complete repository CI gate                    |
-| `npm run connector:build:macos`  | Build a local macOS Connector artifact                 |
-| `npm run connector:verify:macos` | Verify the packaged Connector artifact                 |
+| Command                            | Purpose                                                |
+| ---------------------------------- | ------------------------------------------------------ |
+| `npm run start`                    | Start the Expo development server                      |
+| `npm run ios`                      | Build and run the native iOS app                       |
+| `npm run lint`                     | Run ESLint with zero warnings                          |
+| `npm run typecheck`                | Run strict TypeScript validation                       |
+| `npm run test`                     | Run the Jest suite serially with open-handle detection |
+| `npm run build`                    | Validate app TypeScript and build the Connector bridge |
+| `npm run audit`                    | Fail on high or critical dependency findings           |
+| `npm run ci`                       | Run the complete repository CI gate                    |
+| `npm run connector:build:macos`    | Build a local macOS Connector artifact                 |
+| `npm run connector:verify:macos`   | Verify the packaged Connector artifact                 |
+| `npm run connector:build:windows`  | Build the Windows x64 app, installer, and checksums    |
+| `npm run connector:verify:windows` | Verify installer lifecycle, package, and DPAPI storage |
 
 No package may be added until it is verified in the official registry, including its publication
 history, download history, and source repository. Dependencies are lockfile-enforced; never use a
@@ -254,6 +284,8 @@ src/cache/               Protected Cloud read cache
 modules/                 Reviewed native iOS modules
 bridge/                  Authenticated local Connector service
 connector/macos/         Native macOS application
+connector/windows/       Native Windows application
+connector/windows-installer/ Per-user Windows installer and uninstaller
 specs/                   Product and security source of truth
 docs/                    Setup, parity, threat-model, and release evidence
 tests/                   Unit, integration, security, and UI contract tests

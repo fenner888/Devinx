@@ -52,7 +52,7 @@ the generated private release audit under `artifacts/connector/`.
 For a deliberate rebuild on the authorized build Mac:
 
 1. Store notarization credentials in Keychain with `xcrun notarytool store-credentials devinx-notary`.
-2. Set `DEVINX_CODESIGN_IDENTITY` to the exact Developer ID Application identity and `DEVINX_NOTARYTOOL_PROFILE` to the Keychain profile name.
+2. Set `DEVINX_CODESIGN_IDENTITY` to the exact Developer ID Application identity and `DEVINX_NOTARYTOOL_PROFILE` to the Keychain profile name. If the profile is stored outside the default login Keychain, set `DEVINX_NOTARYTOOL_KEYCHAIN` to that Keychain file path.
 3. Run `npm run connector:notarize:check`, then `npm run connector:build:macos`.
 4. Run `npm run connector:notarize:macos` to notarize/staple the app first, rebuild and sign the DMG, notarize/staple the DMG, run Gatekeeper checks, and write the checksum/audit record.
 5. Test the resulting artifact on a clean macOS account before publication.

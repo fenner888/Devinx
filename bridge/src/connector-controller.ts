@@ -97,7 +97,7 @@ export class ConnectorController {
         });
       },
     };
-    const dependencies = createProductionRunnerDependencies(qrRenderer);
+    const dependencies = createProductionRunnerDependencies(qrRenderer, this.platform.id);
     dependencies.secretStore = this.platform.createSecretStore();
     dependencies.onPairingDiagnostic = ({ route, phase, status }) => {
       this.write({

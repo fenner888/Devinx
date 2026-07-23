@@ -37,6 +37,7 @@ import {
   useInsights,
   useGenerateInsights,
   useUploadAttachment,
+  useSessionAttachments,
 } from '@api/devin/queries';
 import { isValidSessionId } from '@lib/deepLink';
 import { SessionDetailSkeleton, ErrorState } from '@components/Skeletons';
@@ -50,21 +51,19 @@ import {
   prNumber,
   modeLabel,
 } from '@lib/session-utils';
-import type { DevinMode, SessionMessage } from '@api/devin/types';
+import type { DevinMode, SessionAttachment, SessionMessage } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
 import { DevinCompanion } from '@components/pets';
 import { KeyboardDismissButton } from '@components/KeyboardDismissButton';
-import {
-  VoiceComposerStatus,
-  VoiceMicButton,
-  useVoiceComposer,
-} from '@components/VoiceInput';
+import { VoiceComposerStatus, VoiceMicButton, useVoiceComposer } from '@components/VoiceInput';
 import { getSessionMode, getSessionRepository } from '@lib/session-repository';
 import { activityForCloudSession } from '@/pets/devin/activity';
 import { ApiError } from '@api/devin/client';
 import { userFacingError } from '@lib/user-facing-error';
+import { parseSessionMessageArtifacts, sessionArtifactKind } from '@lib/session-artifacts';
+import { SessionArtifactGallery } from '@components/SessionArtifactGallery';
 
 type Tab = 'timeline' | 'worklog' | 'changes' | 'insights';
 
@@ -108,6 +107,7 @@ export default function SessionDetailScreen() {
   const { data: session, isLoading, error, refetch } = useSession(validId);
   const { data: messagesData } = useMessages(validId);
   const messages = messagesData?.items;
+  const sessionAttachments = useSessionAttachments(validId);
   const sendMessage = useSendMessage(validId);
   const uploadAttachment = useUploadAttachment();
   const updateTags = useUpdateTags(validId);
@@ -381,189 +381,210 @@ export default function SessionDetailScreen() {
       >
         {/* Absolute overlays must live inside the flex child KAV shrinks above the keyboard. */}
         <View className="flex-1" testID="cloud-session-keyboard-viewport">
-        <View className="flex-1">
-          {tab === 'timeline' && (
-            <TimelineTab
-              messages={messages ?? []}
-              isLoading={isLoading}
-              pendingText={pendingText}
-              isSending={sendMessage.isPending}
-              isWorking={isWorking}
-              bottomClearance={composerOverlayHeight + (keyboardVisible ? 88 : 120)}
-            />
-          )}
-          {tab === 'worklog' && <WorklogTab session={session} />}
-          {tab === 'changes' && <ChangesTab session={session} />}
-          {tab === 'insights' && <InsightsTab sessionId={validId} />}
-          {/* Foreground-only track: conversation scrolls behind it. It has no
-              shelf/background and never consumes a layout row. */}
-          {tab === 'timeline' && (
-            <View
-              pointerEvents="none"
-              className="absolute inset-x-0 px-4 pb-1"
-              style={{ bottom: composerOverlayHeight }}
-              testID="cloud-session-companion-dock"
-            >
-              <DevinCompanion
-                state={companionActivity.state}
-                size={keyboardVisible ? 72 : 104}
-                message={companionActivity.message}
-                active={companionActive}
-                travel={companionActivity.travel}
-                travelTrack
-                accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
+          <View className="flex-1">
+            {tab === 'timeline' && (
+              <TimelineTab
+                messages={messages ?? []}
+                isLoading={isLoading}
+                pendingText={pendingText}
+                isSending={sendMessage.isPending}
+                isWorking={isWorking}
+                artifacts={sessionAttachments.data ?? []}
+                artifactsRefreshing={sessionAttachments.isRefetching}
+                onRefreshArtifacts={sessionAttachments.refetch}
+                bottomClearance={composerOverlayHeight + (keyboardVisible ? 88 : 120)}
               />
-            </View>
-          )}
-        </View>
-
-        {/* Message steering composer — any non-terminal session (sleeping resumes).
-            It floats above the home indicator instead of becoming a bottom shelf. */}
-        {canSend && (
-          <View
-            className="absolute inset-x-0 bottom-0 px-4 pt-2"
-            style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
-            onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
-            testID="cloud-session-composer-shell"
-          >
-            {(messageAttachments.length > 0 || uploadingAttachmentName) && (
-              <View className="flex-row flex-wrap px-1 pb-2">
-                {uploadingAttachmentName && (
-                  <View className="flex-row items-center bg-tint-blue rounded-chip px-pillX py-pillY mr-2 mb-1">
-                    <ActivityIndicator size="small" color={tokens.brandText.hex} />
-                    <Text className="text-brand-text text-text12 ml-1.5 max-w-40" numberOfLines={1}>
-                      Uploading {uploadingAttachmentName}…
-                    </Text>
-                  </View>
-                )}
-                {messageAttachments.map((attachment) => (
-                  <Pressable
-                    key={attachment.url}
-                    className="flex-row items-center bg-tint-secondary rounded-chip px-pillX py-pillY mr-2 mb-1"
-                    onPress={() =>
-                      setMessageAttachments((current) =>
-                        current.filter((item) => item.url !== attachment.url),
-                      )
-                    }
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${attachment.name}`}
-                  >
-                    {attachment.previewUri ? (
-                      <Image
-                        source={{ uri: attachment.previewUri }}
-                        className="w-6 h-6 rounded-chip"
-                      />
-                    ) : (
-                      <Ionicons name="attach" size={12} color={tokens.textMid.hex} />
-                    )}
-                    <Text
-                      className="text-text-mid text-text12 ml-1 mr-1 max-w-40"
-                      numberOfLines={1}
-                    >
-                      {attachment.name}
-                    </Text>
-                    <Ionicons name="close" size={11} color={tokens.textLow.hex} />
-                  </Pressable>
-                ))}
-              </View>
             )}
-            <View
-              className="rounded-card border border-border px-3 pt-2 pb-2"
-              style={{ backgroundColor: tokens.composerSurface.hex }}
-              testID="cloud-session-composer"
-            >
-              <TextInput
-                ref={voice.inputRef}
-                className="min-h-[44px] max-h-24 px-1 text-text-hi text-text14"
-                value={messageText}
-                onChangeText={setMessageText}
-                placeholder="Ask Devin to build features, fix bugs, or work on your code"
-                placeholderTextColor={tokens.textLow.hex}
-                multiline
-                textAlignVertical="top"
-                accessibilityLabel="Cloud session message"
-                onSelectionChange={voice.onSelectionChange}
-                onFocus={() => setKeyboardVisible(true)}
+            {tab === 'worklog' && (
+              <WorklogTab
+                session={session}
+                messages={messages ?? []}
+                attachments={sessionAttachments.data ?? []}
+                attachmentsLoading={sessionAttachments.isLoading}
+                attachmentsError={sessionAttachments.isError}
+                attachmentsRefreshing={sessionAttachments.isRefetching}
+                onRefreshAttachments={sessionAttachments.refetch}
+                bottomClearance={composerOverlayHeight + 24}
               />
-              <VoiceComposerStatus voice={voice} />
+            )}
+            {tab === 'changes' && (
+              <ChangesTab session={session} bottomClearance={composerOverlayHeight + 24} />
+            )}
+            {tab === 'insights' && (
+              <InsightsTab sessionId={validId} bottomClearance={composerOverlayHeight + 24} />
+            )}
+            {/* Foreground-only track: conversation scrolls behind it. It has no
+              shelf/background and never consumes a layout row. */}
+            {tab === 'timeline' && (
               <View
-                className={`mt-1 flex-row items-center justify-between ${voice.isRecording ? 'hidden' : ''}`}
+                pointerEvents="none"
+                className="absolute inset-x-0 px-4 pb-1"
+                style={{ bottom: composerOverlayHeight }}
+                testID="cloud-session-companion-dock"
               >
-                <View className="flex-row items-center">
-                  <Pressable
-                    className="h-11 w-11 items-center justify-center rounded-full"
-                    onPress={() => setShowAttachmentPicker(true)}
-                    disabled={uploadAttachment.isPending}
-                    accessibilityRole="button"
-                    accessibilityLabel="Add attachment"
-                  >
-                    {uploadAttachment.isPending ? (
-                      <ActivityIndicator size="small" color={tokens.brandText.hex} />
-                    ) : (
-                      <Ionicons name="add" size={22} color={tokens.textMid.hex} />
-                    )}
-                  </Pressable>
-                </View>
-                <View className="flex-row items-center gap-1">
-                  <KeyboardDismissButton visible={keyboardVisible} />
-                  <VoiceMicButton voice={voice} disabled={sendMessage.isPending} />
-                  <Pressable
-                    className={`h-10 w-10 items-center justify-center rounded-full ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
-                    disabled={
-                      !messageText.trim() || sendMessage.isPending || uploadAttachment.isPending
-                    }
-                    onPress={handleSend}
-                    accessibilityRole="button"
-                    accessibilityLabel="Send message"
-                  >
-                    {sendMessage.isPending ? (
-                      <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
-                    ) : (
-                      <Ionicons
-                        name="arrow-up"
-                        size={19}
-                        color={
-                          messageText.trim() && !uploadAttachment.isPending
-                            ? tokens.textAlwaysWhite.hex
-                            : tokens.textLow.hex
-                        }
-                      />
-                    )}
-                  </Pressable>
-                </View>
+                <DevinCompanion
+                  state={companionActivity.state}
+                  size={keyboardVisible ? 72 : 104}
+                  message={companionActivity.message}
+                  active={companionActive}
+                  travel={companionActivity.travel}
+                  travelTrack
+                  accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
+                />
               </View>
-            </View>
-            <View className="flex-row items-center px-1 pt-2">
-              <View className="flex-row items-center mr-4">
-                <Ionicons name="cloud-outline" size={14} color={tokens.textLow.hex} />
-                <Text className="text-text-low text-text12 ml-1.5">Devin Cloud</Text>
-              </View>
-              <View
-                className="flex-row items-center mr-4"
-                accessibilityLabel={`Session mode: ${sessionMode ? modeLabel(sessionMode) : 'Unavailable'}`}
-              >
-                <Ionicons name="speedometer-outline" size={14} color={tokens.textLow.hex} />
-                <Text className="text-text-low text-text12 ml-1.5">
-                  {sessionMode ? `${modeLabel(sessionMode)} mode` : 'Mode unavailable'}
-                </Text>
-              </View>
-              <View
-                className="flex-row items-center flex-1"
-                accessibilityLabel={`Repository: ${sessionRepository ?? 'Unavailable'}`}
-              >
-                <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
-                <Text className="text-text-mid text-text12 ml-1.5 flex-1" numberOfLines={1}>
-                  {sessionRepositoryName}
-                </Text>
-              </View>
-            </View>
-            {sendMessage.isError && (
-              <Text className="text-failed text-text12 mt-1 px-1">
-                Message failed to send — your draft is preserved above. Tap send to retry.
-              </Text>
             )}
           </View>
-        )}
+
+          {/* Message steering composer — any non-terminal session (sleeping resumes).
+            It floats above the home indicator instead of becoming a bottom shelf. */}
+          {canSend && (
+            <View
+              className="absolute inset-x-0 bottom-0 px-4 pt-2"
+              style={{ paddingBottom: Math.max(insets.bottom + 8, 16) }}
+              onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
+              testID="cloud-session-composer-shell"
+            >
+              {(messageAttachments.length > 0 || uploadingAttachmentName) && (
+                <View className="flex-row flex-wrap px-1 pb-2">
+                  {uploadingAttachmentName && (
+                    <View className="flex-row items-center bg-tint-blue rounded-chip px-pillX py-pillY mr-2 mb-1">
+                      <ActivityIndicator size="small" color={tokens.brandText.hex} />
+                      <Text
+                        className="text-brand-text text-text12 ml-1.5 max-w-40"
+                        numberOfLines={1}
+                      >
+                        Uploading {uploadingAttachmentName}…
+                      </Text>
+                    </View>
+                  )}
+                  {messageAttachments.map((attachment) => (
+                    <Pressable
+                      key={attachment.url}
+                      className="flex-row items-center bg-tint-secondary rounded-chip px-pillX py-pillY mr-2 mb-1"
+                      onPress={() =>
+                        setMessageAttachments((current) =>
+                          current.filter((item) => item.url !== attachment.url),
+                        )
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${attachment.name}`}
+                    >
+                      {attachment.previewUri ? (
+                        <Image
+                          source={{ uri: attachment.previewUri }}
+                          className="w-6 h-6 rounded-chip"
+                        />
+                      ) : (
+                        <Ionicons name="attach" size={12} color={tokens.textMid.hex} />
+                      )}
+                      <Text
+                        className="text-text-mid text-text12 ml-1 mr-1 max-w-40"
+                        numberOfLines={1}
+                      >
+                        {attachment.name}
+                      </Text>
+                      <Ionicons name="close" size={11} color={tokens.textLow.hex} />
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              <View
+                className="rounded-card border border-border px-3 pt-2 pb-2"
+                style={{ backgroundColor: tokens.composerSurface.hex }}
+                testID="cloud-session-composer"
+              >
+                <TextInput
+                  ref={voice.inputRef}
+                  className="min-h-[44px] max-h-24 px-1 text-text-hi text-text14"
+                  value={messageText}
+                  onChangeText={setMessageText}
+                  placeholder="Ask Devin to build features, fix bugs, or work on your code"
+                  placeholderTextColor={tokens.textLow.hex}
+                  multiline
+                  textAlignVertical="top"
+                  accessibilityLabel="Cloud session message"
+                  onSelectionChange={voice.onSelectionChange}
+                  onFocus={() => setKeyboardVisible(true)}
+                />
+                <VoiceComposerStatus voice={voice} />
+                <View
+                  className={`mt-1 flex-row items-center justify-between ${voice.isRecording ? 'hidden' : ''}`}
+                >
+                  <View className="flex-row items-center">
+                    <Pressable
+                      className="h-11 w-11 items-center justify-center rounded-full"
+                      onPress={() => setShowAttachmentPicker(true)}
+                      disabled={uploadAttachment.isPending}
+                      accessibilityRole="button"
+                      accessibilityLabel="Add attachment"
+                    >
+                      {uploadAttachment.isPending ? (
+                        <ActivityIndicator size="small" color={tokens.brandText.hex} />
+                      ) : (
+                        <Ionicons name="add" size={22} color={tokens.textMid.hex} />
+                      )}
+                    </Pressable>
+                  </View>
+                  <View className="flex-row items-center gap-1">
+                    <KeyboardDismissButton visible={keyboardVisible} />
+                    <VoiceMicButton voice={voice} disabled={sendMessage.isPending} />
+                    <Pressable
+                      className={`h-10 w-10 items-center justify-center rounded-full ${messageText.trim() && !sendMessage.isPending && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
+                      disabled={
+                        !messageText.trim() || sendMessage.isPending || uploadAttachment.isPending
+                      }
+                      onPress={handleSend}
+                      accessibilityRole="button"
+                      accessibilityLabel="Send message"
+                    >
+                      {sendMessage.isPending ? (
+                        <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+                      ) : (
+                        <Ionicons
+                          name="arrow-up"
+                          size={19}
+                          color={
+                            messageText.trim() && !uploadAttachment.isPending
+                              ? tokens.textAlwaysWhite.hex
+                              : tokens.textLow.hex
+                          }
+                        />
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+              <View className="flex-row items-center px-1 pt-2">
+                <View className="flex-row items-center mr-4">
+                  <Ionicons name="cloud-outline" size={14} color={tokens.textLow.hex} />
+                  <Text className="text-text-low text-text12 ml-1.5">Devin Cloud</Text>
+                </View>
+                <View
+                  className="flex-row items-center mr-4"
+                  accessibilityLabel={`Session mode: ${sessionMode ? modeLabel(sessionMode) : 'Unavailable'}`}
+                >
+                  <Ionicons name="speedometer-outline" size={14} color={tokens.textLow.hex} />
+                  <Text className="text-text-low text-text12 ml-1.5">
+                    {sessionMode ? `${modeLabel(sessionMode)} mode` : 'Mode unavailable'}
+                  </Text>
+                </View>
+                <View
+                  className="flex-row items-center flex-1"
+                  accessibilityLabel={`Repository: ${sessionRepository ?? 'Unavailable'}`}
+                >
+                  <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
+                  <Text className="text-text-mid text-text12 ml-1.5 flex-1" numberOfLines={1}>
+                    {sessionRepositoryName}
+                  </Text>
+                </View>
+              </View>
+              {sendMessage.isError && (
+                <Text className="text-failed text-text12 mt-1 px-1">
+                  Message failed to send — your draft is preserved above. Tap send to retry.
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
 
@@ -657,7 +678,13 @@ export default function SessionDetailScreen() {
 }
 
 /** Insights tab — AI analysis of the session (issues, timeline, classification). */
-function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
+function InsightsTab({
+  sessionId,
+  bottomClearance,
+}: {
+  sessionId: string | undefined;
+  bottomClearance: number;
+}) {
   const { data: insights, isLoading, error, refetch, isRefetching } = useInsights(sessionId);
   const generate = useGenerateInsights(sessionId);
   const { tokens } = useTheme();
@@ -737,6 +764,9 @@ function InsightsTab({ sessionId }: { sessionId: string | undefined }) {
   return (
     <ScrollView
       className="flex-1 px-4 py-3"
+      contentContainerStyle={{ paddingBottom: bottomClearance }}
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
           refreshing={isRefetching}
@@ -841,6 +871,9 @@ function TimelineTab({
   pendingText,
   isSending,
   isWorking,
+  artifacts,
+  artifactsRefreshing,
+  onRefreshArtifacts,
   bottomClearance,
 }: {
   messages: SessionMessage[];
@@ -848,16 +881,27 @@ function TimelineTab({
   pendingText: string | null;
   isSending: boolean;
   isWorking: boolean;
+  artifacts: SessionAttachment[];
+  artifactsRefreshing: boolean;
+  onRefreshArtifacts: () => void;
   bottomClearance: number;
 }) {
   const listRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
+  const parsedMessages = messages.map((message) => ({
+    message,
+    parsed:
+      message.source === 'devin'
+        ? parseSessionMessageArtifacts(message.message)
+        : { displayText: message.message, attachments: [] },
+  }));
+  const messageAttachments = parsedMessages.flatMap(({ parsed }) => parsed.attachments);
 
   useEffect(() => {
     if (nearBottomRef.current) {
       listRef.current?.scrollToEnd({ animated: true });
     }
-  }, [messages.length, pendingText, isWorking]);
+  }, [messages.length, artifacts.length, pendingText, isWorking]);
 
   function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
@@ -872,7 +916,13 @@ function TimelineTab({
     );
   }
 
-  if (messages.length === 0 && !pendingText && !isWorking) {
+  const hasMediaArtifacts = [...artifacts, ...messageAttachments].some(
+    (attachment) =>
+      attachment.source === 'devin' &&
+      (sessionArtifactKind(attachment) === 'image' || sessionArtifactKind(attachment) === 'video'),
+  );
+
+  if (messages.length === 0 && !pendingText && !isWorking && !hasMediaArtifacts) {
     return (
       <View className="flex-1 items-center justify-center px-6">
         <Text className="text-text-mid text-text14">No messages yet.</Text>
@@ -898,9 +948,15 @@ function TimelineTab({
         if (nearBottomRef.current) listRef.current?.scrollToEnd({ animated: false });
       }}
     >
-      {messages.map((m) => (
-        <MessageBubble key={m.event_id} message={m} />
+      {parsedMessages.map(({ message, parsed }) => (
+        <MessageBubble key={message.event_id} message={message} displayText={parsed.displayText} />
       ))}
+      <SessionArtifactGallery
+        attachments={artifacts}
+        messageAttachments={messageAttachments}
+        refreshing={artifactsRefreshing}
+        onRefresh={onRefreshArtifacts}
+      />
       {/* Optimistic echo of the just-sent message (dropped once the real one lands). */}
       {pendingText && (
         <View className="mb-4 max-w-[85%] self-end items-end opacity-70">
@@ -916,13 +972,13 @@ function TimelineTab({
   );
 }
 
-function MessageBubble({ message }: { message: SessionMessage }) {
+function MessageBubble({ message, displayText }: { message: SessionMessage; displayText: string }) {
   const isUser = message.source === 'user';
   if (isUser) {
     return (
       <View className="mb-4 max-w-[85%] self-end items-end">
         <View className="rounded-2xl px-4 py-3 bg-tint-primary">
-          <Text className="text-text14 text-text-hi">{message.message}</Text>
+          <Text className="text-text14 text-text-hi">{displayText}</Text>
         </View>
         <Text className="text-text-low text-text11 mt-1 text-right">
           {relativeTime(message.created_at)}
@@ -930,10 +986,11 @@ function MessageBubble({ message }: { message: SessionMessage }) {
       </View>
     );
   }
+  if (!displayText) return null;
   // Devin messages render as markdown (code blocks, lists, links).
   return (
     <View className="mb-4">
-      <DevinMarkdown>{message.message}</DevinMarkdown>
+      <DevinMarkdown>{displayText}</DevinMarkdown>
       <Text className="text-text-low text-text11 mt-1">
         Devin · {relativeTime(message.created_at)}
       </Text>
@@ -942,7 +999,33 @@ function MessageBubble({ message }: { message: SessionMessage }) {
 }
 
 /** Worklog tab — shows session metadata, ACU consumption, timeline summary. */
-function WorklogTab({ session }: { session: NonNullable<ReturnType<typeof useSession>['data']> }) {
+function WorklogTab({
+  session,
+  messages,
+  attachments,
+  attachmentsLoading,
+  attachmentsError,
+  attachmentsRefreshing,
+  onRefreshAttachments,
+  bottomClearance,
+}: {
+  session: NonNullable<ReturnType<typeof useSession>['data']>;
+  messages: SessionMessage[];
+  attachments: SessionAttachment[];
+  attachmentsLoading: boolean;
+  attachmentsError: boolean;
+  attachmentsRefreshing: boolean;
+  onRefreshAttachments: () => void;
+  bottomClearance: number;
+}) {
+  const { tokens } = useTheme();
+  const messageAttachments = messages
+    .filter((message) => message.source === 'devin')
+    .flatMap((message) => parseSessionMessageArtifacts(message.message).attachments);
+  const fileAttachments = attachments.filter(
+    (attachment) =>
+      sessionArtifactKind(attachment) !== 'image' && sessionArtifactKind(attachment) !== 'video',
+  );
   const rows: { label: string; value: string }[] = [
     { label: 'Status', value: `${session.status} / ${session.status_detail ?? '—'}` },
     { label: 'Created', value: new Date(session.created_at * 1000).toLocaleString() },
@@ -956,7 +1039,13 @@ function WorklogTab({ session }: { session: NonNullable<ReturnType<typeof useSes
   ];
 
   return (
-    <ScrollView className="flex-1 px-4 py-3">
+    <ScrollView
+      className="flex-1 px-4 py-3"
+      contentContainerStyle={{ paddingBottom: bottomClearance }}
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      keyboardShouldPersistTaps="handled"
+      testID="cloud-session-worklog"
+    >
       <View className="bg-surface1 rounded-card px-4 py-3 mb-4">
         <Text className="text-text-low text-text12 font-medium uppercase mb-3">Session info</Text>
         {rows.map(({ label, value }, i) => (
@@ -969,6 +1058,54 @@ function WorklogTab({ session }: { session: NonNullable<ReturnType<typeof useSes
           </View>
         ))}
       </View>
+      {session.structured_output && (
+        <View className="bg-surface1 rounded-card px-4 py-3 mb-4">
+          <Text className="text-text-low text-text12 font-medium uppercase mb-3">
+            Structured output
+          </Text>
+          <Text className="text-text-hi text-text13 font-mono" selectable>
+            {JSON.stringify(session.structured_output, null, 2)}
+          </Text>
+        </View>
+      )}
+      <SessionArtifactGallery
+        attachments={attachments}
+        messageAttachments={messageAttachments}
+        includeUserAttachments
+        refreshing={attachmentsRefreshing}
+        onRefresh={onRefreshAttachments}
+      />
+      {(attachmentsLoading || attachmentsError || fileAttachments.length > 0) && (
+        <View className="bg-surface1 rounded-card px-4 py-3 mb-4">
+          <Text className="text-text-low text-text12 font-medium uppercase mb-3">Other files</Text>
+          {attachmentsLoading && (
+            <Text className="text-text-mid text-text13">Loading attachments…</Text>
+          )}
+          {attachmentsError && (
+            <Text className="text-text-mid text-text13">
+              Attachments are unavailable for this credential or session.
+            </Text>
+          )}
+          {fileAttachments.map((attachment, index) => (
+            <View
+              key={attachment.attachment_id}
+              className={`flex-row items-center py-2 ${index < fileAttachments.length - 1 ? 'border-b border-border-subtle' : ''}`}
+              accessibilityLabel={`${attachment.name}, available in Devin web app`}
+            >
+              <Ionicons name="attach" size={15} color={tokens.textMid.hex} />
+              <View className="flex-1 ml-2">
+                <Text className="text-text-hi text-text13" numberOfLines={1}>
+                  {attachment.name}
+                </Text>
+                <Text className="text-text-low text-text11 mt-0.5">
+                  {attachment.source === 'devin' ? 'Added by Devin' : 'Added by you'}
+                  {attachment.content_type ? ` · ${attachment.content_type}` : ''}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
       {session.url && (
         <Pressable
           className="bg-surface1 rounded-card px-4 py-3 items-center"
@@ -982,7 +1119,13 @@ function WorklogTab({ session }: { session: NonNullable<ReturnType<typeof useSes
 }
 
 /** Changes tab — shows PRs associated with the session. */
-function ChangesTab({ session }: { session: NonNullable<ReturnType<typeof useSession>['data']> }) {
+function ChangesTab({
+  session,
+  bottomClearance,
+}: {
+  session: NonNullable<ReturnType<typeof useSession>['data']>;
+  bottomClearance: number;
+}) {
   const { tokens } = useTheme();
   if (session.pull_requests.length === 0) {
     return (
@@ -995,7 +1138,12 @@ function ChangesTab({ session }: { session: NonNullable<ReturnType<typeof useSes
   }
 
   return (
-    <ScrollView className="flex-1 px-4 py-3">
+    <ScrollView
+      className="flex-1 px-4 py-3"
+      contentContainerStyle={{ paddingBottom: bottomClearance }}
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      keyboardShouldPersistTaps="handled"
+    >
       {session.pull_requests.map((pr, i) => (
         <Pressable
           key={i}

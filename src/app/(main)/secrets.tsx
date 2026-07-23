@@ -54,7 +54,7 @@ export default function SecretsScreen() {
     const q = search.trim().toLowerCase();
     if (!q) return secrets;
     return secrets.filter(
-      (s) => s.key.toLowerCase().includes(q) || (s.note ?? '').toLowerCase().includes(q),
+      (s) => (s.key ?? '').toLowerCase().includes(q) || (s.note ?? '').toLowerCase().includes(q),
     );
   }, [secrets, search]);
 
@@ -87,7 +87,7 @@ export default function SecretsScreen() {
     confirmAction(
       {
         title: 'Delete secret?',
-        message: `"${secret.key}" will no longer be available to sessions. This cannot be undone.`,
+        message: `"${secret.key ?? 'Unnamed secret'}" will no longer be available to sessions. This cannot be undone.`,
         confirmLabel: 'Delete',
         destructive: true,
       },
@@ -188,7 +188,7 @@ export default function SecretsScreen() {
                   className="w-8 h-8 rounded-full items-center justify-center"
                   onPress={() => handleDelete(s)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Delete ${s.key}`}
+                  accessibilityLabel={`Delete ${s.key ?? 'unnamed secret'}`}
                 >
                   <Ionicons name="trash-outline" size={15} color={tokens.failed.hex} />
                 </Pressable>

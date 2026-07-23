@@ -13,12 +13,18 @@ import {
   listRepositories,
   listKnowledge,
   listKnowledgeFolders,
+  listPlaybooks,
+  listSecrets,
   createSchedule,
   createPlaybook,
   createKnowledgeNote,
   deleteSecret,
   listConsumptionCycles,
   listDevinAcuLimits,
+  listSessionAttachments,
+  getActiveUsers,
+  getDailyActiveUsers,
+  getMonthlyActiveUsers,
 } from '../../src/api/devin/endpoints';
 import { clearRateLimit } from '../../src/api/devin/client';
 import type { AuthProvider } from '../../src/auth/AuthProvider';
@@ -85,6 +91,35 @@ const repositoryFixture = {
   last_updated_at: null,
 };
 
+const knowledgeFixture = {
+  note_id: 'note-1',
+  name: 'Release rules',
+  body: 'Run all release gates.',
+  trigger: 'Before release',
+  folder_id: null,
+  folder_path: '',
+  is_enabled: true,
+  created_at: 1,
+  updated_at: 2,
+  access_type: 'org',
+  org_id: 'org-abc',
+  macro: null,
+  pinned_repo: null,
+};
+
+const playbookFixture = {
+  playbook_id: 'playbook-1',
+  title: 'Release',
+  body: 'Run every gate.',
+  macro: null,
+  created_by: 'user-1',
+  updated_by: 'user-1',
+  created_at: 1,
+  updated_at: 2,
+  access_type: 'org',
+  org_id: 'org-abc',
+};
+
 beforeEach(() => {
   mockFetch.mockReset();
   clearRateLimit();
@@ -110,11 +145,37 @@ describe('endpoints — path building & response shaping', () => {
     expect(lastUrl()).toContain('/sessions/devin-abc123');
   });
 
+  it('rejects undocumented list-session filters before issuing a request', async () => {
+    await expect(
+      listSessions(mockAuth, { search: 'private prompt' } as never),
+    ).rejects.toThrow();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it('getSession does not double-prefix an already-prefixed id', async () => {
     mockFetch.mockResolvedValue(ok(sessionFixture));
     await getSession(mockAuth, 'devin-abc123');
     expect(lastUrl()).toContain('/sessions/devin-abc123');
     expect(lastUrl()).not.toContain('devin-devin-');
+  });
+
+  it('listSessionAttachments uses the documented session output endpoint', async () => {
+    mockFetch.mockResolvedValue(
+      ok([
+        {
+          attachment_id: 'attachment-1',
+          name: 'report.md',
+          url: 'https://example.com/report.md',
+          source: 'devin',
+          content_type: 'text/markdown',
+        },
+      ]),
+    );
+
+    const attachments = await listSessionAttachments(mockAuth, 'abc123');
+
+    expect(attachments[0]?.name).toBe('report.md');
+    expect(lastUrl()).toContain('/sessions/devin-abc123/attachments');
   });
 
   it('sendMessage maps attribution and returns the resumed session', async () => {
@@ -141,6 +202,23 @@ describe('endpoints — path building & response shaping', () => {
     expect(days[0]?.acus_by_product.review).toBe(0);
   });
 
+  it('uses the documented organization active-user metric routes', async () => {
+    const query = { time_after: 1_700_000_000, time_before: 1_700_086_400 };
+    const period = { start_time: query.time_after, end_time: query.time_before, active_users: 3 };
+
+    mockFetch.mockResolvedValueOnce(ok(period));
+    await expect(getActiveUsers(mockAuth, query)).resolves.toEqual(period);
+    expect(lastUrl()).toContain('/metrics/active-users');
+
+    mockFetch.mockResolvedValueOnce(ok([period]));
+    await expect(getDailyActiveUsers(mockAuth, query)).resolves.toEqual([period]);
+    expect(lastUrl()).toContain('/metrics/dau');
+
+    mockFetch.mockResolvedValueOnce(ok([period]));
+    await expect(getMonthlyActiveUsers(mockAuth, query)).resolves.toEqual([period]);
+    expect(lastUrl()).toContain('/metrics/mau');
+  });
+
   it('getSessionConsumption returns total_acus', async () => {
     mockFetch.mockResolvedValue(ok({ total_acus: 3.5, consumption_by_date: [] }));
     const total = await getSessionConsumption(mockAuth, 'devin-abc');
@@ -165,14 +243,14 @@ describe('endpoints — path building & response shaping', () => {
     mockFetch
       .mockResolvedValueOnce(
         ok({
-          items: [{ cycle_acu_limit: 100, org_id: 'org-other' }],
+          items: [{ cycle_acu_limit: 100, scope: 'org', org_id: 'org-other' }],
           end_cursor: 'next-limits-page',
           has_next_page: true,
         }),
       )
       .mockResolvedValueOnce(
         ok({
-          items: [{ cycle_acu_limit: 250, org_id: 'org-abc' }],
+          items: [{ cycle_acu_limit: 250, scope: 'org', org_id: 'org-abc' }],
           end_cursor: null,
           has_next_page: false,
         }),
@@ -227,13 +305,7 @@ describe('endpoints — path building & response shaping', () => {
   });
 
   it('listKnowledge follows continuation cursors and returns complete history', async () => {
-    const note = {
-      note_id: 'note-1',
-      name: 'Release rules',
-      body: 'Run all release gates.',
-      trigger: 'Before release',
-      folder_id: null,
-    };
+    const note = knowledgeFixture;
     mockFetch
       .mockResolvedValueOnce(
         ok({ items: [note], end_cursor: 'knowledge-page-2', has_next_page: true }),
@@ -292,11 +364,10 @@ describe('endpoints — path building & response shaping', () => {
   it('createKnowledgeNote keeps folder selection organization-scoped', async () => {
     mockFetch.mockResolvedValue(
       ok({
-        note_id: 'note-1',
-        name: 'Release rules',
+        ...knowledgeFixture,
         body: 'Run every gate.',
-        trigger: 'Before release',
         folder_id: 'folder-1',
+        folder_path: 'Engineering',
       }),
     );
 
@@ -314,9 +385,7 @@ describe('endpoints — path building & response shaping', () => {
   it('createPlaybook forwards the validated command macro', async () => {
     mockFetch.mockResolvedValue(
       ok({
-        playbook_id: 'playbook-1',
-        title: 'Release',
-        body: 'Run every gate.',
+        ...playbookFixture,
         macro: '!release-check',
       }),
     );
@@ -330,17 +399,79 @@ describe('endpoints — path building & response shaping', () => {
     expect(lastBody()).toEqual(expect.objectContaining({ macro: '!release-check' }));
   });
 
+  it('listPlaybooks follows continuation cursors instead of returning a partial catalog', async () => {
+    const playbook = playbookFixture;
+    mockFetch
+      .mockResolvedValueOnce(
+        ok({ items: [playbook], end_cursor: 'playbook-page-2', has_next_page: true }),
+      )
+      .mockResolvedValueOnce(
+        ok({
+          items: [{ ...playbook, playbook_id: 'playbook-2', title: 'Security' }],
+          end_cursor: null,
+          has_next_page: false,
+        }),
+      );
+
+    await expect(listPlaybooks(mockAuth)).resolves.toHaveLength(2);
+    expect(new URL(mockFetch.mock.calls[1]?.[0] as string).searchParams.get('after')).toBe(
+      'playbook-page-2',
+    );
+  });
+
+  it('listSecrets follows continuation cursors and strips unexpected values', async () => {
+    const secret = {
+      secret_id: 'secret-1',
+      key: 'TOKEN',
+      note: null,
+      secret_type: 'key-value',
+      access_type: 'org',
+      created_at: 1,
+      created_by: 'user-1',
+      is_sensitive: true,
+      value: 'must-not-enter-cache',
+    };
+    mockFetch
+      .mockResolvedValueOnce(
+        ok({ items: [secret], end_cursor: 'secret-page-2', has_next_page: true }),
+      )
+      .mockResolvedValueOnce(
+        ok({
+          items: [{ ...secret, secret_id: 'secret-2', key: null }],
+          end_cursor: null,
+          has_next_page: false,
+        }),
+      );
+
+    const secrets = await listSecrets(mockAuth);
+    expect(secrets).toHaveLength(2);
+    expect((secrets[0] as unknown as Record<string, unknown>).value).toBeUndefined();
+    expect(new URL(mockFetch.mock.calls[1]?.[0] as string).searchParams.get('after')).toBe(
+      'secret-page-2',
+    );
+  });
+
   it('createSchedule preserves one-time, notification, playbook, and tag options', async () => {
     mockFetch.mockResolvedValue(
       ok({
         scheduled_session_id: 'sched-1',
+        org_id: 'org-abc',
+        created_by: null,
         name: 'One-time review',
         prompt: 'Review the release.',
+        playbook: null,
         enabled: true,
         schedule_type: 'one_time',
         frequency: null,
         scheduled_at: '2026-07-14T13:00:00Z',
+        last_executed_at: null,
+        created_at: '2026-07-14T12:00:00Z',
+        updated_at: '2026-07-14T12:00:00Z',
+        last_error_at: null,
+        last_error_message: null,
+        consecutive_failures: 0,
         notify_on: 'failure',
+        agent: 'devin',
         tags: ['release'],
       }),
     );

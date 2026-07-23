@@ -64,6 +64,7 @@ export default function AutomationsScreen() {
   const [agent, setAgent] = useState<ScheduleAgent>('devin');
   const [notifyOn, setNotifyOn] = useState<ScheduleNotifyOn>('failure');
   const [playbookId, setPlaybookId] = useState<string | null>(null);
+  const [platform, setPlatform] = useState('');
   const [tags, setTags] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -85,6 +86,7 @@ export default function AutomationsScreen() {
         agent,
         notify_on: notifyOn,
         playbook_id: playbookId,
+        platform: platform.trim() || null,
         tags: normalizeScheduleTags(tags),
       },
       {
@@ -97,6 +99,7 @@ export default function AutomationsScreen() {
           setScheduledAt('');
           setNotifyOn('failure');
           setPlaybookId(null);
+          setPlatform('');
           setTags('');
         },
         onError: (e) => {
@@ -256,13 +259,10 @@ export default function AutomationsScreen() {
                 </Pressable>
               </View>
               <Text className="text-text-low text-text12 mt-1" numberOfLines={1}>
-                {s.agent === 'data_analyst'
-                  ? 'Data Analyst'
-                  : s.agent === 'advanced'
-                    ? 'Advanced'
-                    : 'Devin'}{' '}
+                {s.agent === 'data_analyst' ? 'Data Analyst' : 'Devin'}{' '}
                 · Notify {s.notify_on ?? 'failure'}
                 {s.playbook?.title ? ` · ${s.playbook.title}` : ''}
+                {s.platform ? ` · ${s.platform}` : ''}
                 {s.tags?.length ? ` · ${s.tags.join(', ')}` : ''}
               </Text>
               {s.last_error_message && (
@@ -338,6 +338,24 @@ export default function AutomationsScreen() {
                   </Pressable>
                 ))}
               </View>
+
+              <Text className="text-text-low text-text12 font-medium uppercase mb-1">
+                Platform label (optional)
+              </Text>
+              <TextInput
+                className="bg-surface1 rounded-input px-3 py-2 text-text14 text-text-hi mb-1"
+                value={platform}
+                onChangeText={setPlatform}
+                placeholder="Use organization default"
+                placeholderTextColor={tokens.textLow.hex}
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={256}
+                accessibilityLabel="Automation platform label"
+              />
+              <Text className="text-text-low text-text12 mb-3">
+                Leave blank for your organization default. Custom labels must already exist in Devin.
+              </Text>
 
               <Text className="text-text-low text-text12 font-medium uppercase mb-1">Run</Text>
               <View className="flex-row bg-tint-secondary rounded-button p-1 mb-3">

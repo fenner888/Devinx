@@ -7,7 +7,7 @@ jest.mock('@expo/vector-icons', () => ({
 import { ModeSettings } from '../../src/components/ModeSettings';
 
 describe('documented Cloud mode settings', () => {
-  it('offers only the modes accepted by the public v3 API', () => {
+  it('offers every mode accepted by the public v3 API', () => {
     const onChange = jest.fn();
     const screen = render(
       <ModeSettings mode="normal" onChange={onChange} checkColor="black" mutedColor="gray" />,
@@ -17,11 +17,13 @@ describe('documented Cloud mode settings', () => {
       selected: true,
     });
     expect(screen.getByLabelText('Use Fast Cloud mode')).toBeTruthy();
-    expect(screen.queryByText('Fusion')).toBeNull();
-    expect(screen.queryByText('Ultra')).toBeNull();
-    expect(screen.queryByText('Lite')).toBeNull();
+    expect(screen.getByLabelText('Use Lite Cloud mode')).toBeTruthy();
+    expect(screen.getByLabelText('Use Ultra Cloud mode')).toBeTruthy();
+    expect(screen.getByLabelText('Use Fusion Cloud mode')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Use Fast Cloud mode'));
     expect(onChange).toHaveBeenCalledWith('fast');
+    fireEvent.press(screen.getByLabelText('Use Fusion Cloud mode'));
+    expect(onChange).toHaveBeenCalledWith('fusion');
   });
 });

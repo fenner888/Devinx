@@ -41,3 +41,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# .NET build outputs (Windows Connector)
+**/bin/
+**/obj/

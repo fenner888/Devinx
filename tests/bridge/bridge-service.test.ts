@@ -237,6 +237,7 @@ describe('authenticated Desktop Bridge service', () => {
   function service(overrides: Partial<ConstructorParameters<typeof BridgeService>[0]> = {}) {
     return new BridgeService({
       bridgeId: BRIDGE_ID,
+      platform: 'macos',
       devices,
       replayGuard: new InMemoryReplayGuard(),
       rateLimiter: new FixedWindowRateLimiter(),
@@ -264,6 +265,15 @@ describe('authenticated Desktop Bridge service', () => {
         },
       },
     });
+  });
+
+  it('returns the authenticated connector platform without changing the QR contract', async () => {
+    const result = await service({ platform: 'windows' }).handle(
+      envelope('bridge.platform', {}),
+      context(),
+    );
+
+    expect(result).toEqual({ status: 200, body: { platform: 'windows' } });
   });
 
   it('advertises structured question support through the additive feature handshake', async () => {

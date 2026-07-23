@@ -9,7 +9,9 @@ import {
   sessionListResponseSchema,
   sessionMessageSchema,
   sessionMessageListResponseSchema,
+  sessionMessageCreateRequestSchema,
   sessionTagsResponseSchema,
+  sessionTagsUpdateRequestSchema,
   insightsGenerateResponseSchema,
   sessionInsightsResponseSchema,
   playbookResponseSchema,
@@ -26,8 +28,12 @@ import {
   knowledgeNoteUpdateRequestSchema,
   playbookCreateRequestSchema,
   scheduleCreateRequestSchema,
+  scheduleResponseSchema,
   scheduleUpdateRequestSchema,
   secretCreateRequestSchema,
+  sessionAttachmentListSchema,
+  activeUserMetricsSchema,
+  activeUsersResponseSchema,
 } from '../../src/api/devin/schemas';
 
 const sessionFixture = {
@@ -64,8 +70,13 @@ describe('API schema boundary validation (§8.3)', () => {
   });
 
   it('parses a valid SessionResponse and passes through unknown fields', () => {
-    const out = sessionResponseSchema.parse({ ...sessionFixture, future_field: 'ok' });
+    const out = sessionResponseSchema.parse({
+      ...sessionFixture,
+      structured_output: { summary: 'Done', tests: ['npm test'] },
+      future_field: 'ok',
+    });
     expect(out.session_id).toBe('devin-123');
+    expect(out.structured_output).toEqual({ summary: 'Done', tests: ['npm test'] });
     expect((out as Record<string, unknown>).future_field).toBe('ok');
   });
 
@@ -232,7 +243,9 @@ describe('API schema boundary validation (§8.3)', () => {
       created_at: 1,
       created_by: 'u',
       folder_id: null,
+      folder_path: '',
       is_enabled: true,
+      macro: null,
       name: 'My note',
       note_id: 'n1',
       org_id: 'org-1',
@@ -264,7 +277,7 @@ describe('API schema boundary validation (§8.3)', () => {
     expect(out.indexing_status?.latest_completed_wiki_index_job?.branch_name).toBe('main');
   });
 
-  it('parses a secret WITHOUT a value field (values never returned)', () => {
+  it('strips an unexpected secret value before data can enter the query cache', () => {
     const out = secretResponseSchema.parse({
       access_type: 'org',
       created_at: 1,
@@ -275,6 +288,7 @@ describe('API schema boundary validation (§8.3)', () => {
       org_id: 'org-1',
       secret_id: 's1',
       secret_type: 'key-value',
+      value: 'must-never-survive-response-parsing',
       updated_at: 2,
       updated_by: 'u',
     });
@@ -296,9 +310,7 @@ describe('API schema boundary validation (§8.3)', () => {
       root_note_count: 3,
     };
     expect(knowledgeFolderTreeSchema.parse(fixture).folders[0]?.name).toBe('Engineering');
-    expect(() =>
-      knowledgeFolderTreeSchema.parse({ ...fixture, root_note_count: -1 }),
-    ).toThrow();
+    expect(() => knowledgeFolderTreeSchema.parse({ ...fixture, root_note_count: -1 })).toThrow();
   });
 
   it('parses an attachment response', () => {
@@ -308,6 +320,50 @@ describe('API schema boundary validation (§8.3)', () => {
       url: 'https://example.com/file.txt',
     });
     expect(out.attachment_id).toBe('a1');
+  });
+
+  it('parses documented session output attachments', () => {
+    const out = sessionAttachmentListSchema.parse([
+      {
+        attachment_id: 'a1',
+        name: 'report.md',
+        url: 'https://example.com/report.md',
+        source: 'devin',
+        content_type: 'text/markdown',
+      },
+    ]);
+    expect(out[0]).toEqual(expect.objectContaining({ name: 'report.md', source: 'devin' }));
+  });
+
+  it('rejects non-HTTPS session output attachment URLs', () => {
+    expect(() =>
+      sessionAttachmentListSchema.parse([
+        {
+          attachment_id: 'a1',
+          name: 'demo.mp4',
+          url: 'http://example.com/demo.mp4',
+          source: 'devin',
+          content_type: 'video/mp4',
+        },
+      ]),
+    ).toThrow();
+    expect(() =>
+      sessionAttachmentListSchema.parse([
+        {
+          attachment_id: 'a2',
+          name: 'demo.mp4',
+          url: 'https://user:password@example.com/demo.mp4',
+          source: 'devin',
+          content_type: 'video/mp4',
+        },
+      ]),
+    ).toThrow();
+  });
+
+  it('parses the documented active-user metric shapes', () => {
+    const period = { start_time: 1, end_time: 2, active_users: 3 };
+    expect(activeUserMetricsSchema.parse(period).active_users).toBe(3);
+    expect(activeUsersResponseSchema.parse([period])).toEqual([period]);
   });
 
   it('salvages a list page when one item is malformed instead of failing the page', () => {
@@ -353,12 +409,14 @@ describe('API schema boundary validation (§8.3)', () => {
       end_cursor: null,
       has_next_page: false,
     });
-    expect(out.items[0]).toEqual(expect.objectContaining({ after: 1751342400, before: 1754020800 }));
+    expect(out.items[0]).toEqual(
+      expect.objectContaining({ after: 1751342400, before: 1754020800 }),
+    );
   });
 
-  it('parses organization ACU limits without requiring optional user scope', () => {
+  it('parses organization ACU limits with the documented scope discriminator', () => {
     const out = devinAcuLimitListResponseSchema.parse({
-      items: [{ cycle_acu_limit: 250, org_id: 'org-abc' }],
+      items: [{ cycle_acu_limit: 250, scope: 'org', org_id: 'org-abc' }],
       end_cursor: null,
       has_next_page: false,
     });
@@ -370,20 +428,50 @@ describe('API schema boundary validation (§8.3)', () => {
       prompt: 'fix the bug',
       tags: ['mobile'],
       max_acu_limit: 10,
-      unlisted: true,
+      platform: 'gitpod',
+      resumable: true,
+      session_links: ['https://example.com/issue/1'],
+      structured_output_required: true,
+      structured_output_schema: { type: 'object' },
     });
     expect(out.prompt).toBe('fix the bug');
-    expect(out.unlisted).toBe(true);
+    expect(out.resumable).toBe(true);
+    expect(out.structured_output_required).toBe(true);
   });
 
-  it('rejects undocumented Cloud modes instead of sending a cosmetic preview value', () => {
+  it.each(['normal', 'fast', 'lite', 'ultra', 'fusion'] as const)(
+    'accepts documented Cloud mode %s',
+    (devinMode) => {
+      expect(
+        sessionCreateRequestSchema.parse({ prompt: 'Try it.', devin_mode: devinMode }).devin_mode,
+      ).toBe(devinMode);
+    },
+  );
+
+  it('rejects removed create-session fields instead of silently sending stale contract data', () => {
+    expect(() => sessionCreateRequestSchema.parse({ prompt: 'Try it.', unlisted: true })).toThrow();
     expect(() =>
-      sessionCreateRequestSchema.parse({ prompt: 'Try Fusion.', devin_mode: 'fusion' }),
+      sessionCreateRequestSchema.parse({ prompt: 'Try it.', snapshot_id: 'snapshot-1' }),
+    ).toThrow();
+  });
+
+  it('rejects fractional ACU limits', () => {
+    expect(() =>
+      sessionCreateRequestSchema.parse({ prompt: 'Try it.', max_acu_limit: 1.5 }),
     ).toThrow();
   });
 
   it('rejects a session create request without a prompt', () => {
     expect(() => sessionCreateRequestSchema.parse({ tags: ['x'] })).toThrow();
+  });
+
+  it('rejects undocumented keys in message and tag writes', () => {
+    expect(() =>
+      sessionMessageCreateRequestSchema.parse({ message: 'Hello', create_as_user_id: 'user-1' }),
+    ).toThrow();
+    expect(() =>
+      sessionTagsUpdateRequestSchema.parse({ tags: ['release'], replace: true }),
+    ).toThrow();
   });
 
   it('strictly validates resource writes and rejects empty updates', () => {
@@ -396,7 +484,16 @@ describe('API schema boundary validation (§8.3)', () => {
       }),
     ).toThrow();
     expect(() => knowledgeNoteUpdateRequestSchema.parse({})).toThrow();
-    expect(() => playbookCreateRequestSchema.parse({ title: 'Bad', body: 'x', macro: 'bad' })).toThrow();
+    expect(() =>
+      playbookCreateRequestSchema.parse({ title: 'Bad', body: 'x', macro: 'bad' }),
+    ).toThrow();
+    expect(
+      playbookCreateRequestSchema.parse({
+        title: 'Structured',
+        body: 'Return JSON.',
+        structured_output_schema: { type: 'object' },
+      }).structured_output_schema,
+    ).toEqual({ type: 'object' });
     expect(() =>
       secretCreateRequestSchema.parse({ type: 'key-value', key: 'TOKEN', value: '' }),
     ).toThrow();
@@ -420,5 +517,62 @@ describe('API schema boundary validation (§8.3)', () => {
       }),
     ).toThrow();
     expect(() => scheduleUpdateRequestSchema.parse({})).toThrow();
+  });
+
+  it('accepts the documented advanced schedule contract without exposing unsafe controls in UI', () => {
+    const created = scheduleCreateRequestSchema.parse({
+      name: 'Windows check',
+      prompt: 'Run the checks.',
+      schedule_type: 'recurring',
+      frequency: '0 9 * * *',
+      interval_count: 1,
+      platform: 'windows',
+      create_as_user_id: 'user-1',
+      bypass_approval: false,
+      slack_channel_id: 'channel-1',
+      slack_team_id: 'team-1',
+      target_devin_id: 'devin-1',
+    });
+    expect(created.platform).toBe('windows');
+    expect(
+      scheduleUpdateRequestSchema.parse({
+        run_as_user_id: null,
+        platform: 'linux',
+        enabled: null,
+        notify_on: null,
+      }),
+    ).toEqual({ run_as_user_id: null, platform: 'linux', enabled: null, notify_on: null });
+    expect(() =>
+      scheduleCreateRequestSchema.parse({
+        name: 'Invalid create',
+        prompt: 'Run the checks.',
+        schedule_type: 'recurring',
+        frequency: '0 9 * * *',
+        bypass_approval: null,
+      }),
+    ).toThrow();
+  });
+
+  it('requires the documented ScheduleResponse fields', () => {
+    const response = {
+      scheduled_session_id: 'sched-1',
+      org_id: 'org-test',
+      created_by: null,
+      name: 'Daily check',
+      prompt: 'Run the checks.',
+      playbook: null,
+      frequency: '0 9 * * *',
+      enabled: true,
+      last_executed_at: null,
+      created_at: '2026-07-17T12:00:00Z',
+      updated_at: '2026-07-17T12:00:00Z',
+      last_error_at: null,
+      last_error_message: null,
+      consecutive_failures: 0,
+      notify_on: 'failure',
+      agent: 'devin',
+    };
+    expect(scheduleResponseSchema.parse(response).scheduled_session_id).toBe('sched-1');
+    expect(() => scheduleResponseSchema.parse({ ...response, org_id: undefined })).toThrow();
   });
 });

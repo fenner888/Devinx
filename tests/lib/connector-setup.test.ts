@@ -6,6 +6,9 @@ describe('Connector assisted setup', () => {
     expect(CONNECTOR_SETUP_PROMPT).toContain(CONNECTOR_RELEASE_PAGE);
     expect(CONNECTOR_SETUP_PROMPT).toContain('Developer ID Application');
     expect(CONNECTOR_SETUP_PROMPT).toContain('notarized');
+    expect(CONNECTOR_SETUP_PROMPT).toContain('Authenticode');
+    expect(CONNECTOR_SETUP_PROMPT).toContain('signed per-user package');
+    expect(CONNECTOR_SETUP_PROMPT).toContain('unsigned CI artifact');
     expect(CONNECTOR_SETUP_PROMPT).toContain('SHA-256');
     expect(CONNECTOR_SETUP_PROMPT).toContain('stop and tell me');
     expect(CONNECTOR_SETUP_PROMPT).toContain('Do not clone or build the source');
@@ -17,6 +20,7 @@ describe('Connector assisted setup', () => {
       'A Tailscale IP, server URL, or password cannot replace a compatible service',
     );
     expect(CONNECTOR_SETUP_PROMPT).not.toContain('OFFICIAL_CONNECTOR_DMG_URL');
-    expect(CONNECTOR_SETUP_PROMPT).toContain('Do not run it as root, bind it to 0.0.0.0');
+    expect(CONNECTOR_SETUP_PROMPT).toContain('Do not run it as root or Administrator');
+    expect(CONNECTOR_SETUP_PROMPT).toContain('bind it to 0.0.0.0');
   });
 });

@@ -200,7 +200,7 @@ const defaultRuntime: PairingRuntime = {
   wait: (milliseconds, signal) =>
     new Promise<void>((resolve, reject) => {
       if (signal?.aborted) {
-        reject(new Error('Computer pairing was cancelled'));
+        reject(new Error('Local pairing was cancelled'));
         return;
       }
       const timer = setTimeout(() => {
@@ -209,7 +209,7 @@ const defaultRuntime: PairingRuntime = {
       }, milliseconds);
       const abort = () => {
         clearTimeout(timer);
-        reject(new Error('Computer pairing was cancelled'));
+        reject(new Error('Local pairing was cancelled'));
       };
       signal?.addEventListener('abort', abort, { once: true });
     }),
@@ -223,7 +223,7 @@ function runtime(): PairingRuntime {
 }
 
 function ensureActive(signal?: AbortSignal): void {
-  if (signal?.aborted) throw new Error('Computer pairing was cancelled');
+  if (signal?.aborted) throw new Error('Local pairing was cancelled');
 }
 
 function notify(options: PairComputerOptions, status: ComputerPairingStatus): void {
@@ -255,7 +255,7 @@ function parseOffer(payload: string, now: number): ComputerPairingOffer {
 
 function validatePendingExpiry(expiresAt: number, now: number): void {
   if (expiresAt <= now || expiresAt > now + MAXIMUM_PAIRING_WINDOW_MS) {
-    throw new Error('The Mac returned an invalid approval window');
+    throw new Error('The local device returned an invalid approval window');
   }
 }
 
@@ -273,11 +273,11 @@ async function verifyReceipt(
     receipt.tlsCertificateFingerprint !== offer.tlsCertificateFingerprint ||
     receipt.deviceId !== deviceId
   ) {
-    throw new Error('The Mac approval did not match this pairing code');
+    throw new Error('The local-device approval did not match this pairing code');
   }
   const { signature, ...unsignedReceipt } = receipt;
   if (!(await verify(offer.bridgePublicKeySpki, canonicalJson(unsignedReceipt), signature))) {
-    throw new Error('The Mac approval signature is invalid');
+    throw new Error('The local-device approval signature is invalid');
   }
   return receipt;
 }
@@ -310,7 +310,7 @@ async function migratePairedComputerEndpoint(
   options: PairComputerOptions,
 ): Promise<PairedComputerSummary> {
   if (!bridgeIdentityMatches(current, offer)) {
-    throw new Error('The pairing code does not match the paired Mac identity');
+    throw new Error('The pairing code does not match the paired local-device identity');
   }
   const candidate = pairedComputerCredentialSchema.parse({
     ...current,
@@ -326,7 +326,7 @@ async function migratePairedComputerEndpoint(
   const latestIndex = latestComputers.findIndex((computer) => computer.bridgeId === offer.bridgeId);
   const latest = latestComputers[latestIndex];
   if (!latest || !bridgeIdentityMatches(latest, offer)) {
-    throw new Error('The paired Mac changed while its connection was being updated');
+    throw new Error('The paired local device changed while its connection was being updated');
   }
   const updated = pairedComputerCredentialSchema.parse({
     ...latest,
@@ -349,7 +349,7 @@ async function removeRevokedComputerForFreshPairing(
   const latestComputers = await loadPairedComputers();
   const latest = latestComputers.find((computer) => computer.bridgeId === offer.bridgeId);
   if (!latest || !bridgeIdentityMatches(current, offer) || !bridgeIdentityMatches(latest, offer)) {
-    throw new Error('The paired Mac changed while its authorization was being recovered');
+    throw new Error('The paired local device changed while its authorization was being recovered');
   }
   const remaining = latestComputers.filter((computer) => computer.bridgeId !== offer.bridgeId);
   await storePairedComputers(remaining);
@@ -397,7 +397,7 @@ async function performComputerPairing(
       initialComputers = await removeRevokedComputerForFreshPairing(existingComputer, offer);
     }
   }
-  if (initialComputers.length >= 8) throw new Error('Remove a paired Mac before adding another');
+  if (initialComputers.length >= 8) throw new Error('Remove a paired local device before adding another');
 
   notify(options, 'creating_device_identity');
   const identity = await createDeviceIdentity();
@@ -425,7 +425,9 @@ async function performComputerPairing(
       proof,
     });
     ensureActive(options.signal);
-    if (submission.status !== 202) throw new Error('The Mac did not accept the pairing request');
+    if (submission.status !== 202) {
+      throw new Error('The local device did not accept the pairing request');
+    }
     const pending = pendingSubmissionSchema.parse(submission.body);
     validatePendingExpiry(pending.expiresAt, pairingRuntime.now());
     notify(options, 'waiting_for_approval');
@@ -446,7 +448,7 @@ async function performComputerPairing(
       if (poll.status === 202) {
         const status = pendingStatusSchema.parse(poll.body);
         if (status.expiresAt !== pending.expiresAt) {
-          throw new Error('The Mac returned an inconsistent approval window');
+          throw new Error('The local device returned an inconsistent approval window');
         }
         continue;
       }
@@ -460,10 +462,10 @@ async function performComputerPairing(
     notify(options, 'saving');
     const latestComputers = await loadPairedComputers();
     if (latestComputers.some((computer) => computer.bridgeId === offer.bridgeId)) {
-      throw new Error('This Mac was paired by another request');
+      throw new Error('This local device was paired by another request');
     }
     if (latestComputers.length >= 8) {
-      throw new Error('Remove a paired Mac before adding another');
+      throw new Error('Remove a paired local device before adding another');
     }
     const credential = pairedComputerCredentialSchema.parse({
       version: 3,
@@ -489,7 +491,7 @@ async function performComputerPairing(
       try {
         await deleteDeviceIdentity(identity.keyId);
       } catch {
-        throw new Error('Computer pairing failed and its temporary key could not be erased');
+        throw new Error('Local pairing failed and its temporary key could not be erased');
       }
     }
     throw error;
@@ -500,7 +502,7 @@ export async function pairComputerFromQrPayload(
   payload: string,
   options: PairComputerOptions,
 ): Promise<PairedComputerSummary> {
-  if (pairingInProgress) throw new Error('Another computer pairing is already in progress');
+  if (pairingInProgress) throw new Error('Another local pairing is already in progress');
   pairingInProgress = true;
   try {
     return await performComputerPairing(payload, options);

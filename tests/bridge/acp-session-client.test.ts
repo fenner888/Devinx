@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  acpWorkingDirectory,
   AcpSessionClient,
   isAcpSessionInUseError,
   parseAcpModelCatalog,
+  safeAcpChildEnvironment,
 } from '../../bridge/src/acp';
 
 describe('ACP session client', () => {
@@ -45,6 +47,45 @@ process.stdin.on('data', (chunk) => {
     execFileSync(process.execPath, ['--check', executable]);
     return executable;
   }
+
+  it('uses an allowlisted Windows user environment without forwarding unrelated values', () => {
+    const environment = safeAcpChildEnvironment({
+      NODE_ENV: 'production',
+      USERPROFILE: 'C:\\Users\\tester',
+      LOCALAPPDATA: 'C:\\Users\\tester\\AppData\\Local',
+      Path: 'C:\\Windows\\System32',
+      SystemRoot: 'C:\\Windows',
+      DEVINX_TEST_SECRET: 'must-not-forward',
+    });
+
+    expect(environment).toEqual({
+      NODE_ENV: 'production',
+      NO_COLOR: '1',
+      LOCALAPPDATA: 'C:\\Users\\tester\\AppData\\Local',
+      Path: 'C:\\Windows\\System32',
+      SystemRoot: 'C:\\Windows',
+      USERPROFILE: 'C:\\Users\\tester',
+    });
+    expect(environment.DEVINX_TEST_SECRET).toBeUndefined();
+  });
+
+  it('uses USERPROFILE when a Windows ACP process has no HOME', () => {
+    if (process.platform === 'win32') {
+      expect(
+        acpWorkingDirectory({
+          NODE_ENV: 'test',
+          USERPROFILE: 'C:\\Users\\tester',
+        }),
+      ).toBe('C:\\Users\\tester');
+      return;
+    }
+    expect(
+      acpWorkingDirectory({
+        HOME: '/Users/tester',
+        NODE_ENV: 'test',
+      }),
+    ).toBe('/Users/tester');
+  });
 
   it('initializes, capability-gates, and returns minimized validated session metadata', async () => {
     process.env.DEVINX_TEST_SECRET = 'must-not-forward';

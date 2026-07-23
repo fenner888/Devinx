@@ -238,7 +238,7 @@ describe('Computer session detail', () => {
     expect(screen.queryByText('Devin needs your input')).toBeNull();
     expect(
       screen.getByText(
-        'Update DevinX Connector on this Mac to answer structured Devin questions from your iPhone.',
+        'Update DevinX Connector on this local device to answer structured Devin questions from your iPhone.',
       ),
     ).toBeTruthy();
   });
@@ -269,8 +269,8 @@ describe('Computer session detail', () => {
     expect(composer.props.className).toContain('rounded-card');
     expect(composer.props.className).not.toContain('bg-surface1');
     expect(composer.props.style.backgroundColor).toBe('#1F1F1F');
-    expect(screen.getByLabelText('Computer session message').props.textAlignVertical).toBe('top');
-    expect(screen.getByLabelText('Computer session message').props.className).toContain(
+    expect(screen.getByLabelText('Local session message').props.textAlignVertical).toBe('top');
+    expect(screen.getByLabelText('Local session message').props.className).toContain(
       'min-h-[44px]',
     );
     expect(screen.getByTestId('computer-session-history').props.keyboardDismissMode).toBe(
@@ -284,8 +284,8 @@ describe('Computer session detail', () => {
     fireEvent.press(screen.getByLabelText('Reasoning and speed: High'));
     fireEvent.press(screen.getByLabelText('Use Medium for SWE-1.7'));
     expect(screen.getByLabelText('Reasoning and speed: Medium')).toBeTruthy();
-    fireEvent.changeText(screen.getByLabelText('Computer session message'), 'Continue the task.');
-    fireEvent.press(screen.getByLabelText('Send computer session message'));
+    fireEvent.changeText(screen.getByLabelText('Local session message'), 'Continue the task.');
+    fireEvent.press(screen.getByLabelText('Send local session message'));
 
     expect(screen.getByLabelText('Workspace: DevinX')).toBeTruthy();
     expect(mockMutate).toHaveBeenCalledWith(
@@ -307,14 +307,14 @@ describe('Computer session detail', () => {
   it('lets the user explicitly hide the keyboard without clearing the draft', () => {
     const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
     const screen = render(<ComputerSessionDetailScreen />);
-    const input = screen.getByLabelText('Computer session message');
+    const input = screen.getByLabelText('Local session message');
 
     fireEvent.changeText(input, 'Keep this local draft');
     fireEvent(input, 'focus');
     fireEvent.press(screen.getByLabelText('Hide keyboard'));
 
     expect(dismissKeyboard).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('Computer session message').props.value).toBe(
+    expect(screen.getByLabelText('Local session message').props.value).toBe(
       'Keep this local draft',
     );
   });
@@ -340,7 +340,7 @@ describe('Computer session detail', () => {
       'Devin is finishing the previous turn. Try again in a moment.',
     );
     expect(promptErrorMessage(new ComputerBridgeError('Revoked', 'authorization_failed'))).toBe(
-      'This iPhone is no longer authorized. Re-pair this computer in Settings.',
+      'This iPhone is no longer authorized. Re-pair this local device in Settings.',
     );
   });
 
@@ -353,9 +353,9 @@ describe('Computer session detail', () => {
     };
     const screen = render(<ComputerSessionDetailScreen />);
 
-    expect(screen.getByLabelText('Computer session message').props.editable).toBe(false);
-    fireEvent.changeText(screen.getByLabelText('Computer session message'), 'Do not send yet');
-    fireEvent.press(screen.getByLabelText('Send computer session message'));
+    expect(screen.getByLabelText('Local session message').props.editable).toBe(false);
+    fireEvent.changeText(screen.getByLabelText('Local session message'), 'Do not send yet');
+    fireEvent.press(screen.getByLabelText('Send local session message'));
     expect(mockMutate).not.toHaveBeenCalled();
   });
 });

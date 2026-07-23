@@ -1,6 +1,6 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: Apple-silicon macOS Connector 0.1.2 adds explicit official-release awareness to the established protected-state uninstall, automated clean-copy packaging/replacement validation, Developer ID signing, Apple notarization, stapling, Gatekeeper verification, and independent public-download checksum workflow. Windows, Linux, and Intel Mac packages remain roadmap targets.
+Status: macOS Connector 0.1.2 is the supported release. Windows implementation is tracked by spec 037 and remains unavailable to end users until its signed package and physical test matrix pass. Linux and Intel Mac packages remain roadmap targets.
 
 ## Product decision
 
@@ -8,7 +8,7 @@ The local-computer feature is delivered as **DevinX Connector**. It is an option
 
 Tailscale and DevinX Connector have separate required roles in computer mode. Tailscale supplies only the private encrypted network route between the iPhone and computer; it does not start an application service, expose Devin sessions, authorize a phone, or communicate with Devin for Terminal. DevinX Connector is the trusted local service that performs those operations. A Tailscale address, server URL, or shared password cannot replace that service unless a compatible server is already installed and running. The separate Connector app is the current supported distribution of that required local service; a future supported desktop integration could embed the same bridge, but the bridge function itself cannot be omitted from local-computer mode.
 
-The user-facing action is **Connect this computer**. “Desktop Bridge,” ACP, listener addresses, ports, TLS fingerprints, and service managers are implementation details and must not be prerequisites for normal setup.
+The user-facing product term is **Local** and the action is **Connect a local device**. A specific paired device keeps the name its owner gave it, such as **My Mac** or **Windows PC**. Existing internal `computer` route names, storage keys, and connection-mode values remain stable compatibility identifiers and are not user-facing terminology. “Desktop Bridge,” ACP, listener addresses, ports, TLS fingerprints, and service managers are implementation details and must not be prerequisites for normal setup.
 
 On macOS, automatic Devin CLI discovery checks both executable entries inherited through `PATH` and the supported Devin desktop application locations in `/Applications` and the current user's `Applications` directory. A GUI launch must not silently disable session discovery merely because macOS did not inherit the user's interactive-shell `PATH`.
 
@@ -20,7 +20,7 @@ DevinX Connector is not an official Cognition component. It uses the supported D
 
 Before presenting a Connector download or assisted-install action, DevinX and its public documentation must explain that cloud-only use needs no Connector, while computer access needs both Tailscale for private transport and Connector for authorized local Devin session access. The explanation must not imply that Tailscale alone exposes a computer service or that an IP address/password is sufficient without a compatible service listening on the computer.
 
-1. After choosing **Computer** or **Cloud + Computer**, the user receives an assisted setup prompt as the primary path. The iPhone share sheet lets them send or copy it to an AI assistant running on the computer. **Official releases** and **Already installed** remain visible alternatives.
+1. After choosing **Local** or **Cloud + Local**, the user receives an assisted setup prompt as the primary path. The iPhone share sheet lets them send or copy it to an AI assistant running on the local device. **Official releases** and **Already installed** remain visible alternatives.
 2. The assisted prompt references only the official DevinX GitHub Releases page. It tells the computer-side assistant to stop when no signed, notarized release and adjacent checksum are available; it never substitutes a source checkout, guessed package, unsigned artifact, or third-party mirror.
 3. The user downloads and explicitly approves the signed connector for the computer's operating system. iPhone never claims it can silently install or remotely launch an unpaired computer application.
 4. The connector detects Devin for Terminal and an active Tailscale IPv4 address without reading Devin credentials.

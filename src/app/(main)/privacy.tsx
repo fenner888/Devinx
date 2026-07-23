@@ -31,9 +31,9 @@ const rows = [
       'No product analytics SDK is enabled. Session titles, prompts, messages, repository names, and attachment contents are never sent to analytics.',
   },
   {
-    title: 'Local Desktop sessions',
+    title: 'Local sessions',
     detail:
-      'Only after you pair and approve an iPhone, DevinX can request minimized Devin CLI session data directly from your Mac over Tailscale. Metadata is the default; message text requires a separate read grant. Local files, tool payloads, thoughts, and credentials are not returned.',
+      'Only after you pair and approve an iPhone, DevinX can request minimized Devin session data directly from your local device over Tailscale. Metadata is the default; message text requires a separate read grant. Local files, tool payloads, thoughts, and credentials are not returned.',
   },
   {
     title: 'Tailscale and private networks',
@@ -48,7 +48,7 @@ const rows = [
   {
     title: 'Your controls and deletion',
     detail:
-      'Disconnecting removes DevinX credentials, drafts, saved session context, and cached data from this iPhone. Revoking the iPhone in DevinX Connector ends its Mac access. Cloud-session retention remains controlled by Cognition and your Devin account.',
+      'Disconnecting removes DevinX credentials, drafts, saved session context, and cached data from this iPhone. Revoking the iPhone in DevinX Connector ends its local-device access. Cloud-session retention remains controlled by Cognition and your Devin account.',
   },
 ] as const;
 
@@ -74,7 +74,7 @@ export default function PrivacyScreen() {
         </Text>
         <Text className="text-text-mid text-text14 leading-5 mb-5">
           DevinX does not relay session content through its own backend. Cloud actions go directly
-          to Cognition's Devin API; approved local-session requests go directly to your paired Mac.
+          to Cognition's Devin API; approved local-session requests go directly to your paired local device.
         </Text>
         <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-5">
           {rows.map((row, index) => (

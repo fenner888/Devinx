@@ -24,6 +24,7 @@ function checkWithEnvironment(environment: Record<string, string | undefined>) {
   const env = { ...process.env };
   delete env.DEVINX_CODESIGN_IDENTITY;
   delete env.DEVINX_NOTARYTOOL_PROFILE;
+  delete env.DEVINX_NOTARYTOOL_KEYCHAIN;
   for (const [name, value] of Object.entries(environment)) {
     if (value !== undefined) env[name] = value;
   }
@@ -59,6 +60,13 @@ describe('macOS Connector notarization policy', () => {
     expect(source).toContain("'/usr/sbin/spctl'");
     expect(source).not.toContain("'altool'");
     expect(source.match(/submitAndReview\(/g)).toHaveLength(3); // definition + app + DMG
+  });
+
+  it('supports a dedicated release Keychain without hardcoding its path', () => {
+    const source = readFileSync(scriptPath, 'utf8');
+    expect(source).toContain('DEVINX_NOTARYTOOL_KEYCHAIN');
+    expect(source).toContain("['--keychain', keychainPath]");
+    expect(source).not.toContain('/Users/');
   });
 
   it('grants the bundled runtime only JIT permission', () => {

@@ -41,7 +41,8 @@ export const branding = {
   links: {
     docs: 'https://docs.devin.ai',
     status: 'https://status.devin.ai',
-    createServiceUser: 'https://docs.devin.ai/api-reference/api-keys',
+    devinApp: 'https://app.devin.ai',
+    createServiceUser: 'https://docs.devin.ai/api-reference/authentication',
     connectorReleases: 'https://github.com/fenner888/Devinx/releases/latest',
   },
 } as const;

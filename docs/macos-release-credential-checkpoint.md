@@ -46,6 +46,8 @@ For an intentional rebuild on this authorized Mac, run:
 ```bash
 export DEVINX_CODESIGN_IDENTITY='Developer ID Application: Mark Fenner (TEAMID)'
 export DEVINX_NOTARYTOOL_PROFILE='devinx-notary'
+# The authorized build Mac currently stores this profile in a dedicated Keychain.
+export DEVINX_NOTARYTOOL_KEYCHAIN='~/Library/Keychains/devinx-build.keychain-db'
 npm run connector:notarize:check
 npm run connector:build:macos
 npm run connector:notarize:macos

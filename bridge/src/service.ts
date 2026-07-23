@@ -96,9 +96,13 @@ const featuresResponseSchema = z
   })
   .strict();
 
-const versionResponseSchema = z
-  .object({ version: z.string().regex(/^\d+\.\d+\.\d+$/) })
+const platformResponseSchema = z
+  .object({
+    platform: z.enum(['macos', 'windows', 'linux']),
+  })
   .strict();
+
+const versionResponseSchema = z.object({ version: z.string().regex(/^\d+\.\d+\.\d+$/) }).strict();
 
 const localSessionPageSchema = z
   .object({
@@ -262,6 +266,7 @@ export interface SessionDiscoveryAdapter {
 
 export interface BridgeServiceOptions {
   bridgeId: string;
+  platform: 'macos' | 'windows' | 'linux';
   devices: DeviceStore & { revoke?(deviceId: string): Promise<boolean> };
   replayGuard: ReplayGuard;
   rateLimiter: RateLimiter;
@@ -439,6 +444,7 @@ export class BridgeService {
               authorization.request.method === 'session.elicitation'
             ? this.rates.sessionActivityLimit
             : authorization.request.method === 'bridge.health' ||
+                authorization.request.method === 'bridge.platform' ||
                 authorization.request.method === 'bridge.version'
               ? this.rates.healthLimit
               : this.rates.mutationLimit;
@@ -476,10 +482,16 @@ export class BridgeService {
         body: featuresResponseSchema.parse({
           sessionElicitation: Boolean(
             this.dependencies.sessions.isSessionElicitationSupported?.() &&
-              this.dependencies.sessions.getPendingElicitation &&
-              this.dependencies.sessions.respondToElicitation,
+            this.dependencies.sessions.getPendingElicitation &&
+            this.dependencies.sessions.respondToElicitation,
           ),
         }),
+      };
+    }
+    if (authorization.request.method === 'bridge.platform') {
+      return {
+        status: 200,
+        body: platformResponseSchema.parse({ platform: this.dependencies.platform }),
       };
     }
     if (authorization.request.method === 'bridge.version') {

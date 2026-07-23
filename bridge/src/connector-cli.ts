@@ -4,7 +4,13 @@ import { CONNECTOR_IPC_VERSION, encodeConnectorEvent } from './connector-ipc';
 export function connectorStartupErrorCode(
   error: unknown,
 ): 'bridge_start_failed' | 'tailscale_unavailable' | 'unsupported_platform' {
-  if (process.platform !== 'darwin') return 'unsupported_platform';
+  if (
+    error instanceof Error &&
+    (error.message.startsWith('The Linux DevinX Connector adapter') ||
+      error.message.startsWith('This operating system is not supported'))
+  ) {
+    return 'unsupported_platform';
+  }
   return error instanceof Error && error.message.startsWith('Tailscale is not connected')
     ? 'tailscale_unavailable'
     : 'bridge_start_failed';

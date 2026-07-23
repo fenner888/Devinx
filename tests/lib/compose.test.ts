@@ -65,10 +65,21 @@ describe('compose', () => {
       expect(result.success).toBe(false);
     });
 
-    it('rejects web-only preview modes that the public API does not document', () => {
+    it.each(['normal', 'fast', 'lite', 'ultra', 'fusion'] as const)(
+      'accepts the documented %s Cloud mode',
+      (devinMode) => {
+        const result = sessionCreateRequestSchema.safeParse({
+          prompt: 'Do something',
+          devin_mode: devinMode,
+        });
+        expect(result.success).toBe(true);
+      },
+    );
+
+    it('rejects fractional ACU limits because the API contract requires an integer', () => {
       const result = sessionCreateRequestSchema.safeParse({
         prompt: 'Do something',
-        devin_mode: 'fusion',
+        max_acu_limit: 1.5,
       });
       expect(result.success).toBe(false);
     });

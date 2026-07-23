@@ -153,13 +153,17 @@ export async function apiRequest<T = unknown>(
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-      const res = await fetch(url, {
-        method,
-        headers,
-        body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       // 401 — hard stop, no retry (spec §8.4).
       if (res.status === 401) {
@@ -192,15 +196,15 @@ export async function apiRequest<T = unknown>(
         throw lastError;
       }
 
-      // 4xx (non-401/429) — no retry. Include the response body detail so
-      // validation errors (422 etc.) are actionable instead of opaque.
+      // 4xx (non-401/429) — no retry. Never retain the response body in an
+      // Error: validation responses can echo prompt, repository, or secret
+      // metadata and errors may later reach diagnostics or rendered state.
       if (!res.ok) {
         const err = classifyError(res.status);
-        let detail = '';
         try {
-          detail = (await res.text()).slice(0, 300);
-        } catch { /* ignore */ }
-        throw detail ? new ApiError(`${err.message} — ${detail}`, err.status, err.code) : err;
+          await res.text();
+        } catch { /* response disposal is best-effort */ }
+        throw err;
       }
 
       // Parse response. 204s and empty bodies are valid successes — treating

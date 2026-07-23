@@ -64,6 +64,13 @@ jest.mock('@api/devin/queries', () => ({
     isPending: false,
     mutateAsync: mockUploadAttachment,
   })),
+  useSessionAttachments: jest.fn(() => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    isRefetching: false,
+    refetch: jest.fn(),
+  })),
   useUpdateTags: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
   useInsights: jest.fn(() => ({ data: null, isLoading: false })),
   useGenerateInsights: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
@@ -138,7 +145,10 @@ describe('active session composer', () => {
     expect(composerShell.props.className).toContain('absolute');
     expect(composerShell.props.className).not.toContain('bg-canvas');
     let composerAncestor = composerShell.parent;
-    while (composerAncestor && composerAncestor.props.testID !== 'cloud-session-keyboard-viewport') {
+    while (
+      composerAncestor &&
+      composerAncestor.props.testID !== 'cloud-session-keyboard-viewport'
+    ) {
       composerAncestor = composerAncestor.parent;
     }
     expect(composerAncestor?.props.testID).toBe('cloud-session-keyboard-viewport');
@@ -170,6 +180,23 @@ describe('active session composer', () => {
 
     expect(dismissKeyboard).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Cloud session message').props.value).toBe('Keep this draft');
+  });
+
+  it('keeps the bottom of Worklog reachable above the fixed composer', () => {
+    const screen = render(
+      <ThemeProvider>
+        <SessionDetailScreen />
+      </ThemeProvider>,
+    );
+
+    fireEvent.press(screen.getByText('Worklog'));
+
+    expect(screen.getByTestId('cloud-session-worklog').props.contentContainerStyle).toEqual({
+      paddingBottom: 176,
+    });
+    expect(screen.getByTestId('cloud-session-worklog').props.keyboardDismissMode).toBe(
+      'interactive',
+    );
   });
 
   it('does not duplicate the sleeping status beside the composer', async () => {
@@ -258,13 +285,14 @@ describe('active session composer', () => {
     await waitFor(() => {
       const calls = mockDevinCompanion.mock.calls;
       const props = calls[calls.length - 1]?.[0] as
-        {
-          accessibilityLabel?: string;
-          size?: number;
-          state?: string;
-          travel?: boolean;
-          travelTrack?: boolean;
-        } | undefined;
+        | {
+            accessibilityLabel?: string;
+            size?: number;
+            state?: string;
+            travel?: boolean;
+            travelTrack?: boolean;
+          }
+        | undefined;
       expect(props).toEqual(
         expect.objectContaining({ size: 104, state: 'waiting', travel: false, travelTrack: true }),
       );

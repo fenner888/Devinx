@@ -19,7 +19,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useTheme } from '@theme/index';
 
-const REMOTE_URL_RE = /^https?:\/\//i;
+const REMOTE_URL_RE = /^https:\/\//i;
 const IMAGE_DATA_URL_RE = /^data:image\/(png|gif|jpe?g|webp);base64,/i;
 const VIDEO_RE = /\.(mp4|mov|webm|m4v)(\?|#|$)/i;
 const AUDIO_RE = /\.(mp3|wav|m4a|aac|ogg|oga)(\?|#|$)/i;
@@ -123,7 +123,13 @@ function ImageViewer({
 }
 
 /** Inline video with native controls. */
-export function InlineVideo({ uri }: { uri: string }) {
+export function InlineVideo({
+  uri,
+  accessibilityLabel = 'Inline video',
+}: {
+  uri: string;
+  accessibilityLabel?: string;
+}) {
   const { width } = useWindowDimensions();
   const { tokens } = useTheme();
   const player = useVideoPlayer(uri, (p) => {
@@ -133,6 +139,7 @@ export function InlineVideo({ uri }: { uri: string }) {
   return (
     <VideoView
       player={player}
+      accessibilityLabel={accessibilityLabel}
       style={[
         sheet.media,
         { width: w, height: w * (9 / 16), backgroundColor: tokens.textAlwaysBlack.hex },

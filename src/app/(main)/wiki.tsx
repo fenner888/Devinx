@@ -74,7 +74,7 @@ export default function WikiScreen() {
         {!isAuthenticated ? (
           <ErrorState
             title="Devin Cloud is not active"
-            message="Choose Devin Cloud or Cloud + Computer as the connection mode to read repository documentation."
+            message="Choose Devin Cloud or Cloud + Local as the connection mode to read repository documentation."
           />
         ) : !repoName ? (
           <ErrorState

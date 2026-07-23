@@ -1,14 +1,17 @@
 # Devin API — Live Docs vs. Build Spec Deltas
 
-> Source: `https://docs.devin.ai/llms.txt` + crawled v3 API reference, refreshed 2026-07-12.
+> Source: `https://docs.devin.ai/llms.txt`, the published v3 OpenAPI document, and the
+> official API release notes, refreshed 2026-07-17.
 > Compared against build spec §2.3 (API facts) and §8.5 (endpoint coverage).
 
 ## Summary
 
-The spec's §2.3 field list is **accurate** — every field it names exists in
-v3. The deltas below are additions, missing endpoints, and one notable
-removal. **No spec assumption was found to be wrong about a field that DOES
-exist**; the spec is a strict subset of the live API.
+The published v3 contract has moved beyond the original §2.3 field list.
+`snapshot_id` and `unlisted` are no longer create-session inputs, five Cloud
+modes are documented, session output attachments have their own endpoint, and
+session-list filters no longer include `search`, `status`, or `pr_states`.
+The runtime types, Zod boundaries, UI, tests, and retry behavior must follow
+the current contract instead of preserving those stale assumptions.
 
 ## Confirmed (spec assumptions that match live docs)
 
@@ -19,9 +22,12 @@ exist**; the spec is a strict subset of the live API.
 - No streaming, no webhooks → polling architecture ✅
 - Cursor pagination on messages (and on every list endpoint) ✅
 - 429 rate limits documented → backoff + jitter required ✅
-- Session create fields all present: `prompt`, `playbook_id`, `snapshot_id`,
-  `knowledge_ids`, `secret_ids`, `session_secrets`, `tags`, `title`,
-  `max_acu_limit`, `structured_output_schema`, `unlisted`, `create_as_user_id` ✅
+- Session creation accepts the current documented fields: `prompt`,
+  `attachment_urls`, `bypass_approval`, `child_playbook_id`,
+  `create_as_user_id`, `devin_mode`, `knowledge_ids`, `max_acu_limit`,
+  `platform`, `playbook_id`, `repos`, `resumable`, `secret_ids`,
+  `session_links`, `session_secrets`, `structured_output_required`,
+  `structured_output_schema`, `tags`, and `title` ✅
 - v3 session responses include `origin`, `category` ✅ (and `subcategory`)
 - Attachments upload + download endpoints exist ✅
 - Consumption: daily endpoint exists ✅
@@ -38,14 +44,12 @@ Connector's approved local-workspace list.
 
 ### D1. `devin_mode` field on session create
 
-Live v3 exposes `devin_mode: 'normal' | 'fast'` (`fast` ≈ 2x faster, 4x more
-expensive). Spec §2.3/§8.5 didn't list it. **Action:** added to types +
-schemas and surfaced only these two documented values in the Cloud composer.
-The Devin Web UI may expose account- or preview-specific controls such as
-Fusion, but the reviewed public v3 contract does not accept them. DevinX must
-not render or submit those values until Cognition documents a supported API
-contract for them. Computer-session model choices remain a separate live ACP
-catalog and are never inferred from this Cloud enum.
+Live v3 exposes `devin_mode: 'normal' | 'fast' | 'lite' | 'ultra' | 'fusion'`.
+`ultra` and `fusion` are preview features that may be unavailable to a given
+organization. **Action:** all five documented values are validated and shown;
+the API remains authoritative for account availability. Computer-session model
+choices remain a separate live ACP catalog and are never inferred from this
+Cloud enum.
 
 ### D2. `attachment_urls` on session create AND message send
 
@@ -53,6 +57,28 @@ Both `POST /sessions` and `POST /sessions/{id}/messages` accept
 `attachment_urls: string[]` (URIs, max 2083 chars). Spec §7.5 mentions
 attachments for the composer but didn't specify the create-body field.
 **Action:** added to both request schemas.
+
+The separate documented session-output endpoint returns session-scoped items
+with `attachment_id`, `name`, `source`, `url`, and nullable `content_type`.
+It does not associate an attachment with an individual message. DevinX may
+therefore render validated Devin-produced image/video artifacts at the live
+tail of a Cloud timeline and in Worklog, but must not invent a message-level
+association. Media rendering accepts HTTPS only, uses `content_type` before a
+filename-extension fallback, lazy-loads video after an explicit tap, and keeps
+unsupported files labeled for access from the canonical Devin session. This
+does not expand the Connector's local-session attachment permissions.
+
+Live behavior observed on 2026-07-19: Devin may additionally append
+`ATTACHMENT:{"url":"...","fileSize":...}` transport markers to a Devin
+message. Those markers use an `app.devin.ai/attachments/{uuid}/{name}` web-app
+URL, which is not the service-user download endpoint. DevinX strips only valid
+HTTPS markers from visible message text, uses them to associate session-level
+attachment records, and converts that exact web-app URL shape to the documented
+`GET /v3/organizations/{org_id}/attachments/{uuid}/{name}` endpoint. The API
+request carries the service-user bearer credential and follows the provider's
+short-lived presigned redirect into the temporary OS cache. DevinX never sends
+authorization to the web-app host, the presigned storage host, or an arbitrary
+attachment host.
 
 ### D3. `bypass_approval` and `child_playbook_id` on session create
 
@@ -120,14 +146,12 @@ just said "session insights." **Action:** full schema encoded.
 ### D9. `idempotent` parameter on session create — DOES NOT EXIST in v3
 
 Spec §8.4 said: _"an `idempotent: true` param exists on session create — use
-it to make retry-safe creates."_ **This is not present in v3.** It was a
-v1/v2 feature. **Action:** `idempotent` is NOT in `SessionCreateRequest` or
-its schema. The client must implement retry-safe creates by treating a
-network-error-after-send as a potential duplicate: on retry, first list
-sessions filtered by `search` on the prompt prefix / title to detect an
-already-created session before re-POSTing. This logic lives in the
-`useCreateSession` query hook (Session 1). **This is a real behavioral
-change from the spec — flagging for Mark.**
+it to make retry-safe creates."_ **This is not present in v3.** The current
+session-list contract also has no free-text `search` filter, so reconciliation
+must not send that stale query parameter. **Action:** `idempotent` is absent
+from the request schema. After an ambiguous create failure, DevinX performs a
+bounded recent-session read scoped to the authenticated user/service user and
+matches the normalized title/prompt prefix locally before offering a retry.
 
 ### D10. v3 status enum ≠ v1 status enum ≠ web-app display labels
 

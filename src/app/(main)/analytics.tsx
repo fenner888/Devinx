@@ -1,7 +1,7 @@
 /**
  * Analytics — org metrics (v3 metrics API), mirroring the web Settings →
  * Analytics page: Sessions stats + by-size/by-origin distributions,
- * Pull requests funnel, searches, weekly active users.
+ * Pull requests funnel, searches, and active-user metrics.
  */
 import { useState } from 'react';
 import {
@@ -104,6 +104,8 @@ export default function AnalyticsScreen() {
       : '—';
   const wau = data?.weeklyActiveUsers ?? [];
   const maxWau = Math.max(...wau.map((w) => w.active_users), 1);
+  const dau = data?.dailyActiveUsers ?? [];
+  const mau = data?.monthlyActiveUsers ?? [];
 
   return (
     <SafeAreaView className="flex-1 bg-surface0" edges={['top']}>
@@ -202,25 +204,48 @@ export default function AnalyticsScreen() {
             />
           </View>
 
-          {/* Weekly active users */}
-          {wau.length > 0 && (
+          {/* Active users */}
+          {(data.activeUsers || dau.length > 0 || wau.length > 0 || mau.length > 0) && (
             <View className="bg-surface1 rounded-2xl border border-border-subtle px-4 py-4 mb-4">
-              <Text className="text-text-low text-text12 font-medium uppercase mb-3">Weekly active users</Text>
-              <View className="flex-row items-end justify-between h-20">
-                {wau.map((w, i) => (
-                  <View
-                    key={i}
-                    className="flex-1 bg-brand rounded-t-sm mx-0.5"
-                    style={{ height: Math.max((w.active_users / maxWau) * 72, 2) }}
-                  />
-                ))}
-              </View>
-              <View className="flex-row justify-between mt-2">
-                <Text className="text-text-low text-text11">{wau.length} weeks</Text>
-                <Text className="text-text-low text-text11">
-                  latest: {wau[wau.length - 1]?.active_users ?? 0} active
-                </Text>
-              </View>
+              <Text className="text-text-low text-text12 font-medium uppercase mb-3">
+                Active users
+              </Text>
+              <StatPair
+                items={[
+                  {
+                    label: `Unique · ${rangeDays}d`,
+                    value: String(data.activeUsers?.active_users ?? '—'),
+                  },
+                  {
+                    label: 'Latest day',
+                    value: String(dau[dau.length - 1]?.active_users ?? '—'),
+                  },
+                  {
+                    label: 'Latest week',
+                    value: String(wau[wau.length - 1]?.active_users ?? '—'),
+                  },
+                  {
+                    label: 'Latest month',
+                    value: String(mau[mau.length - 1]?.active_users ?? '—'),
+                  },
+                ]}
+              />
+              {wau.length > 0 && (
+                <>
+                  <View className="flex-row items-end justify-between h-20">
+                    {wau.map((w, i) => (
+                      <View
+                        key={`${w.start_time}-${i}`}
+                        className="flex-1 bg-brand rounded-t-sm mx-0.5"
+                        style={{ height: Math.max((w.active_users / maxWau) * 72, 2) }}
+                      />
+                    ))}
+                  </View>
+                  <Text className="text-text-low text-text11 mt-2">
+                    {wau.length} weekly periods
+                  </Text>
+                </>
+              )}
             </View>
           )}
         </ScrollView>

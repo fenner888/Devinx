@@ -1,6 +1,6 @@
 /**
  * Zod schemas for every Devin API v3 endpoint used by DevinX v1 (spec §8.5).
- * Generated from live docs.devin.ai reference (crawled 2026-07-07).
+ * Generated from live docs.devin.ai reference (OpenAPI contract refreshed 2026-07-17).
  *
  * Boundary validation rule (spec §8.3): every API response parses through
  * these schemas. Unknown fields PASS THROUGH (API evolves monthly); missing
@@ -95,7 +95,7 @@ export const sessionCategorySchema = z.enum([
   'unit_test_generation',
 ]);
 
-export const devinModeSchema = z.enum(['normal', 'fast']);
+export const devinModeSchema = z.enum(['normal', 'fast', 'lite', 'ultra', 'fusion']);
 export const sessionSizeSchema = z.enum(['xs', 's', 'm', 'l', 'xl']);
 export const insightSeveritySchema = z.enum(['low', 'medium', 'high', 'critical']);
 export const secretTypeSchema = z.enum(['cookie', 'key-value', 'totp']);
@@ -152,32 +152,37 @@ export const pullRequestSchema = z
   })
   .passthrough();
 
-export const sessionSecretInputSchema = z.object({
-  key: z.string().min(1).max(256),
-  value: z.string().min(1),
-});
+export const sessionSecretInputSchema = z
+  .object({
+    key: z.string().min(1).max(256),
+    value: z.string().max(65_536),
+    sensitive: z.boolean().optional(),
+  })
+  .strict();
 
 export const sessionCreateRequestSchema = z
   .object({
     prompt: z.string().min(1),
-    attachment_urls: z.array(z.string().url().min(1).max(2083)).optional(),
-    bypass_approval: z.boolean().optional(),
-    child_playbook_id: z.string().optional(),
-    create_as_user_id: z.string().optional(),
-    devin_mode: devinModeSchema.optional(),
-    knowledge_ids: z.array(z.string()).optional(),
-    max_acu_limit: z.number().positive().optional(),
-    playbook_id: z.string().optional(),
-    repos: z.array(z.string()).optional(),
-    secret_ids: z.array(z.string()).optional(),
-    session_secrets: z.array(sessionSecretInputSchema).optional(),
-    snapshot_id: z.string().optional(),
-    structured_output_schema: z.record(z.unknown()).optional(),
-    tags: z.array(z.string()).max(50).optional(),
-    title: z.string().optional(),
-    unlisted: z.boolean().optional(),
+    attachment_urls: z.array(z.string().url().min(1).max(2083)).nullable().optional(),
+    bypass_approval: z.boolean().nullable().optional(),
+    child_playbook_id: z.string().nullable().optional(),
+    create_as_user_id: z.string().nullable().optional(),
+    devin_mode: devinModeSchema.nullable().optional(),
+    knowledge_ids: z.array(z.string()).nullable().optional(),
+    max_acu_limit: z.number().int().nullable().optional(),
+    platform: z.string().min(1).nullable().optional(),
+    playbook_id: z.string().nullable().optional(),
+    repos: z.array(z.string()).nullable().optional(),
+    resumable: z.boolean().optional(),
+    secret_ids: z.array(z.string()).nullable().optional(),
+    session_links: z.array(z.string()).nullable().optional(),
+    session_secrets: z.array(sessionSecretInputSchema).nullable().optional(),
+    structured_output_required: z.boolean().nullable().optional(),
+    structured_output_schema: z.record(z.unknown()).nullable().optional(),
+    tags: z.array(z.string()).max(50).nullable().optional(),
+    title: z.string().nullable().optional(),
   })
-  .passthrough();
+  .strict();
 
 export const sessionResponseSchema = z
   .object({
@@ -200,6 +205,7 @@ export const sessionResponseSchema = z
     // Accept any string — status_detail carries billing/limit values that
     // drift beyond the known enum.
     status_detail: sessionStatusDetailLoose.nullish(),
+    structured_output: z.record(z.unknown()).nullish(),
     tags: z.array(z.string()),
     title: z.string().nullish(),
     updated_at: unixTimestampSchema,
@@ -245,15 +251,15 @@ export const sessionsQueryParamsSchema = z
     origins: z.array(sessionOriginSchema).nullable().optional(),
     playbook_id: z.string().nullable().optional(),
     repo_names: z.array(z.string()).nullable().optional(),
-    pr_states: z.array(z.string()).nullable().optional(),
-    search: z.string().nullable().optional(),
-    status: sessionStatusSchema.nullable().optional(),
+    schedule_id: z.string().nullable().optional(),
+    service_user_ids: z.array(z.string()).nullable().optional(),
+    session_ids: z.array(z.string()).nullable().optional(),
     tags: z.array(z.string()).nullable().optional(),
     updated_after: unixTimestampSchema.nullable().optional(),
     updated_before: unixTimestampSchema.nullable().optional(),
     user_ids: z.array(z.string()).nullable().optional(),
   })
-  .passthrough();
+  .strict();
 
 export const sessionListResponseSchema = paginatedResponseSchema(sessionResponseSchema);
 
@@ -278,7 +284,7 @@ export const sessionMessageCreateRequestSchema = z
     attachment_urls: z.array(z.string().url().min(1).max(2083)).nullable().optional(),
     message_as_user_id: z.string().nullable().optional(),
   })
-  .passthrough();
+  .strict();
 
 // ---------------------------------------------------------------------------
 // Tags
@@ -288,7 +294,7 @@ export const sessionTagsUpdateRequestSchema = z
   .object({
     tags: z.array(z.string()).max(50),
   })
-  .passthrough();
+  .strict();
 
 export const sessionTagsResponseSchema = z
   .object({
@@ -391,14 +397,14 @@ export const playbookResponseSchema = z
     playbook_id: z.string(),
     title: z.string(),
     body: z.string(),
-    macro: z.string().nullable().optional(),
-    access_type: accessTypeSchema.optional(),
-    created_at: unixTimestampSchema.optional(),
-    created_by: z.string().optional(),
-    org_id: z.string().nullable().optional(),
+    macro: z.string().nullable(),
+    access_type: z.enum(['enterprise', 'org']),
+    created_at: unixTimestampSchema,
+    created_by: z.string(),
+    org_id: z.string().nullable(),
     structured_output_schema: z.record(z.unknown()).nullable().optional(),
-    updated_at: unixTimestampSchema.optional(),
-    updated_by: z.string().optional(),
+    updated_at: unixTimestampSchema,
+    updated_by: z.string(),
   })
   .passthrough();
 
@@ -413,17 +419,15 @@ export const knowledgeNoteResponseSchema = z
     name: z.string(),
     body: z.string(),
     trigger: z.string(),
-    access_type: accessTypeSchema.optional(),
-    created_at: unixTimestampSchema.optional(),
-    updated_at: unixTimestampSchema.optional(),
-    folder_id: z.string().nullable().optional(),
-    folder_path: z.string().optional(),
-    is_enabled: z.boolean().nullable().optional(),
-    macro: z.string().nullable().optional(),
-    org_id: z.string().nullable().optional(),
-    pinned_repo: z.string().nullable().optional(),
-    created_by: z.string().optional(),
-    updated_by: z.string().optional(),
+    access_type: z.enum(['enterprise', 'org']),
+    created_at: unixTimestampSchema,
+    updated_at: unixTimestampSchema,
+    folder_id: z.string().nullable(),
+    folder_path: z.string(),
+    is_enabled: z.boolean(),
+    macro: z.string().nullable(),
+    org_id: z.string().nullable(),
+    pinned_repo: z.string().nullable(),
   })
   .passthrough();
 
@@ -451,22 +455,19 @@ export const secretResponseSchema = z
   .object({
     secret_id: z.string(),
     key: z.string().nullable(),
-    note: z.string().nullable().optional(),
-    secret_type: secretTypeSchema.catch('key-value'),
-    access_type: accessTypeSchema.optional(),
-    created_at: unixTimestampSchema.optional(),
-    created_by: z.string().optional(),
-    is_sensitive: z.boolean().optional(),
-    org_id: z.string().nullable().optional(),
-    updated_at: unixTimestampSchema.optional(),
-    updated_by: z.string().optional(),
+    note: z.string().nullable(),
+    secret_type: secretTypeSchema,
+    access_type: z.enum(['org', 'personal']),
+    created_at: unixTimestampSchema,
+    created_by: z.string(),
+    is_sensitive: z.boolean(),
+    updated_at: unixTimestampSchema.nullable().optional(),
+    updated_by: z.string().nullable().optional(),
   })
-  .passthrough();
+  .strip();
 // SECURITY: secret values are never returned by the list endpoint. This schema
-// intentionally omits any `value` field; if one ever appears it is dropped by
-// the parser because the response object is .passthrough()-only on declared
-// fields. The endpoint layer MUST additionally strip any `value` key before
-// logging or caching (defense in depth, spec §10.2).
+// intentionally omits any `value` field and strips unknown keys so an upstream
+// regression cannot place secret material in the query cache (spec §10.2).
 
 export const secretListResponseSchema = paginatedResponseSchema(secretResponseSchema);
 
@@ -491,6 +492,24 @@ export const attachmentResponseSchema = z
     url: z.string().url(),
   })
   .passthrough();
+
+export const sessionAttachmentSchema = attachmentResponseSchema.extend({
+  url: z
+    .string()
+    .url()
+    .refine((value) => {
+      try {
+        const url = new URL(value);
+        return url.protocol === 'https:' && !url.username && !url.password && !!url.hostname;
+      } catch {
+        return false;
+      }
+    }, 'Expected a secure HTTPS attachment URL without embedded credentials'),
+  source: z.enum(['devin', 'user']),
+  content_type: z.string().nullable().optional(),
+});
+
+export const sessionAttachmentListSchema = z.array(sessionAttachmentSchema);
 
 // ---------------------------------------------------------------------------
 // Consumption
@@ -530,8 +549,9 @@ export const consumptionCycleListResponseSchema = paginatedResponseSchema(consum
 export const devinAcuLimitSchema = z
   .object({
     cycle_acu_limit: acuCountSchema,
-    org_id: z.string().optional(),
-    user_id: z.string().optional(),
+    scope: z.enum(['enterprise', 'org', 'user']),
+    org_id: z.string().nullable().optional(),
+    user_id: z.string().nullable().optional(),
   })
   .passthrough();
 
@@ -566,16 +586,24 @@ export const scheduleResponseSchema = z
     schedule_type: z.enum(['recurring', 'one_time']).catch('recurring'),
     frequency: z.string().nullable().optional(),
     scheduled_at: z.string().nullable().optional(),
-    // The docs currently mention an advanced agent in prose while the request/response
-    // enum tables omit it. Preserve unknown read values without offering unsupported writes.
-    agent: z.string().optional(),
-    notify_on: z.enum(['always', 'failure', 'never']).optional(),
-    playbook: z.object({ playbook_id: z.string(), title: z.string() }).nullable().optional(),
-    consecutive_failures: z.number().optional(),
-    last_executed_at: z.string().nullable().optional(),
-    last_error_message: z.string().nullable().optional(),
-    created_at: z.string().optional(),
-    updated_at: z.string().optional(),
+    agent: z.enum(['devin', 'data_analyst']),
+    bypass_approval: z.boolean().optional(),
+    interval_count: z.number().int().positive().optional(),
+    notify_on: z.enum(['always', 'failure', 'never']),
+    platform: z.string().nullable().optional(),
+    playbook: z.object({ playbook_id: z.string(), title: z.string().nullable() }).nullable(),
+    slack_channel_id: z.string().nullable().optional(),
+    slack_team_id: z.string().nullable().optional(),
+    target_devin_id: z.string().nullable().optional(),
+    consecutive_failures: z.number().int(),
+    created_by: z.string().nullable(),
+    last_edited_by: z.string().nullable().optional(),
+    last_error_at: z.string().datetime({ offset: true }).nullable(),
+    last_executed_at: z.string().datetime({ offset: true }).nullable(),
+    last_error_message: z.string().nullable(),
+    org_id: z.string(),
+    created_at: z.string().datetime({ offset: true }),
+    updated_at: z.string().datetime({ offset: true }),
     tags: z.array(z.string()).nullable().optional(),
   })
   .passthrough()
@@ -610,7 +638,7 @@ export const knowledgeNoteCreateRequestSchema = z
     body: z.string().trim().min(1).max(100_000),
     trigger: z.string().trim().min(1).max(5_000),
     folder_id: z.string().min(1).max(256).nullable().optional(),
-    is_enabled: z.boolean().optional(),
+    is_enabled: z.boolean().nullable().optional(),
     pinned_repo: z.string().min(1).max(1_024).nullable().optional(),
   })
   .strict();
@@ -629,6 +657,7 @@ export const playbookCreateRequestSchema = z
       .max(100)
       .nullable()
       .optional(),
+    structured_output_schema: z.record(z.unknown()).nullable().optional(),
   })
   .strict();
 
@@ -652,25 +681,29 @@ export const resourceIdSchema = z
   .max(256)
   .regex(/^[A-Za-z0-9._:-]+$/);
 
-const scheduleWriteFieldsSchema = z
+const scheduleCreateFieldsSchema = z
   .object({
-    name: z.string().trim().min(1).max(100).optional(),
-    prompt: z.string().trim().min(1).max(10_000).optional(),
-    enabled: z.boolean().optional(),
+    name: z.string().trim().min(1).max(100),
+    prompt: z.string().trim().min(1).max(10_000),
     schedule_type: z.enum(['recurring', 'one_time']).optional(),
     frequency: z.string().trim().min(1).max(256).nullable().optional(),
     scheduled_at: z.string().datetime({ offset: true }).nullable().optional(),
     tags: z.array(z.string().trim().min(1).max(100)).max(50).nullable().optional(),
     playbook_id: resourceIdSchema.nullable().optional(),
     notify_on: z.enum(['always', 'failure', 'never']).optional(),
-    agent: z.enum(['devin', 'data_analyst']).nullable().optional(),
+    agent: z.enum(['devin', 'data_analyst']).optional(),
+    bypass_approval: z.boolean().optional(),
+    interval_count: z.number().int().positive().optional(),
+    platform: z.string().trim().min(1).max(256).nullable().optional(),
+    slack_channel_id: resourceIdSchema.nullable().optional(),
+    slack_team_id: resourceIdSchema.nullable().optional(),
+    target_devin_id: resourceIdSchema.nullable().optional(),
   })
   .strict();
 
-export const scheduleCreateRequestSchema = scheduleWriteFieldsSchema
+export const scheduleCreateRequestSchema = scheduleCreateFieldsSchema
   .extend({
-    name: z.string().trim().min(1).max(100),
-    prompt: z.string().trim().min(1).max(10_000),
+    create_as_user_id: resourceIdSchema.nullable().optional(),
   })
   .superRefine((body, context) => {
     const type = body.schedule_type ?? 'recurring';
@@ -682,10 +715,28 @@ export const scheduleCreateRequestSchema = scheduleWriteFieldsSchema
     }
   });
 
-export const scheduleUpdateRequestSchema = scheduleWriteFieldsSchema.refine(
-  (body) => Object.keys(body).length > 0,
-  { message: 'update is empty' },
-);
+export const scheduleUpdateRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).nullable().optional(),
+    prompt: z.string().trim().min(1).max(10_000).nullable().optional(),
+    enabled: z.boolean().nullable().optional(),
+    schedule_type: z.enum(['recurring', 'one_time']).nullable().optional(),
+    frequency: z.string().trim().min(1).max(256).nullable().optional(),
+    scheduled_at: z.string().datetime({ offset: true }).nullable().optional(),
+    tags: z.array(z.string().trim().min(1).max(100)).max(50).nullable().optional(),
+    playbook_id: resourceIdSchema.nullable().optional(),
+    notify_on: z.enum(['always', 'failure', 'never']).nullable().optional(),
+    agent: z.enum(['devin', 'data_analyst']).nullable().optional(),
+    bypass_approval: z.boolean().nullable().optional(),
+    interval_count: z.number().int().positive().nullable().optional(),
+    platform: z.string().trim().min(1).max(256).nullable().optional(),
+    run_as_user_id: resourceIdSchema.nullable().optional(),
+    slack_channel_id: resourceIdSchema.nullable().optional(),
+    slack_team_id: resourceIdSchema.nullable().optional(),
+    target_devin_id: resourceIdSchema.nullable().optional(),
+  })
+  .strict()
+  .refine((body) => Object.keys(body).length > 0, { message: 'update is empty' });
 
 // ---------------------------------------------------------------------------
 // Org metrics (Analytics)
@@ -731,17 +782,16 @@ export const searchMetricsSchema = z.object({ searches_created_count: metricCoun
 
 export const activeUserPeriodSchema = z
   .object({
-    start_time: z.union([z.number(), z.string()]),
-    end_time: z.union([z.number(), z.string()]),
-    active_users: z.number(),
+    start_time: z.number().int(),
+    end_time: z.number().int(),
+    active_users: z.number().int().nonnegative(),
   })
   .passthrough();
 
+export const activeUserMetricsSchema = activeUserPeriodSchema;
+
 // The list may arrive bare or wrapped in an items envelope.
-export const activeUsersResponseSchema = z.union([
-  z.array(activeUserPeriodSchema),
-  z.object({ items: z.array(activeUserPeriodSchema) }).passthrough(),
-]);
+export const activeUsersResponseSchema = z.array(activeUserPeriodSchema);
 
 // ---------------------------------------------------------------------------
 // Repositories (v3beta1)

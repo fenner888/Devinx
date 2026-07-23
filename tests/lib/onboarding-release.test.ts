@@ -30,7 +30,7 @@ describe('release onboarding', () => {
     expect(welcome).not.toContain('companionStageGlow');
     expect(welcome).not.toContain('companionStageLine');
     expect(welcome).not.toContain("APP_ICON from '../../../assets/icon.png'");
-    expect(features).toContain('Cloud or your computer');
+    expect(features).toContain('Cloud or Local');
     expect(features).toContain('Keep credentials private');
     expect(features).not.toContain('Manage files');
     expect(connections).toContain('Choose where Devin runs');
@@ -43,13 +43,13 @@ describe('release onboarding', () => {
     expect(credentials).toContain('Connect Cloud & continue');
     expect(computer).toContain("mode === 'both'");
     expect(computer).toContain('STEP 2 OF 2');
-    expect(computer).toContain('Pair your computer');
+    expect(computer).toContain('Pair a local device');
     expect(computer).toContain('Devin Cloud is connected.');
     expect(computer).toContain('Send assisted setup prompt');
     expect(computer).toContain('Tailscale alone does not expose Devin sessions');
     expect(computer).toContain('CONNECTOR_SETUP_PROMPT');
     expect(computer).toContain('CONNECTOR_RELEASE_PAGE');
     expect(computer).toContain('Remove from this iPhone');
-    expect(computer).toContain('inactive Mac record');
+    expect(computer).toContain('inactive device record');
   });
 });

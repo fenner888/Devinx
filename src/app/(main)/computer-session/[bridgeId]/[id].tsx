@@ -83,12 +83,12 @@ function publicErrorMessage(error: unknown): string {
     return 'This iPhone does not have permission to read that local session.';
   }
   if (error.code === 'invalid_response') {
-    return 'The paired Mac returned an incompatible session history.';
+    return 'The paired local device returned an incompatible session history.';
   }
   if (error.code === 'rate_limited') {
-    return 'The paired Mac is busy. Wait a moment and try again.';
+    return 'The paired local device is busy. Wait a moment and try again.';
   }
-  return 'Open DevinX Connector and confirm the secure computer connection is available.';
+  return 'Open DevinX Connector and confirm the secure local connection is available.';
 }
 
 export function promptErrorMessage(error: unknown): string {
@@ -99,7 +99,7 @@ export function promptErrorMessage(error: unknown): string {
     return 'Devin is finishing the previous turn. Try again in a moment.';
   }
   if (error.code === 'authorization_failed') {
-    return 'This iPhone is no longer authorized. Re-pair this computer in Settings.';
+    return 'This iPhone is no longer authorized. Re-pair this local device in Settings.';
   }
   if (error.code === 'permission_denied') {
     return 'This iPhone does not have permission to steer this session.';
@@ -108,7 +108,7 @@ export function promptErrorMessage(error: unknown): string {
     return 'Too many requests were sent. Wait a moment and try again.';
   }
   if (error.code === 'unavailable') {
-    return 'DevinX Connector is temporarily unavailable. Confirm it is running on your Mac.';
+    return 'DevinX Connector is temporarily unavailable. Confirm it is running on your local device.';
   }
   return 'The message could not be sent. Try again.';
 }
@@ -226,7 +226,7 @@ export default function ComputerSessionDetailScreen() {
       repositories: query.data?.session.workspaceName ? [query.data.session.workspaceName] : [],
     },
     scribeContext: {
-      destination: computer?.computerName ?? 'Paired computer',
+      destination: computer?.computerName ?? 'Paired local device',
       repository: query.data?.session.workspaceName,
     },
   });
@@ -415,12 +415,12 @@ export default function ComputerSessionDetailScreen() {
         <BackButton onPress={() => router.back()} />
         <View className="flex-1 min-w-0">
           <Text className="text-text-hi text-text16" numberOfLines={1}>
-            {query.data?.session.workspaceName ?? 'Computer session'}
+            {query.data?.session.workspaceName ?? 'Local session'}
           </Text>
           <View className="mt-0.5 flex-row items-center">
             <Ionicons name="desktop-outline" size={12} color={tokens.brandText.hex} />
             <Text className="ml-1.5 text-brand-text text-text12" numberOfLines={1}>
-              {computer?.computerName ?? 'Paired Mac'}
+              {computer?.computerName ?? 'Paired local device'}
             </Text>
             <Text className="mx-1.5 text-text-low text-text12">·</Text>
             <Text className="text-text-low text-text12">
@@ -467,7 +467,7 @@ export default function ComputerSessionDetailScreen() {
             ) : query.isLoading ? (
               <View className="flex-1 items-center justify-center">
                 <ActivityIndicator color={tokens.brand.hex} />
-                <Text className="mt-3 text-text-mid text-text13">Loading from your Mac…</Text>
+                <Text className="mt-3 text-text-mid text-text13">Loading from your local device…</Text>
               </View>
             ) : !query.data ? (
               <View className="flex-1 items-center justify-center px-8">
@@ -525,7 +525,7 @@ export default function ComputerSessionDetailScreen() {
                   <View className="mb-5 flex-row items-start rounded-card border border-border-subtle bg-surface1 px-3 py-3">
                     <Ionicons name="git-branch-outline" size={16} color={tokens.brandText.hex} />
                     <Text className="ml-2 flex-1 text-text-mid text-text12 leading-4">
-                      {steeringActive ? 'Continuing' : 'Continued'} in a new computer session while
+                      {steeringActive ? 'Continuing' : 'Continued'} in a new local session while
                       the original remains open in Devin Desktop.
                     </Text>
                   </View>
@@ -553,7 +553,7 @@ export default function ComputerSessionDetailScreen() {
                   <View className="mb-4 flex-row items-start rounded-card border border-border-subtle bg-surface1 px-3 py-3">
                     <Ionicons name="download-outline" size={16} color={tokens.brandText.hex} />
                     <Text className="ml-2 flex-1 text-text-mid text-text12 leading-4">
-                      Update DevinX Connector on this Mac to answer structured Devin questions from
+                      Update DevinX Connector on this local device to answer structured Devin questions from
                       your iPhone.
                     </Text>
                   </View>
@@ -618,7 +618,7 @@ export default function ComputerSessionDetailScreen() {
                   multiline
                   textAlignVertical="top"
                   editable={!prompt.isPending && !steeringActive && !sessionBusy}
-                  accessibilityLabel="Computer session message"
+                  accessibilityLabel="Local session message"
                   onSelectionChange={voice.onSelectionChange}
                   onFocus={() => setKeyboardVisible(true)}
                 />
@@ -674,7 +674,7 @@ export default function ComputerSessionDetailScreen() {
                       onPress={sendPrompt}
                       disabled={!draft.trim() || prompt.isPending || steeringActive || sessionBusy}
                       accessibilityRole="button"
-                      accessibilityLabel="Send computer session message"
+                      accessibilityLabel="Send local session message"
                     >
                       {prompt.isPending ? (
                         <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
@@ -693,7 +693,7 @@ export default function ComputerSessionDetailScreen() {
                 <View className="mr-4 flex-row items-center">
                   <Ionicons name="desktop-outline" size={14} color={tokens.textLow.hex} />
                   <Text className="ml-1.5 text-text-low text-text12" numberOfLines={1}>
-                    {computer?.computerName ?? 'Paired Mac'}
+                    {computer?.computerName ?? 'Paired local device'}
                   </Text>
                 </View>
                 <View

@@ -26,7 +26,9 @@ jest.mock('../../src/theme/index', () => ({
   useTheme: () => ({
     tokens: {
       brandText: { hex: '#0088ff' },
+      textAlwaysWhite: { hex: '#ffffff' },
       textHi: { hex: '#ffffff' },
+      textMid: { hex: '#999999' },
       textLow: { hex: '#666666' },
     },
   }),
@@ -58,7 +60,23 @@ describe('Cloud credential onboarding', () => {
 
     expect(screen.getByText('STEP 1 OF 2')).toBeTruthy();
     expect(screen.getByText('Connect Cloud & continue')).toBeTruthy();
-    expect(screen.getByText(/Next, you’ll pair your computer/)).toBeTruthy();
+    expect(screen.getByText(/Next, you’ll pair a local device/)).toBeTruthy();
+  });
+
+  it('opens an in-app service-user walkthrough before external links', () => {
+    const screen = render(<CredentialsScreen />);
+
+    fireEvent.press(screen.getByLabelText('Open service user instructions'));
+
+    expect(screen.getByText('Create your Devin service user')).toBeTruthy();
+    expect(screen.getByText('Open Service users')).toBeTruthy();
+    expect(screen.getByText('Create a scoped service user')).toBeTruthy();
+    expect(screen.getByText('Generate its API key')).toBeTruthy();
+    expect(screen.getByText('Copy your organization ID')).toBeTruthy();
+    expect(screen.getByLabelText('Open Devin')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Read official Devin authentication documentation'),
+    ).toBeTruthy();
   });
 
   it('preserves and submits an org_ identifier for authenticated validation', () => {

@@ -70,7 +70,7 @@ export default function ConnectionChoiceScreen() {
             <Ionicons name="shield-checkmark-outline" size={17} color={tokens.brandText.hex} />
             <Text className="text-brand-text text-text12 leading-4 ml-2 flex-1">
               Tailscale provides the private network route. DevinX Connector provides authorized
-              access to local sessions. Your Devin credentials remain on the computer.
+              access to local sessions. Your Devin credentials remain on the local device.
             </Text>
           </View>
           <OnboardingProgress current={3} total={3} />

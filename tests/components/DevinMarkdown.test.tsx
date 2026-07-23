@@ -125,7 +125,9 @@ describe('media URL detection', () => {
     expect(isVideoUrl('https://x.com/a.png')).toBe(false);
     expect(isAudioUrl('https://x.com/a.png')).toBe(false);
     expect(isVideoUrl('ftp://x.com/a.mp4')).toBe(false);
+    expect(isVideoUrl('http://x.com/a.mp4')).toBe(false);
     expect(isAudioUrl('file:///tmp/a.mp3')).toBe(false);
+    expect(isImageUrl('http://x.com/a.png')).toBe(false);
     expect(isImageUrl('data:text/html;base64,PHNjcmlwdD4=')).toBe(false);
   });
 });

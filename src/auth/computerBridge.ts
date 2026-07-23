@@ -54,6 +54,7 @@ const computerModelSchema = z
 const bridgeMethodSchema = z.enum([
   'bridge.health',
   'bridge.features',
+  'bridge.platform',
   'bridge.version',
   'device.revoke',
   'session.list',
@@ -67,9 +68,11 @@ const bridgeMethodSchema = z.enum([
 ]);
 const bridgeHealthBodySchema = z.object({}).strict();
 const bridgeFeaturesBodySchema = z.object({}).strict();
+const bridgePlatformBodySchema = z.object({}).strict();
 const bridgeVersionBodySchema = z.object({}).strict();
-const computerBridgeFeaturesSchema = z
-  .object({ sessionElicitation: z.boolean() })
+const computerBridgeFeaturesSchema = z.object({ sessionElicitation: z.boolean() }).strict();
+const computerBridgePlatformSchema = z
+  .object({ platform: z.enum(['macos', 'windows', 'linux']) })
   .strict();
 export const computerBridgeVersionSchema = z
   .object({ version: z.string().regex(/^\d+\.\d+\.\d+$/) })
@@ -334,9 +337,9 @@ export const computerSessionPageSchema = z
 
 export type ComputerBridgeHealth = z.infer<typeof computerBridgeHealthSchema>;
 export type ComputerBridgeFeatures = z.infer<typeof computerBridgeFeaturesSchema>;
+export type ComputerBridgePlatform = z.infer<typeof computerBridgePlatformSchema>['platform'];
 export type ComputerBridgeVersionStatus =
-  | { kind: 'supported'; version: string }
-  | { kind: 'legacy' };
+  { kind: 'supported'; version: string } | { kind: 'legacy' };
 export type ComputerSessionSummary = z.infer<typeof computerSessionSummarySchema>;
 export type ComputerSessionPage = z.infer<typeof computerSessionPageSchema>;
 export type ComputerLoadedSession = z.infer<typeof computerLoadedSessionSchema>;
@@ -379,6 +382,7 @@ type SupportedMethod = z.infer<typeof bridgeMethodSchema>;
 const permissionByMethod = {
   'bridge.health': 'bridge:health',
   'bridge.features': 'bridge:health',
+  'bridge.platform': 'bridge:health',
   'bridge.version': 'bridge:health',
   'device.revoke': 'bridge:health',
   'session.list': 'session:metadata:read',
@@ -394,6 +398,7 @@ const permissionByMethod = {
 function bodyForMethod(method: SupportedMethod, input: unknown): object {
   if (method === 'bridge.health') return bridgeHealthBodySchema.parse(input);
   if (method === 'bridge.features') return bridgeFeaturesBodySchema.parse(input);
+  if (method === 'bridge.platform') return bridgePlatformBodySchema.parse(input);
   if (method === 'bridge.version') return bridgeVersionBodySchema.parse(input);
   if (method === 'device.revoke') return deviceRevokeBodySchema.parse(input);
   if (method === 'session.list') return sessionListBodySchema.parse(input);
@@ -411,13 +416,13 @@ function bodyForMethod(method: SupportedMethod, input: unknown): object {
 function publicResponseError(status: number, method: SupportedMethod): ComputerBridgeError {
   if (status === 404) {
     return new ComputerBridgeError(
-      'This iPhone is no longer authorized by the paired Mac.',
+      'This iPhone is no longer authorized by the paired local device.',
       'authorization_failed',
     );
   }
   if (status === 429) {
     return new ComputerBridgeError(
-      'The paired Mac is receiving requests too quickly.',
+      'The paired local device is receiving requests too quickly.',
       'rate_limited',
     );
   }
@@ -425,15 +430,21 @@ function publicResponseError(status: number, method: SupportedMethod): ComputerB
     return new ComputerBridgeError('Devin is finishing the previous turn.', 'busy');
   }
   if (status === 503) {
-    return new ComputerBridgeError('The paired Mac is temporarily unavailable.', 'unavailable');
-  }
-  if (status === 400 && method === 'bridge.version') {
     return new ComputerBridgeError(
-      'The paired Mac does not support version negotiation.',
+      'The paired local device is temporarily unavailable.',
+      'unavailable',
+    );
+  }
+  if (status === 400 && (method === 'bridge.platform' || method === 'bridge.version')) {
+    return new ComputerBridgeError(
+      'The paired local device does not support version negotiation.',
       'unsupported_method',
     );
   }
-  return new ComputerBridgeError('The paired Mac rejected an invalid request.', 'invalid_response');
+  return new ComputerBridgeError(
+    'The paired local device rejected an invalid request.',
+    'invalid_response',
+  );
 }
 
 async function validatedComputerRegistry(): Promise<PairedComputerCredential[]> {
@@ -441,7 +452,10 @@ async function validatedComputerRegistry(): Promise<PairedComputerCredential[]> 
   try {
     computers = await loadPairedComputers();
   } catch {
-    throw new ComputerBridgeError('Paired Mac credentials could not be validated.', 'not_paired');
+    throw new ComputerBridgeError(
+      'Paired local-device credentials could not be validated.',
+      'not_paired',
+    );
   }
   return computers;
 }
@@ -459,7 +473,7 @@ async function requestComputer(
     !credential.permissions.includes(requiredPermission)
   ) {
     throw new ComputerBridgeError(
-      'This iPhone does not have permission for that Mac request.',
+      'This iPhone does not have permission for that local request.',
       'permission_denied',
     );
   }
@@ -494,7 +508,10 @@ async function requestComputer(
     return { body: response.body, credential };
   } catch (error) {
     if (error instanceof ComputerBridgeError) throw error;
-    throw new ComputerBridgeError('The paired Mac could not be reached securely.', 'unavailable');
+    throw new ComputerBridgeError(
+      'The paired local device could not be reached securely.',
+      'unavailable',
+    );
   }
 }
 
@@ -503,7 +520,7 @@ async function requestHealth(credential: PairedComputerCredential): Promise<Comp
   const result = computerBridgeHealthSchema.safeParse(response.body);
   if (!result.success) {
     throw new ComputerBridgeError(
-      'The paired Mac returned an invalid health response.',
+      'The paired local device returned an invalid health response.',
       'invalid_response',
     );
   }
@@ -518,7 +535,7 @@ async function requestFeatures(
     const result = computerBridgeFeaturesSchema.safeParse(response.body);
     if (!result.success) {
       throw new ComputerBridgeError(
-        'The paired Mac returned invalid feature information.',
+        'The paired local device returned invalid feature information.',
         'invalid_response',
       );
     }
@@ -526,6 +543,27 @@ async function requestFeatures(
   } catch (error) {
     if (error instanceof ComputerBridgeError && error.code === 'invalid_response') {
       return { sessionElicitation: false };
+    }
+    throw error;
+  }
+}
+
+async function requestPlatform(
+  credential: PairedComputerCredential,
+): Promise<ComputerBridgePlatform | 'unknown'> {
+  try {
+    const response = await requestComputer(credential, 'bridge.platform', {});
+    const result = computerBridgePlatformSchema.safeParse(response.body);
+    if (!result.success) {
+      throw new ComputerBridgeError(
+        'The paired local device returned invalid platform information.',
+        'invalid_response',
+      );
+    }
+    return result.data.platform;
+  } catch (error) {
+    if (error instanceof ComputerBridgeError && error.code === 'unsupported_method') {
+      return 'unknown';
     }
     throw error;
   }
@@ -539,7 +577,7 @@ async function requestVersion(
     const result = computerBridgeVersionSchema.safeParse(response.body);
     if (!result.success) {
       throw new ComputerBridgeError(
-        'The paired Mac returned invalid version information.',
+        'The paired local device returned invalid version information.',
         'invalid_response',
       );
     }
@@ -556,7 +594,7 @@ async function requestDeviceRevocation(credential: PairedComputerCredential): Pr
   const response = await requestComputer(credential, 'device.revoke', {});
   if (!deviceRevokeResponseSchema.safeParse(response.body).success) {
     throw new ComputerBridgeError(
-      'The paired Mac returned an invalid revocation response.',
+      'The paired local device returned an invalid revocation response.',
       'invalid_response',
     );
   }
@@ -571,7 +609,7 @@ async function requestSessionList(
   const result = computerSessionPageSchema.safeParse(response.body);
   if (!result.success) {
     throw new ComputerBridgeError(
-      'The paired Mac returned an invalid session list.',
+      'The paired local device returned an invalid session list.',
       'invalid_response',
     );
   }
@@ -580,7 +618,7 @@ async function requestSessionList(
     result.data.sessions.some((session) => session.title !== undefined)
   ) {
     throw new ComputerBridgeError(
-      'The paired Mac returned session content outside the device grant.',
+      'The paired local device returned session content outside the device grant.',
       'invalid_response',
     );
   }
@@ -596,7 +634,7 @@ async function requestSessionLoad(
   const result = computerLoadedSessionSchema.safeParse(response.body);
   if (!result.success || result.data.session.id !== body.sessionId) {
     throw new ComputerBridgeError(
-      'The paired Mac returned an invalid session history.',
+      'The paired local device returned an invalid session history.',
       'invalid_response',
     );
   }
@@ -612,7 +650,7 @@ async function requestSessionActivity(
   const result = computerSessionActivitySchema.safeParse(response.body);
   if (!result.success) {
     throw new ComputerBridgeError(
-      'The paired Mac returned invalid session activity.',
+      'The paired local device returned invalid session activity.',
       'invalid_response',
     );
   }
@@ -628,7 +666,7 @@ async function requestSessionElicitation(
   const result = computerSessionElicitationSchema.safeParse(response.body);
   if (!result.success) {
     throw new ComputerBridgeError(
-      'The paired Mac returned an invalid question.',
+      'The paired local device returned an invalid question.',
       'invalid_response',
     );
   }
@@ -643,7 +681,7 @@ async function requestSessionElicitationResponse(
   const response = await requestComputer(credential, 'session.elicitation.respond', body);
   if (!sessionElicitationResponseSchema.safeParse(response.body).success) {
     throw new ComputerBridgeError(
-      'The paired Mac returned an invalid question response.',
+      'The paired local device returned an invalid question response.',
       'invalid_response',
     );
   }
@@ -658,7 +696,7 @@ async function requestSessionPrompt(
   const result = sessionPromptResponseSchema.safeParse(response.body);
   if (!result.success) {
     throw new ComputerBridgeError(
-      'The paired Mac returned an invalid steering response.',
+      'The paired local device returned an invalid steering response.',
       'invalid_response',
     );
   }
@@ -672,7 +710,7 @@ async function requestSessionCreateOptions(
   const result = sessionCreateOptionsResponseSchema.safeParse(response.body);
   if (!result.success) {
     throw new ComputerBridgeError(
-      'The paired Mac returned invalid session creation options.',
+      'The paired local device returned invalid session creation options.',
       'invalid_response',
     );
   }
@@ -688,7 +726,7 @@ async function requestSessionCreate(
   const result = sessionCreateResponseSchema.safeParse(response.body);
   if (!result.success) {
     throw new ComputerBridgeError(
-      'The paired Mac returned an invalid created session.',
+      'The paired local device returned an invalid created session.',
       'invalid_response',
     );
   }
@@ -756,7 +794,10 @@ export async function openComputerBridges(
   for (const bridgeId of bridgeIds) {
     const credential = credentials.get(bridgeId);
     if (!credential || credential.transportSecurity !== 'tailscale_wireguard') {
-      throw new ComputerBridgeError('This Mac is not paired through Tailscale.', 'not_paired');
+      throw new ComputerBridgeError(
+        'This local device is not paired through Tailscale.',
+        'not_paired',
+      );
     }
     connections.set(bridgeId, connectionForCredential(credential));
   }
@@ -766,7 +807,7 @@ export async function openComputerBridges(
 export async function openComputerBridge(bridgeId: string): Promise<ComputerBridgeConnection> {
   const connections = await openComputerBridges([bridgeId]);
   const connection = connections.get(bridgeId);
-  if (!connection) throw new ComputerBridgeError('This Mac is not paired.', 'not_paired');
+  if (!connection) throw new ComputerBridgeError('This local device is not paired.', 'not_paired');
   return connection;
 }
 
@@ -774,9 +815,7 @@ export async function getComputerBridgeHealth(bridgeId: string): Promise<Compute
   return (await openComputerBridge(bridgeId)).getHealth();
 }
 
-export async function getComputerBridgeFeatures(
-  bridgeId: string,
-): Promise<ComputerBridgeFeatures> {
+export async function getComputerBridgeFeatures(bridgeId: string): Promise<ComputerBridgeFeatures> {
   return (await openComputerBridge(bridgeId)).getFeatures();
 }
 
@@ -784,6 +823,20 @@ export async function getComputerBridgeVersion(
   bridgeId: string,
 ): Promise<ComputerBridgeVersionStatus> {
   return (await openComputerBridge(bridgeId)).getVersion();
+}
+
+export async function getComputerBridgePlatform(
+  bridgeId: string,
+): Promise<ComputerBridgePlatform | 'unknown'> {
+  const computers = await validatedComputerRegistry();
+  const credential = computers.find((computer) => computer.bridgeId === bridgeId);
+  if (!credential || credential.transportSecurity !== 'tailscale_wireguard') {
+    throw new ComputerBridgeError(
+      'This local device is not paired through Tailscale.',
+      'not_paired',
+    );
+  }
+  return requestPlatform(credential);
 }
 
 export async function listComputerSessions(
@@ -846,7 +899,10 @@ export async function disconnectComputer(bridgeIdInput: string): Promise<void> {
   const computers = await validatedComputerRegistry();
   const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
   if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {
-    throw new ComputerBridgeError('This Mac is not paired through Tailscale.', 'not_paired');
+    throw new ComputerBridgeError(
+      'This local device is not paired through Tailscale.',
+      'not_paired',
+    );
   }
   try {
     await requestDeviceRevocation(computer);
@@ -864,7 +920,10 @@ export async function removeComputerFromThisIPhone(bridgeIdInput: string): Promi
   const computers = await validatedComputerRegistry();
   const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
   if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {
-    throw new ComputerBridgeError('This Mac is not paired through Tailscale.', 'not_paired');
+    throw new ComputerBridgeError(
+      'This local device is not paired through Tailscale.',
+      'not_paired',
+    );
   }
   await storePairedComputers(computers.filter((candidate) => candidate.bridgeId !== bridgeId));
   await deleteDeviceIdentity(computer.deviceKeyId);

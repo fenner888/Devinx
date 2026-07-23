@@ -115,8 +115,8 @@ describe('Computer connection onboarding', () => {
   it('shows the real pairing instructions and starts the scanner after permission', async () => {
     const screen = render(<ComputerConnectionScreen />);
 
-    expect(screen.getByText('Connect your Mac')).toBeTruthy();
-    expect(screen.getByText('Name this Mac')).toBeTruthy();
+    expect(screen.getByText('Connect locally')).toBeTruthy();
+    expect(screen.getByText('Name this local device')).toBeTruthy();
     expect(screen.getByText('Open Tailscale setup guide')).toBeTruthy();
     expect(screen.getByText('Set up DevinX Connector')).toBeTruthy();
     expect(screen.getByText('Send assisted setup prompt')).toBeTruthy();
@@ -150,7 +150,7 @@ describe('Computer connection onboarding', () => {
     const screen = render(<ComputerConnectionScreen />);
 
     expect(screen.getByText('STEP 2 OF 2')).toBeTruthy();
-    expect(screen.getByText('Pair your computer')).toBeTruthy();
+    expect(screen.getByText('Pair a local device')).toBeTruthy();
     expect(screen.getByText(/Devin Cloud is connected/)).toBeTruthy();
     expect(screen.queryByText('Connect your Mac')).toBeNull();
   });
@@ -174,7 +174,7 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByText(/0.1.2 or later/)).toBeTruthy();
   });
 
-  it('keeps the Mac name reachable above the keyboard and supports dismissal', () => {
+  it('keeps the local-device name reachable above the keyboard and supports dismissal', () => {
     const screen = render(<ComputerConnectionScreen />);
 
     expect(screen.getByTestId('computer-connection-keyboard-viewport')).toBeTruthy();
@@ -184,7 +184,7 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByTestId('computer-connection-scroll').props.keyboardShouldPersistTaps).toBe(
       'handled',
     );
-    expect(screen.getByLabelText('Paired Mac name').props.returnKeyType).toBe('done');
+    expect(screen.getByLabelText('Paired local-device name').props.returnKeyType).toBe('done');
   });
 
   it('requests first-use permission and sends a scanned payload directly to pairing', async () => {
@@ -199,7 +199,7 @@ describe('Computer connection onboarding', () => {
     await waitFor(() => expect(mockPairComputer).toHaveBeenCalledTimes(1));
     expect(mockPairComputer).toHaveBeenCalledWith(
       '{"pairing":"offer"}',
-      expect.objectContaining({ computerName: 'My Mac', signal: expect.any(Object) }),
+      expect.objectContaining({ computerName: 'My local device', signal: expect.any(Object) }),
     );
     await waitFor(() => expect(mockRefreshComputers).toHaveBeenCalledTimes(1));
     expect(mockReplace).toHaveBeenCalledWith('/(main)');
@@ -230,7 +230,7 @@ describe('Computer connection onboarding', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Confirm Tailscale is connected on this iPhone and Mac/),
+        screen.getByText(/Confirm Tailscale is connected on this iPhone and local device/),
       ).toBeTruthy(),
     );
   });

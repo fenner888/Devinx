@@ -296,7 +296,7 @@ export default function SessionsScreen() {
                 hasUnfilteredSessions
                   ? 'No sessions match your search or tag filters.'
                   : usesComputer && !usesCloud
-                    ? 'Start or resume a session on your paired Mac.'
+                    ? 'Start or resume a session on your paired local device.'
                     : 'Start a new session from Home.'
               }
             />
@@ -329,7 +329,7 @@ export default function SessionsScreen() {
             <View className="py-2 bg-surface0">
               <Text className="text-text-low text-text12 font-medium uppercase tracking-wider">
                 {boardSection.section === 'computer'
-                  ? 'Computer'
+                  ? 'Local'
                   : sectionTitles[boardSection.section]}{' '}
                 ({boardSection.data.length})
               </Text>
