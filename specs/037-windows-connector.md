@@ -95,10 +95,12 @@ The Store identity is public packaging metadata, not a secret:
 - publisher display name: `DevinX Tools`
 - Store ID: `9N52Z3FVMFH8`
 - package family: `DevinXTools.DevinXConnector_ydtgrt4yd5wrc`
+- default package language: `en-US`
 
 The committed Store identity file is the source of truth for manifest rendering. CI must reject any
-manifest or artifact whose name, publisher, architecture, version, or startup-task declaration
-drifts from it. The MSIX submitted to Partner Center is intentionally unsigned before upload;
+manifest or artifact whose name, publisher, architecture, version, language, logo assets, normalized
+packaged executable name (`DevinXConnector.exe`), or startup-task declaration drifts from it. The
+MSIX submitted to Partner Center is intentionally unsigned before upload;
 Microsoft signs the accepted Store package. It must never be offered as a direct-download build.
 
 Unsigned EXE/ZIP CI artifacts remain verification artifacts only. The mobile assisted setup prompt

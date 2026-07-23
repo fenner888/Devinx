@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -58,6 +59,10 @@ rmSync(msixPath, { force: true });
 rmSync(`${msixPath}.sha256`, { force: true });
 mkdirSync(stagingRoot, { recursive: true });
 cpSync(unpackagedRoot, stagingRoot, { recursive: true });
+renameSync(
+  resolve(stagingRoot, 'DevinX Connector.exe'),
+  resolve(stagingRoot, 'DevinXConnector.exe'),
+);
 mkdirSync(resolve(stagingRoot, 'Assets'), { recursive: true });
 for (const asset of ['Square44x44Logo.png', 'Square150x150Logo.png', 'StoreLogo.png']) {
   copyFileSync(resolve(storePackagingRoot, 'Assets', asset), resolve(stagingRoot, 'Assets', asset));
