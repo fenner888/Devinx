@@ -62,6 +62,6 @@ jobs:
         with:
           name: devinx-connector-windows-x64-MICROSOFT-STORE-UPLOAD
           path: |
-            artifacts/connector/windows/DevinX-Connector-0.1.0.0-windows-x64.msix
-            artifacts/connector/windows/DevinX-Connector-0.1.0.0-windows-x64.msix.sha256
+            artifacts/connector/windows/DevinX-Connector-*-windows-x64.msix
+            artifacts/connector/windows/DevinX-Connector-*-windows-x64.msix.sha256
           if-no-files-found: error
