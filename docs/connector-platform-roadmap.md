@@ -16,21 +16,22 @@ Platform code may implement only secure storage, executable discovery, lifecycle
 ## Windows x64 implementation checkpoint
 
 The shared Windows adapter, current-user DPAPI helper, native WinForms control surface,
-notification-area lifecycle, pinned-runtime builder, per-user installer/uninstaller, Authenticode
-signing hook, and Windows CI verifier are implemented under `bridge/`, `connector/windows/`,
-`connector/windows-installer/`, and `scripts/connector/`. Ordinary CI remains explicitly unsigned
-and not for release. A protected manual workflow produces a signed verification candidate once a
-publisher-controlled Authenticode identity is configured. Windows becomes a supported download
-only after that candidate passes the physical matrix in `specs/037-windows-connector.md`.
+notification-area lifecycle, pinned-runtime builder, per-user installer/uninstaller, Microsoft
+Store MSIX builder, and Windows CI verifier are implemented under `bridge/`, `connector/windows/`,
+`connector/windows-installer/`, `connector/windows-msix/`, and `scripts/connector/`. Ordinary EXE
+and ZIP CI artifacts remain explicitly unsigned and not for release. The public path is the exact
+Partner Center identity `DevinXTools.DevinXConnector`; Microsoft signs and delivers the accepted
+MSIX. Windows becomes a supported download only after Store certification and that exact package
+passes the physical matrix in `specs/037-windows-connector.md`.
 
 Remaining public-release gates:
 
 1. Physically verify the exact ACP methods advertised by the installed official Windows Devin CLI.
    Cognition now documents native Windows x64 and arm64 CLI installers plus `devin acp`; runtime
    negotiation remains authoritative for the exact methods available on the test PC.
-2. Configure a stable Authenticode code-signing identity, run the protected signed-candidate
-   workflow, and publish its checksum and provenance only after the physical matrix passes. Do not
-   distribute the unsigned CI artifact.
+2. Upload the exact-identity MSIX to Partner Center, pass certification, and publish only through
+   Store ID `9N52Z3FVMFH8` after the physical matrix passes. Do not distribute the unsigned CI EXE,
+   ZIP, or pre-certification MSIX directly.
 3. Validate Windows Firewall behavior while binding only to the active `100.64.0.0/10` Tailscale
    interface.
 4. Test pairing, denial, expiry, read/send/create permission separation, endpoint refresh,

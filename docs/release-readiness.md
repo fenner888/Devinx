@@ -281,11 +281,11 @@ official release link.
 ## Platform scope
 
 macOS is the first Connector release. Windows 11 x64 is an active implementation using the same
-protocol and authorization contract, with native DPAPI storage, process supervision, per-user
-packaging, signing hooks, Tailscale discovery, and update guidance now implemented. Authenticode
-configuration and the physical Windows matrix remain release gates. Linux remains a later
-platform. Neither platform is a supported download until its own threat model and physical tests
-pass.
+protocol and authorization contract, with native DPAPI storage, process supervision, exact-identity
+Microsoft Store packaging, an opt-in packaged startup task, Tailscale discovery, and update
+guidance. The Microsoft Store listing is public under **DevinX Tools** with Store ID
+`9N52Z3FVMFH8`; Store certification and signing cover the published MSIX. Authenticode applies only
+to any separately released direct-download package. Linux remains a later platform.
 
 ## Connector 0.1.4 release evidence
 

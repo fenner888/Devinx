@@ -21,8 +21,9 @@ internal static class Program
 internal sealed class ConnectorForm : Form
 {
     private const int MaximumIpcLineCharacters = 16_384;
+    private const string StartupTaskId = "DevinXConnectorStartup";
     private const string StartupValueName = "DevinX Connector";
-    private const string ReleasePage = "https://github.com/fenner888/Devinx/releases/latest";
+    private const string ReleasePage = "https://apps.microsoft.com/detail/9N52Z3FVMFH8";
     private const string SetupGuide =
         "https://github.com/fenner888/Devinx/blob/main/docs/devinx-connector.md";
     private readonly Label statusLabel = new() { AutoSize = true, Font = new Font("Segoe UI", 18, FontStyle.Bold) };
@@ -42,12 +43,13 @@ internal sealed class ConnectorForm : Form
     };
     private readonly Button savePermissionsButton = new() { Text = "Save permissions", AutoSize = true };
     private readonly Button revokeButton = new() { Text = "Revoke selected iPhone", AutoSize = true };
-    private readonly Button releasesButton = new() { Text = "Check official releases", AutoSize = true };
+    private readonly Button releasesButton = new() { Text = "Open Microsoft Store", AutoSize = true };
     private readonly Button helpButton = new() { Text = "Setup and uninstall help", AutoSize = true };
     private readonly NotifyIcon trayIcon = new() { Text = "DevinX Connector", Visible = true };
     private readonly SemaphoreSlim writeLock = new(1, 1);
     private Process? runtime;
     private bool exiting;
+    private bool launchAtLoginInitializing = true;
 
     public ConnectorForm()
     {
@@ -124,9 +126,13 @@ internal sealed class ConnectorForm : Form
         revokeButton.Click += async (_, _) => await RevokeSelectedDeviceAsync();
         releasesButton.Click += (_, _) => OpenOfficialPage(ReleasePage);
         helpButton.Click += (_, _) => OpenOfficialPage(SetupGuide);
-        launchAtLogin.CheckedChanged += (_, _) => SetLaunchAtLogin(launchAtLogin.Checked);
+        launchAtLogin.CheckedChanged += async (_, _) => await HandleLaunchAtLoginChangedAsync();
         FormClosing += HandleFormClosing;
-        Shown += async (_, _) => await StartRuntimeAsync();
+        Shown += async (_, _) =>
+        {
+            await InitializeLaunchAtLoginAsync();
+            await StartRuntimeAsync();
+        };
 
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open DevinX Connector", null, (_, _) => RestoreWindow());
@@ -134,7 +140,6 @@ internal sealed class ConnectorForm : Form
         trayIcon.ContextMenuStrip = menu;
         trayIcon.Icon = SystemIcons.Application;
         trayIcon.DoubleClick += (_, _) => RestoreWindow();
-        launchAtLogin.Checked = IsLaunchAtLoginEnabled();
         SetStatus("Starting…", "Checking Tailscale and Devin for Terminal");
     }
 
@@ -372,13 +377,102 @@ internal sealed class ConnectorForm : Form
         Application.Exit();
     }
 
-    private static bool IsLaunchAtLoginEnabled()
+    private async Task InitializeLaunchAtLoginAsync()
+    {
+        launchAtLoginInitializing = true;
+        try
+        {
+            if (!IsPackaged())
+            {
+                launchAtLogin.Checked = IsRegistryLaunchAtLoginEnabled();
+                return;
+            }
+
+            var startupTask = await Windows.ApplicationModel.StartupTask.GetAsync(StartupTaskId);
+            launchAtLogin.Checked =
+                startupTask.State == Windows.ApplicationModel.StartupTaskState.Enabled;
+        }
+        catch
+        {
+            launchAtLogin.Checked = false;
+            launchAtLogin.Enabled = false;
+            launchAtLogin.Text = "Open at sign in is unavailable for this installation";
+        }
+        finally
+        {
+            launchAtLoginInitializing = false;
+        }
+    }
+
+    private async Task HandleLaunchAtLoginChangedAsync()
+    {
+        if (launchAtLoginInitializing) return;
+        if (!IsPackaged())
+        {
+            SetRegistryLaunchAtLogin(launchAtLogin.Checked);
+            return;
+        }
+
+        launchAtLoginInitializing = true;
+        try
+        {
+            var startupTask = await Windows.ApplicationModel.StartupTask.GetAsync(StartupTaskId);
+            if (!launchAtLogin.Checked)
+            {
+                startupTask.Disable();
+                return;
+            }
+
+            var state = await startupTask.RequestEnableAsync();
+            if (state == Windows.ApplicationModel.StartupTaskState.Enabled) return;
+
+            launchAtLogin.Checked = false;
+            var detail =
+                state == Windows.ApplicationModel.StartupTaskState.DisabledByUser
+                    ? "Windows has disabled this startup task. Re-enable DevinX Connector in Settings > Apps > Startup."
+                    : "Windows could not enable DevinX Connector at sign in on this PC.";
+            MessageBox.Show(
+                this,
+                detail,
+                "Open at sign in",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch
+        {
+            launchAtLogin.Checked = false;
+            MessageBox.Show(
+                this,
+                "Windows could not update the startup setting. Reopen DevinX Connector and try again.",
+                "Open at sign in",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+        finally
+        {
+            launchAtLoginInitializing = false;
+        }
+    }
+
+    private static bool IsPackaged()
+    {
+        try
+        {
+            return !string.IsNullOrWhiteSpace(Windows.ApplicationModel.Package.Current.Id.Name);
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsRegistryLaunchAtLoginEnabled()
     {
         using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: false);
         return key?.GetValue(StartupValueName) is string;
     }
 
-    private static void SetLaunchAtLogin(bool enabled)
+    private static void SetRegistryLaunchAtLogin(bool enabled)
     {
         using var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
         if (enabled) key.SetValue(StartupValueName, $"\"{Application.ExecutablePath}\"");

@@ -120,7 +120,8 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByText('Open Tailscale setup guide')).toBeTruthy();
     expect(screen.getByText('Set up DevinX Connector')).toBeTruthy();
     expect(screen.getByText('Send assisted setup prompt')).toBeTruthy();
-    expect(screen.getByText('Open official releases')).toBeTruthy();
+    expect(screen.getByText('Mac release')).toBeTruthy();
+    expect(screen.getByText('Windows Store')).toBeTruthy();
     expect(
       screen.getByText(/Tailscale alone does not expose Devin sessions/),
     ).toBeTruthy();
@@ -170,7 +171,12 @@ describe('Computer connection onboarding', () => {
     const screen = render(<ComputerConnectionScreen />);
 
     await waitFor(() => expect(screen.getByText('Connector update required')).toBeTruthy());
-    expect(screen.getByLabelText('Open official DevinX Connector update')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Open official DevinX Connector update for Mac'),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Open DevinX Connector update in Microsoft Store'),
+    ).toBeTruthy();
     expect(screen.getByText(/0.1.2 or later/)).toBeTruthy();
   });
 

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap10 desktop rescap">
+  <Identity
+    Name="{{IDENTITY_NAME}}"
+    Publisher="{{PUBLISHER}}"
+    Version="{{VERSION}}"
+    ProcessorArchitecture="{{ARCHITECTURE}}" />
+  <Properties>
+    <DisplayName>DevinX Connector</DisplayName>
+    <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="{{MINIMUM_WINDOWS_VERSION}}"
+      MaxVersionTested="{{MAXIMUM_WINDOWS_VERSION_TESTED}}" />
+  </Dependencies>
+  <Applications>
+    <Application
+      Id="DevinXConnector"
+      Executable="DevinX Connector.exe"
+      EntryPoint="Windows.FullTrustApplication"
+      uap10:RuntimeBehavior="win32App"
+      uap10:TrustLevel="mediumIL">
+      <uap:VisualElements
+        DisplayName="DevinX Connector"
+        Description="Securely connect DevinX on iPhone to Devin running on this Windows PC."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <desktop:Extension
+          Category="windows.startupTask"
+          Executable="DevinX Connector.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask
+            TaskId="DevinXConnectorStartup"
+            Enabled="false"
+            DisplayName="DevinX Connector" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
