@@ -23,6 +23,8 @@
     "connector:open:macos": "npm run connector:build:macos && open 'artifacts/connector/DevinX Connector.app'",
     "connector:build:windows": "node scripts/connector/build-windows.mjs",
     "connector:verify:windows": "node scripts/connector/verify-windows-artifact.mjs",
+    "connector:build:windows:store": "npm run connector:build:windows && node scripts/connector/build-windows-msix.mjs",
+    "connector:verify:windows:store": "node scripts/connector/verify-windows-msix.mjs",
     "build": "echo 'EAS build is invoked via eas build; CI validates both app and bridge TypeScript' && tsc --noEmit && npm run bridge:build",
     "audit": "npm audit --audit-level=high",
     "ci": "npm run lint && npm run typecheck && npm run test && npm run build && npm run audit"

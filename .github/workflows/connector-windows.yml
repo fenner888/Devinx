@@ -31,11 +31,16 @@ jobs:
           npm run typecheck
           npm run test -- --ci --runInBand tests/bridge/bridge-service.test.ts tests/auth/computer-bridge.test.ts tests/lib/connector-version.test.ts
 
-      - name: Build unsigned Windows installer verification artifacts
-        run: npm run connector:build:windows
+      - name: Build Windows verification artifacts and Microsoft Store MSIX
+        run: npm run connector:build:windows:store
 
       - name: Verify installer lifecycle, package, pinned runtime, and DPAPI
         run: npm run connector:verify:windows
+
+      - name: Verify Microsoft Store identity and MSIX contents
+        env:
+          DEVINX_REQUIRE_MSIX_ARTIFACT: '1'
+        run: npm run connector:verify:windows:store
 
       - name: Audit JavaScript dependencies
         run: npm audit --audit-level=high
@@ -50,4 +55,13 @@ jobs:
             artifacts/connector/windows/DevinX-Connector-Setup-0.1.0-windows-x64.exe
             artifacts/connector/windows/DevinX-Connector-Setup-0.1.0-windows-x64.exe.sha256
             artifacts/connector/windows/verification-audit.json
+          if-no-files-found: error
+
+      - name: Upload Microsoft Store submission package
+        uses: actions/upload-artifact@v6
+        with:
+          name: devinx-connector-windows-x64-MICROSOFT-STORE-UPLOAD
+          path: |
+            artifacts/connector/windows/DevinX-Connector-*-windows-x64.msix
+            artifacts/connector/windows/DevinX-Connector-*-windows-x64.msix.sha256
           if-no-files-found: error

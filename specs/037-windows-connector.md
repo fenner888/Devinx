@@ -44,8 +44,10 @@ The Windows adapter owns only:
 - current-user DPAPI protection and the user-owned encrypted state file;
 - Windows `Path` executable discovery;
 - a native per-user control window and notification-area lifecycle;
-- explicit launch-at-sign-in registration;
-- packaging, Authenticode signing, update awareness, diagnostics, and uninstall; and
+- explicit launch-at-sign-in registration through the packaged Windows startup-task API, with a
+  current-user registry fallback only for separately gated unpackaged development builds;
+- Store packaging, update awareness, diagnostics, and uninstall, plus Authenticode signing only
+  for any separately released direct-download package; and
 - Windows Firewall guidance for the exact active Tailscale interface.
 
 The Windows shell launches the bundled, checksum-verified Node runtime as a child with redirected standard input/output. The existing bounded newline-delimited IPC protocol is the only native-to-runtime channel. QR payloads stay in memory and are rendered only in the native window.
@@ -66,7 +68,10 @@ Connector state is encrypted with Windows DPAPI using `CRYPTPROTECT_UI_FORBIDDEN
 - Normal operation is per-user and requires no administrator privilege or Windows service.
 - Closing the control window keeps Connector available through a visible notification-area icon.
 - **Quit DevinX Connector** explicitly stops the child runtime and listener.
-- Launch at sign-in is opt-in and visible. It may use an allowlisted current-user startup registration; it may not create a system service or machine-wide task.
+- Launch at sign-in is opt-in and visible. The Store package uses the manifest-declared
+  `DevinXConnectorStartup` task and `Windows.ApplicationModel.StartupTask`; unpackaged development
+  builds may use an allowlisted current-user startup registration. Neither path may create a
+  system service or machine-wide task, and Connector must respect a user-disabled startup task.
 - The window presents connection health, short-lived QR, pending phone approval, separate read/send/create grants, paired-device revocation, code regeneration, update awareness, and reset/uninstall guidance.
 - Paired devices are ordered with the most recently paired device first.
 
@@ -74,22 +79,42 @@ Connector state is encrypted with Windows DPAPI using `CRYPTPROTECT_UI_FORBIDDEN
 
 The first supported package is Windows 11 x64. Windows 10 and Windows arm64 remain unsupported until separately tested and named in the compatibility matrix. The app and helper are self-contained. A public artifact requires:
 
-- an Authenticode code-signing certificate controlled by the DevinX publisher;
-- signature verification on every owned executable and installer;
+- a Microsoft Store MSIX whose package identity exactly matches the Partner Center reservation;
+- Microsoft Store signing and delivery for the public Store package;
 - a published adjacent SHA-256 checksum and provenance record;
 - the MIT license in both the installed application and distribution artifact;
-- explicit user-approved update/replacement with no silent installer; and
-- deterministic per-user uninstall that stops Connector and deletes only DevinX Connector state.
+- Store-managed updates and deterministic per-user uninstall that deletes only DevinX Connector
+  state; and
+- a separately gated direct-download installer only when every owned executable and installer has
+  a verified Authenticode signature controlled by the DevinX publisher.
 
-Unsigned CI artifacts are verification artifacts only. The mobile assisted setup prompt must ignore them and must stop when no signed Windows release exists. Product copy must describe Windows as an active release target without offering an unsigned artifact or promising that an unavailable package works.
+The Store identity is public packaging metadata, not a secret:
+
+- identity name: `DevinXTools.DevinXConnector`
+- publisher: `CN=43D84E24-857C-4C40-9DAA-1A6983913CD9`
+- publisher display name: `DevinX Tools`
+- Store ID: `9N52Z3FVMFH8`
+- package family: `DevinXTools.DevinXConnector_ydtgrt4yd5wrc`
+- default package language: `en-US`
+
+The committed Store identity file is the source of truth for manifest rendering. CI must reject any
+manifest or artifact whose name, publisher, architecture, version, language, logo assets, normalized
+packaged executable name (`DevinXConnector.exe`), or startup-task declaration drifts from it. The
+MSIX submitted to Partner Center is intentionally unsigned before upload;
+Microsoft signs the accepted Store package. It must never be offered as a direct-download build.
+
+Unsigned EXE/ZIP CI artifacts remain verification artifacts only. The mobile assisted setup prompt
+must ignore them and must stop when no Store-signed or Authenticode-signed Windows release exists.
+Product copy must describe Windows as an active release target without offering an unsigned artifact
+or promising that an unavailable package works.
 
 ## Acceptance gates
 
 Automated:
 
 - strict TypeScript and Windows native builds on a pinned Windows CI image;
-- fail-closed Authenticode signing and verification for the application, DPAPI helper, and
-  per-user installer;
+- fail-closed Authenticode signing and verification for any separately released direct-download
+  application, DPAPI helper, and per-user installer; ordinary CI artifacts remain non-release;
 - DPAPI set/get/delete, not-found, size-limit, malformed-input, and wrong-user failure tests;
 - in-memory .NET TLS identity generation, cryptographic key/certificate matching, bounded helper
   output, and encrypted persistence without an OpenSSL installation;
@@ -97,6 +122,8 @@ Automated:
 - shared pairing, authorization, rate-limit, replay, grant, revoke, endpoint-refresh, and generic-404 suites;
 - package contents, installer registration/uninstall lifecycle, MIT license, pinned runtime
   checksum, secret scan, dependency audit, and artifact checksum verification; and
+- exact Partner Center identity rendering, MSIX schema validation, Store asset dimensions,
+  `runFullTrust`, Windows 11 targeting, and an opt-in packaged startup task; and
 - mobile copy tests proving **Local** does not change persisted `computer` identifiers.
 
 Physical Windows 11 x64:

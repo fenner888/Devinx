@@ -15,7 +15,14 @@ The separate Connector application is the current supported way to install and o
 
 ## User experience
 
-1. Download the supported signed connector from the official DevinX release page. Connector 0.1.2 currently supports Apple-silicon Macs. Windows 11 x64 is an active release implementation; its public download activates only after the signed installer and physical test matrix pass. Linux and Intel Mac packages remain unavailable.
+1. Choose the trusted package for the computer:
+   - Apple-silicon macOS: download the signed DMG and checksum from the
+     [official DevinX release page](https://github.com/fenner888/Devinx/releases/latest).
+   - Windows 11 x64: install only
+     [DevinX Connector from Microsoft Store](https://apps.microsoft.com/detail/9N52Z3FVMFH8)
+     after the listing is public. The package must be published by **DevinX Tools** with Store ID
+     `9N52Z3FVMFH8`.
+   Linux and Intel Mac packages remain unavailable.
 2. Install and open **DevinX Connector**.
 3. Connect the computer and iPhone to the same Tailscale network, then confirm that the connector shows Tailscale and Devin for Terminal.
 4. In the iPhone app, open **Settings → Local devices → Add local device → Scan pairing code**.
@@ -87,12 +94,13 @@ The app bundle and DMG root both include `LICENSE.txt`, byte-for-byte matching t
 
 ## Windows 11 x64 active release track
 
-On a Windows 11 x64 development machine with Node 24 and .NET 10 installed:
+On a Windows 11 x64 development machine with Node 24, .NET 10, and the Windows 11 SDK installed:
 
 ```powershell
 npm ci --legacy-peer-deps
-npm run connector:build:windows
+npm run connector:build:windows:store
 npm run connector:verify:windows
+npm run connector:verify:windows:store
 ```
 
 The build compiles a native per-user Windows control surface, a current-user DPAPI helper, and a
@@ -105,21 +113,27 @@ The signed native helper also creates the Connector's bounded self-signed TLS id
 with .NET cryptography. Windows does not need OpenSSL, and the resulting identity is retained only
 inside the current user's DPAPI-protected Connector state.
 
-Ordinary CI uploads only an explicitly named **UNSIGNED-NOT-FOR-RELEASE** artifact. The manual
-**Windows Connector Signed Candidate** workflow fails closed unless the protected
-`windows-connector-release` environment supplies:
+Ordinary CI uploads two deliberately separate artifacts:
 
-- `WINDOWS_SIGNING_PFX_BASE64` and `WINDOWS_SIGNING_PFX_PASSWORD` secrets for the publisher's
-  Authenticode identity; and
-- a `WINDOWS_TIMESTAMP_URL` variable for an RFC 3161 timestamp service.
+- an EXE/ZIP verification artifact explicitly named **UNSIGNED-NOT-FOR-RELEASE**; and
+- an unsigned MSIX explicitly named **MICROSOFT-STORE-UPLOAD** whose manifest uses the exact
+  Partner Center identity.
 
-Repository administrators must restrict that environment to the protected `main` branch, require a
-human reviewer, and prevent self-review where the GitHub plan supports it. The signing identity must
-not be exposed to pull-request workflows or ordinary branch builds.
+The MSIX is uploaded only to Partner Center. Microsoft signs the accepted Store package; the
+unsigned upload MSIX must never be sideloaded or offered as a direct download. The identity is:
 
-That workflow signs and verifies every DevinX-owned EXE, verifies the signed installer lifecycle,
-and uploads a candidate for physical testing. It does not publish a GitHub release. Public
-distribution still requires clean-account install/update/uninstall, SmartScreen/signature
+- package identity: `DevinXTools.DevinXConnector`
+- publisher: `CN=43D84E24-857C-4C40-9DAA-1A6983913CD9`
+- publisher display name: `DevinX Tools`
+- Store ID: `9N52Z3FVMFH8`
+- package family: `DevinXTools.DevinXConnector_ydtgrt4yd5wrc`
+
+The Store package declares an opt-in Windows startup task. Connector uses the packaged
+`Windows.ApplicationModel.StartupTask` API and respects a task disabled by the user in Windows
+Settings or Task Manager. A separately distributed direct-download installer remains a distinct
+future gate and would require Authenticode signing for every owned executable and installer.
+
+Public distribution still requires clean-account install/update/uninstall, Store signature
 inspection, Windows Firewall validation, official Devin ACP validation, and the complete physical
 matrix in `specs/037-windows-connector.md`.
 
@@ -134,7 +148,8 @@ matrix in `specs/037-windows-connector.md`.
 - The Devin CLI is discovered from an allowlisted application PATH and launched only through the fixed ACP subcommand.
 - Bridge identity, TLS material, and paired-device records stay in macOS Keychain or Windows current-user DPAPI storage.
 - The QR payload crosses only the inherited connector process pipe and the native in-memory renderer.
-- Launch at login is an explicit user toggle and uses the per-user macOS login-item API.
+- Launch at login is an explicit user toggle. macOS uses the per-user login-item API; the Windows
+  Store package uses its manifest-declared startup task and Windows' packaged startup API.
 
 ## Release gates
 
