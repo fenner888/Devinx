@@ -7,7 +7,9 @@ import {
   acpWorkingDirectory,
   AcpSessionClient,
   isAcpSessionInUseError,
+  listDevinCliModelCatalog,
   parseAcpModelCatalog,
+  parseDevinCliModelCatalog,
   safeAcpChildEnvironment,
 } from '../../bridge/src/acp';
 
@@ -85,6 +87,100 @@ process.stdin.on('data', (chunk) => {
         NODE_ENV: 'test',
       }),
     ).toBe('/Users/tester');
+  });
+
+  it('parses the bounded account-scoped Devin CLI model catalog', () => {
+    expect(
+      parseDevinCliModelCatalog(
+        {
+          families: [
+            {
+              family_label: 'Claude Opus 5',
+              variants: [
+                {
+                  model_uid: 'claude-opus-5-medium',
+                  label: 'Claude Opus 5 Medium',
+                  description: 'Balanced reasoning',
+                  is_new: true,
+                  cost_summary: 'private display metadata is ignored',
+                },
+              ],
+            },
+            {
+              family_label: 'Adaptive',
+              variants: [{ model_uid: 'adaptive', label: 'Adaptive', is_new: false }],
+            },
+          ],
+        },
+        'claude-opus-5-medium',
+      ),
+    ).toEqual({
+      defaultModelId: 'claude-opus-5-medium',
+      models: [
+        {
+          id: 'claude-opus-5-medium',
+          name: 'Claude Opus 5 Medium',
+          description: 'Balanced reasoning',
+          badge: 'new',
+        },
+        { id: 'adaptive', name: 'Adaptive' },
+      ],
+    });
+  });
+
+  it('loads the model catalog through the Devin CLI machine-readable command', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'devinx-model-catalog-'));
+    temporaryDirectories.push(directory);
+    const executable = join(directory, 'devin');
+    writeFileSync(
+      executable,
+      `#!/usr/bin/env node
+if (process.argv.slice(2).join(' ') !== 'models list --format json') process.exit(2);
+process.stdout.write(JSON.stringify({
+  families: [
+    { variants: [{ model_uid: 'adaptive', label: 'Adaptive', is_new: false }] },
+    { variants: [{ model_uid: 'swe-1-8', label: 'SWE-1.8', is_new: true }] }
+  ]
+}));
+`,
+      { encoding: 'utf8' },
+    );
+    chmodSync(executable, 0o700);
+
+    await expect(listDevinCliModelCatalog(executable)).resolves.toEqual({
+      defaultModelId: 'adaptive',
+      models: [
+        { id: 'adaptive', name: 'Adaptive' },
+        { id: 'swe-1-8', name: 'SWE-1.8', badge: 'new' },
+      ],
+    });
+  });
+
+  it('rejects duplicate model IDs from the Devin CLI catalog', () => {
+    expect(() =>
+      parseDevinCliModelCatalog({
+        families: [
+          { variants: [{ model_uid: 'adaptive', label: 'Adaptive', is_new: false }] },
+          { variants: [{ model_uid: 'adaptive', label: 'Adaptive duplicate', is_new: false }] },
+        ],
+      }),
+    ).toThrow('duplicate IDs');
+  });
+
+  it('rejects oversized Devin CLI catalog output', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'devinx-model-catalog-oversized-'));
+    temporaryDirectories.push(directory);
+    const executable = join(directory, 'devin');
+    writeFileSync(
+      executable,
+      `#!/usr/bin/env node
+process.stdout.write(' '.repeat(1024 * 1024 + 1));
+`,
+      { encoding: 'utf8' },
+    );
+    chmodSync(executable, 0o700);
+
+    await expect(listDevinCliModelCatalog(executable)).rejects.toThrow('size limit');
   });
 
   it('initializes, capability-gates, and returns minimized validated session metadata', async () => {

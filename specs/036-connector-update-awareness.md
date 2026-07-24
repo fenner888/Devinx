@@ -1,6 +1,6 @@
 # Connector update awareness
 
-Status: implemented for Connector 0.1.2; Connector 0.1.3 remains a release candidate until its signed and notarized artifact is published
+Status: implemented for Connector 0.1.3; Connector 0.1.4 remains a release candidate until its signed and notarized artifact is published
 
 ## Purpose
 
