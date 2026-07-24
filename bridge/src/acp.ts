@@ -18,6 +18,8 @@ const MAX_REPLAY_NOTIFICATIONS = 10_000;
 const MAX_REPLAY_MESSAGES = 200;
 const MAX_REPLAY_TEXT_BYTES = 160 * 1024;
 const MAX_MESSAGE_TEXT_BYTES = 100 * 1024;
+const MAX_MODEL_CATALOG_BYTES = 1024 * 1024;
+const MODEL_CATALOG_TIMEOUT_MS = 10_000;
 const MAX_ELICITATION_FIELDS = 16;
 const MAX_ELICITATION_OPTIONS = 100;
 const MAX_ELICITATION_TEXT_LENGTH = 10_000;
@@ -159,6 +161,35 @@ const selectConfigOptionSchema = z
 
 const setConfigOptionResultSchema = z
   .object({ configOptions: z.array(z.unknown()).max(1_000) })
+  .passthrough();
+
+const devinModelCatalogSchema = z
+  .object({
+    families: z
+      .array(
+        z
+          .object({
+            variants: z
+              .array(
+                z
+                  .object({
+                    model_uid: z
+                      .string()
+                      .min(1)
+                      .max(160)
+                      .regex(/^[A-Za-z0-9._:+-]+$/),
+                    label: z.string().min(1).max(160),
+                    description: z.string().min(1).max(500).optional(),
+                    is_new: z.boolean().default(false),
+                  })
+                  .passthrough(),
+              )
+              .max(200),
+          })
+          .passthrough(),
+      )
+      .max(100),
+  })
   .passthrough();
 
 const promptResponseSchema = z
@@ -798,6 +829,92 @@ export function parseAcpModelCatalog(
   return parseAcpModelSelector(configOptions)?.catalog ?? null;
 }
 
+export function parseDevinCliModelCatalog(
+  input: unknown,
+  previousDefaultModelId?: string,
+): AcpModelCatalog {
+  const parsed = devinModelCatalogSchema.parse(input);
+  const models = parsed.families.flatMap((family) =>
+    family.variants.map((variant) => ({
+      id: variant.model_uid,
+      name: variant.label,
+      ...(variant.description ? { description: variant.description } : {}),
+      ...(variant.is_new ? { badge: 'new' as const } : {}),
+    })),
+  );
+  if (models.length === 0 || models.length > 200) {
+    throw new Error('Devin CLI model catalog has an invalid size');
+  }
+  const ids = models.map((model) => model.id);
+  if (new Set(ids).size !== ids.length) {
+    throw new Error('Devin CLI model catalog contains duplicate IDs');
+  }
+  const defaultModelId =
+    previousDefaultModelId && ids.includes(previousDefaultModelId)
+      ? previousDefaultModelId
+      : ids.includes('adaptive')
+        ? 'adaptive'
+        : ids[0];
+  if (!defaultModelId) throw new Error('Devin CLI model catalog has no default');
+  return { defaultModelId, models };
+}
+
+export async function listDevinCliModelCatalog(
+  executablePath: string,
+  previousDefaultModelId?: string,
+): Promise<AcpModelCatalog> {
+  const validatedPath = acpClientOptionsSchema.shape.executablePath.parse(executablePath);
+  const environment = safeAcpChildEnvironment();
+  const workingDirectory = acpWorkingDirectory(environment);
+  return new Promise<AcpModelCatalog>((resolve, reject) => {
+    const child = spawn(validatedPath, ['models', 'list', '--format', 'json'], {
+      cwd: workingDirectory,
+      env: environment,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let output = '';
+    let outputBytes = 0;
+    let settled = false;
+    const finish = (error?: Error, value?: AcpModelCatalog) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else if (value) resolve(value);
+      else reject(new Error('Devin CLI model catalog is unavailable'));
+    };
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM');
+      finish(new Error('Devin CLI model catalog timed out'));
+    }, MODEL_CATALOG_TIMEOUT_MS);
+    timer.unref();
+    child.stdout.on('data', (chunk: Buffer) => {
+      outputBytes += chunk.length;
+      if (outputBytes > MAX_MODEL_CATALOG_BYTES) {
+        child.kill('SIGTERM');
+        finish(new Error('Devin CLI model catalog exceeded the size limit'));
+        return;
+      }
+      output += chunk.toString('utf8');
+    });
+    child.stderr.resume();
+    child.on('error', () => finish(new Error('Devin CLI model catalog could not be started')));
+    child.on('close', (code) => {
+      if (settled) return;
+      if (code !== 0) {
+        finish(new Error('Devin CLI model catalog command failed'));
+        return;
+      }
+      try {
+        finish(undefined, parseDevinCliModelCatalog(JSON.parse(output), previousDefaultModelId));
+      } catch {
+        finish(new Error('Devin CLI model catalog failed validation'));
+      }
+    });
+  });
+}
+
 function cloneModelCatalog(catalog: AcpModelCatalog): AcpModelCatalog {
   return {
     defaultModelId: catalog.defaultModelId,
@@ -1037,6 +1154,18 @@ export class AcpSessionClient {
     const previousCatalog = this.modelCatalog ? cloneModelCatalog(this.modelCatalog) : null;
     if (forceRefresh) this.modelCatalog = null;
     try {
+      if (forceRefresh) {
+        try {
+          const catalog = await listDevinCliModelCatalog(
+            this.options.executablePath,
+            previousCatalog?.defaultModelId,
+          );
+          this.modelCatalog = catalog;
+          return cloneModelCatalog(catalog);
+        } catch {
+          // Older Devin CLI releases fall back to bounded ACP session discovery.
+        }
+      }
       if (!this.canListSessions || !this.canLoadSessions) {
         throw new Error('ACP agent does not support model discovery');
       }

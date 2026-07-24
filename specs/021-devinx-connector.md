@@ -1,6 +1,6 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: macOS Connector 0.1.2 is the supported public release. Version 0.1.3 is the validated source candidate for live model-catalog refresh and does not become the supported public release until its signed, notarized artifact and checksum are published. Windows implementation is tracked by spec 037 and remains unavailable to end users until its existing Microsoft Store submission passes certification and the physical test matrix. Linux and Intel Mac packages remain roadmap targets.
+Status: macOS Connector 0.1.3 is the supported public release. Version 0.1.4 is the validated source candidate for reliable direct CLI model-catalog refresh and does not become the supported public release until its signed, notarized artifact and checksum are published. Windows implementation is tracked by spec 037 and remains unavailable to end users until its existing Microsoft Store submission passes certification and the physical test matrix. Linux and Intel Mac packages remain roadmap targets.
 
 ## Product decision
 

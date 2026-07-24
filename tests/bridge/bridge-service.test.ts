@@ -297,7 +297,7 @@ describe('authenticated Desktop Bridge service', () => {
   it('returns the authenticated Connector version without changing the health contract', async () => {
     await expect(service().handle(envelope('bridge.version', {}), context())).resolves.toEqual({
       status: 200,
-      body: { version: '0.1.3' },
+      body: { version: '0.1.4' },
     });
   });
 

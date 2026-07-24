@@ -34,18 +34,24 @@ cannot enforce.
 `session.create_options` combines two local sources:
 
 1. the reviewed session store supplies opaque workspace handles and ordered recent model IDs;
-2. the active ACP agent supplies the authoritative model selector from session `configOptions`.
+2. the installed Devin CLI supplies the authoritative account-scoped catalog through
+   `devin models list --format json`.
 
 Recent model IDs are optional hints. Empty historical model markers are ignored rather than making
-workspace discovery unavailable; they never become selectable IDs. The live ACP catalog remains
+workspace discovery unavailable; they never become selectable IDs. The live CLI catalog remains
 authoritative for creation.
 
-The Connector obtains ACP configuration from a bounded existing-session load and caches the
-sanitized catalog for the Connector process lifetime. The phone may explicitly request a refresh
-through the authenticated `session.create_options` request body with `{ "refresh": true }`. A
-refresh bypasses the process cache, repeats the same bounded existing-session discovery, and
-replaces the cache only after a valid live catalog is available. It does not create a probe session,
-send a prompt, expose replayed content, or return raw ACP extensions.
+The Connector obtains the complete catalog from the installed Devin CLI's bounded,
+machine-readable `models list` command and caches the sanitized result for the Connector process
+lifetime. The CLI output is account scoped and therefore reflects only models available to the
+signed-in Devin user. The Connector keeps the prior bounded existing-session ACP discovery as a
+compatibility fallback for older CLI releases that do not expose the command.
+
+The phone may explicitly request a refresh through the authenticated `session.create_options`
+request body with `{ "refresh": true }`. A refresh bypasses the process cache, reruns the
+machine-readable catalog command, and replaces the cache only after a valid live catalog is
+available. It does not create a probe session, send a prompt, expose replayed content, or return raw
+CLI or ACP extensions.
 
 The Home and Local-session model pickers refresh automatically when opened and also expose a
 44-point accessible refresh control. While refresh is in progress the previous validated catalog
@@ -76,16 +82,18 @@ it, so stale catalogs fail closed.
   returned to the phone.
 - Catalog and string sizes are bounded; duplicate IDs fail validation.
 - Unknown metadata is ignored. Only explicit allowlisted scalar keys can influence presentation.
-- No new dependency or hardcoded model catalog is introduced.
+- No new dependency or hardcoded model catalog is introduced. The only default-selection fallback
+  is the CLI's stable `adaptive` model when it is present; otherwise the first validated
+  account-scoped model is used only to satisfy the existing ACP recommendation contract.
 - This remains a coordinated pre-release Connector/mobile contract change. The updated Connector is
   not distributed ahead of the matching mobile build; public compatibility/version negotiation must
   be finalized before independent Connector updates are enabled.
 
 ## Validation
 
-- ACP tests cover full ordered catalogs, descriptions, recommendation, metadata allowlisting,
-  duplicate rejection, in-use-session fallback, and no session creation or prompting during
-  discovery.
+- CLI and ACP tests cover full ordered catalogs, descriptions, recommendation, metadata
+  allowlisting, duplicate rejection, bounded output, in-use-session fallback, and no session
+  creation or prompting during discovery.
 - Bridge tests cover recent/live merging, bounded responses, stale-model rejection, and metadata
   minimization, including forced-refresh propagation and failure preservation.
 - Mobile tests cover Recommended, Recent, All Models, search, deduplication, badges, dismissal,
