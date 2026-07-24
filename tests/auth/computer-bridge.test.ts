@@ -341,6 +341,28 @@ describe('authenticated mobile Computer Bridge client', () => {
     });
   });
 
+  it('requests a forced local model-catalog refresh without accepting client catalog input', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        workspaces: [],
+        models: [{ id: 'swe-1.8', name: 'SWE-1.8', recent: false, recommended: true }],
+        defaultModelId: 'swe-1.8',
+        catalogSource: 'live',
+      },
+    });
+
+    await expect(getComputerCreateOptions(BRIDGE_ID, true)).resolves.toMatchObject({
+      models: [{ id: 'swe-1.8', name: 'SWE-1.8' }],
+      defaultModelId: 'swe-1.8',
+      catalogSource: 'live',
+    });
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
+      method: 'session.create_options',
+      body: { refresh: true },
+    });
+  });
+
   it('revokes on the Mac before removing the local computer credential', async () => {
     mockPostPinnedBridgeJson.mockResolvedValue({ status: 200, body: { revoked: true } });
 

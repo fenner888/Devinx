@@ -60,6 +60,13 @@ The iPhone app also performs an authenticated version handshake with each paired
 Connector produces a visible **Connector update required** action that opens only the official
 latest-release page; an offline or revoked Connector retains its separate recovery message.
 
+Connector 0.1.3 adds an authenticated live refresh for the local Devin model catalog. Opening the
+local model picker asks Connector for a fresh ACP catalog, and the picker also provides a manual
+refresh control. The request remains device-signed, permission-checked, replay-protected, rate
+limited, and strictly validated. A failed refresh never erases the last valid catalog. Mobile
+clients retain Connector 0.1.2 as the minimum compatible version: older Connectors keep all existing
+local-session behavior, but users must install 0.1.3 to receive a newly forced model catalog.
+
 To remove the Connector, choose **Uninstall DevinX Connector** in the native app and confirm. The
 Connector stops its private listener before deleting its own Keychain identity and paired-iPhone
 permissions, unregisters launch at login, moves itself to Trash, and quits. Reinstalling requires a

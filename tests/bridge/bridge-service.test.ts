@@ -108,6 +108,7 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     defaultModelId: 'gpt-5-6-sol-medium',
     catalogSource: 'live' as const,
   };
+  createOptionRefreshes: boolean[] = [];
   creations: Array<{ cwd: string; modelId: string | null; text: string }> = [];
 
   isSessionListSupported(): boolean {
@@ -175,7 +176,8 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     return this.createSupported;
   }
 
-  async listCreateOptions() {
+  async listCreateOptions(forceRefresh = false) {
+    this.createOptionRefreshes.push(forceRefresh);
     return this.createOptions;
   }
 
@@ -295,7 +297,7 @@ describe('authenticated Desktop Bridge service', () => {
   it('returns the authenticated Connector version without changing the health contract', async () => {
     await expect(service().handle(envelope('bridge.version', {}), context())).resolves.toEqual({
       status: 200,
-      body: { version: '0.1.2' },
+      body: { version: '0.1.3' },
     });
   });
 
@@ -471,6 +473,33 @@ describe('authenticated Desktop Bridge service', () => {
       },
     });
     expect(JSON.stringify(result)).not.toContain('/Users/frank');
+    expect(adapter.createOptionRefreshes).toEqual([false]);
+  });
+
+  it('propagates a validated forced model-catalog refresh to the local ACP adapter', async () => {
+    const result = await service().handle(
+      envelope('session.create_options', { refresh: true }, ['session:metadata:read']),
+      context(),
+    );
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        defaultModelId: 'gpt-5-6-sol-medium',
+        catalogSource: 'live',
+      },
+    });
+    expect(adapter.createOptionRefreshes).toEqual([true]);
+  });
+
+  it('rejects malformed model-catalog refresh input before dispatch', async () => {
+    const result = await service().handle(
+      envelope('session.create_options', { refresh: 'yes' }, ['session:metadata:read']),
+      context(),
+    );
+
+    expect(result).toEqual({ status: 400, body: { error: 'invalid_request' } });
+    expect(adapter.createOptionRefreshes).toEqual([]);
   });
 
   it('creates a local session only with the separate create grant and validated options', async () => {

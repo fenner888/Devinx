@@ -1031,37 +1031,52 @@ export class AcpSessionClient {
     return Boolean(this.child);
   }
 
-  async listModelCatalog(): Promise<AcpModelCatalog> {
+  async listModelCatalog(forceRefresh = false): Promise<AcpModelCatalog> {
     if (!this.child) throw new Error('ACP client is not started');
-    if (this.modelCatalog) return cloneModelCatalog(this.modelCatalog);
-    if (!this.canListSessions || !this.canLoadSessions) {
-      throw new Error('ACP agent does not support model discovery');
-    }
-    if (this.activeLoad || this.activePromptSessionId || this.creatingContinuation) {
-      throw new AcpBusyError();
-    }
-    let cursor: string | undefined;
-    let attempts = 0;
-    while (attempts < 20) {
-      const page = await this.listSessions(cursor ? { cursor } : {});
-      for (const session of page.sessions) {
-        if (attempts >= 20) break;
-        attempts += 1;
-        try {
-          await this.loadSession(session.sessionId);
-          if (this.modelCatalog) {
-            const catalog = cloneModelCatalog(this.modelCatalog);
-            await this.releaseSessionOwnership(session.sessionId);
-            return catalog;
-          }
-        } catch (error) {
-          if (!isAcpSessionInUseError(error)) continue;
-        }
+    if (this.modelCatalog && !forceRefresh) return cloneModelCatalog(this.modelCatalog);
+    const previousCatalog = this.modelCatalog ? cloneModelCatalog(this.modelCatalog) : null;
+    if (forceRefresh) this.modelCatalog = null;
+    try {
+      if (!this.canListSessions || !this.canLoadSessions) {
+        throw new Error('ACP agent does not support model discovery');
       }
-      if (!page.nextCursor) break;
-      cursor = page.nextCursor;
+      if (this.activeLoad || this.activePromptSessionId || this.creatingContinuation) {
+        throw new AcpBusyError();
+      }
+      let cursor: string | undefined;
+      let attempts = 0;
+      while (attempts < 20) {
+        const page = await this.listSessions(cursor ? { cursor } : {});
+        for (const session of page.sessions) {
+          if (attempts >= 20) break;
+          attempts += 1;
+          let loaded = false;
+          try {
+            await this.loadSession(session.sessionId);
+            loaded = true;
+            if (this.modelCatalog) {
+              return cloneModelCatalog(this.modelCatalog);
+            }
+          } catch (error) {
+            if (!isAcpSessionInUseError(error)) continue;
+          } finally {
+            if (loaded) {
+              try {
+                await this.releaseSessionOwnership(session.sessionId);
+              } catch {
+                // Catalog discovery must not fail because best-effort ownership release did.
+              }
+            }
+          }
+        }
+        if (!page.nextCursor) break;
+        cursor = page.nextCursor;
+      }
+      throw new Error('ACP model catalog is unavailable');
+    } catch (error) {
+      if (forceRefresh) this.modelCatalog = previousCatalog;
+      throw error;
     }
-    throw new Error('ACP model catalog is unavailable');
   }
 
   async loadSession(input: unknown): Promise<AcpLoadedSession> {

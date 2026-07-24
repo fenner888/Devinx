@@ -41,9 +41,18 @@ workspace discovery unavailable; they never become selectable IDs. The live ACP 
 authoritative for creation.
 
 The Connector obtains ACP configuration from a bounded existing-session load and caches the
-sanitized catalog for the Connector process lifetime. It does not create a probe session, send a
-prompt, expose replayed content, or return raw ACP extensions. If live discovery is unavailable, the
-Connector may return the bounded recent list as an explicitly non-authoritative fallback.
+sanitized catalog for the Connector process lifetime. The phone may explicitly request a refresh
+through the authenticated `session.create_options` request body with `{ "refresh": true }`. A
+refresh bypasses the process cache, repeats the same bounded existing-session discovery, and
+replaces the cache only after a valid live catalog is available. It does not create a probe session,
+send a prompt, expose replayed content, or return raw ACP extensions.
+
+The Home and Local-session model pickers refresh automatically when opened and also expose a
+44-point accessible refresh control. While refresh is in progress the previous validated catalog
+stays usable. If refresh fails, DevinX keeps that catalog visible and shows a recoverable error; it
+does not relabel recent history as a successful live refresh. For ordinary non-refresh loading, if
+live discovery is unavailable, the Connector may still return the bounded recent list as an
+explicitly non-authoritative fallback.
 
 Returned model fields are limited to:
 
@@ -61,6 +70,8 @@ it, so stale catalogs fail closed.
 ## Security and compatibility
 
 - Protected requests remain signed, replay-protected, rate-limited, and Zod validated.
+- The optional refresh flag is the only accepted `session.create_options` input and is authorized
+  by the existing `session:metadata:read` grant.
 - No conversation text, raw session identifier, filesystem path, or arbitrary ACP `_meta` value is
   returned to the phone.
 - Catalog and string sizes are bounded; duplicate IDs fail validation.
@@ -76,9 +87,10 @@ it, so stale catalogs fail closed.
   duplicate rejection, in-use-session fallback, and no session creation or prompting during
   discovery.
 - Bridge tests cover recent/live merging, bounded responses, stale-model rejection, and metadata
-  minimization.
+  minimization, including forced-refresh propagation and failure preservation.
 - Mobile tests cover Recommended, Recent, All Models, search, deduplication, badges, dismissal,
-  accessibility labels, model-family grouping, reasoning/speed selection, exact-ID resolution, and
-  selected-model behavior.
+  accessibility labels, model-family grouping, reasoning/speed selection, exact-ID resolution,
+  selected-model behavior, and refresh success/failure states.
 - Physical QA confirms the list matches the installed Devin CLI and that a model absent from prior
-  history can create and run a session over Tailscale.
+  history can create and run a session over Tailscale. It also confirms that opening either Local
+  picker discovers a newly available ACP model without restarting DevinX Connector.

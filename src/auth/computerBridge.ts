@@ -183,7 +183,11 @@ const sessionPromptBodySchema = z
 const sessionPromptResponseSchema = z
   .object({ accepted: z.literal(true), sessionId: localSessionIdSchema.optional() })
   .strict();
-const sessionCreateOptionsBodySchema = z.object({}).strict();
+const sessionCreateOptionsBodySchema = z
+  .object({
+    refresh: z.boolean().optional(),
+  })
+  .strict();
 const sessionCreateOptionsResponseSchema = z
   .object({
     workspaces: z
@@ -705,8 +709,10 @@ async function requestSessionPrompt(
 
 async function requestSessionCreateOptions(
   credential: PairedComputerCredential,
+  input: { refresh?: boolean } = {},
 ): Promise<ComputerCreateOptions> {
-  const response = await requestComputer(credential, 'session.create_options', {});
+  const body = sessionCreateOptionsBodySchema.parse(input);
+  const response = await requestComputer(credential, 'session.create_options', body);
   const result = sessionCreateOptionsResponseSchema.safeParse(response.body);
   if (!result.success) {
     throw new ComputerBridgeError(
@@ -748,7 +754,7 @@ export interface ComputerBridgeConnection {
     text: string,
     modelId?: string,
   ): Promise<void | { sessionId: string }>;
-  getCreateOptions(): Promise<ComputerCreateOptions>;
+  getCreateOptions(refresh?: boolean): Promise<ComputerCreateOptions>;
   createSession(input: {
     workspaceId: string;
     modelId?: string | null;
@@ -773,7 +779,8 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
         text,
         ...(modelId ? { modelId } : {}),
       }),
-    getCreateOptions: () => requestSessionCreateOptions(credential),
+    getCreateOptions: (refresh = false) =>
+      requestSessionCreateOptions(credential, refresh ? { refresh: true } : {}),
     createSession: (input) => requestSessionCreate(credential, input),
   };
 }
@@ -883,8 +890,11 @@ export async function promptComputerSession(
   return (await openComputerBridge(bridgeId)).promptSession(sessionId, text, modelId);
 }
 
-export async function getComputerCreateOptions(bridgeId: string): Promise<ComputerCreateOptions> {
-  return (await openComputerBridge(bridgeId)).getCreateOptions();
+export async function getComputerCreateOptions(
+  bridgeId: string,
+  refresh = false,
+): Promise<ComputerCreateOptions> {
+  return (await openComputerBridge(bridgeId)).getCreateOptions(refresh);
 }
 
 export async function createComputerSession(

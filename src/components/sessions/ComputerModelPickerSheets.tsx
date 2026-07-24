@@ -1,5 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ModelFamilyMark } from '@components/sessions/ModelFamilyMark';
@@ -20,6 +29,9 @@ interface ComputerModelPickerSheetsProps {
   onCloseModel: () => void;
   onCloseVariant: () => void;
   catalogSource?: 'live' | 'recent';
+  onRefresh?: () => Promise<unknown> | void;
+  refreshing?: boolean;
+  refreshError?: boolean;
 }
 
 export function ComputerModelPickerSheets({
@@ -31,10 +43,14 @@ export function ComputerModelPickerSheets({
   onCloseModel,
   onCloseVariant,
   catalogSource,
+  onRefresh,
+  refreshing = false,
+  refreshError = false,
 }: ComputerModelPickerSheetsProps) {
   const { height } = useWindowDimensions();
   const { tokens } = useTheme();
   const [query, setQuery] = useState('');
+  const refreshedForOpen = useRef(false);
   const families = useMemo(() => groupComputerModels(models), [models]);
   const selectedFamily = families.find((family) =>
     family.variants.some((variant) => variant.model.id === selectedModelId),
@@ -59,8 +75,16 @@ export function ComputerModelPickerSheets({
   );
 
   useEffect(() => {
-    if (modelVisible) setQuery('');
-  }, [modelVisible]);
+    if (!modelVisible) {
+      refreshedForOpen.current = false;
+      return;
+    }
+    setQuery('');
+    if (!refreshedForOpen.current && onRefresh) {
+      refreshedForOpen.current = true;
+      Promise.resolve(onRefresh()).catch(() => undefined);
+    }
+  }, [modelVisible, onRefresh]);
 
   function familyRow(family: ComputerModelFamily) {
     const selected = family.key === selectedFamily?.key;
@@ -135,14 +159,34 @@ export function ComputerModelPickerSheets({
           >
             <View className="mb-3 flex-row items-center justify-between">
               <Text className="text-text-low text-text14 font-medium">Model</Text>
-              <Pressable
-                className="h-9 w-9 items-center justify-center rounded-full"
-                onPress={onCloseModel}
-                accessibilityRole="button"
-                accessibilityLabel="Close model menu"
-              >
-                <Ionicons name="close" size={18} color={tokens.textLow.hex} />
-              </Pressable>
+              <View className="flex-row items-center">
+                {onRefresh && (
+                  <Pressable
+                    className="h-11 w-11 items-center justify-center rounded-full"
+                    onPress={() => {
+                      Promise.resolve(onRefresh()).catch(() => undefined);
+                    }}
+                    disabled={refreshing}
+                    accessibilityRole="button"
+                    accessibilityLabel="Refresh models from Devin"
+                    accessibilityState={{ disabled: refreshing, busy: refreshing }}
+                  >
+                    {refreshing ? (
+                      <ActivityIndicator size="small" color={tokens.brandText.hex} />
+                    ) : (
+                      <Ionicons name="refresh" size={18} color={tokens.brandText.hex} />
+                    )}
+                  </Pressable>
+                )}
+                <Pressable
+                  className="h-11 w-11 items-center justify-center rounded-full"
+                  onPress={onCloseModel}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close model menu"
+                >
+                  <Ionicons name="close" size={18} color={tokens.textLow.hex} />
+                </Pressable>
+              </View>
             </View>
             {models.length > 8 && (
               <View className="mb-3 flex-row items-center rounded-input border border-border-subtle bg-surface1 px-3">
@@ -193,7 +237,12 @@ export function ComputerModelPickerSheets({
                   )}
                   {catalogSource === 'recent' && (
                     <Text className="px-10 pb-3 pt-4 text-text-low text-text11">
-                      Showing recent models while Devin refreshes the full catalog.
+                      Showing recent models. Refresh to load the full catalog from Devin.
+                    </Text>
+                  )}
+                  {refreshError && (
+                    <Text className="px-10 pb-3 pt-4 text-failed text-text11">
+                      Couldn&apos;t refresh models. Your previous list is still available.
                     </Text>
                   )}
                 </>

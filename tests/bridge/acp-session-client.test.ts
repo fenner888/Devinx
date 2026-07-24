@@ -795,6 +795,7 @@ if (request.method === 'initialize') {
 
   it('discovers and caches the full model catalog from a bounded existing-session load', async () => {
     const executablePath = fakeCli(`
+globalThis.catalogLoads = globalThis.catalogLoads || 0;
 if (request.method === 'initialize') {
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
     protocolVersion: 1,
@@ -812,14 +813,22 @@ if (request.method === 'initialize') {
     code: -32600, message: 'Session is already open in another process'
   } }) + '\\n');
 } else if (request.method === 'session/load') {
+  globalThis.catalogLoads += 1;
+  const modelOptions = globalThis.catalogLoads > 1
+    ? [
+        { value: 'adaptive', name: 'Adaptive' },
+        { value: 'deepseek-v4', name: 'DeepSeek V4 Pro' },
+        { value: 'swe-1.8', name: 'SWE-1.8' }
+      ]
+    : [
+        { value: 'adaptive', name: 'Adaptive' },
+        { value: 'deepseek-v4', name: 'DeepSeek V4 Pro' }
+      ];
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
     configOptions: [{
       id: 'model', name: 'Model', category: 'model', type: 'select',
       currentValue: 'adaptive',
-      options: [
-        { value: 'adaptive', name: 'Adaptive' },
-        { value: 'deepseek-v4', name: 'DeepSeek V4 Pro' }
-      ]
+      options: modelOptions
     }]
   } }) + '\\n');
 } else if (request.method === 'session/close') {
@@ -833,6 +842,7 @@ if (request.method === 'initialize') {
       await client.start();
       const first = await client.listModelCatalog();
       const second = await client.listModelCatalog();
+      const refreshed = await client.listModelCatalog(true);
       expect(first).toEqual({
         defaultModelId: 'adaptive',
         models: [
@@ -842,6 +852,14 @@ if (request.method === 'initialize') {
       });
       expect(second).toEqual(first);
       expect(second).not.toBe(first);
+      expect(refreshed).toEqual({
+        defaultModelId: 'adaptive',
+        models: [
+          { id: 'adaptive', name: 'Adaptive' },
+          { id: 'deepseek-v4', name: 'DeepSeek V4 Pro' },
+          { id: 'swe-1.8', name: 'SWE-1.8' },
+        ],
+      });
     } finally {
       await client.stop();
     }

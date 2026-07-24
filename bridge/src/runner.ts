@@ -105,7 +105,7 @@ export interface AcpSessionLifecycle extends SessionDiscoveryAdapter {
     modelId?: string,
   ): Promise<string>;
   isSessionCreateSupported?(): boolean;
-  listModelCatalog?(): Promise<AcpModelCatalog>;
+  listModelCatalog?(forceRefresh?: boolean): Promise<AcpModelCatalog>;
   createSession?(cwd: string, modelId: string | null, text: string): Promise<string>;
 }
 
@@ -115,7 +115,7 @@ export interface SessionHistoryLifecycle {
   isSessionLoadSupported(): boolean;
   loadSession(sessionId: string): ReturnType<SessionDiscoveryAdapter['loadSession']>;
   getSessionPresentation?(sessionId: string): Promise<DevinSessionPresentation>;
-  listCreateOptions?(): Promise<DevinCreateOptions>;
+  listCreateOptions?(forceRefresh?: boolean): Promise<DevinCreateOptions>;
 }
 
 export interface DesktopBridgeRunnerDependencies {
@@ -286,14 +286,14 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     );
   }
 
-  async listCreateOptions(): Promise<DevinCreateOptions> {
+  async listCreateOptions(forceRefresh = false): Promise<DevinCreateOptions> {
     if (!this.isSessionCreateSupported() || !this.history?.listCreateOptions) {
       throw new Error('Session creation is not enabled');
     }
     const historyOptions = await this.history.listCreateOptions();
     const recentModelIds = new Set(historyOptions.models.map((model) => model.id));
     try {
-      const catalog = await this.current.listModelCatalog?.();
+      const catalog = await this.current.listModelCatalog?.(forceRefresh);
       if (catalog) {
         return {
           workspaces: historyOptions.workspaces,
@@ -306,7 +306,8 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
           catalogSource: 'live',
         };
       }
-    } catch {
+    } catch (error) {
+      if (forceRefresh) throw error;
       // Recent history remains a safe fallback when live ACP discovery is temporarily unavailable.
     }
     return {

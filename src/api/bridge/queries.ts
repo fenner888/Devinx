@@ -293,13 +293,28 @@ export function usePromptComputerSession(bridgeId: string, sessionId: string) {
 }
 
 export function useComputerCreateOptions(bridgeId: string, enabled = true) {
-  return useQuery({
-    queryKey: ['computerCreateOptions', bridgeId],
+  const queryClient = useQueryClient();
+  const queryKey = ['computerCreateOptions', bridgeId] as const;
+  const query = useQuery({
+    queryKey,
     queryFn: () => getComputerCreateOptions(bridgeId),
     enabled,
     staleTime: 30_000,
     retry: false,
   });
+  const refresh = useMutation({
+    mutationKey: ['refreshComputerCreateOptions', bridgeId],
+    mutationFn: () => getComputerCreateOptions(bridgeId, true),
+    onSuccess: (options) => {
+      queryClient.setQueryData(queryKey, options);
+    },
+  });
+  return {
+    ...query,
+    refreshCatalog: refresh.mutateAsync,
+    isRefreshingCatalog: refresh.isPending,
+    refreshCatalogError: refresh.error,
+  };
 }
 
 export function useCreateComputerSession(bridgeId: string) {
