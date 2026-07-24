@@ -19,7 +19,7 @@
 <p align="center">
   <a href="https://github.com/fenner888/Devinx/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fenner888/Devinx/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <a href="https://testflight.apple.com/join/KBD25apN"><img alt="TestFlight Build 67" src="https://img.shields.io/badge/TestFlight-0.1.0%20(67)-0D96F6?logo=apple"></a>
+  <a href="https://testflight.apple.com/join/KBD25apN"><img alt="TestFlight Build 77" src="https://img.shields.io/badge/TestFlight-0.1.0%20(77)-0D96F6?logo=apple"></a>
 </p>
 
 > [!IMPORTANT]
@@ -32,7 +32,7 @@
 
 | Product                          | Current release     | Availability                                                                                      |
 | -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------- |
-| **DevinX for iPhone**            | `0.1.0 (73)`        | [External TestFlight beta](https://testflight.apple.com/join/KBD25apN) · up to 100 testers        |
+| **DevinX for iPhone**            | `0.1.0 (77)`        | [External TestFlight beta](https://testflight.apple.com/join/KBD25apN) · up to 100 testers        |
 | **Public App Store version**     | `1.0`               | Submitted to Apple and waiting for App Review · manual release after approval                     |
 | **DevinX Connector for macOS**   | `0.1.2`             | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
 | **DevinX Connector for Windows** | active release work | Windows 11 x64 installer is implemented; signing and physical release gates remain                |
@@ -90,7 +90,7 @@ DevinX operates no relay for normal Cloud or Local session traffic.
 
 1. Install Apple's [TestFlight](https://apps.apple.com/app/testflight/id899247664) app.
 2. Open the [DevinX Early Access link](https://testflight.apple.com/join/KBD25apN).
-3. Install Build `0.1.0 (67)` and complete the in-app onboarding.
+3. Install Build `0.1.0 (77)` and complete the in-app onboarding.
 4. Choose **Devin Cloud**, **Local**, or **Cloud + Local**.
 
 ### Cloud setup

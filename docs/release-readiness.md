@@ -211,14 +211,19 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-Use the next iPhone-only Build 67 as the release and screenshot-validation target. Build 66 remains
-historical signed TestFlight evidence, but it advertises unvalidated iPad support and must not be the
-initial public binary. The owner already accepted Build 65 onboarding and assisted Connector setup;
-Build 67 preserves that flow and requires a narrow visual/setup-link spot-check before the prepared
-iPhone screenshot set is uploaded. Record the remaining functional matrix in
-`docs/build-62-physical-acceptance-record.md`; the concise current handoff is
-`docs/build-67-release-handoff.md`. The official Connector DMG is Developer ID signed,
-notarized, stapled, checksum-published, and available from the guarded official release link.
+- [x] Build 77 was locally archived and exported on July 24, 2026, uploaded directly to App Store
+      Connect, accepted as a valid iPhone-only TestFlight build, supplied with model-catalog refresh
+      test notes, and assigned to both **Team (Expo)** and **DevinX Early Access**. App Store Connect
+      reports the build as **Testing**. This tester distribution does not replace Build 76 in the
+      submitted public App Store 1.0 version.
+
+Build 67 remains historical screenshot and physical-acceptance evidence. Build 76 is the binary
+already attached to the submitted public App Store 1.0 version; Build 77 is a separate TestFlight
+checkpoint for Local model-catalog refresh and must not silently replace that public submission.
+Record any remaining physical matrix evidence in `docs/build-62-physical-acceptance-record.md`; the
+historical Build 67 handoff remains in `docs/build-67-release-handoff.md`. The official Connector DMG
+is Developer ID signed, notarized, stapled, checksum-published, and available from the guarded
+official release link.
 
 - [x] In Build 35, switching Home from Cloud to Computer changed Recent from Cloud sessions to sessions from the selected Mac, switching back restored Cloud recents, and View all retained the combined cross-origin Sessions screen
 - [x] In Build 35, the destination and workspace sheets remained compact, bounded, explicitly dismissible, and free of raw paths or excessive empty space
