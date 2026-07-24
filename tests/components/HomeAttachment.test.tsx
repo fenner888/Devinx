@@ -2,6 +2,7 @@ const mockUploadAttachment = jest.fn();
 const mockCreateSession = jest.fn();
 const mockCreateComputerSession = jest.fn();
 const mockRefetchRepositories = jest.fn();
+const mockRefreshComputerCreateOptions = jest.fn(async () => mockComputerCreateOptions);
 const mockDevinCompanion = jest.fn((_props: unknown) => null);
 let mockConnection = {
   mode: 'cloud',
@@ -84,6 +85,9 @@ jest.mock('@api/bridge/queries', () => ({
     data: mockComputerCreateOptions,
     isLoading: mockComputerCreateOptionsLoading,
     error: mockComputerCreateOptionsError,
+    refreshCatalog: mockRefreshComputerCreateOptions,
+    isRefreshingCatalog: false,
+    refreshCatalogError: null,
   }),
   useCreateComputerSession: () => ({
     isPending: false,
@@ -556,7 +560,7 @@ describe('home attachment control', () => {
     );
   });
 
-  it('organizes the live model catalog into recommended, recent, searchable options and badges', () => {
+  it('organizes and refreshes the live model catalog into recommended, recent, searchable options and badges', async () => {
     mockConnection = {
       mode: 'computer',
       hasCloudConnection: false,
@@ -592,6 +596,9 @@ describe('home attachment control', () => {
 
     expect(screen.getByLabelText('Model: Adaptive')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Model: Adaptive'));
+    await waitFor(() => expect(mockRefreshComputerCreateOptions).toHaveBeenCalledTimes(1));
+    fireEvent.press(screen.getByLabelText('Refresh models from Devin'));
+    await waitFor(() => expect(mockRefreshComputerCreateOptions).toHaveBeenCalledTimes(2));
     expect(screen.getByText('Recommended')).toBeTruthy();
     expect(screen.getByText('Recent')).toBeTruthy();
     expect(screen.getByText('All Models')).toBeTruthy();

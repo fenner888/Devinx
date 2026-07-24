@@ -64,6 +64,7 @@ function interfaces(): NetworkInterfaceMap {
 
 describe('Desktop Bridge development runner', () => {
   it('merges the live ACP catalog with history-only recent model markers', async () => {
+    const catalogRefreshes: boolean[] = [];
     const current: AcpSessionLifecycle = {
       start: async () => {},
       stop: async () => {},
@@ -76,14 +77,17 @@ describe('Desktop Bridge development runner', () => {
       isSessionPromptSupported: () => true,
       promptSession: async () => {},
       isSessionCreateSupported: () => true,
-      listModelCatalog: async () => ({
-        defaultModelId: 'adaptive',
-        models: [
-          { id: 'adaptive', name: 'Adaptive', description: 'Recommended' },
-          { id: 'deepseek-v4', name: 'DeepSeek V4 Pro', supportsImages: false },
-          { id: 'gpt-5-6-sol-medium', name: 'GPT-5.6 Sol Medium Thinking' },
-        ],
-      }),
+      listModelCatalog: async (forceRefresh = false) => {
+        catalogRefreshes.push(forceRefresh);
+        return {
+          defaultModelId: 'adaptive',
+          models: [
+            { id: 'adaptive', name: 'Adaptive', description: 'Recommended' },
+            { id: 'deepseek-v4', name: 'DeepSeek V4 Pro', supportsImages: false },
+            { id: 'gpt-5-6-sol-medium', name: 'GPT-5.6 Sol Medium Thinking' },
+          ],
+        };
+      },
       createSession: async () => 'session-created',
     };
     const adapter = new RecoverableSessionDiscoveryAdapter();
@@ -101,7 +105,7 @@ describe('Desktop Bridge development runner', () => {
       }),
     });
 
-    await expect(adapter.listCreateOptions()).resolves.toEqual({
+    await expect(adapter.listCreateOptions(true)).resolves.toEqual({
       workspaces: [{ path: '/tmp/project' }],
       models: [
         {
@@ -128,6 +132,44 @@ describe('Desktop Bridge development runner', () => {
       defaultModelId: 'adaptive',
       catalogSource: 'live',
     });
+    expect(catalogRefreshes).toEqual([true]);
+  });
+
+  it('does not silently replace a requested live refresh with history-only models', async () => {
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace({
+      isSessionListSupported: () => true,
+      listSessions: async () => ({ sessions: [] }),
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new Error('not used');
+      },
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
+      isSessionCreateSupported: () => true,
+      listModelCatalog: async () => {
+        throw new Error('live catalog unavailable');
+      },
+      createSession: async () => 'session-created',
+    });
+    adapter.setHistory({
+      start: async () => {},
+      stop: async () => {},
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new Error('not used');
+      },
+      listCreateOptions: async () => ({
+        workspaces: [{ path: '/tmp/project' }],
+        models: [{ id: 'recent-model' }],
+      }),
+    });
+
+    await expect(adapter.listCreateOptions()).resolves.toMatchObject({
+      models: [{ id: 'recent-model', recent: true }],
+      catalogSource: 'recent',
+    });
+    await expect(adapter.listCreateOptions(true)).rejects.toThrow('live catalog unavailable');
   });
 
   it('securely rehydrates listed and loaded session state after ACP replacement', async () => {

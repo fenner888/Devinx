@@ -158,7 +158,11 @@ export const sessionPromptBodySchema = z
   })
   .strict();
 
-export const sessionCreateOptionsBodySchema = z.object({}).strict();
+export const sessionCreateOptionsBodySchema = z
+  .object({
+    refresh: z.boolean().optional(),
+  })
+  .strict();
 
 export const sessionCreateBodySchema = z
   .object({

@@ -6,6 +6,7 @@ const mockMutate = jest.fn();
 const mockRefetch = jest.fn(async () => {});
 const mockCompanionProps = jest.fn();
 const mockAnswerMutate = jest.fn();
+const mockRefreshComputerCreateOptions = jest.fn(async () => undefined);
 const mockReact = React;
 let mockPromptError: Error | null = null;
 let mockSessionElicitationSupported = true;
@@ -106,6 +107,9 @@ jest.mock('../../src/api/bridge/queries', () => ({
     },
     isLoading: false,
     error: null,
+    refreshCatalog: mockRefreshComputerCreateOptions,
+    isRefreshingCatalog: false,
+    refreshCatalogError: null,
   }),
 }));
 

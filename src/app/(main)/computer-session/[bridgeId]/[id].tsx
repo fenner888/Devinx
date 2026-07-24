@@ -719,6 +719,9 @@ export default function ComputerSessionDetailScreen() {
         onCloseModel={() => setShowModelPicker(false)}
         onCloseVariant={() => setShowVariantPicker(false)}
         catalogSource={localOptions.data?.catalogSource}
+        onRefresh={localOptions.refreshCatalog}
+        refreshing={localOptions.isRefreshingCatalog}
+        refreshError={Boolean(localOptions.refreshCatalogError)}
       />
     </SafeAreaView>
   );

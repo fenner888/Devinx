@@ -246,8 +246,8 @@ export interface SessionDiscoveryAdapter {
   ): Promise<string>;
   releaseSessionOwnership?(sessionId: string): Promise<void>;
   isSessionCreateSupported?(): boolean;
-  listModelCatalog?(): Promise<AcpModelCatalog>;
-  listCreateOptions?(): Promise<{
+  listModelCatalog?(forceRefresh?: boolean): Promise<AcpModelCatalog>;
+  listCreateOptions?(forceRefresh?: boolean): Promise<{
     workspaces: Array<{ path: string }>;
     models: Array<{
       id: string;
@@ -778,7 +778,11 @@ export class BridgeService {
     authorization: RequestAuthorization,
     now: number,
   ): Promise<BridgeServiceResponse> {
-    sessionCreateOptionsBodySchema.parse(authorization.request.body);
+    const bodyResult = sessionCreateOptionsBodySchema.safeParse(authorization.request.body);
+    if (!bodyResult.success) {
+      return { status: 400, body: { error: 'invalid_request' } };
+    }
+    const body = bodyResult.data;
     if (
       !this.dependencies.sessions.isSessionCreateSupported?.() ||
       !this.dependencies.sessions.listCreateOptions
@@ -786,7 +790,7 @@ export class BridgeService {
       return { status: 503, body: { error: 'temporarily_unavailable' } };
     }
     try {
-      const options = await this.dependencies.sessions.listCreateOptions();
+      const options = await this.dependencies.sessions.listCreateOptions(body.refresh === true);
       const workspaceNames = workspaceDisplayNames(options.workspaces);
       return {
         status: 200,
