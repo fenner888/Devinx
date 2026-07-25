@@ -1,6 +1,6 @@
 # 037 — DevinX Connector for Windows
 
-Status: active release implementation. Windows is an in-scope Local target, not a deferred “coming soon” item. It becomes a supported public download only after every release gate below passes on physical Windows hardware.
+Status: public test track. The Store-signed Windows 11 x64 package is publicly installable for controlled testing. Windows is an in-scope Local target, not a deferred “coming soon” item, but it becomes a fully supported release only after every physical gate below passes with the exact Store package.
 
 ## Product decision
 
@@ -134,4 +134,8 @@ Physical Windows 11 x64:
 - locked-screen and second-Windows-user isolation; and
 - confirmation that Connector never binds to LAN, wildcard, or public interfaces.
 
-Until those physical gates pass, the iPhone UI must not use **coming soon** copy or offer a Windows download as working functionality. The signed-release lookup may report that a verified Windows package is not yet available and provide recovery guidance. Once the gates pass, Windows 11 x64 is presented alongside macOS as a supported Local platform.
+Until those physical gates pass, the iPhone UI may offer the verified Microsoft Store package only
+as a **Windows 11 x64 test track**. It must not use **coming soon** copy, claim full Windows support,
+or link to unsigned CI artifacts. Once the gates pass, Windows 11 x64 may be presented alongside
+macOS as a fully supported Local platform. Physical testers must follow
+`docs/windows-connector-test-checklist.md` and report the exact Store version they exercised.

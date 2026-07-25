@@ -148,9 +148,11 @@ The Store package declares an opt-in Windows startup task. Connector uses the pa
 Settings or Task Manager. A separately distributed direct-download installer remains a distinct
 future gate and would require Authenticode signing for every owned executable and installer.
 
-Public distribution still requires clean-account install/update/uninstall, Store signature
-inspection, Windows Firewall validation, official Devin ACP validation, and the complete physical
-matrix in `specs/037-windows-connector.md`.
+The Store-signed package is publicly installable for controlled testing. A fully supported release
+designation still requires clean-account install/update/uninstall, Store signature inspection,
+Windows Firewall validation, official Devin ACP validation, and the complete physical matrix in
+`specs/037-windows-connector.md`. Use the
+[Windows Connector physical test checklist](windows-connector-test-checklist.md) for that evidence.
 
 ## Runtime behavior
 
