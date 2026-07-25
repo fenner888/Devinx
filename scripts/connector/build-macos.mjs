@@ -209,7 +209,7 @@ copyFileSync(
 );
 buildApplicationIcon();
 
-await build({
+const runtimeBundle = await build({
   entryPoints: [resolve(repositoryRoot, 'dist', 'bridge', 'connector-cli.js')],
   outfile: resolve(resourcesRoot, 'connector-runtime.cjs'),
   bundle: true,
@@ -219,7 +219,14 @@ await build({
   sourcemap: false,
   legalComments: 'eof',
   logLevel: 'info',
+  metafile: true,
 });
+for (const input of Object.keys(runtimeBundle.metafile.inputs)) {
+  const normalizedInput = input.replaceAll('\\', '/');
+  if (/node_modules\/(?:brace-expansion|minimatch)\//.test(normalizedInput)) {
+    throw new Error('The Connector runtime unexpectedly includes vulnerable glob tooling');
+  }
+}
 
 const nodeRuntime = await ensurePinnedNodeRuntime();
 copyFileSync(nodeRuntime, resolve(runtimeRoot, 'node'));

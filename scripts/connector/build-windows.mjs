@@ -130,7 +130,7 @@ rmSync(zipPath, { force: true });
 rmSync(installerPath, { force: true });
 mkdirSync(runtimeRoot, { recursive: true });
 
-await build({
+const runtimeBundle = await build({
   entryPoints: [resolve(repositoryRoot, 'dist', 'bridge', 'connector-cli.js')],
   outfile: resolve(resourcesRoot, 'connector-runtime.cjs'),
   bundle: true,
@@ -140,7 +140,14 @@ await build({
   sourcemap: false,
   legalComments: 'eof',
   logLevel: 'info',
+  metafile: true,
 });
+for (const input of Object.keys(runtimeBundle.metafile.inputs)) {
+  const normalizedInput = input.replaceAll('\\', '/');
+  if (/node_modules\/(?:brace-expansion|minimatch)\//.test(normalizedInput)) {
+    throw new Error('The Connector runtime unexpectedly includes vulnerable glob tooling');
+  }
+}
 
 const helperPublishRoot = resolve(outputRoot, 'dpapi-publish');
 const appPublishRoot = resolve(outputRoot, 'app-publish');

@@ -38,7 +38,7 @@ jobs:
         run: npm run connector:verify:windows
 
       - name: Audit JavaScript dependencies
-        run: npm audit --audit-level=high
+        run: npm run audit
 
       - name: Upload non-release verification artifact
         uses: actions/upload-artifact@v6
