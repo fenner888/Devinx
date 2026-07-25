@@ -1,6 +1,6 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: macOS Connector 0.1.2 is the supported release. Windows implementation is tracked by spec 037 and remains unavailable to end users until its signed package and physical test matrix pass. Linux and Intel Mac packages remain roadmap targets.
+Status: macOS Connector 0.1.4 is the supported public release with reliable direct CLI model-catalog refresh. Windows implementation is tracked by spec 037 and remains unavailable to end users until its existing Microsoft Store submission passes certification and the physical test matrix. Linux and Intel Mac packages remain roadmap targets.
 
 ## Product decision
 

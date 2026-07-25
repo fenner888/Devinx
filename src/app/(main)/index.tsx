@@ -356,6 +356,7 @@ export default function HomeScreen() {
     }
     setModelQuery('');
     setShowModelPicker(true);
+    localOptions.refreshCatalog().catch(() => undefined);
   }
 
   function modelFamilyRow(family: ComputerModelFamily<(typeof localModels)[number]>) {
@@ -1386,14 +1387,35 @@ export default function HomeScreen() {
           >
             <View className="mb-3 flex-row items-center justify-between">
               <Text className="text-text-low text-text14 font-medium">Model</Text>
-              <Pressable
-                className="h-9 w-9 items-center justify-center rounded-full"
-                onPress={() => setShowModelPicker(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Close model menu"
-              >
-                <Ionicons name="close" size={18} color={tokens.textLow.hex} />
-              </Pressable>
+              <View className="flex-row items-center">
+                <Pressable
+                  className="h-11 w-11 items-center justify-center rounded-full"
+                  onPress={() => {
+                    localOptions.refreshCatalog().catch(() => undefined);
+                  }}
+                  disabled={localOptions.isRefreshingCatalog}
+                  accessibilityRole="button"
+                  accessibilityLabel="Refresh models from Devin"
+                  accessibilityState={{
+                    disabled: localOptions.isRefreshingCatalog,
+                    busy: localOptions.isRefreshingCatalog,
+                  }}
+                >
+                  {localOptions.isRefreshingCatalog ? (
+                    <ActivityIndicator size="small" color={tokens.brandText.hex} />
+                  ) : (
+                    <Ionicons name="refresh" size={18} color={tokens.brandText.hex} />
+                  )}
+                </Pressable>
+                <Pressable
+                  className="h-11 w-11 items-center justify-center rounded-full"
+                  onPress={() => setShowModelPicker(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close model menu"
+                >
+                  <Ionicons name="close" size={18} color={tokens.textLow.hex} />
+                </Pressable>
+              </View>
             </View>
             {localModels.length > 8 && (
               <View className="mb-3 flex-row items-center rounded-input border border-border-subtle bg-surface1 px-3">
@@ -1482,7 +1504,12 @@ export default function HomeScreen() {
                   )}
                   {localOptions.data?.catalogSource === 'recent' && (
                     <Text className="px-10 pb-3 pt-4 text-text-low text-text11">
-                      Showing recent models while Devin refreshes the full catalog.
+                      Showing recent models. Refresh to load the full catalog from Devin.
+                    </Text>
+                  )}
+                  {localOptions.refreshCatalogError && (
+                    <Text className="px-10 pb-3 pt-4 text-failed text-text11">
+                      Couldn&apos;t refresh models. Your previous list is still available.
                     </Text>
                   )}
                 </>

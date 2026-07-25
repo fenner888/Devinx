@@ -1,6 +1,6 @@
 # Connector update awareness
 
-Status: approved for Connector 0.1.2 and the next iPhone TestFlight build
+Status: implemented and published for Connector 0.1.4
 
 ## Purpose
 
@@ -13,8 +13,8 @@ executes an installer.
 
 - Protocol 2 gains an additive authenticated `bridge.version` method guarded by the existing
   `bridge:health` permission and existing per-device rate limit.
-- Its strict response is `{ "version": "0.1.2" }`, where the version is a three-component semantic
-  version. Existing `bridge.health` and `bridge.features` responses do not change, preserving
+- Its strict response is `{ "version": "<semver>" }`, where the version is the Connector's
+  three-component semantic version. Existing `bridge.health` and `bridge.features` responses do not change, preserving
   compatibility with already-shipped mobile builds.
 - A new mobile client probes `bridge.version` only after loading a stored paired computer. A `400`
   response to this new method is treated as a legacy Connector; unreachable, revoked, malformed,

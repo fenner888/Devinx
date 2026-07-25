@@ -36,7 +36,7 @@ jobs:
         run: npm run build
 
       - name: npm audit (fail on high/critical)
-        run: npm audit --audit-level=high
+        run: npm run audit
         continue-on-error: false
 
       - name: Key-leak grep gate (§10.1)

@@ -211,14 +211,19 @@ The results below must be refreshed after release-document changes and before a 
 
 ## Required physical checkpoint
 
-Use the next iPhone-only Build 67 as the release and screenshot-validation target. Build 66 remains
-historical signed TestFlight evidence, but it advertises unvalidated iPad support and must not be the
-initial public binary. The owner already accepted Build 65 onboarding and assisted Connector setup;
-Build 67 preserves that flow and requires a narrow visual/setup-link spot-check before the prepared
-iPhone screenshot set is uploaded. Record the remaining functional matrix in
-`docs/build-62-physical-acceptance-record.md`; the concise current handoff is
-`docs/build-67-release-handoff.md`. The official Connector DMG is Developer ID signed,
-notarized, stapled, checksum-published, and available from the guarded official release link.
+- [x] Build 77 was locally archived and exported on July 24, 2026, uploaded directly to App Store
+      Connect, accepted as a valid iPhone-only TestFlight build, supplied with model-catalog refresh
+      test notes, and assigned to both **Team (Expo)** and **DevinX Early Access**. App Store Connect
+      reports the build as **Testing**. This tester distribution does not replace Build 76 in the
+      submitted public App Store 1.0 version.
+
+Build 67 remains historical screenshot and physical-acceptance evidence. Build 76 is the binary
+already attached to the submitted public App Store 1.0 version; Build 77 is a separate TestFlight
+checkpoint for Local model-catalog refresh and must not silently replace that public submission.
+Record any remaining physical matrix evidence in `docs/build-62-physical-acceptance-record.md`; the
+historical Build 67 handoff remains in `docs/build-67-release-handoff.md`. The official Connector DMG
+is Developer ID signed, notarized, stapled, checksum-published, and available from the guarded
+official release link.
 
 - [x] In Build 35, switching Home from Cloud to Computer changed Recent from Cloud sessions to sessions from the selected Mac, switching back restored Cloud recents, and View all retained the combined cross-origin Sessions screen
 - [x] In Build 35, the destination and workspace sheets remained compact, bounded, explicitly dismissible, and free of raw paths or excessive empty space
@@ -281,3 +286,20 @@ packaging, signing hooks, Tailscale discovery, and update guidance now implement
 configuration and the physical Windows matrix remain release gates. Linux remains a later
 platform. Neither platform is a supported download until its own threat model and physical tests
 pass.
+
+## Connector 0.1.4 release evidence
+
+- [x] The authenticated local model-catalog refresh reads the installed Devin CLI's bounded
+      machine-readable model list, validates it with Zod, preserves exact model identifiers, and
+      falls back to ACP discovery for older compatible CLI releases.
+- [x] Lint, strict TypeScript, the full Jest suite (86 suites / 665 tests), app and Connector
+      builds, tracked-diff secret scanning, and the production dependency audit were rerun for the
+      source change. The audit reports the existing Expo/Jest/React Native transitive advisories;
+      this fix adds no dependency.
+- [x] The Apple-silicon DMG was signed with the stable Developer ID identity, notarized, stapled,
+      accepted by Gatekeeper, and paired with an adjacent checksum. Public artifact SHA-256:
+      `f778deb400c2f5ff41e63a21ab6888a1d76297aaa2aaef665fc9498805c107cd`.
+- [x] A live authenticated request through the installed Connector returned the full local catalog
+      (162 models in the verification account), including Adaptive and the current Kimi model,
+      without changing pairing or cloud state.
+- [x] The owner physically confirmed that the refreshed model catalog works before publication.
