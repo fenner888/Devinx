@@ -35,7 +35,7 @@
 | **DevinX for iPhone**            | `0.1.0 (77)`        | [External TestFlight beta](https://testflight.apple.com/join/KBD25apN) · up to 100 testers        |
 | **Public App Store version**     | `1.0`               | Submitted to Apple and waiting for App Review · manual release after approval                     |
 | **DevinX Connector for macOS**   | `0.1.4`             | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
-| **DevinX Connector for Windows** | active release work | Windows 11 x64 installer is implemented; signing and physical release gates remain                |
+| **DevinX Connector for Windows** | public test track   | Store-signed Windows 11 x64 package is live; physical acceptance remains before full support       |
 
 TestFlight access does not include a Devin account or shared Devin data. Each tester connects their
 own Devin organization, pairs a local device they control, or uses both.
@@ -134,7 +134,7 @@ does not silently install a desktop application.
 For detailed installation, update, uninstall, development, and notarization information, read
 [docs/devinx-connector.md](docs/devinx-connector.md).
 
-### Windows 11 x64 active release track
+### Windows 11 x64 public test track
 
 The native per-user Windows application, DPAPI-protected state helper, notification-area lifecycle,
 installer, deterministic uninstaller, pinned-runtime package, and automated Windows verification
@@ -149,14 +149,14 @@ controls. Cognition's separate
 are not the Connector runtime.
 
 The unsigned EXE and ZIP artifacts produced by ordinary CI are deliberately marked **NOT FOR
-RELEASE**. The public Windows distribution is the reserved
-[Microsoft Store listing](https://apps.microsoft.com/detail/9N52Z3FVMFH8), whose accepted MSIX is
-signed and delivered by Microsoft. DevinX will offer it as a supported download only after the
-Store package passes certification and the clean Windows 11 x64 physical matrix in
-[spec 037](specs/037-windows-connector.md), including
+RELEASE**. The Store-signed Windows 11 x64 package is publicly installable from the
+[Microsoft Store listing](https://apps.microsoft.com/detail/9N52Z3FVMFH8) for controlled testing.
+It is still a **public test track**, not a completed support claim, until the clean physical matrix
+in [spec 037](specs/037-windows-connector.md) passes with the exact Store package. That matrix covers
 official Devin ACP discovery, Tailscale routing, pairing, read/send/create grants,
-AskUserQuestion, sleep/reconnect, update, and uninstall. This prevents an unfinished or unsigned
-package from being presented as trustworthy.
+AskUserQuestion, sleep/reconnect, update, and uninstall. Testers should follow the
+[Windows Connector physical test checklist](docs/windows-connector-test-checklist.md) and must
+never sideload the unsigned CI artifacts.
 
 ## Why Tailscale is not enough
 
