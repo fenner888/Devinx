@@ -15,7 +15,7 @@ The separate Connector application is the current supported way to install and o
 
 ## User experience
 
-1. Download the supported signed connector from the official DevinX release page. Connector 0.1.2 currently supports Apple-silicon Macs. Windows 11 x64 is an active release implementation; its public download activates only after the signed installer and physical test matrix pass. Linux and Intel Mac packages remain unavailable.
+1. Download the supported signed connector from the official DevinX release page. Connector 0.1.4 currently supports Apple-silicon Macs. Windows 11 x64 is an active release implementation; its public download activates only after the signed installer and physical test matrix pass. Linux and Intel Mac packages remain unavailable.
 2. Install and open **DevinX Connector**.
 3. Connect the computer and iPhone to the same Tailscale network, then confirm that the connector shows Tailscale and Devin for Terminal.
 4. In the iPhone app, open **Settings → Local devices → Add local device → Scan pairing code**.
@@ -61,6 +61,12 @@ refresh control. Older Devin CLI releases fall back to the bounded ACP discovery
 strictly validated. A failed refresh never erases the last valid catalog. Mobile clients retain
 Connector 0.1.2 as the minimum compatible version: older Connectors keep all existing local-session
 behavior, but users must install 0.1.4 for reliable full-catalog refresh.
+
+Existing 0.1.2 or 0.1.3 users update once by quitting Connector, opening the signed 0.1.4 DMG,
+and replacing the app in Applications. The stable Developer ID identity preserves the existing
+Connector identity and paired-device grants, so a normal replacement does not require a new QR
+pairing, cloud reconnection, or iPhone setup. New Local-mode installs receive 0.1.4 from the same
+official latest-release page. Cloud-only users do not install or update Connector.
 
 To remove the Connector, choose **Uninstall DevinX Connector** in the native app and confirm. The
 Connector stops its private listener before deleting its own Keychain identity and paired-iPhone

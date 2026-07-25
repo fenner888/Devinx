@@ -286,3 +286,20 @@ packaging, signing hooks, Tailscale discovery, and update guidance now implement
 configuration and the physical Windows matrix remain release gates. Linux remains a later
 platform. Neither platform is a supported download until its own threat model and physical tests
 pass.
+
+## Connector 0.1.4 release evidence
+
+- [x] The authenticated local model-catalog refresh reads the installed Devin CLI's bounded
+      machine-readable model list, validates it with Zod, preserves exact model identifiers, and
+      falls back to ACP discovery for older compatible CLI releases.
+- [x] Lint, strict TypeScript, the full Jest suite (86 suites / 665 tests), app and Connector
+      builds, tracked-diff secret scanning, and the production dependency audit were rerun for the
+      source change. The audit reports the existing Expo/Jest/React Native transitive advisories;
+      this fix adds no dependency.
+- [x] The Apple-silicon DMG was signed with the stable Developer ID identity, notarized, stapled,
+      accepted by Gatekeeper, and paired with an adjacent checksum. Public artifact SHA-256:
+      `f778deb400c2f5ff41e63a21ab6888a1d76297aaa2aaef665fc9498805c107cd`.
+- [x] A live authenticated request through the installed Connector returned the full local catalog
+      (162 models in the verification account), including Adaptive and the current Kimi model,
+      without changing pairing or cloud state.
+- [x] The owner physically confirmed that the refreshed model catalog works before publication.
