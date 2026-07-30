@@ -417,7 +417,13 @@ function bodyForMethod(method: SupportedMethod, input: unknown): object {
   return sessionCreateBodySchema.parse(input);
 }
 
-function publicResponseError(status: number, method: SupportedMethod): ComputerBridgeError {
+const bridgeBusyResponseSchema = z.object({ error: z.literal('busy') }).strict();
+
+function publicResponseError(
+  status: number,
+  method: SupportedMethod,
+  body: Record<string, unknown>,
+): ComputerBridgeError {
   if (status === 404) {
     return new ComputerBridgeError(
       'This iPhone is no longer authorized by the paired local device.',
@@ -425,6 +431,9 @@ function publicResponseError(status: number, method: SupportedMethod): ComputerB
     );
   }
   if (status === 429) {
+    if (bridgeBusyResponseSchema.safeParse(body).success) {
+      return new ComputerBridgeError('The paired local device is finishing another read.', 'busy');
+    }
     return new ComputerBridgeError(
       'The paired local device is receiving requests too quickly.',
       'rate_limited',
@@ -508,7 +517,9 @@ async function requestComputer(
             credential.tlsCertificateFingerprint,
             envelope,
           );
-    if (response.status !== 200) throw publicResponseError(response.status, method);
+    if (response.status !== 200) {
+      throw publicResponseError(response.status, method, response.body);
+    }
     return { body: response.body, credential };
   } catch (error) {
     if (error instanceof ComputerBridgeError) throw error;
