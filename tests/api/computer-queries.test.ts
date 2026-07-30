@@ -34,7 +34,10 @@ jest.mock('../../src/auth/ConnectionContext', () => ({
 
 import { ComputerBridgeError } from '../../src/auth/computerBridge';
 import type { PairedComputerSummary } from '../../src/auth/pairedComputers';
-import { loadComputerSessionBoard } from '../../src/api/bridge/queries';
+import {
+  loadComputerSessionBoard,
+  loadComputerSessionWithRecovery,
+} from '../../src/api/bridge/queries';
 
 const FIRST: PairedComputerSummary = {
   bridgeId: 'bridge_1234567890',
@@ -209,6 +212,61 @@ describe('Computer session board query', () => {
     expect(result.computers).toEqual([
       { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'unavailable' },
     ]);
+  });
+
+  it('rehydrates a restarted Connector handle through one authenticated list before retrying load', async () => {
+    const listedSession = session('A', '2027-01-15T10:00:00.000Z');
+    const loadedSession = {
+      session: listedSession,
+      messages: [{ sequence: 1, source: 'devin', text: 'Recovered.' }],
+      truncated: false,
+    };
+    mockGetComputerBridgeHealth.mockResolvedValue({
+      protocolVersion: 2,
+      status: 'ready',
+      capabilities: {
+        sessionList: true,
+        sessionLoad: true,
+        sessionPrompt: false,
+      },
+    });
+    mockListComputerSessions.mockResolvedValue({ sessions: [listedSession] });
+    mockLoadComputerSession
+      .mockRejectedValueOnce(
+        new ComputerBridgeError('public authorization failure', 'authorization_failed'),
+      )
+      .mockResolvedValueOnce(loadedSession);
+
+    await expect(loadComputerSessionWithRecovery(FIRST, listedSession.id)).resolves.toEqual(
+      loadedSession,
+    );
+    expect(mockGetComputerBridgeHealth).toHaveBeenCalledTimes(1);
+    expect(mockListComputerSessions).toHaveBeenCalledTimes(1);
+    expect(mockLoadComputerSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a stale handle that the authenticated Connector cannot rediscover', async () => {
+    const staleSessionId = session('A', '2027-01-15T10:00:00.000Z').id;
+    mockGetComputerBridgeHealth.mockResolvedValue({
+      protocolVersion: 2,
+      status: 'ready',
+      capabilities: {
+        sessionList: true,
+        sessionLoad: true,
+        sessionPrompt: false,
+      },
+    });
+    mockListComputerSessions.mockResolvedValue({
+      sessions: [session('B', '2027-01-15T11:00:00.000Z')],
+    });
+    mockLoadComputerSession.mockRejectedValueOnce(
+      new ComputerBridgeError('public authorization failure', 'authorization_failed'),
+    );
+
+    await expect(loadComputerSessionWithRecovery(FIRST, staleSessionId)).rejects.toMatchObject({
+      code: 'authorization_failed',
+    });
+    expect(mockLoadComputerSession).toHaveBeenCalledTimes(1);
   });
 
   it('fails a computer closed on repeated cursors or duplicate session handles', async () => {

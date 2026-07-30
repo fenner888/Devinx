@@ -121,6 +121,19 @@ describe('iOS device signing boundary', () => {
     ).rejects.toThrow();
   });
 
+  it('preserves the Connector session-conflict status across the pinned transport', async () => {
+    const nativeModule = createNativeModule();
+    nativeModule.postPinnedJson.mockResolvedValueOnce({
+      status: 409,
+      body: '{"error":"session_in_use"}',
+    });
+    setDeviceCryptoNativeModuleForTests(nativeModule);
+
+    await expect(
+      postPinnedBridgeJson('https://192.168.1.20:45831/', '/v1/request', 'F'.repeat(43), {}),
+    ).resolves.toEqual({ status: 409, body: { error: 'session_in_use' } });
+  });
+
   it('allows bounded HTTP only on the Tailscale CGNAT range and rejects redirects', async () => {
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
       new Response('{"status":"pending"}', {
@@ -145,6 +158,20 @@ describe('iOS device signing boundary', () => {
     await expect(
       postTailnetBridgeJson('https://100.127.166.87:45831/', '/v1/pair/submit', {}),
     ).rejects.toThrow('100.64.0.0/10');
+    fetchMock.mockRestore();
+  });
+
+  it('preserves the Connector session-conflict status across the Tailnet transport', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response('{"error":"conflict"}', {
+        status: 409,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      }),
+    );
+
+    await expect(
+      postTailnetBridgeJson('http://100.127.166.87:45831/', '/v1/request', {}),
+    ).resolves.toEqual({ status: 409, body: { error: 'conflict' } });
     fetchMock.mockRestore();
   });
 

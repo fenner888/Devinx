@@ -69,6 +69,7 @@ const nativePinnedResponseSchema = z
       z.literal(202),
       z.literal(400),
       z.literal(404),
+      z.literal(409),
       z.literal(429),
       z.literal(503),
     ]),
@@ -215,7 +216,7 @@ export async function deleteAllDeviceIdentities(): Promise<void> {
 }
 
 export interface PinnedBridgeResponse {
-  status: 200 | 202 | 400 | 404 | 429 | 503;
+  status: 200 | 202 | 400 | 404 | 409 | 429 | 503;
   body: Record<string, unknown>;
 }
 
@@ -313,7 +314,7 @@ export async function postTailnetBridgeJson(
     });
     if (
       (response.url !== '' && response.url !== requestUrl) ||
-      ![200, 202, 400, 404, 429, 503].includes(response.status)
+      ![200, 202, 400, 404, 409, 429, 503].includes(response.status)
     ) {
       throw new Error('Bridge returned an invalid response');
     }

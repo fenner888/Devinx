@@ -531,6 +531,13 @@ describe('authenticated mobile Computer Bridge client', () => {
     await expect(request).rejects.toMatchObject({ code });
   });
 
+  it('distinguishes Connector read contention from request-rate limiting', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValue({ status: 429, body: { error: 'busy' } });
+
+    await expect(getComputerBridgeHealth(BRIDGE_ID)).rejects.toMatchObject({ code: 'busy' });
+    expect(mockPostPinnedBridgeJson).toHaveBeenCalledTimes(1);
+  });
+
   it('fails closed on malformed response fields, duplicate sessions, or transport errors', async () => {
     mockPostPinnedBridgeJson.mockResolvedValueOnce({
       status: 200,
