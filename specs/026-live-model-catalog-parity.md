@@ -17,6 +17,9 @@ The picker follows the current Devin interaction pattern:
 - selection uses a simple checkmark and compact rows rather than nested cards;
 - trusted `New` or promotion badges render only when Devin supplies an explicit supported metadata
   value. DevinX never guesses or hardcodes time-sensitive promotions.
+- each model row reflects Devin's current catalog pricing metadata: exact `Free` models are labeled
+  `Free`, while paid or variable-cost models receive a compact relative-cost indicator. This data
+  refreshes with the catalog and is never inferred from a model name or maintained as a static list.
 
 When ACP exposes several exact IDs for one model family, DevinX may present those IDs as two
 controls: model family and reasoning/speed variant. Presentation grouping is derived only from the
@@ -68,6 +71,7 @@ Returned model fields are limited to:
 - whether it was recently used;
 - optional image-support capability;
 - an optional allowlisted badge value supplied by trusted ACP metadata.
+- optional bounded cost summary and normalized cost tier supplied by the installed Devin CLI.
 
 The phone still submits only an exact model ID returned by `session.create_options`. On creation the
 Connector revalidates the selected ID against the new session's live `configOptions` before applying

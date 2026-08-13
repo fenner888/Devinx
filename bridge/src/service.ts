@@ -255,6 +255,8 @@ export interface SessionDiscoveryAdapter {
       description?: string;
       supportsImages?: boolean;
       badge?: 'new' | 'free_promo';
+      costTier?: 'low' | 'medium' | 'high' | 'free';
+      costSummary?: string;
       recent?: boolean;
       recommended?: boolean;
     }>;
@@ -815,6 +817,8 @@ export class BridgeService {
                     description: z.string().min(1).max(500).optional(),
                     supportsImages: z.boolean().optional(),
                     badge: z.enum(['new', 'free_promo']).optional(),
+                    costTier: z.enum(['low', 'medium', 'high', 'free']).optional(),
+                    costSummary: z.string().min(1).max(200).optional(),
                     recent: z.boolean(),
                     recommended: z.boolean(),
                   })
@@ -860,6 +864,10 @@ export class BridgeService {
                 ? { supportsImages: model.supportsImages }
                 : {}),
               ...(model.badge ? { badge: model.badge } : {}),
+              ...(model.costTier ? { costTier: model.costTier } : {}),
+              ...(model.costSummary
+                ? { costSummary: cleanDisplayText(model.costSummary, 200, 'Cost') }
+                : {}),
               recent: model.recent === true,
               recommended: model.recommended === true,
             })),

@@ -19,6 +19,8 @@ let mockComputerCreateOptions:
         description?: string;
         supportsImages?: boolean;
         badge?: 'new' | 'free_promo';
+        costTier?: 'low' | 'medium' | 'high' | 'free';
+        costSummary?: string;
         recent?: boolean;
         recommended?: boolean;
       }>;
@@ -576,10 +578,11 @@ describe('home attachment control', () => {
           id: 'adaptive',
           name: 'Adaptive',
           description: 'Automatically balances quality and cost',
+          costSummary: '$0.5 / MTok In · $2 / MTok Out',
           recommended: true,
         },
-        { id: 'gpt-recent', name: 'GPT Recent', recent: true },
-        { id: 'deepseek-v4', name: 'DeepSeek V4 Pro', badge: 'new' },
+        { id: 'gpt-recent', name: 'GPT Recent', recent: true, costTier: 'free' },
+        { id: 'deepseek-v4', name: 'DeepSeek V4 Pro', badge: 'new', costTier: 'high' },
         { id: 'model-4', name: 'Model Four' },
         { id: 'model-5', name: 'Model Five' },
         { id: 'model-6', name: 'Model Six' },
@@ -602,14 +605,16 @@ describe('home attachment control', () => {
     expect(screen.getByText('Recommended')).toBeTruthy();
     expect(screen.getByText('Recent')).toBeTruthy();
     expect(screen.getByText('All Models')).toBeTruthy();
-    expect(screen.getByLabelText('Use model family Adaptive')).toBeTruthy();
-    expect(screen.getByLabelText('Use model family DeepSeek V4 Pro, New')).toBeTruthy();
+    expect(screen.getByLabelText('Use model family Adaptive, Variable cost')).toBeTruthy();
+    expect(screen.getByLabelText('Use model family GPT Recent, Free')).toBeTruthy();
+    expect(screen.getByText('Free')).toBeTruthy();
+    expect(screen.getByLabelText('Use model family DeepSeek V4 Pro, New, High cost')).toBeTruthy();
     expect(screen.getByText('New')).toBeTruthy();
 
     fireEvent.changeText(screen.getByLabelText('Search local models'), 'deepseek');
     expect(screen.getByText('Results')).toBeTruthy();
     expect(screen.queryByLabelText('Use model family GPT Recent')).toBeNull();
-    fireEvent.press(screen.getByLabelText('Use model family DeepSeek V4 Pro, New'));
+    fireEvent.press(screen.getByLabelText('Use model family DeepSeek V4 Pro, New, High cost'));
     expect(screen.getByLabelText('Model: DeepSeek V4 Pro')).toBeTruthy();
   });
 

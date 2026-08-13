@@ -1,4 +1,5 @@
 export type ComputerModelBadge = 'new' | 'free_promo';
+export type ComputerModelCostTier = 'low' | 'medium' | 'high' | 'free';
 
 export interface ComputerModelCatalogItem {
   id: string;
@@ -6,6 +7,8 @@ export interface ComputerModelCatalogItem {
   description?: string;
   supportsImages?: boolean;
   badge?: ComputerModelBadge;
+  costTier?: ComputerModelCostTier;
+  costSummary?: string;
   recent?: boolean;
   recommended?: boolean;
 }
