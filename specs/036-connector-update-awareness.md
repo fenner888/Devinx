@@ -1,6 +1,6 @@
 # Connector update awareness
 
-Status: implemented and published for Connector 0.1.4
+Status: implemented and published for Connector 0.1.5
 
 ## Purpose
 

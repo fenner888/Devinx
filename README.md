@@ -34,7 +34,7 @@
 | -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------- |
 | **DevinX for iPhone**            | `0.1.0 (77)`        | [External TestFlight beta](https://testflight.apple.com/join/KBD25apN) · up to 100 testers        |
 | **Public App Store version**     | `1.0`               | Submitted to Apple and waiting for App Review · manual release after approval                     |
-| **DevinX Connector for macOS**   | `0.1.4`             | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
+| **DevinX Connector for macOS**   | `0.1.5`             | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
 | **DevinX Connector for Windows** | public test track   | Store-signed Windows 11 x64 package is live; physical acceptance remains before full support       |
 
 TestFlight access does not include a Devin account or shared Devin data. Each tester connects their
@@ -226,7 +226,7 @@ official Devin MCP tool, or approved local ACP capability.
   server passwords are outside the Connector grant model.
 - Personal profile/OAuth settings, plan and invoice management, organization administration, and
   unsupported Web-only mutations remain owned by Devin Web.
-- The initial mobile release is iPhone-only. Android and iPad are not supported. Connector `0.1.4`
+- The initial mobile release is iPhone-only. Android and iPad are not supported. Connector `0.1.5`
   supports Apple-silicon Macs. Windows 11 x64 is an active release implementation whose public
   download activates only after its signature and physical compatibility gates pass; Linux and
   Intel Mac packages remain unavailable.
