@@ -60,20 +60,26 @@ The iPhone app also performs an authenticated version handshake with each paired
 Connector produces a visible **Connector update required** action that opens only the official
 latest-release page; an offline or revoked Connector retains its separate recovery message.
 
-Connector 0.1.4 fixes authenticated live refresh for the local Devin model catalog by reading the
-installed CLI's account-scoped, machine-readable `devin models list --format json` output. Opening
-the local model picker asks Connector for a fresh catalog, and the picker also provides a manual
-refresh control. Older Devin CLI releases fall back to the bounded ACP discovery used by Connector
-0.1.3. The request remains device-signed, permission-checked, replay-protected, rate limited, and
-strictly validated. A failed refresh never erases the last valid catalog. Mobile clients retain
-Connector 0.1.2 as the minimum compatible version: older Connectors keep all existing local-session
-behavior, but users must install 0.1.4 for reliable full-catalog refresh.
+Connector 0.1.5 extends the authenticated live local model catalog with the CLI's bounded display
+metadata. When Devin supplies a relative cost tier, DevinX shows the matching three-segment cost
+indicator; models explicitly marked free show a **Free** label. These are availability hints from
+the user's installed Devin CLI, not prices calculated or guessed by DevinX. Unknown or omitted
+metadata remains neutral and never blocks the catalog.
 
-Existing 0.1.2 or 0.1.3 users update once by quitting Connector, opening the signed 0.1.4 DMG,
-and replacing the app in Applications. The stable Developer ID identity preserves the existing
-Connector identity and paired-device grants, so a normal replacement does not require a new QR
-pairing, cloud reconnection, or iPhone setup. New Local-mode installs receive 0.1.4 from the same
-official latest-release page. Cloud-only users do not install or update Connector.
+Connector 0.1.4 introduced reliable catalog refresh by reading the installed CLI's account-scoped,
+machine-readable `devin models list --format json` output. Opening the local model picker asks
+Connector for a fresh catalog, and the picker also provides a manual refresh control. Older Devin
+CLI releases fall back to bounded ACP discovery. The request remains device-signed,
+permission-checked, replay-protected, rate limited, and strictly validated. A failed refresh never
+erases the last valid catalog. Mobile clients retain Connector 0.1.2 as the minimum compatible
+version: older Connectors keep existing local-session behavior, but users must install 0.1.5 to see
+the latest catalog display metadata.
+
+Existing users update once by quitting Connector, opening the signed 0.1.5 DMG, and replacing the
+app in Applications. The stable Developer ID identity preserves the existing Connector identity
+and paired-device grants, so a normal replacement does not require a new QR pairing, cloud
+reconnection, or iPhone setup. New Local-mode installs receive 0.1.5 from the same official
+latest-release page. Cloud-only users do not install or update Connector.
 
 To remove the Connector, choose **Uninstall DevinX Connector** in the native app and confirm. The
 Connector stops its private listener before deleting its own Keychain identity and paired-iPhone

@@ -1,6 +1,6 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: macOS Connector 0.1.4 is the supported public release with reliable direct CLI model-catalog refresh. Windows 11 x64 is publicly distributed through Microsoft Store under Store ID `9N52Z3FVMFH8`; its implementation and release gates are tracked by spec 037. Linux and Intel Mac packages remain roadmap targets.
+Status: macOS Connector 0.1.5 is the supported public release with reliable direct CLI model-catalog refresh and bounded model cost metadata. Windows 11 x64 is publicly distributed through Microsoft Store under Store ID `9N52Z3FVMFH8`; its implementation and release gates are tracked by spec 037. Linux and Intel Mac packages remain roadmap targets.
 
 ## Product decision
 

@@ -10,7 +10,7 @@ Confirm all of the following before pairing:
 - product name: **DevinX Connector**
 - publisher: **DevinX Tools**
 - Store ID: `9N52Z3FVMFH8`
-- version: `0.1.1.0` or newer
+- version: `0.1.2.0` or newer
 - device: Windows 11 x64, build `10.0.22000` or newer
 
 Do not download, sideload, or run an unsigned MSIX, EXE, or ZIP from GitHub Actions. Never share a
