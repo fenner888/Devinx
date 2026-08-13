@@ -131,6 +131,32 @@ process.stdin.on('data', (chunk) => {
     });
   });
 
+  it('ignores future cost tiers and safely bounds display-only cost summaries', () => {
+    const summary = `Variable\n${'x'.repeat(240)}`;
+    const catalog = parseDevinCliModelCatalog({
+      families: [
+        {
+          variants: [
+            {
+              model_uid: 'future-model',
+              label: 'Future Model',
+              cost_tier: 'Future tier',
+              cost_summary: summary,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(catalog.models).toEqual([
+      {
+        id: 'future-model',
+        name: 'Future Model',
+        costSummary: `Variable ${'x'.repeat(191)}`,
+      },
+    ]);
+  });
+
   it('loads the model catalog through the Devin CLI machine-readable command', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'devinx-model-catalog-'));
     temporaryDirectories.push(directory);

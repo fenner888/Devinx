@@ -40,7 +40,7 @@ export function ModelCostIndicator({ costTier, costSummary }: ModelCostIndicator
     );
   }
 
-  const activeSegments = costTier ? COST_LEVELS[costTier] : 3;
+  const activeSegments = costTier ? COST_LEVELS[costTier] : 0;
   const colors = [tokens.finished.hex, tokens.chartAmber.hex, tokens.blocked.hex];
   return (
     <View
