@@ -81,6 +81,8 @@ export interface DevinCreateOptions {
     description?: string;
     supportsImages?: boolean;
     badge?: 'new' | 'free_promo';
+    costTier?: 'low' | 'medium' | 'high' | 'free';
+    costSummary?: string;
     recent?: boolean;
     recommended?: boolean;
   }>;

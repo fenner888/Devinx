@@ -47,6 +47,8 @@ const computerModelSchema = z
     description: z.string().min(1).max(500).optional(),
     supportsImages: z.boolean().optional(),
     badge: z.enum(['new', 'free_promo']).optional(),
+    costTier: z.enum(['low', 'medium', 'high', 'free']).optional(),
+    costSummary: z.string().min(1).max(200).optional(),
     recent: z.boolean().default(false),
     recommended: z.boolean().default(false),
   })

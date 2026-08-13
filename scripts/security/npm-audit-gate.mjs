@@ -1,13 +1,22 @@
 import { spawnSync } from 'node:child_process';
 
-const APPROVED_ADVISORY = Object.freeze({
-  source: 1124334,
-  name: 'brace-expansion',
-  severity: 'high',
-  url: 'https://github.com/advisories/GHSA-mh99-v99m-4gvg',
-  range: '<=5.0.7',
-});
-const EXCEPTION_EXPIRES_AT = Date.UTC(2026, 7, 8);
+const APPROVED_ADVISORIES = Object.freeze([
+  Object.freeze({
+    source: 1138808,
+    name: 'image-size',
+    severity: 'high',
+    url: 'https://github.com/advisories/GHSA-w3rx-r6r6-pgpr',
+    range: '<=2.0.2',
+  }),
+  Object.freeze({
+    source: 1138809,
+    name: 'image-size',
+    severity: 'high',
+    url: 'https://github.com/advisories/GHSA-5p2g-fcmc-qvqq',
+    range: '<=2.0.2',
+  }),
+]);
+const EXCEPTION_EXPIRES_AT = Date.UTC(2026, 8, 30);
 
 function fail(message) {
   console.error(`Dependency audit gate failed: ${message}`);
@@ -39,7 +48,7 @@ function runAudit() {
 
 function advisoryLeaves(packageName, vulnerabilities, trail = []) {
   if (trail.includes(packageName)) {
-    fail(`npm audit reported a cyclic vulnerability chain: ${[...trail, packageName].join(' -> ')}`);
+    return [];
   }
   const vulnerability = vulnerabilities[packageName];
   if (!vulnerability || !Array.isArray(vulnerability.via) || vulnerability.via.length === 0) {
@@ -54,12 +63,13 @@ function advisoryLeaves(packageName, vulnerabilities, trail = []) {
 }
 
 function isApprovedAdvisory(advisory) {
-  return (
-    advisory?.source === APPROVED_ADVISORY.source &&
-    advisory?.name === APPROVED_ADVISORY.name &&
-    advisory?.severity === APPROVED_ADVISORY.severity &&
-    advisory?.url === APPROVED_ADVISORY.url &&
-    advisory?.range === APPROVED_ADVISORY.range
+  return APPROVED_ADVISORIES.some(
+    (approved) =>
+      advisory?.source === approved.source &&
+      advisory?.name === approved.name &&
+      advisory?.severity === approved.severity &&
+      advisory?.url === approved.url &&
+      advisory?.range === approved.range,
   );
 }
 
@@ -79,7 +89,12 @@ if (blocking.length === 0) {
 
 const unexpected = [];
 for (const [packageName] of blocking) {
-  for (const advisory of advisoryLeaves(packageName, vulnerabilities)) {
+  const leaves = advisoryLeaves(packageName, vulnerabilities);
+  if (leaves.length === 0) {
+    unexpected.push({ packageName, advisory: 'no advisory leaf found' });
+    continue;
+  }
+  for (const advisory of leaves) {
     if (!isApprovedAdvisory(advisory)) {
       unexpected.push({ packageName, advisory });
     }
@@ -90,14 +105,14 @@ if (unexpected.length > 0) {
 }
 if (Date.now() >= EXCEPTION_EXPIRES_AT) {
   fail(
-    `${APPROVED_ADVISORY.url} still requires a reviewed upstream-compatible resolution; ` +
-      'the temporary toolchain exception expired on 2026-08-08',
+    'The exact image-size toolchain advisories still require a reviewed upstream-compatible ' +
+      'resolution; the temporary exception expired on 2026-09-30',
   );
 }
 
 console.warn(
-  `Dependency audit gate passed with a temporary exception for ${APPROVED_ADVISORY.url}.`,
+  'Dependency audit gate passed with a temporary exception for two exact image-size advisories.',
 );
 console.warn(
-  `${blocking.length} npm audit entries resolve exclusively to that one build/test-toolchain advisory.`,
+  `${blocking.length} npm audit entries resolve exclusively to those build-toolchain advisories.`,
 );

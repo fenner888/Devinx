@@ -96,11 +96,17 @@
   },
   "overrides": {
     "@xmldom/xmldom": "0.8.13",
-    "brace-expansion@1.1.15": "1.1.16",
-    "fast-uri": "3.1.4",
+    "brace-expansion@1.x": "1.1.18",
+    "brace-expansion@2.x": "2.1.4",
+    "brace-expansion@5.x": "5.0.9",
+    "fast-uri": "3.1.5",
+    "js-yaml@3.x": "3.15.1",
+    "js-yaml@4.x": "4.3.1",
     "linkify-it": "5.0.2",
     "markdown-it": "14.3.0",
+    "nanoid": "3.3.18",
     "postcss": "8.5.23",
+    "undici": "6.28.0",
     "uuid": "11.1.1"
   },
   "allowScripts": {

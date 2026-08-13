@@ -144,8 +144,8 @@ const runtimeBundle = await build({
 });
 for (const input of Object.keys(runtimeBundle.metafile.inputs)) {
   const normalizedInput = input.replaceAll('\\', '/');
-  if (/node_modules\/(?:brace-expansion|minimatch)\//.test(normalizedInput)) {
-    throw new Error('The Connector runtime unexpectedly includes vulnerable glob tooling');
+  if (/node_modules\/(?:brace-expansion|image-size|minimatch)\//.test(normalizedInput)) {
+    throw new Error('The Connector runtime unexpectedly includes vulnerable build tooling');
   }
 }
 

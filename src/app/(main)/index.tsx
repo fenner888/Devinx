@@ -50,6 +50,10 @@ import {
   ComputerSessionRow,
 } from '@components/sessions/ComputerSessionRow';
 import { ModelFamilyMark } from '@components/sessions/ModelFamilyMark';
+import {
+  ModelCostIndicator,
+  modelCostLabel,
+} from '@components/sessions/ModelCostIndicator';
 import { useConnections } from '@auth/ConnectionContext';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
 import { connectionModeUsesComputer } from '@lib/connections';
@@ -361,8 +365,10 @@ export default function HomeScreen() {
 
   function modelFamilyRow(family: ComputerModelFamily<(typeof localModels)[number]>) {
     const selected = family.key === selectedFamily?.key;
+    const presentedModel = preferredFamilyVariant(family, selectedModelId).model;
     const badgeLabel =
       family.badge === 'free_promo' ? 'Free promo' : family.badge === 'new' ? 'New' : null;
+    const costLabel = modelCostLabel(presentedModel.costTier, presentedModel.costSummary);
     return (
       <Pressable
         key={family.key}
@@ -373,7 +379,7 @@ export default function HomeScreen() {
           setShowModelPicker(false);
         }}
         accessibilityRole="button"
-        accessibilityLabel={`Use model family ${family.name}${badgeLabel ? `, ${badgeLabel}` : ''}`}
+        accessibilityLabel={`Use model family ${family.name}${badgeLabel ? `, ${badgeLabel}` : ''}${costLabel ? `, ${costLabel}` : ''}`}
       >
         <View className="w-10 items-start">
           <ModelFamilyMark name={family.name} size={26} />
@@ -404,6 +410,12 @@ export default function HomeScreen() {
         {family.variants.some((variant) => variant.model.supportsImages) && (
           <Ionicons name="image-outline" size={15} color={tokens.textLow.hex} />
         )}
+        <View className="ml-2">
+          <ModelCostIndicator
+            costTier={presentedModel.costTier}
+            costSummary={presentedModel.costSummary}
+          />
+        </View>
         <View className="w-8 items-end">
           {selected && <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />}
         </View>
@@ -1559,6 +1571,10 @@ export default function HomeScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               {selectedFamily?.variants.map((variant) => {
                 const selected = variant.model.id === selectedVariant?.model.id;
+                const costLabel = modelCostLabel(
+                  variant.model.costTier,
+                  variant.model.costSummary,
+                );
                 return (
                   <Pressable
                     key={variant.model.id}
@@ -1568,7 +1584,7 @@ export default function HomeScreen() {
                       setShowModelVariantPicker(false);
                     }}
                     accessibilityRole="button"
-                    accessibilityLabel={`Use ${variant.label} for ${selectedFamily.name}`}
+                    accessibilityLabel={`Use ${variant.label} for ${selectedFamily.name}${costLabel ? `, ${costLabel}` : ''}`}
                   >
                     <View className="w-8 items-start">
                       {selected && (
@@ -1579,6 +1595,12 @@ export default function HomeScreen() {
                     {variant.model.supportsImages && (
                       <Ionicons name="image-outline" size={15} color={tokens.textLow.hex} />
                     )}
+                    <View className="ml-2">
+                      <ModelCostIndicator
+                        costTier={variant.model.costTier}
+                        costSummary={variant.model.costSummary}
+                      />
+                    </View>
                   </Pressable>
                 );
               })}

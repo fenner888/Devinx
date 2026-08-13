@@ -13,6 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { ModelFamilyMark } from '@components/sessions/ModelFamilyMark';
 import {
+  ModelCostIndicator,
+  modelCostLabel,
+} from '@components/sessions/ModelCostIndicator';
+import {
   groupComputerModels,
   preferredFamilyVariant,
   type ComputerModelCatalogItem,
@@ -88,7 +92,9 @@ export function ComputerModelPickerSheets({
 
   function familyRow(family: ComputerModelFamily) {
     const selected = family.key === selectedFamily?.key;
+    const presentedModel = preferredFamilyVariant(family, selectedModelId).model;
     const badge = family.badge === 'free_promo' ? 'Free promo' : family.badge === 'new' ? 'New' : null;
+    const costLabel = modelCostLabel(presentedModel.costTier, presentedModel.costSummary);
     return (
       <Pressable
         key={family.key}
@@ -98,7 +104,7 @@ export function ComputerModelPickerSheets({
           onCloseModel();
         }}
         accessibilityRole="button"
-        accessibilityLabel={`Use model family ${family.name}${badge ? `, ${badge}` : ''}`}
+        accessibilityLabel={`Use model family ${family.name}${badge ? `, ${badge}` : ''}${costLabel ? `, ${costLabel}` : ''}`}
       >
         <View className="w-10 items-start">
           <ModelFamilyMark name={family.name} size={26} />
@@ -129,6 +135,12 @@ export function ComputerModelPickerSheets({
         {family.variants.some((variant) => variant.model.supportsImages) && (
           <Ionicons name="image-outline" size={15} color={tokens.textLow.hex} />
         )}
+        <View className="ml-2">
+          <ModelCostIndicator
+            costTier={presentedModel.costTier}
+            costSummary={presentedModel.costSummary}
+          />
+        </View>
         <View className="w-8 items-end">
           {selected && <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />}
         </View>
@@ -290,6 +302,10 @@ export function ComputerModelPickerSheets({
             <ScrollView showsVerticalScrollIndicator={false}>
               {selectedFamily?.variants.map((variant) => {
                 const selected = variant.model.id === selectedModelId;
+                const costLabel = modelCostLabel(
+                  variant.model.costTier,
+                  variant.model.costSummary,
+                );
                 return (
                   <Pressable
                     key={variant.model.id}
@@ -299,12 +315,16 @@ export function ComputerModelPickerSheets({
                       onCloseVariant();
                     }}
                     accessibilityRole="button"
-                    accessibilityLabel={`Use ${variant.label} for ${selectedFamily.name}`}
+                    accessibilityLabel={`Use ${variant.label} for ${selectedFamily.name}${costLabel ? `, ${costLabel}` : ''}`}
                   >
                     <View className="w-8 items-start">
                       {selected && <Ionicons name="checkmark" size={21} color={tokens.textHi.hex} />}
                     </View>
                     <Text className="flex-1 text-text-hi text-text16">{variant.label}</Text>
+                    <ModelCostIndicator
+                      costTier={variant.model.costTier}
+                      costSummary={variant.model.costSummary}
+                    />
                   </Pressable>
                 );
               })}

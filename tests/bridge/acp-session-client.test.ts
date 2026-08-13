@@ -102,7 +102,8 @@ process.stdin.on('data', (chunk) => {
                   label: 'Claude Opus 5 Medium',
                   description: 'Balanced reasoning',
                   is_new: true,
-                  cost_summary: 'private display metadata is ignored',
+                  cost_summary: '$2 / MTok In · $8 / MTok Out',
+                  cost_tier: 'High cost',
                 },
               ],
             },
@@ -122,10 +123,38 @@ process.stdin.on('data', (chunk) => {
           name: 'Claude Opus 5 Medium',
           description: 'Balanced reasoning',
           badge: 'new',
+          costTier: 'high',
+          costSummary: '$2 / MTok In · $8 / MTok Out',
         },
         { id: 'adaptive', name: 'Adaptive' },
       ],
     });
+  });
+
+  it('ignores future cost tiers and safely bounds display-only cost summaries', () => {
+    const summary = `Variable\n${'x'.repeat(240)}`;
+    const catalog = parseDevinCliModelCatalog({
+      families: [
+        {
+          variants: [
+            {
+              model_uid: 'future-model',
+              label: 'Future Model',
+              cost_tier: 'Future tier',
+              cost_summary: summary,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(catalog.models).toEqual([
+      {
+        id: 'future-model',
+        name: 'Future Model',
+        costSummary: `Variable ${'x'.repeat(191)}`,
+      },
+    ]);
   });
 
   it('loads the model catalog through the Devin CLI machine-readable command', async () => {

@@ -181,6 +181,8 @@ const devinModelCatalogSchema = z
                     label: z.string().min(1).max(160),
                     description: z.string().min(1).max(500).optional(),
                     is_new: z.boolean().default(false),
+                    cost_summary: z.unknown().optional(),
+                    cost_tier: z.unknown().optional(),
                   })
                   .passthrough(),
               )
@@ -516,6 +518,7 @@ export interface AcpLoadedSession {
 }
 
 export type AcpModelBadge = 'new' | 'free_promo';
+export type AcpModelCostTier = 'low' | 'medium' | 'high' | 'free';
 
 export interface AcpModelOption {
   id: string;
@@ -523,6 +526,8 @@ export interface AcpModelOption {
   description?: string;
   supportsImages?: boolean;
   badge?: AcpModelBadge;
+  costTier?: AcpModelCostTier;
+  costSummary?: string;
 }
 
 export interface AcpModelCatalog {
@@ -789,6 +794,31 @@ function trustedModelBadge(meta: Record<string, unknown> | undefined): AcpModelB
   return badge === 'new' || badge === 'free_promo' ? badge : undefined;
 }
 
+function trustedModelCostTier(value: unknown): AcpModelCostTier | undefined {
+  return value === 'Low cost'
+    ? 'low'
+    : value === 'Med cost'
+      ? 'medium'
+      : value === 'High cost'
+        ? 'high'
+        : value === 'Free'
+          ? 'free'
+          : undefined;
+}
+
+function trustedModelCostSummary(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const cleaned = [...value]
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 31 || codePoint === 127 ? ' ' : character;
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned ? cleaned.slice(0, 200) : undefined;
+}
+
 function parseAcpModelSelector(
   configOptions: unknown[] | null | undefined,
 ): AcpModelSelector | null {
@@ -835,12 +865,18 @@ export function parseDevinCliModelCatalog(
 ): AcpModelCatalog {
   const parsed = devinModelCatalogSchema.parse(input);
   const models = parsed.families.flatMap((family) =>
-    family.variants.map((variant) => ({
-      id: variant.model_uid,
-      name: variant.label,
-      ...(variant.description ? { description: variant.description } : {}),
-      ...(variant.is_new ? { badge: 'new' as const } : {}),
-    })),
+    family.variants.map((variant) => {
+      const costTier = trustedModelCostTier(variant.cost_tier);
+      const costSummary = trustedModelCostSummary(variant.cost_summary);
+      return {
+        id: variant.model_uid,
+        name: variant.label,
+        ...(variant.description ? { description: variant.description } : {}),
+        ...(variant.is_new ? { badge: 'new' as const } : {}),
+        ...(costTier ? { costTier } : {}),
+        ...(costSummary ? { costSummary } : {}),
+      };
+    }),
   );
   if (models.length === 0 || models.length > 200) {
     throw new Error('Devin CLI model catalog has an invalid size');
