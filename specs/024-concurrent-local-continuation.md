@@ -41,6 +41,21 @@ The supported fallback is a new Connector-owned ACP session created with `sessio
 
 Until that continuation path passes synthetic and physical validation, locked sessions are readable but steering remains unavailable with an explicit `session_in_use` state.
 
+## Restart and contention recovery
+
+Opaque session handles remain deterministic for a Connector installation, but the in-memory handle-to-session mapping is intentionally rebuilt from authenticated `session.list` results after a Connector restart. The mobile client may therefore receive one authorization-shaped `404` when it opens a previously listed local session before the restarted Connector has rehydrated that mapping.
+
+For the read-only `session.load` path only, DevinX performs one bounded recovery:
+
+1. authenticate `bridge.health`;
+2. enumerate the same local device through the existing bounded `session.list` pagination;
+3. require the original opaque handle to appear in that authenticated result; and
+4. retry `session.load` exactly once.
+
+If the handle is not rediscovered, any request fails, or the retry fails, DevinX preserves the public failure and does not guess a raw session identifier. Write operations (`session.prompt`, `session.create`, elicitation responses, revocation) never use this automatic retry because replaying a successful-but-unacknowledged write could duplicate user intent.
+
+Connector read contention is distinct from request-rate limiting. A `429` response with the allowlisted `{ "error": "busy" }` body maps to a transient busy state; other `429` responses remain rate-limited. The secure native and Tailnet transports accept the Connector's documented `409` session-conflict response so it can reach the typed client error boundary instead of becoming an opaque transport failure.
+
 ## Authorization and privacy
 
 - `session:content:read` remains required server-side for every history request.
@@ -53,5 +68,8 @@ Until that continuation path passes synthetic and physical validation, locked se
 
 - Synthetic SQLite fixtures cover ownership/path rejection, schema drift, main-chain traversal, branch exclusion, role filtering, clipping, and concurrent WAL reads.
 - Existing ACP/list/load/prompt authorization, rate-limit, replay, and secret-leak tests remain green.
+- A restarted Connector rejects the stale in-memory mapping once, rehydrates it from an authenticated bounded list, and loads the same opaque session handle on the single retry.
+- A missing handle, offline Connector, or unauthorized device does not loop, enumerate across devices, or retry a write.
+- Connector `busy`, rate-limited, and session-conflict responses remain distinct typed states through both secure transports.
 - The Connector build contains no new dependency and uses the pinned Node runtime.
 - Physical validation opens one session in Devin Desktop, loads its full minimized history on iPhone, creates a continuation, receives a reply, and confirms the Desktop-owned original was not terminated or modified.

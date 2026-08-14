@@ -225,6 +225,12 @@ historical Build 67 handoff remains in `docs/build-67-release-handoff.md`. The o
 is Developer ID signed, notarized, stapled, checksum-published, and available from the guarded
 official release link.
 
+- [ ] Build 79 is the next internal and external TestFlight checkpoint. It combines the local-session
+      recovery fix with live model catalog metadata, including provider-reported relative cost tiers,
+      cost summaries, and `Free` labels. It must be assigned to both **Team (Expo)** and
+      **DevinX Early Access** after Apple finishes processing. It does not replace Build 76 in the
+      submitted public App Store 1.0 version.
+
 - [x] In Build 35, switching Home from Cloud to Computer changed Recent from Cloud sessions to sessions from the selected Mac, switching back restored Cloud recents, and View all retained the combined cross-origin Sessions screen
 - [x] In Build 35, the destination and workspace sheets remained compact, bounded, explicitly dismissible, and free of raw paths or excessive empty space
 - [x] In Build 35, Cloud repositories remained distinct from Computer workspaces and the complete bounded repository picker behaved correctly

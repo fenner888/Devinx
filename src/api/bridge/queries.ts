@@ -10,7 +10,6 @@ import {
   getComputerSessionElicitation,
   getComputerCreateOptions,
   createComputerSession,
-  loadComputerSession,
   promptComputerSession,
   respondToComputerSessionElicitation,
   openComputerBridges,
@@ -186,6 +185,35 @@ export async function loadComputerSessionBoard(
   };
 }
 
+export async function loadComputerSessionWithRecovery(
+  computer: PairedComputerSummary,
+  sessionId: string,
+): Promise<ComputerLoadedSession> {
+  const bridges = await openComputerBridges([computer.bridgeId]);
+  const bridge = bridges.get(computer.bridgeId);
+  if (!bridge) {
+    throw new ComputerBridgeError(
+      'This iPhone is no longer authorized by the paired local device.',
+      'authorization_failed',
+    );
+  }
+
+  try {
+    return await bridge.loadSession(sessionId);
+  } catch (error) {
+    if (!(error instanceof ComputerBridgeError) || error.code !== 'authorization_failed') {
+      throw error;
+    }
+
+    const recovery = await discoverComputer(computer, bridge);
+    const handleWasRehydrated =
+      recovery.status.state === 'ready' &&
+      recovery.sessions.some((session) => session.id === sessionId && session.canLoad);
+    if (!handleWasRehydrated) throw error;
+    return bridge.loadSession(sessionId);
+  }
+}
+
 export function useComputerSessions() {
   const queryClient = useQueryClient();
   const { mode, computers } = useConnections();
@@ -208,15 +236,27 @@ export function useComputerSessions() {
 }
 
 export function useComputerSessionDetail(bridgeId: string, sessionId: string, enabled = true) {
-  return useQuery<ComputerLoadedSession, Error>({
+  const { computers } = useConnections();
+  const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
+
+  return useQuery<ComputerLoadedSession, ComputerBridgeError>({
     queryKey: ['computerSession', bridgeId, sessionId],
-    queryFn: () => loadComputerSession(bridgeId, sessionId),
-    enabled,
+    queryFn: () => {
+      if (!computer) {
+        throw new ComputerBridgeError(
+          'This iPhone is no longer paired with that local device.',
+          'not_paired',
+        );
+      }
+      return loadComputerSessionWithRecovery(computer, sessionId);
+    },
+    enabled: enabled && computer !== undefined,
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    retry: false,
+    retry: (failureCount, error) => failureCount < 1 && error.code === 'busy',
+    retryDelay: 300,
   });
 }
 

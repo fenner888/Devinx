@@ -1,10 +1,10 @@
 # TestFlight and App Store release plan
 
-Updated: July 24, 2026
+Updated: August 13, 2026
 
 ## Goal
 
-Use Build 77 for controlled beta access while the public App Store listing is completed and reviewed.
+Use Build 79 for controlled beta access while the public App Store listing is completed and reviewed.
 TestFlight distribution and public App Store release are separate approval paths.
 
 ## Recommended rollout
