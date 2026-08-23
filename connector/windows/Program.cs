@@ -31,6 +31,14 @@ internal sealed class ConnectorForm : Form
     private readonly PictureBox qrImage = new() { Width = 360, Height = 360, SizeMode = PictureBoxSizeMode.Zoom };
     private readonly Button regenerateButton = new() { Text = "Generate new code", AutoSize = true };
     private readonly CheckBox launchAtLogin = new() { Text = "Open DevinX Connector when I sign in", AutoSize = true };
+    private readonly Label devicesTitle = new()
+    {
+        Text = "Paired iPhones",
+        AutoSize = true,
+        Font = new Font("Segoe UI", 14, FontStyle.Bold),
+        Margin = new Padding(0, 18, 0, 8),
+        Visible = false,
+    };
     private readonly DataGridView devicesGrid = new()
     {
         AllowUserToAddRows = false,
@@ -40,6 +48,13 @@ internal sealed class ConnectorForm : Form
         MultiSelect = false,
         RowHeadersVisible = false,
         Height = 220,
+        Visible = false,
+    };
+    private readonly FlowLayoutPanel deviceActions = new()
+    {
+        AutoSize = true,
+        FlowDirection = FlowDirection.LeftToRight,
+        Visible = false,
     };
     private readonly Button savePermissionsButton = new() { Text = "Save permissions", AutoSize = true };
     private readonly Button revokeButton = new() { Text = "Revoke selected iPhone", AutoSize = true };
@@ -81,14 +96,6 @@ internal sealed class ConnectorForm : Form
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 0, 0, 18),
         };
-        var devicesTitle = new Label
-        {
-            Text = "Paired iPhones",
-            AutoSize = true,
-            Font = new Font("Segoe UI", 14, FontStyle.Bold),
-            Margin = new Padding(0, 18, 0, 8),
-        };
-        var deviceActions = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
         deviceActions.Controls.Add(savePermissionsButton);
         deviceActions.Controls.Add(revokeButton);
         var supportActions = new FlowLayoutPanel
@@ -218,9 +225,11 @@ internal sealed class ConnectorForm : Form
             case "ready":
                 SetStatus(
                     "Ready to connect",
-                    connectorEvent.CliDetected == true
-                        ? "Tailscale connected · Devin for Terminal detected"
-                        : "Tailscale connected · Devin for Terminal unavailable");
+                    connectorEvent.CliDetected != true
+                        ? "Tailscale connected · Install Devin for Terminal to access local sessions. Pairing is available."
+                        : connectorEvent.SessionDiscoveryEnabled == true
+                            ? "Tailscale connected · Devin for Terminal ready"
+                            : "Tailscale connected · Devin for Terminal is starting. Pairing is available and sessions reconnect automatically.");
                 break;
             case "pairing_offer" when !string.IsNullOrWhiteSpace(connectorEvent.Payload):
                 RenderQr(connectorEvent.Payload);
@@ -284,6 +293,10 @@ internal sealed class ConnectorForm : Form
             devicesGrid.Rows[index].Tag = device.DeviceId;
             devicesGrid.Rows[index].ReadOnly = device.Status != "active";
         }
+        var hasDevices = devices.Count > 0;
+        devicesTitle.Visible = hasDevices;
+        devicesGrid.Visible = hasDevices;
+        deviceActions.Visible = hasDevices;
     }
 
     private async Task SaveSelectedPermissionsAsync()
@@ -502,6 +515,7 @@ internal sealed class ConnectorEvent
     [JsonPropertyName("type")] public string? Type { get; init; }
     [JsonPropertyName("payload")] public string? Payload { get; init; }
     [JsonPropertyName("cliDetected")] public bool? CliDetected { get; init; }
+    [JsonPropertyName("sessionDiscoveryEnabled")] public bool? SessionDiscoveryEnabled { get; init; }
     [JsonPropertyName("pairingId")] public string? PairingId { get; init; }
     [JsonPropertyName("deviceName")] public string? DeviceName { get; init; }
     [JsonPropertyName("devices")] public List<ConnectorDevice>? Devices { get; init; }

@@ -60,9 +60,13 @@ export function executableCandidates(environment: NodeJS.ProcessEnv): string[] {
 }
 
 export function windowsDevinCliCandidates(environment: NodeJS.ProcessEnv): string[] {
-  const pathValue = environment.Path ?? environment.PATH;
-  if (!pathValue) return [];
   const candidates = new Set<string>();
+  const localAppData = environment.LOCALAPPDATA;
+  if (localAppData && win32.isAbsolute(localAppData)) {
+    candidates.add(win32.join(localAppData, 'devin', 'cli', 'bin', 'devin.exe'));
+  }
+  const pathValue = environment.Path ?? environment.PATH;
+  if (!pathValue) return [...candidates];
   for (const rawEntry of pathValue.split(win32.delimiter)) {
     const result = pathEntrySchema.safeParse(rawEntry);
     if (!result.success || !win32.isAbsolute(result.data)) continue;

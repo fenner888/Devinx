@@ -467,11 +467,19 @@ export class DesktopBridgeRunner {
       let sessions: SessionDiscoveryAdapter = unavailableSessions;
       if (options.devinCliPath) {
         this.devinCliPath = options.devinCliPath;
-        const acp = this.dependencies.createAcpClient(options.devinCliPath);
-        this.acp = acp;
-        await acp.start();
-        this.sessions.replace(acp);
+        // The stable adapter is shared with BridgeService so ACP can recover in
+        // place without restarting the listener or invalidating a phone pairing.
         sessions = this.sessions;
+        const acp = this.dependencies.createAcpClient(options.devinCliPath);
+        try {
+          await acp.start();
+          this.acp = acp;
+          this.sessions.replace(acp);
+        } catch {
+          await acp.stop().catch(() => {});
+          this.acp = null;
+          this.sessions.replace(null);
+        }
         if (options.devinSessionDbPath && this.dependencies.createSessionStore) {
           const history = this.dependencies.createSessionStore(options.devinSessionDbPath);
           try {

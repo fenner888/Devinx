@@ -24,10 +24,16 @@ the exact methods it advertises. Before a Windows release can be called function
 official Devin CLI on the test PC must expose the ACP capabilities consumed by Connector. Connector
 therefore:
 
-- discovers only an allowlisted executable available through the signed-in user's Windows `Path`;
+- discovers only the official per-user `%LOCALAPPDATA%\devin\cli\bin\devin.exe` location or an
+  allowlisted absolute executable available through the signed-in user's Windows `Path`;
 - executes no shell profile and never guesses a third-party package or download;
-- negotiates ACP capabilities at runtime and fails closed when required methods are unavailable; and
-- shows a clear **Devin for Terminal is unavailable on this Windows PC** state without opening a listener that claims session support.
+- negotiates ACP capabilities at runtime and fails closed when required methods are unavailable;
+- keeps the authenticated pairing listener available when the installed CLI is temporarily starting
+  or unavailable, while advertising session discovery as disabled and returning the existing generic
+  `404`/unavailable responses for unsupported session operations; and
+- retries ACP negotiation without requiring the user to reinstall or re-pair, and shows a clear
+  **Devin for Terminal is starting or unavailable on this Windows PC** state without claiming session
+  support.
 
 No fallback may scrape credentials, automate the Devin web application, run arbitrary shell commands, or impersonate a user account.
 
@@ -42,7 +48,7 @@ The platform-neutral TypeScript controller, bridge authorization, pairing protoc
 The Windows adapter owns only:
 
 - current-user DPAPI protection and the user-owned encrypted state file;
-- Windows `Path` executable discovery;
+- allowlisted official per-user and Windows `Path` executable discovery;
 - a native per-user control window and notification-area lifecycle;
 - explicit launch-at-sign-in registration through the packaged Windows startup-task API, with a
   current-user registry fallback only for separately gated unpackaged development builds;
