@@ -34,15 +34,6 @@ jobs:
       - name: Clear preinstalled NuGet caches
         run: dotnet nuget locals all --clear
 
-      - name: Diagnose current SDK linker lock
-        shell: pwsh
-        run: |
-          $project = 'bridge/windows-dpapi-helper/DevinX.WindowsDpapiHelper.csproj'
-          $lock = 'bridge/windows-dpapi-helper/packages.lock.json'
-          Remove-Item -LiteralPath $lock -Force
-          dotnet restore $project --use-lock-file --force-evaluate --no-cache --source https://api.nuget.org/v3/index.json
-          Get-Content -LiteralPath $lock
-
       - name: Build Windows verification artifacts and Microsoft Store MSIX
         run: npm run connector:build:windows:store
 
