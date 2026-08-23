@@ -22,6 +22,7 @@ const repositoryRoot = resolve(scriptDirectory, '..', '..');
 const connectorVersion = '0.1.0';
 const architecture = 'x64';
 const runtimeIdentifier = `win-${architecture}`;
+const nugetSource = 'https://api.nuget.org/v3/index.json';
 const pinnedNodeVersion = readFileSync(resolve(repositoryRoot, '.nvmrc'), 'utf8').trim();
 if (!/^24\.\d+\.\d+$/.test(pinnedNodeVersion)) {
   throw new Error('DevinX Connector requires a pinned Node 24 runtime in .nvmrc');
@@ -159,11 +160,17 @@ run('dotnet.exe', [
   'restore',
   resolve(repositoryRoot, 'bridge', 'windows-dpapi-helper', 'DevinX.WindowsDpapiHelper.csproj'),
   '--locked-mode',
+  '--no-cache',
+  '--source',
+  nugetSource,
 ]);
 run('dotnet.exe', [
   'restore',
   resolve(repositoryRoot, 'connector', 'windows', 'DevinXConnector.csproj'),
   '--locked-mode',
+  '--no-cache',
+  '--source',
+  nugetSource,
 ]);
 run('dotnet.exe', [
   'publish',
@@ -234,6 +241,9 @@ run('dotnet.exe', [
   'restore',
   resolve(repositoryRoot, 'connector', 'windows-installer', 'DevinXConnectorInstaller.csproj'),
   '--locked-mode',
+  '--no-cache',
+  '--source',
+  nugetSource,
   `-p:ConnectorPayload=${zipPath}`,
 ]);
 run('dotnet.exe', [
