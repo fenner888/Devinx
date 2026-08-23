@@ -31,6 +31,9 @@ jobs:
           npm run typecheck
           npm run test -- --ci --runInBand tests/bridge/bridge-service.test.ts tests/auth/computer-bridge.test.ts tests/lib/connector-version.test.ts
 
+      - name: Clear preinstalled NuGet package cache
+        run: dotnet nuget locals global-packages --clear
+
       - name: Build Windows verification artifacts and Microsoft Store MSIX
         run: npm run connector:build:windows:store
 

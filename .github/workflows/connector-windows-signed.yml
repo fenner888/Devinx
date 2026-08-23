@@ -28,6 +28,9 @@ jobs:
       - name: Validate repository
         run: npm run ci
 
+      - name: Clear preinstalled NuGet package cache
+        run: dotnet nuget locals global-packages --clear
+
       - name: Import protected Authenticode identity
         shell: pwsh
         env:
