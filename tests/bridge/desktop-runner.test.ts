@@ -597,4 +597,73 @@ describe('Desktop Bridge development runner', () => {
     expect(createAcpClient).toHaveBeenCalledTimes(2);
     await runner.stop();
   });
+
+  it('keeps pairing available while initial ACP startup recovers in place', async () => {
+    const renderedPayloads: string[] = [];
+    const firstStop = jest.fn<Promise<void>, []>().mockResolvedValue();
+    const first: AcpSessionLifecycle = {
+      start: jest.fn<Promise<void>, []>().mockRejectedValue(new Error('ACP is still starting')),
+      stop: firstStop,
+      isSessionListSupported: () => false,
+      listSessions: async () => {
+        throw new Error('Session discovery is unavailable');
+      },
+      isSessionLoadSupported: () => false,
+      loadSession: async () => {
+        throw new Error('Session loading is unavailable');
+      },
+      isSessionPromptSupported: () => false,
+      promptSession: async () => {
+        throw new Error('Session prompting is unavailable');
+      },
+    };
+    const replacement: AcpSessionLifecycle = {
+      start: jest.fn<Promise<void>, []>().mockResolvedValue(),
+      stop: jest.fn<Promise<void>, []>().mockResolvedValue(),
+      isSessionListSupported: () => true,
+      listSessions: async () => ({ sessions: [] }),
+      isSessionLoadSupported: () => true,
+      loadSession: async () => ({ sessionId: 'session', cwd: '/', messages: [], truncated: false }),
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
+    };
+    const createAcpClient = jest
+      .fn<AcpSessionLifecycle, [string]>()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(replacement);
+    const runner = new DesktopBridgeRunner(
+      {
+        advertisedHost: '100.127.166.87',
+        devinCliPath: '/usr/local/bin/devin',
+      },
+      {
+        platform: 'windows',
+        secretStore: new MemorySecretStore(),
+        tlsIdentityGenerator: new OpenSslTlsIdentityGenerator({ validityDays: 1 }),
+        qrRenderer: { render: (payload) => renderedPayloads.push(payload) },
+        createListener: (options) => {
+          const identity = tlsIdentityFromPem(options.tlsCertificatePem, options.tlsPrivateKeyPem);
+          return {
+            start: async () => ({
+              host: '100.127.166.87',
+              port: 45_831,
+              certificateFingerprint: identity.certificateFingerprint,
+            }),
+            stop: async () => {},
+          };
+        },
+        createAcpClient,
+      },
+    );
+
+    await expect(runner.start()).resolves.toMatchObject({
+      sessionDiscoveryEnabled: false,
+      transportKind: 'tailscale_vpn',
+    });
+    expect(renderedPayloads).toHaveLength(1);
+    expect(firstStop).toHaveBeenCalledTimes(1);
+    await expect(runner.recoverSessionDiscovery()).resolves.toBe(true);
+    expect(createAcpClient).toHaveBeenCalledTimes(2);
+    await runner.stop();
+  });
 });

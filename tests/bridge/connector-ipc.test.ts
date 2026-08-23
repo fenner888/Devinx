@@ -101,14 +101,25 @@ describe('DevinX Connector platform and IPC boundary', () => {
     expect(candidates.every((candidate) => candidate.startsWith('/'))).toBe(true);
   });
 
-  it('derives Windows CLI candidates only from absolute Path entries', () => {
+  it('checks the official Windows install before absolute Path entries', () => {
     expect(
       windowsDevinCliCandidates({
         NODE_ENV: 'test',
+        LOCALAPPDATA: 'C:\\Users\\tester\\AppData\\Local',
         Path: 'C:\\Program Files\\Devin;relative;;D:\\Tools',
       }),
-    ).toEqual(['C:\\Program Files\\Devin\\devin.exe', 'D:\\Tools\\devin.exe']);
+    ).toEqual([
+      'C:\\Users\\tester\\AppData\\Local\\devin\\cli\\bin\\devin.exe',
+      'C:\\Program Files\\Devin\\devin.exe',
+      'D:\\Tools\\devin.exe',
+    ]);
     expect(windowsDevinCliCandidates({ NODE_ENV: 'test', Path: 'relative;;' })).toEqual([]);
+    expect(
+      windowsDevinCliCandidates({
+        NODE_ENV: 'test',
+        LOCALAPPDATA: 'C:\\Users\\tester\\AppData\\Local',
+      }),
+    ).toEqual(['C:\\Users\\tester\\AppData\\Local\\devin\\cli\\bin\\devin.exe']);
   });
 
   it('derives the read-only Devin session store only from an absolute home', async () => {

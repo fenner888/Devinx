@@ -137,6 +137,7 @@ export class ConnectorController {
         cliDetected: Boolean(devinCliPath),
       });
       this.writeDevices();
+      let sessionDiscoveryEnabled = started.sessionDiscoveryEnabled;
       let nextAcpRecoveryAt = Date.now() + ACP_RECOVERY_INTERVAL_MS;
       while (!this.stopping) {
         const review = runner.pendingReviews()[0];
@@ -155,7 +156,17 @@ export class ConnectorController {
         }
         if (Date.now() >= nextAcpRecoveryAt) {
           nextAcpRecoveryAt = Date.now() + ACP_RECOVERY_INTERVAL_MS;
-          await runner.recoverSessionDiscovery();
+          const recovered = await runner.recoverSessionDiscovery();
+          if (recovered !== sessionDiscoveryEnabled) {
+            sessionDiscoveryEnabled = recovered;
+            this.write({
+              version: CONNECTOR_IPC_VERSION,
+              type: 'ready',
+              transport: started.transportKind,
+              sessionDiscoveryEnabled,
+              cliDetected: Boolean(devinCliPath),
+            });
+          }
         }
         await delay(this.pollIntervalMs);
       }
