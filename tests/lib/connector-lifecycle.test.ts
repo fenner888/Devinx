@@ -5,6 +5,10 @@ const connectorSource = readFileSync(
   resolve(__dirname, '../../connector/macos/DevinXConnector.swift'),
   'utf8',
 );
+const supervisorSource = readFileSync(
+  resolve(__dirname, '../../connector/macos/ConnectorProcessSupervisor.swift'),
+  'utf8',
+);
 
 describe('macOS Connector lifecycle', () => {
   it('keeps the runtime available after the window closes and exposes explicit menu actions', () => {
@@ -24,11 +28,20 @@ describe('macOS Connector lifecycle', () => {
       'task.arguments = ["delete", keychainService, keychainAccount]',
     );
     expect(connectorSource).toMatch(
-      /if self\.uninstalling \{[\s\S]*?self\.removeProtectedStateWithHelper\(\)/,
+      /private func runtimeDidTerminate\(_ terminationStatus: Int32\) \{[\s\S]*?if uninstalling \{[\s\S]*?removeProtectedStateWithHelper\(\)/,
     );
     expect(connectorSource).toMatch(
-      /if process\?\.isRunning == true \{[\s\S]*?type": "reset"[\s\S]*?\} else \{[\s\S]*?removeProtectedStateWithHelper\(\)/,
+      /if runtime\.isRunning \{[\s\S]*?type": "reset"[\s\S]*?\} else \{[\s\S]*?removeProtectedStateWithHelper\(\)/,
     );
+  });
+
+  it('owns stdout and stderr handlers in one idempotent cleanup path', () => {
+    expect(connectorSource).toContain('private let runtime = ConnectorProcessSupervisor()');
+    expect(supervisorSource).toContain('private func handleEOF');
+    expect(supervisorSource).toContain('private func finish');
+    expect(supervisorSource).toContain('context.cleaned = true');
+    expect(supervisorSource).toContain('readabilityHandler = nil');
+    expect(supervisorSource).toContain('close(context.error.fileHandleForWriting)');
   });
 
   it('shows the newest paired iPhone first and marks that row as most recent', () => {

@@ -97,8 +97,7 @@ private final class ConnectorModel: ObservableObject {
     @Published var showingUninstallConfirmation = false
     @Published var availableUpdate: ConnectorRelease?
 
-    private var process: Process?
-    private var inputPipe: Pipe?
+    private let runtime = ConnectorProcessSupervisor()
     private var outputBuffer = Data()
     private let maximumBufferedBytes = 65_536
     private var uninstalling = false
@@ -106,6 +105,16 @@ private final class ConnectorModel: ObservableObject {
     private var protectedStateRemovalConfirmed = false
 
     init() {
+        runtime.onOutput = { [weak self] data in
+            Task { @MainActor in self?.consume(data) }
+        }
+        runtime.onError = { _ in
+            // Stderr must be drained so the child cannot block, but runtime
+            // diagnostics are intentionally not persisted or logged.
+        }
+        runtime.onTermination = { [weak self] status in
+            Task { @MainActor in self?.runtimeDidTerminate(status) }
+        }
         refreshLaunchAtLogin()
         start()
         checkForUpdate()
@@ -178,8 +187,9 @@ private final class ConnectorModel: ObservableObject {
     }
 
     func start() {
-        guard process == nil else { return }
+        guard !runtime.isActive else { return }
         status = .starting
+        outputBuffer.removeAll(keepingCapacity: false)
         guard let resources = Bundle.main.resourceURL else {
             status = .failed("The connector resources are missing.")
             return
@@ -187,13 +197,6 @@ private final class ConnectorModel: ObservableObject {
         let nodeURL = resources.appendingPathComponent("runtime/node")
         let scriptURL = resources.appendingPathComponent("connector-runtime.cjs")
 
-        let task = Process()
-        let stdin = Pipe()
-        let stdout = Pipe()
-        let stderr = Pipe()
-        task.executableURL = nodeURL
-        task.arguments = [scriptURL.path]
-        task.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
         var environment: [String: String] = [
             "HOME": FileManager.default.homeDirectoryForCurrentUser.path,
             "LANG": Locale.current.identifier,
@@ -203,40 +206,13 @@ private final class ConnectorModel: ObservableObject {
         ]
         if let user = ProcessInfo.processInfo.environment["USER"] { environment["USER"] = user }
         if let tmpdir = ProcessInfo.processInfo.environment["TMPDIR"] { environment["TMPDIR"] = tmpdir }
-        task.environment = environment
-        task.standardInput = stdin
-        task.standardOutput = stdout
-        task.standardError = stderr
-        stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty else { return }
-            Task { @MainActor in self?.consume(data) }
-        }
-        stderr.fileHandleForReading.readabilityHandler = { handle in
-            _ = handle.availableData
-        }
-        task.terminationHandler = { [weak self] terminated in
-            Task { @MainActor in
-                guard let self else { return }
-                guard self.process === terminated else { return }
-                self.process = nil
-                self.inputPipe = nil
-                if self.uninstalling {
-                    if !self.protectedStateRemovalConfirmed {
-                        self.removeProtectedStateWithHelper()
-                    }
-                    return
-                }
-                if case .failed = self.status { return }
-                self.status = .failed(terminated.terminationStatus == 0
-                    ? "The connector stopped."
-                    : "The connector could not start securely.")
-            }
-        }
         do {
-            try task.run()
-            process = task
-            inputPipe = stdin
+            try runtime.start(
+                executableURL: nodeURL,
+                arguments: [scriptURL.path],
+                currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+                environment: environment
+            )
         } catch {
             status = .failed("The connector runtime could not be opened.")
         }
@@ -244,10 +220,7 @@ private final class ConnectorModel: ObservableObject {
 
     func stop() {
         send(["version": ipcVersion, "type": "shutdown"])
-        let activeProcess = process
-        process = nil
-        inputPipe = nil
-        activeProcess?.terminate()
+        runtime.stop()
     }
 
     func regenerateCode() {
@@ -314,7 +287,7 @@ private final class ConnectorModel: ObservableObject {
         uninstalling = true
         protectedStateRemovalConfirmed = false
         status = .uninstalling
-        if process?.isRunning == true {
+        if runtime.isRunning {
             send(["version": ipcVersion, "type": "reset"])
         } else {
             removeProtectedStateWithHelper()
@@ -399,6 +372,19 @@ private final class ConnectorModel: ObservableObject {
                 status = .failed("The connector returned an invalid response.")
             }
         }
+    }
+
+    private func runtimeDidTerminate(_ terminationStatus: Int32) {
+        if uninstalling {
+            if !protectedStateRemovalConfirmed {
+                removeProtectedStateWithHelper()
+            }
+            return
+        }
+        if case .failed = status { return }
+        status = .failed(terminationStatus == 0
+            ? "The connector stopped."
+            : "The connector could not start securely.")
     }
 
     private func handle(_ event: ConnectorEvent) {
@@ -491,14 +477,11 @@ private final class ConnectorModel: ObservableObject {
         guard
             JSONSerialization.isValidJSONObject(value),
             let data = try? JSONSerialization.data(withJSONObject: value),
-            data.count < 16_384,
-            let pipe = inputPipe
+            data.count < 16_384
         else { return }
         var line = data
         line.append(0x0A)
-        do {
-            try pipe.fileHandleForWriting.write(contentsOf: line)
-        } catch {
+        if !runtime.write(line) {
             status = .failed("The connector stopped responding.")
         }
     }
