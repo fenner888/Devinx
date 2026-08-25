@@ -48,6 +48,7 @@ export default function SettingsScreen() {
   const setHaptics = useAppPreferences((s) => s.setHaptics);
   const defaultTags = useAppPreferences((s) => s.defaultTags);
   const setDefaultTags = useAppPreferences((s) => s.setDefaultTags);
+  const launchProfileCount = useAppPreferences((s) => s.launchProfiles.length);
   const resetUserScopedData = useAppPreferences((s) => s.resetUserScopedData);
   const [defaultTagsInput, setDefaultTagsInput] = useState(defaultTags.join(', '));
   const [credentialFingerprint, setCredentialFingerprint] = useState<string | null>(null);
@@ -192,6 +193,79 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* Mobile defaults and derived attention inbox */}
+        <Text className="text-text-low text-text12 font-medium uppercase mb-2">My defaults</Text>
+        <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
+          <Pressable
+            className="flex-row items-center px-4 py-3 border-b border-border-subtle"
+            onPress={() => router.push('/(main)/action-center')}
+            accessibilityRole="button"
+            accessibilityLabel="Open Action Center"
+          >
+            <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
+              <Ionicons name="notifications-outline" size={15} color={tokens.brandText.hex} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-text-hi text-text14">Action Center</Text>
+              <Text className="text-text-low text-text12 mt-0.5">
+                Waiting, approval, problem, and watched-completion states
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+          </Pressable>
+          <Pressable
+            className="flex-row items-center px-4 py-3"
+            onPress={() => router.push('/(main)/launch-profiles')}
+            accessibilityRole="button"
+            accessibilityLabel="Manage launch profiles"
+          >
+            <View className="w-8 h-8 rounded-button bg-tint-purple items-center justify-center mr-3">
+              <Ionicons name="options-outline" size={15} color={tokens.merged.hex} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-text-hi text-text14">Launch profiles</Text>
+              <Text className="text-text-low text-text12 mt-0.5">
+                {launchProfileCount === 0
+                  ? 'Reusable, device-local Cloud defaults'
+                  : `${launchProfileCount} saved on this device`}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+          </Pressable>
+        </View>
+
+        {computers.length > 0 && (
+          <>
+            <Text className="text-text-low text-text12 font-medium uppercase mb-2">
+              Local devices
+            </Text>
+            <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
+              {computers.map((computer, index) => (
+                <Pressable
+                  key={computer.bridgeId}
+                  className={`flex-row items-center px-4 py-3 ${index < computers.length - 1 ? 'border-b border-border-subtle' : ''}`}
+                  onPress={() =>
+                    router.push(`/(main)/computer-profile/${computer.bridgeId}` as never)
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${computer.computerName} local device profile`}
+                >
+                  <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
+                    <Ionicons name="desktop-outline" size={15} color={tokens.brandText.hex} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-text-hi text-text14">{computer.computerName}</Text>
+                    <Text className="text-text-low text-text12 mt-0.5">
+                      {computerTransportLabel(computer.transportKind)} · grants and capabilities
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
+
         {/* Appearance */}
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">Appearance</Text>
         <View className="flex-row bg-tint-secondary rounded-button p-1 mb-6">
@@ -320,7 +394,7 @@ export default function SettingsScreen() {
               </Text>
             </View>
           </View>
-          {provider && (
+          {isAuthenticated && provider && (
             <Pressable
               className="flex-row items-center px-4 py-3"
               onPress={() => router.push('/(main)/usage')}
@@ -336,107 +410,138 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        {/* Products */}
-        <Text className="text-text-low text-text12 font-medium uppercase mb-2">Products</Text>
-        <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
-          {(
-            [
-              {
-                icon: 'time-outline',
-                label: 'Automations',
-                route: '/(main)/automations',
-                tint: 'bg-tint-blue',
-                color: tokens.brandText.hex,
-              },
-              {
-                icon: 'git-pull-request-outline',
-                label: 'Review',
-                route: '/(main)/review',
-                tint: 'bg-tint-blue',
-                color: tokens.brandText.hex,
-              },
-              {
-                icon: 'shield-checkmark-outline',
-                label: 'Security Work',
-                route: '/(main)/security-work',
-                tint: 'bg-tint-green',
-                color: tokens.finished.hex,
-              },
-            ] as const
-          ).map(({ icon, label, route, tint, color }, i, arr) => (
-            <Pressable
-              key={label}
-              className={`flex-row items-center px-4 py-3 ${i < arr.length - 1 ? 'border-b border-border-subtle' : ''}`}
-              onPress={() => router.push(route)}
-              accessibilityRole="button"
-              accessibilityLabel={label}
-            >
-              <View className={`w-8 h-8 rounded-button items-center justify-center mr-3 ${tint}`}>
-                <Ionicons name={icon} size={15} color={color} />
-              </View>
-              <Text className="text-text-hi text-text14 flex-1">{label}</Text>
-              <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
-            </Pressable>
-          ))}
-        </View>
+        {/* Cloud-only product and resource surfaces */}
+        {isAuthenticated && (
+          <>
+            <Text className="text-text-low text-text12 font-medium uppercase mb-2">
+              Devin Cloud
+            </Text>
+            <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
+              <Pressable
+                className="flex-row items-center px-4 py-3"
+                onPress={() => router.push('/(main)/environment')}
+                accessibilityRole="button"
+                accessibilityLabel="Open Cloud environment setup assistant"
+              >
+                <View className="w-8 h-8 rounded-button bg-tint-blue items-center justify-center mr-3">
+                  <Ionicons name="construct-outline" size={15} color={tokens.brandText.hex} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-text-hi text-text14">Environment setup</Text>
+                  <Text className="text-text-low text-text12 mt-0.5">
+                    Preview and launch a guided Cloud session
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+              </Pressable>
+            </View>
 
-        {/* Resources — mirrors the web settings tree */}
-        <Text className="text-text-low text-text12 font-medium uppercase mb-2">Resources</Text>
-        <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
-          {(
-            [
-              {
-                icon: 'document-text-outline',
-                label: 'Knowledge',
-                route: '/(main)/knowledge',
-                tint: 'bg-tint-purple',
-                color: tokens.merged.hex,
-              },
-              {
-                icon: 'folder-open-outline',
-                label: 'Repositories & Wiki',
-                route: '/(main)/repositories',
-                tint: 'bg-tint-blue',
-                color: tokens.brandText.hex,
-              },
-              {
-                icon: 'book-outline',
-                label: 'Playbooks',
-                route: '/(main)/playbooks',
-                tint: 'bg-tint-blue',
-                color: tokens.brandText.hex,
-              },
-              {
-                icon: 'lock-closed-outline',
-                label: 'Secrets',
-                route: '/(main)/secrets',
-                tint: 'bg-tint-orange',
-                color: tokens.blocked.hex,
-              },
-              {
-                icon: 'stats-chart-outline',
-                label: 'Analytics',
-                route: '/(main)/analytics',
-                tint: 'bg-tint-green',
-                color: tokens.finished.hex,
-              },
-            ] as const
-          ).map(({ icon, label, route, tint, color }, i, arr) => (
-            <Pressable
-              key={label}
-              className={`flex-row items-center px-4 py-3 ${i < arr.length - 1 ? 'border-b border-border-subtle' : ''}`}
-              onPress={() => router.push(route)}
-              accessibilityRole="button"
-              accessibilityLabel={label}
-            >
-              <View className={`w-8 h-8 rounded-button items-center justify-center mr-3 ${tint}`}>
-                <Ionicons name={icon} size={15} color={color} />
-              </View>
-              <Text className="text-text-hi text-text14 flex-1">{label}</Text>
-              <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
-            </Pressable>
-          ))}
-        </View>
+            <Text className="text-text-low text-text12 font-medium uppercase mb-2">Products</Text>
+            <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
+              {(
+                [
+                  {
+                    icon: 'time-outline',
+                    label: 'Automations',
+                    route: '/(main)/automations',
+                    tint: 'bg-tint-blue',
+                    color: tokens.brandText.hex,
+                  },
+                  {
+                    icon: 'git-pull-request-outline',
+                    label: 'Review',
+                    route: '/(main)/review',
+                    tint: 'bg-tint-blue',
+                    color: tokens.brandText.hex,
+                  },
+                  {
+                    icon: 'shield-checkmark-outline',
+                    label: 'Security Work',
+                    route: '/(main)/security-work',
+                    tint: 'bg-tint-green',
+                    color: tokens.finished.hex,
+                  },
+                ] as const
+              ).map(({ icon, label, route, tint, color }, i, arr) => (
+                <Pressable
+                  key={label}
+                  className={`flex-row items-center px-4 py-3 ${i < arr.length - 1 ? 'border-b border-border-subtle' : ''}`}
+                  onPress={() => router.push(route)}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                >
+                  <View
+                    className={`w-8 h-8 rounded-button items-center justify-center mr-3 ${tint}`}
+                  >
+                    <Ionicons name={icon} size={15} color={color} />
+                  </View>
+                  <Text className="text-text-hi text-text14 flex-1">{label}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Resources — mirrors supported public API surfaces */}
+            <Text className="text-text-low text-text12 font-medium uppercase mb-2">Resources</Text>
+            <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
+              {(
+                [
+                  {
+                    icon: 'document-text-outline',
+                    label: 'Knowledge',
+                    route: '/(main)/knowledge',
+                    tint: 'bg-tint-purple',
+                    color: tokens.merged.hex,
+                  },
+                  {
+                    icon: 'folder-open-outline',
+                    label: 'Repositories & Wiki',
+                    route: '/(main)/repositories',
+                    tint: 'bg-tint-blue',
+                    color: tokens.brandText.hex,
+                  },
+                  {
+                    icon: 'book-outline',
+                    label: 'Playbooks',
+                    route: '/(main)/playbooks',
+                    tint: 'bg-tint-blue',
+                    color: tokens.brandText.hex,
+                  },
+                  {
+                    icon: 'lock-closed-outline',
+                    label: 'Secrets',
+                    route: '/(main)/secrets',
+                    tint: 'bg-tint-orange',
+                    color: tokens.blocked.hex,
+                  },
+                  {
+                    icon: 'stats-chart-outline',
+                    label: 'Analytics',
+                    route: '/(main)/analytics',
+                    tint: 'bg-tint-green',
+                    color: tokens.finished.hex,
+                  },
+                ] as const
+              ).map(({ icon, label, route, tint, color }, i, arr) => (
+                <Pressable
+                  key={label}
+                  className={`flex-row items-center px-4 py-3 ${i < arr.length - 1 ? 'border-b border-border-subtle' : ''}`}
+                  onPress={() => router.push(route)}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                >
+                  <View
+                    className={`w-8 h-8 rounded-button items-center justify-center mr-3 ${tint}`}
+                  >
+                    <Ionicons name={icon} size={15} color={color} />
+                  </View>
+                  <Text className="text-text-hi text-text14 flex-1">{label}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
 
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">Privacy</Text>
         <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-6">
