@@ -60,6 +60,12 @@ The iPhone app also performs an authenticated version handshake with each paired
 Connector produces a visible **Connector update required** action that opens only the official
 latest-release page; an offline or revoked Connector retains its separate recovery message.
 
+Connector 0.1.7 fixes a macOS child-process EOF lifecycle defect that could leave stdout and stderr
+handlers repeatedly reading closed pipes after the embedded runtime exited. Every EOF, normal exit,
+launch failure, explicit stop, and restart now uses one idempotent cleanup path that removes both
+handlers and closes all pipe endpoints. The release gate repeatedly exits and restarts real child
+processes and requires quiescent idle CPU, stable memory, and zero project-owned disk growth.
+
 Connector 0.1.6 keeps the secure pairing listener and QR-code flow available while Devin ACP starts
 or recovers. On Windows it also discovers the official per-user Devin CLI path even when a Store app
 inherits a stale `PATH`. Session operations remain unavailable until ACP is ready, and recovery never
@@ -77,13 +83,13 @@ Connector for a fresh catalog, and the picker also provides a manual refresh con
 CLI releases fall back to bounded ACP discovery. The request remains device-signed,
 permission-checked, replay-protected, rate limited, and strictly validated. A failed refresh never
 erases the last valid catalog. Mobile clients retain Connector 0.1.2 as the minimum compatible
-version: older Connectors keep existing local-session behavior, but users must install 0.1.6 to see
+version: older Connectors keep existing local-session behavior, but users must install 0.1.7 to receive
 the latest catalog display metadata.
 
-Existing users update once by quitting Connector, opening the signed 0.1.6 DMG, and replacing the
+Existing users update once by quitting Connector, opening the signed 0.1.7 DMG, and replacing the
 app in Applications. The stable Developer ID identity preserves the existing Connector identity
 and paired-device grants, so a normal replacement does not require a new QR pairing, cloud
-reconnection, or iPhone setup. New Local-mode installs receive 0.1.6 from the same official
+reconnection, or iPhone setup. New Local-mode installs receive 0.1.7 from the same official
 latest-release page. Cloud-only users do not install or update Connector.
 
 To remove the Connector, choose **Uninstall DevinX Connector** in the native app and confirm. The

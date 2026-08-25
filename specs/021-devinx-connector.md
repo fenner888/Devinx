@@ -1,6 +1,6 @@
 # 021 — DevinX Connector distribution and cross-platform boundary
 
-Status: Connector 0.1.6 is the supported public release with reliable direct CLI model-catalog refresh, bounded model cost metadata, and recoverable Windows ACP startup. Windows 11 x64 is publicly distributed through Microsoft Store under Store ID `9N52Z3FVMFH8`; its implementation and release gates are tracked by spec 037. Linux and Intel Mac packages remain roadmap targets.
+Status: Connector 0.1.7 is the supported public release. It adds deterministic macOS child-process pipe cleanup so stdout and stderr monitoring quiesces at EOF and every exit path remains restartable, while preserving the direct CLI model catalog, bounded model cost metadata, and recoverable Windows ACP startup. Windows 11 x64 is publicly distributed through Microsoft Store under Store ID `9N52Z3FVMFH8`; its implementation and release gates are tracked by spec 037. Linux and Intel Mac packages remain roadmap targets.
 
 ## Product decision
 

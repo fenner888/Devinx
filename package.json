@@ -20,6 +20,7 @@
     "connector:verify:macos": "node scripts/connector/verify-macos-artifact.mjs",
     "connector:notarize:macos": "node scripts/connector/notarize-macos.mjs",
     "connector:notarize:check": "node scripts/connector/notarize-macos.mjs --check",
+    "connector:test:lifecycle": "jest --runInBand tests/lib/connector-lifecycle.test.ts tests/lib/connector-process-supervisor.test.ts",
     "connector:open:macos": "npm run connector:build:macos && open 'artifacts/connector/DevinX Connector.app'",
     "connector:build:windows": "node scripts/connector/build-windows.mjs",
     "connector:verify:windows": "node scripts/connector/verify-windows-artifact.mjs",
