@@ -1,6 +1,6 @@
 # macOS Connector 0.1.7 release checklist
 
-Status: release candidate. This checklist is complete only after the public artifact is installed and the child-exit scenario is re-verified from that installed build.
+Status: released and verified from the public artifact on 2026-08-25.
 
 ## Incident boundary
 
@@ -57,16 +57,49 @@ Dependency audit gate: passed with the repository's existing exact image-size bu
 
 ## Artifact gates
 
-- [ ] Build the supported `arm64` architecture on macOS 13+.
-- [ ] Seal every executable with the Developer ID Application identity and hardened runtime.
-- [ ] Notarize and staple the app and DMG.
-- [ ] Pass strict codesign, Gatekeeper, staple, checksum, embedded-runtime, entitlement, license, and clean-install verification.
-- [ ] Publish a GitHub release newer than `connector-v0.1.5` with DMG and matching SHA-256 asset.
-- [ ] Confirm the new release is GitHub `Latest` and its downloaded checksum matches independently.
-- [ ] Confirm an affected installed build detects the newer public version and shows **Update available**.
-- [ ] Download the public DMG and replace the installed app; this release does not auto-install.
-- [ ] From the upgraded public app, force the embedded child to exit and confirm the app remains idle rather than entering the former EOF loop.
-- [ ] Confirm the upgraded installed app can restart its child and preserve bounded Connector-owned cache and HTTP storage.
+- [x] Build the supported `arm64` architecture on macOS 13+.
+- [x] Seal every executable with the Developer ID Application identity and hardened runtime.
+- [x] Notarize and staple the app and DMG.
+- [x] Pass strict codesign, Gatekeeper, staple, checksum, embedded-runtime, entitlement, license, and clean-install verification.
+- [x] Publish a GitHub release newer than `connector-v0.1.5` with DMG and matching SHA-256 asset.
+- [x] Confirm the new release is GitHub `Latest` and its downloaded checksum matches independently.
+- [x] Confirm an affected installed build detects the newer public version and shows **Update available**.
+- [x] Download the public DMG and replace the installed app; this release does not auto-install.
+- [x] From the upgraded public app, force the embedded child to exit and confirm the app remains idle rather than entering the former EOF loop.
+- [x] Confirm the upgraded installed app can restart its child and preserve bounded Connector-owned cache and HTTP storage.
+
+## Published release evidence
+
+- Source merge: `622bfc167ed7b58b03850dd4c24276a63d4074e4` (PR #73).
+- Public release: <https://github.com/fenner888/Devinx/releases/tag/connector-v0.1.7>.
+- Published state: GitHub `Latest`, not a draft or prerelease.
+- Public DMG: `DevinX-Connector-0.1.7-macos-arm64.dmg`, 45,703,947 bytes.
+- Public DMG SHA-256: `a3764478905ef02c0cbda3a831be25567b7a31543420d3f2714e2c0bcbba460a`.
+- Fresh public download passed its published checksum, strict codesign, Gatekeeper (`Notarized Developer ID`), app and DMG staple validation, version `0.1.7` build `6`, and `arm64` architecture inspection.
+- The affected installed private `0.1.6` build detected `connector-v0.1.7` after relaunch and displayed **Update available**.
+- `/Applications/DevinX Connector.app` was replaced from the freshly downloaded public DMG, then independently passed codesign, Gatekeeper, and staple validation.
+
+Installed public-build child-exit verification:
+
+```text
+20 idle samples after child exit: CPU 0.0% throughout
+RSS: 99,808 KiB throughout
+Remaining child processes: 0 throughout
+Connector cache + HTTP storage: 452 KiB -> 452 KiB (0 KiB growth)
+```
+
+Five-cycle installed-public restart soak:
+
+```text
+cycle 1: child seen, remaining children 0, CPU 0.0%, RSS 97,232 KiB
+cycle 2: child seen, remaining children 0, CPU 0.0%, RSS 97,072 KiB
+cycle 3: child seen, remaining children 0, CPU 0.0%, RSS 97,120 KiB
+cycle 4: child seen, remaining children 0, CPU 0.0%, RSS 96,992 KiB
+cycle 5: child seen, remaining children 0, CPU 0.0%, RSS 97,232 KiB
+Connector cache + HTTP storage: 516 KiB -> 516 KiB (0 KiB growth)
+```
+
+Each restart launched the embedded `runtime/node` child, each child exited, and the installed Connector returned to idle without an `fd_monitoring` CPU loop.
 
 ## User update boundary
 
