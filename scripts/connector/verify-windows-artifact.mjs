@@ -86,6 +86,7 @@ try {
     '--version',
   ]).trim();
   if (actualNode !== expectedNode) throw new Error(`Bundled Node mismatch: ${actualNode}`);
+  run(resolve(packageRoot, 'DevinX Connector.exe'), ['--verify-qr-renderer']);
   run(installerPath, ['--verify-payload']);
   if (signatureRequired) {
     verifyWindowsSignature(resolve(packageRoot, 'DevinX Connector.exe'));
@@ -208,6 +209,7 @@ try {
         dpapiBoundsVerified: true,
         dpapiOperationAllowlistVerified: true,
         nativeTlsIdentityVerified: true,
+        qrRendererVerified: true,
         signatureStatus: signatureRequired ? 'authenticode-verified' : 'unsigned-ci-artifact',
         publishable: false,
         releaseStage: signatureRequired

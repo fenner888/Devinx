@@ -11,10 +11,60 @@ namespace DevinX.Connector.Windows;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static int Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--verify-qr-renderer")
+        {
+            return QrCodeRenderer.Verify() ? 0 : 1;
+        }
+
         ApplicationConfiguration.Initialize();
         Application.Run(new ConnectorForm());
+        return 0;
+    }
+}
+
+internal static class QrCodeRenderer
+{
+    private const int PixelsPerModule = 8;
+
+    internal static Bitmap Render(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            throw new ArgumentException("A pairing payload is required.", nameof(payload));
+        }
+
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.M);
+        using var qrCode = new QRCode(data);
+        using var rendered = qrCode.GetGraphic(
+            PixelsPerModule,
+            Color.Black,
+            Color.White,
+            drawQuietZones: true);
+        return new Bitmap(rendered);
+    }
+
+    internal static bool Verify()
+    {
+        using var bitmap = Render(
+            "{\"version\":1,\"type\":\"pairing_offer\",\"url\":\"https://100.64.0.1:43110\",\"pairingId\":\"windows-qr-self-test\"}");
+        if (bitmap.Width <= 0 || bitmap.Height <= 0) return false;
+
+        var hasDarkPixel = false;
+        var hasLightPixel = false;
+        for (var y = 0; y < bitmap.Height && !(hasDarkPixel && hasLightPixel); y++)
+        {
+            for (var x = 0; x < bitmap.Width && !(hasDarkPixel && hasLightPixel); x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                hasDarkPixel |= pixel.R < 32 && pixel.G < 32 && pixel.B < 32;
+                hasLightPixel |= pixel.R > 223 && pixel.G > 223 && pixel.B > 223;
+            }
+        }
+
+        return hasDarkPixel && hasLightPixel;
     }
 }
 
@@ -28,7 +78,13 @@ internal sealed class ConnectorForm : Form
         "https://github.com/fenner888/Devinx/blob/main/docs/devinx-connector.md";
     private readonly Label statusLabel = new() { AutoSize = true, Font = new Font("Segoe UI", 18, FontStyle.Bold) };
     private readonly Label detailLabel = new() { AutoSize = true, ForeColor = Color.DimGray };
-    private readonly PictureBox qrImage = new() { Width = 360, Height = 360, SizeMode = PictureBoxSizeMode.Zoom };
+    private readonly PictureBox qrImage = new()
+    {
+        Width = 360,
+        Height = 360,
+        BackColor = Color.White,
+        SizeMode = PictureBoxSizeMode.Zoom,
+    };
     private readonly Button regenerateButton = new() { Text = "Generate new code", AutoSize = true };
     private readonly CheckBox launchAtLogin = new() { Text = "Open DevinX Connector when I sign in", AutoSize = true };
     private readonly Label devicesTitle = new()
@@ -251,15 +307,23 @@ internal sealed class ConnectorForm : Form
 
     private void RenderQr(string payload)
     {
-        using var generator = new QRCodeGenerator();
-        using var data = generator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.M);
-        var png = new PngByteQRCode(data).GetGraphic(8, drawQuietZones: true);
-        using var stream = new MemoryStream(png, writable: false);
-        var replacement = new Bitmap(stream);
-        var prior = qrImage.Image;
-        qrImage.Image = new Bitmap(replacement);
-        prior?.Dispose();
-        Array.Clear(png);
+        try
+        {
+            var replacement = QrCodeRenderer.Render(payload);
+            var prior = qrImage.Image;
+            qrImage.Image = replacement;
+            qrImage.Visible = true;
+            qrImage.Invalidate();
+            qrImage.Update();
+            prior?.Dispose();
+            SetStatus("Ready to connect", "Scan this pairing code with DevinX on your iPhone.");
+        }
+        catch (Exception)
+        {
+            qrImage.Image?.Dispose();
+            qrImage.Image = null;
+            SetStatus("Pairing code unavailable", "Generate a new code, then try again.");
+        }
     }
 
     private void ReviewPairing(ConnectorEvent connectorEvent)
