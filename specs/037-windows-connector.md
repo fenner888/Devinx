@@ -79,6 +79,7 @@ Connector state is encrypted with Windows DPAPI using `CRYPTPROTECT_UI_FORBIDDEN
   builds may use an allowlisted current-user startup registration. Neither path may create a
   system service or machine-wide task, and Connector must respect a user-disabled startup task.
 - The window presents connection health, short-lived QR, pending phone approval, separate read/send/create grants, paired-device revocation, code regeneration, update awareness, and reset/uninstall guidance.
+- The short-lived QR is rendered as a native black-on-white Windows bitmap with a quiet zone. The packaged executable exposes a non-interactive renderer self-test that fails unless a representative pairing payload produces both dark and light pixels, preventing an empty QR surface from passing the Windows release workflow.
 - Paired devices are ordered with the most recently paired device first.
 
 ## Packaging and update boundary
@@ -129,7 +130,7 @@ Automated:
 - package contents, installer registration/uninstall lifecycle, MIT license, pinned runtime
   checksum, secret scan, dependency audit, and artifact checksum verification; and
 - exact Partner Center identity rendering, MSIX schema validation, Store asset dimensions,
-  `runFullTrust`, Windows 11 targeting, and an opt-in packaged startup task; and
+  `runFullTrust`, Windows 11 targeting, an opt-in packaged startup task, and a pixel-level native QR renderer self-test; and
 - mobile copy tests proving **Local** does not change persisted `computer` identifiers.
 
 Physical Windows 11 x64:
