@@ -10,7 +10,7 @@ Confirm all of the following before pairing:
 - product name: **DevinX Connector**
 - publisher: **DevinX Tools**
 - Store ID: `9N52Z3FVMFH8`
-- version: `0.1.6.0` or newer
+- version: `0.1.7.0` or newer
 - device: Windows 11 x64, build `10.0.22000` or newer
 
 Do not download, sideload, or run an unsigned MSIX, EXE, or ZIP from GitHub Actions. Never share a
@@ -30,7 +30,7 @@ Record the Windows build, Connector version, Devin CLI version, and iPhone build
 
 ### 1. Install and first launch
 
-- If updating from `0.1.4.0`, use **Microsoft Store → Library → Get updates**. Do not copy files
+- If updating from `0.1.4.0` through `0.1.6.0`, use **Microsoft Store → Library → Get updates**. Do not copy files
   from `WindowsApps` or use PowerShell to repair the runtime.
 - Install from Microsoft Store as a standard user without running as Administrator.
 - Open Connector and confirm it detects both Tailscale and Devin for Terminal.
@@ -56,8 +56,12 @@ Record the Windows build, Connector version, Devin CLI version, and iPhone build
 
 - Load the local session list and open an existing session with history.
 - Create a new local session in an approved workspace.
-- Refresh workspaces and models, then confirm the Windows ACP catalog remains available without a
-  local Devin session database or any raw path appearing on the iPhone.
+- Refresh workspaces and models, then confirm Windows workspace paths remain behind opaque handles
+  and never appear raw on the iPhone.
+- Force or observe a live model-catalog failure. Confirm the paired device remains online,
+  workspace selection still works, and a session can still be created with **Default model**. If
+  reviewed recent models are available, confirm they remain selectable; otherwise confirm the app
+  does not invent model IDs.
 - Send a steering message and confirm exactly one response appears.
 - Trigger an `AskUserQuestion` request, answer it on the iPhone, and confirm the local session
   continues.

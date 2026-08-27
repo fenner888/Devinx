@@ -1,4 +1,4 @@
-import { isAbsolute } from 'node:path';
+import { isAbsolute, win32 } from 'node:path';
 import { isIP } from 'node:net';
 
 import { z } from 'zod';
@@ -286,13 +286,12 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     return Boolean(
       this.current.isSessionCreateSupported?.() &&
       this.current.createSession &&
-      this.current.listModelCatalog &&
       canDiscoverWorkspaces,
     );
   }
 
   async listCreateOptions(forceRefresh = false): Promise<DevinCreateOptions> {
-    if (!this.isSessionCreateSupported() || !this.current.listModelCatalog) {
+    if (!this.isSessionCreateSupported()) {
       throw new Error('Session creation is not enabled');
     }
     const historyOptions = this.history?.listCreateOptions
@@ -300,24 +299,34 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
       : null;
     const recentModelIds = new Set(historyOptions?.models.map((model) => model.id) ?? []);
     const workspaces = historyOptions?.workspaces ?? (await this.listAcpWorkspaces());
-    try {
-      const catalog = await this.current.listModelCatalog(forceRefresh);
+    if (this.current.listModelCatalog) {
+      try {
+        const catalog = await this.current.listModelCatalog(forceRefresh);
+        return {
+          workspaces,
+          models: catalog.models.map((model) => ({
+            ...model,
+            recent: recentModelIds.has(model.id),
+            recommended: model.id === catalog.defaultModelId,
+          })),
+          defaultModelId: catalog.defaultModelId,
+          catalogSource: 'live',
+        };
+      } catch {
+        // Model discovery is optional. Preserve workspace discovery and the
+        // default-model create path when ACP cannot enumerate a live catalog.
+      }
+    }
+    if (!historyOptions) {
       return {
         workspaces,
-        models: catalog.models.map((model) => ({
-          ...model,
-          recent: recentModelIds.has(model.id),
-          recommended: model.id === catalog.defaultModelId,
-        })),
-        defaultModelId: catalog.defaultModelId,
-        catalogSource: 'live',
+        models: [],
+        defaultModelId: null,
+        catalogSource: 'recent',
       };
-    } catch (error) {
-      if (forceRefresh || !historyOptions) throw error;
-      // Recent history remains a safe fallback when live ACP discovery is temporarily unavailable.
     }
     return {
-      ...historyOptions,
+      workspaces,
       models: historyOptions.models.map((model) => ({
         ...model,
         recent: true,
@@ -337,7 +346,7 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     for (let pageCount = 0; pageCount < MAXIMUM_REHYDRATION_PAGES; pageCount += 1) {
       const page = await this.current.listSessions(cursor ? { cursor } : {});
       for (const session of page.sessions) {
-        if (isAbsolute(session.cwd)) paths.add(session.cwd);
+        if (isAbsolute(session.cwd) || win32.isAbsolute(session.cwd)) paths.add(session.cwd);
         if (paths.size >= MAXIMUM_CREATE_WORKSPACES) break;
       }
       if (paths.size >= MAXIMUM_CREATE_WORKSPACES || !page.nextCursor) break;

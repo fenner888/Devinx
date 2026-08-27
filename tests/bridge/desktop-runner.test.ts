@@ -135,7 +135,7 @@ describe('Desktop Bridge development runner', () => {
     expect(catalogRefreshes).toEqual([true]);
   });
 
-  it('does not silently replace a requested live refresh with history-only models', async () => {
+  it('preserves recent options when a requested live refresh is unavailable', async () => {
     const adapter = new RecoverableSessionDiscoveryAdapter();
     adapter.replace({
       isSessionListSupported: () => true,
@@ -169,7 +169,12 @@ describe('Desktop Bridge development runner', () => {
       models: [{ id: 'recent-model', recent: true }],
       catalogSource: 'recent',
     });
-    await expect(adapter.listCreateOptions(true)).rejects.toThrow('live catalog unavailable');
+    await expect(adapter.listCreateOptions(true)).resolves.toMatchObject({
+      workspaces: [{ path: '/tmp/project' }],
+      models: [{ id: 'recent-model', recent: true }],
+      defaultModelId: null,
+      catalogSource: 'recent',
+    });
   });
 
   it('discovers Windows create options from ACP when no reviewed history store exists', async () => {
@@ -240,11 +245,14 @@ describe('Desktop Bridge development runner', () => {
     );
   });
 
-  it('does not claim ACP-only creation when live model discovery is unavailable', async () => {
+  it('keeps ACP-only creation available with Devin default when model discovery is unavailable', async () => {
+    const createSession = jest.fn(async () => 'session-created');
     const adapter = new RecoverableSessionDiscoveryAdapter();
     adapter.replace({
       isSessionListSupported: () => true,
-      listSessions: async () => ({ sessions: [] }),
+      listSessions: async () => ({
+        sessions: [{ sessionId: 'session-1', cwd: '/workspaces/alpha' }],
+      }),
       isSessionLoadSupported: () => true,
       loadSession: async () => {
         throw new Error('not used');
@@ -252,11 +260,58 @@ describe('Desktop Bridge development runner', () => {
       isSessionPromptSupported: () => true,
       promptSession: async () => {},
       isSessionCreateSupported: () => true,
+      createSession,
+    });
+
+    expect(adapter.isSessionCreateSupported()).toBe(true);
+    await expect(adapter.listCreateOptions(true)).resolves.toEqual({
+      workspaces: [{ path: '/workspaces/alpha' }],
+      models: [],
+      defaultModelId: null,
+      catalogSource: 'recent',
+    });
+    await expect(
+      adapter.createSession('/workspaces/alpha', null, 'Use Devin\'s default model.'),
+    ).resolves.toBe('session-created');
+    expect(createSession).toHaveBeenCalledWith(
+      '/workspaces/alpha',
+      null,
+      'Use Devin\'s default model.',
+    );
+  });
+
+  it('keeps Windows workspaces online when live model discovery fails', async () => {
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace({
+      isSessionListSupported: () => true,
+      listSessions: async () => ({
+        sessions: [
+          { sessionId: 'session-1', cwd: 'C:\\Users\\tester\\project-one' },
+          { sessionId: 'session-2', cwd: 'C:\\Users\\tester\\project-two' },
+        ],
+      }),
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new Error('not used');
+      },
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
+      isSessionCreateSupported: () => true,
+      listModelCatalog: async () => {
+        throw new Error('ACP model catalog is unavailable');
+      },
       createSession: async () => 'session-created',
     });
 
-    expect(adapter.isSessionCreateSupported()).toBe(false);
-    await expect(adapter.listCreateOptions()).rejects.toThrow('Session creation is not enabled');
+    await expect(adapter.listCreateOptions(true)).resolves.toEqual({
+      workspaces: [
+        { path: 'C:\\Users\\tester\\project-one' },
+        { path: 'C:\\Users\\tester\\project-two' },
+      ],
+      models: [],
+      defaultModelId: null,
+      catalogSource: 'recent',
+    });
   });
 
   it('securely rehydrates listed and loaded session state after ACP replacement', async () => {

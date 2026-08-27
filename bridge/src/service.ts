@@ -1,4 +1,4 @@
-import { basename } from 'node:path';
+import { basename, win32 } from 'node:path';
 
 import { z } from 'zod';
 
@@ -337,7 +337,11 @@ function modelDisplayName(modelId: string): string {
 
 function workspaceDisplayNames(workspaces: Array<{ path: string }>): string[] {
   const bases = workspaces.map((workspace) =>
-    cleanDisplayText(basename(workspace.path), 150, 'Workspace'),
+    cleanDisplayText(
+      win32.isAbsolute(workspace.path) ? win32.basename(workspace.path) : basename(workspace.path),
+      150,
+      'Workspace',
+    ),
   );
   const totals = new Map<string, number>();
   for (const base of bases) totals.set(base, (totals.get(base) ?? 0) + 1);

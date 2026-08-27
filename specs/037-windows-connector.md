@@ -63,8 +63,11 @@ and creation options use the live ACP session list when no reviewed history-stor
 available. Connector bounds pagination and result counts, deduplicates absolute working
 directories, converts them into process-local opaque handles before any phone response, and
 revalidates both the resolved workspace and exact selected model against fresh authenticated
-creation options before starting a session. Failure to obtain a live model catalog fails closed;
-the phone never receives a raw Windows path or a guessed model.
+creation options before starting a session. Live model discovery is optional capability metadata:
+failure to obtain it must not invalidate reviewed workspace discovery, existing-session access, or
+creation with Devin's default model. Connector may return a recent bounded catalog or no explicit
+model choices while preserving the default-model path; it must never invent a model ID. The phone
+never receives a raw Windows path or a guessed model.
 
 ## Secure storage
 
