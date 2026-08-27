@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Drawing;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -18,9 +19,225 @@ internal static class Program
             return QrCodeRenderer.Verify() ? 0 : 1;
         }
 
+        if (args.Length == 1 && args[0] == "--verify-runtime-launch")
+        {
+            return RuntimeBundle.VerifyLaunch() ? 0 : 1;
+        }
+
         ApplicationConfiguration.Initialize();
         Application.Run(new ConnectorForm());
         return 0;
+    }
+}
+
+internal sealed record StagedRuntime(string NodePath, string ScriptPath, string WorkingDirectory);
+
+internal static class RuntimeBundle
+{
+    private static readonly string[] RequiredFiles =
+    [
+        "connector-runtime.cjs",
+        "runtime/node.exe",
+        "windows-dpapi-helper.exe",
+    ];
+
+    internal static StagedRuntime Stage()
+    {
+        var sourceRoot = Path.Combine(AppContext.BaseDirectory, "Resources");
+        var localRootOverride = Environment.GetEnvironmentVariable("DEVINX_RUNTIME_STAGE_ROOT");
+        var connectorRoot = string.IsNullOrWhiteSpace(localRootOverride)
+            ? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "DevinX",
+                "Connector")
+            : Path.GetFullPath(localRootOverride);
+        var runtimeRoot = Path.Combine(connectorRoot, "Runtime");
+        var workingDirectory = Path.Combine(connectorRoot, "Data");
+
+        ValidateSource(sourceRoot);
+        Directory.CreateDirectory(runtimeRoot);
+        Directory.CreateDirectory(workingDirectory);
+
+        var expectedHashes = RequiredFiles.ToDictionary(
+            relativePath => relativePath,
+            relativePath => HashFile(Path.Combine(sourceRoot, relativePath)),
+            StringComparer.OrdinalIgnoreCase);
+        var fingerprint = Fingerprint(expectedHashes);
+        var stagedRoot = Path.Combine(runtimeRoot, fingerprint);
+
+        using (AcquireLock(runtimeRoot))
+        {
+            if (!VerifyStaged(stagedRoot, expectedHashes))
+            {
+                TryDeleteDirectory(stagedRoot);
+                var temporaryRoot = Path.Combine(runtimeRoot, $".staging-{Guid.NewGuid():N}");
+                try
+                {
+                    foreach (var relativePath in RequiredFiles)
+                    {
+                        var source = Path.Combine(sourceRoot, relativePath);
+                        var destination = Path.Combine(temporaryRoot, relativePath);
+                        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                        File.Copy(source, destination, overwrite: false);
+                    }
+                    if (!VerifyStaged(temporaryRoot, expectedHashes))
+                    {
+                        throw new InvalidDataException("The staged Connector runtime failed integrity verification.");
+                    }
+                    Directory.Move(temporaryRoot, stagedRoot);
+                }
+                finally
+                {
+                    TryDeleteDirectory(temporaryRoot);
+                }
+            }
+
+            CleanupOldVersions(runtimeRoot, fingerprint);
+        }
+
+        return new StagedRuntime(
+            Path.Combine(stagedRoot, "runtime", "node.exe"),
+            Path.Combine(stagedRoot, "connector-runtime.cjs"),
+            workingDirectory);
+    }
+
+    internal static bool VerifyLaunch()
+    {
+        try
+        {
+            var staged = Stage();
+            if (!RunProbe(staged.NodePath, ["--version"], staged.WorkingDirectory, [0])) return false;
+            var helper = Path.Combine(Path.GetDirectoryName(staged.ScriptPath)!, "windows-dpapi-helper.exe");
+            return RunProbe(helper, ["probe"], staged.WorkingDirectory, [0]);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool RunProbe(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        IReadOnlySet<int> acceptedExitCodes)
+    {
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = executable,
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            },
+        };
+        foreach (var argument in arguments) process.StartInfo.ArgumentList.Add(argument);
+        if (!process.Start()) return false;
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(15_000))
+        {
+            process.Kill(entireProcessTree: true);
+            return false;
+        }
+        Task.WaitAll([outputTask, errorTask], 5_000);
+        return acceptedExitCodes.Contains(process.ExitCode);
+    }
+
+    private static void ValidateSource(string sourceRoot)
+    {
+        if (!Directory.Exists(sourceRoot)) throw new DirectoryNotFoundException();
+        if (HasReparsePoint(sourceRoot)) throw new InvalidDataException();
+        foreach (var relativePath in RequiredFiles)
+        {
+            var source = Path.Combine(sourceRoot, relativePath);
+            if (!File.Exists(source) || HasReparsePoint(source)) throw new FileNotFoundException();
+        }
+    }
+
+    private static bool VerifyStaged(string stagedRoot, IReadOnlyDictionary<string, string> hashes)
+    {
+        if (!Directory.Exists(stagedRoot) || HasReparsePoint(stagedRoot)) return false;
+        var actualFiles = Directory
+            .EnumerateFiles(stagedRoot, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(stagedRoot, path).Replace('\\', '/'))
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (!actualFiles.SequenceEqual(RequiredFiles.Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        foreach (var relativePath in RequiredFiles)
+        {
+            var path = Path.Combine(stagedRoot, relativePath);
+            if (HasReparsePoint(path) || HashFile(path) != hashes[relativePath]) return false;
+        }
+        return true;
+    }
+
+    private static string Fingerprint(IReadOnlyDictionary<string, string> hashes)
+    {
+        var value = string.Join(
+            "\n",
+            hashes.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => $"{item.Key}:{item.Value}"));
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    }
+
+    private static string HashFile(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return Convert.ToHexStringLower(SHA256.HashData(stream));
+    }
+
+    private static FileStream AcquireLock(string runtimeRoot)
+    {
+        var path = Path.Combine(runtimeRoot, ".stage.lock");
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            try
+            {
+                return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException) when (attempt < 39)
+            {
+                Thread.Sleep(50);
+            }
+        }
+        throw new IOException("The Connector runtime staging lock is unavailable.");
+    }
+
+    private static void CleanupOldVersions(string runtimeRoot, string currentFingerprint)
+    {
+        foreach (var directory in Directory.EnumerateDirectories(runtimeRoot))
+        {
+            var name = Path.GetFileName(directory);
+            if (name.Equals(currentFingerprint, StringComparison.OrdinalIgnoreCase)) continue;
+            if (name.StartsWith(".staging-", StringComparison.Ordinal)
+                || name.Length == 64 && name.All(Uri.IsHexDigit))
+            {
+                TryDeleteDirectory(directory);
+            }
+        }
+    }
+
+    private static bool HasReparsePoint(string path) =>
+        (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 }
 
@@ -206,45 +423,38 @@ internal sealed class ConnectorForm : Form
         SetStatus("Starting…", "Checking Tailscale and Devin for Terminal");
     }
 
-    private string ResourcePath(string name) => Path.Combine(AppContext.BaseDirectory, "Resources", name);
-
     private async Task StartRuntimeAsync()
     {
-        var node = ResourcePath(Path.Combine("runtime", "node.exe"));
-        var script = ResourcePath("connector-runtime.cjs");
-        if (!File.Exists(node) || !File.Exists(script))
-        {
-            SetStatus("Connector runtime unavailable", "Reinstall DevinX Connector from the official signed release.");
-            return;
-        }
-
-        runtime = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = node,
-                ArgumentList = { script },
-                WorkingDirectory = AppContext.BaseDirectory,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                StandardInputEncoding = Encoding.UTF8,
-                StandardOutputEncoding = Encoding.UTF8,
-            },
-            EnableRaisingEvents = true,
-        };
-        runtime.Exited += (_, _) => BeginInvoke(() => SetStatus("Needs attention", "The Connector runtime stopped. Quit and reopen DevinX Connector."));
         try
         {
+            var staged = RuntimeBundle.Stage();
+            runtime = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = staged.NodePath,
+                    ArgumentList = { staged.ScriptPath },
+                    WorkingDirectory = staged.WorkingDirectory,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardInputEncoding = Encoding.UTF8,
+                    StandardOutputEncoding = Encoding.UTF8,
+                },
+                EnableRaisingEvents = true,
+            };
+            runtime.Exited += (_, _) => BeginInvoke(() => SetStatus("Needs attention", "The Connector runtime stopped. Quit and reopen DevinX Connector."));
             if (!runtime.Start()) throw new InvalidOperationException();
             _ = Task.Run(() => DrainErrorsAsync(runtime.StandardError));
             await ReadEventsAsync(runtime.StandardOutput);
         }
         catch
         {
-            SetStatus("Connector runtime unavailable", "Confirm this is an official Windows package, then reopen it.");
+            runtime?.Dispose();
+            runtime = null;
+            SetStatus("Connector runtime unavailable", "Update DevinX Connector from Microsoft Store, then reopen it.");
         }
     }
 

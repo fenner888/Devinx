@@ -165,6 +165,18 @@ The Store package declares an opt-in Windows startup task. Connector uses the pa
 Settings or Task Manager. A separately distributed direct-download installer remains a distinct
 future gate and would require Authenticode signing for every owned executable and installer.
 
+Connector 0.1.5.0 also accounts for the Microsoft Store application-container boundary. Windows
+can start the signed control window while denying direct child-process execution from the protected
+`WindowsApps` directory. On each launch, Connector copies only its bundled Node runtime, fixed
+runtime script, and DPAPI helper into a versioned current-user runtime folder; it rejects reparse
+points and verifies every SHA-256 hash against the installed Store package before execution. No
+runtime is downloaded and no user-selected executable is accepted. Interrupted and obsolete staged
+versions are removed automatically.
+
+Users of Store version 0.1.4.0 who see a blank QR or **Connector could not start** should update
+through **Microsoft Store → Library → Get updates**, confirm version 0.1.5.0 or newer, and reopen
+Connector. They do not need PowerShell, administrator access, a new pairing, or a manual file copy.
+
 The Store-signed package is publicly installable for controlled testing. A fully supported release
 designation still requires clean-account install/update/uninstall, Store signature inspection,
 Windows Firewall validation, official Devin ACP validation, and the complete physical matrix in
