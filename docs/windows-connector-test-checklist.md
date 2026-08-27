@@ -10,7 +10,7 @@ Confirm all of the following before pairing:
 - product name: **DevinX Connector**
 - publisher: **DevinX Tools**
 - Store ID: `9N52Z3FVMFH8`
-- version: `0.1.3.0` or newer
+- version: `0.1.5.0` or newer
 - device: Windows 11 x64, build `10.0.22000` or newer
 
 Do not download, sideload, or run an unsigned MSIX, EXE, or ZIP from GitHub Actions. Never share a
@@ -30,9 +30,14 @@ Record the Windows build, Connector version, Devin CLI version, and iPhone build
 
 ### 1. Install and first launch
 
+- If updating from `0.1.4.0`, use **Microsoft Store → Library → Get updates**. Do not copy files
+  from `WindowsApps` or use PowerShell to repair the runtime.
 - Install from Microsoft Store as a standard user without running as Administrator.
 - Open Connector and confirm it detects both Tailscale and Devin for Terminal.
-- Confirm the window shows a short-lived pairing code without exposing credentials.
+- Confirm the window reaches **Ready to connect** and shows a non-empty short-lived pairing code
+  without exposing credentials.
+- Quit and reopen Connector twice. Confirm the pairing code continues to render and no manual
+  runtime installation or administrator prompt appears.
 - Close the window and confirm Connector remains available from the notification-area icon.
 - Choose **Quit DevinX Connector** and confirm the listener stops.
 

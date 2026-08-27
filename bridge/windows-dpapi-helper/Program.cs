@@ -31,6 +31,7 @@ internal static class Program
         {
             return args[0] switch
             {
+                "probe" => 0,
                 "get" => Get(),
                 "set" => Set(),
                 "delete" => Delete(),

@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -43,6 +44,19 @@ function run(executable, args) {
     cwd: repositoryRoot,
     encoding: 'utf8',
     shell: false,
+  });
+  if (result.error || result.status !== 0) {
+    const detail = `${result.stderr ?? ''}${result.stdout ?? ''}`.trim();
+    throw new Error(`${basename(executable)} failed${detail ? `: ${detail}` : ''}`);
+  }
+}
+
+function runWithEnvironment(executable, args, environment) {
+  const result = spawnSync(executable, args, {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    shell: false,
+    env: { ...process.env, ...environment },
   });
   if (result.error || result.status !== 0) {
     const detail = `${result.stderr ?? ''}${result.stdout ?? ''}`.trim();
@@ -121,6 +135,30 @@ if (process.env.DEVINX_REQUIRE_MSIX_ARTIFACT === '1' || existsSync(msixPath)) {
     }
     if (existsSync(resolve(unpackRoot, 'DevinX Connector.exe'))) {
       throw new Error('Store MSIX contains the ambiguous spaced executable name');
+    }
+    const runtimeStageRoot = mkdtempSync(resolve(tmpdir(), 'devinx-store-runtime-'));
+    try {
+      runWithEnvironment(
+        resolve(unpackRoot, 'DevinXConnector.exe'),
+        ['--verify-runtime-launch'],
+        { DEVINX_RUNTIME_STAGE_ROOT: runtimeStageRoot },
+      );
+      const stagedExecutables = [
+        'runtime/node.exe',
+        'windows-dpapi-helper.exe',
+      ];
+      const versionDirectories = readdirSync(resolve(runtimeStageRoot, 'Runtime'))
+        .filter((entry) => /^[a-f0-9]{64}$/i.test(entry));
+      if (versionDirectories.length !== 1) {
+        throw new Error('Store runtime staging did not create exactly one verified version');
+      }
+      for (const relativePath of stagedExecutables) {
+        if (!existsSync(resolve(runtimeStageRoot, 'Runtime', versionDirectories[0], relativePath))) {
+          throw new Error(`Store runtime staging is missing ${relativePath}`);
+        }
+      }
+    } finally {
+      rmSync(runtimeStageRoot, { recursive: true, force: true });
     }
   } finally {
     rmSync(unpackRoot, { recursive: true, force: true });

@@ -104,6 +104,22 @@ The Store identity is public packaging metadata, not a secret:
 - package family: `DevinXTools.DevinXConnector_ydtgrt4yd5wrc`
 - default package language: `en-US`
 
+The Store container is also an execution boundary. Some Windows Store installations allow the
+WinForms control surface to start while denying direct child-process execution from the protected
+`WindowsApps` package directory. Connector therefore copies only these three allowlisted resources
+from its installed, Store-signed package into a versioned current-user runtime directory before
+launching them:
+
+- `connector-runtime.cjs`
+- `runtime/node.exe`
+- `windows-dpapi-helper.exe`
+
+Every launch derives a SHA-256 fingerprint from the installed package resources, rejects reparse
+points, verifies every staged file byte-for-byte by hash, uses an atomic staging-directory rename,
+and removes obsolete or interrupted staging directories. It never downloads runtime code, accepts
+a user-provided executable, or runs an unverified staged file. Runtime data remains separate from
+the immutable staged files under current-user local application data.
+
 The committed Store identity file is the source of truth for manifest rendering. CI must reject any
 manifest or artifact whose name, publisher, architecture, version, language, logo assets, normalized
 packaged executable name (`DevinXConnector.exe`), or startup-task declaration drifts from it. The
@@ -130,12 +146,18 @@ Automated:
 - package contents, installer registration/uninstall lifecycle, MIT license, pinned runtime
   checksum, secret scan, dependency audit, and artifact checksum verification; and
 - exact Partner Center identity rendering, MSIX schema validation, Store asset dimensions,
-  `runFullTrust`, Windows 11 targeting, an opt-in packaged startup task, and a pixel-level native QR renderer self-test; and
+  `runFullTrust`, Windows 11 targeting, an opt-in packaged startup task, and a pixel-level native QR renderer self-test;
+- unpacking the final MSIX, staging its allowlisted runtime through the production code path, and
+  successfully launching both the staged Node runtime and DPAPI helper before CI accepts the
+  Store-upload artifact; and
 - mobile copy tests proving **Local** does not change persisted `computer` identifiers.
 
 Physical Windows 11 x64:
 
 - clean standard-user install, SmartScreen/signature presentation, first launch, Tailscale detection, and ACP capability negotiation;
+- Store update from `0.1.4.0`, followed by a cold launch proving the Connector reaches **Ready to
+  connect**, renders a non-empty QR, and listens only on the active Tailscale address without
+  PowerShell, administrator access, or manual runtime repair;
 - QR scan, approve/deny/expiry, read/send/create grant separation, AskUserQuestion response, session create/load/continue, endpoint refresh, and revoke from both sides;
 - window close versus explicit Quit, launch at sign-in, reboot, sleep/wake, Tailscale reconnect, repair, update, and uninstall;
 - locked-screen and second-Windows-user isolation; and
