@@ -1,12 +1,16 @@
 import { createHmac } from 'node:crypto';
-import { isAbsolute } from 'node:path';
+import { isAbsolute, win32 } from 'node:path';
 
 import { z } from 'zod';
 
 import { canonicalJson } from './canonical';
 import { opaqueIdSchema } from './schemas';
 
-const workspacePathSchema = z.string().min(1).max(4_096).refine(isAbsolute);
+const workspacePathSchema = z
+  .string()
+  .min(1)
+  .max(4_096)
+  .refine((path) => isAbsolute(path) || win32.isAbsolute(path));
 const workspaceHandleSchema = z.string().regex(/^workspace_[A-Za-z0-9_-]{43}$/);
 
 interface WorkspaceHandleEntry {

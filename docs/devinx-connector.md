@@ -178,9 +178,15 @@ session database. It discovers approved workspaces through bounded live ACP sess
 authoritative model catalog from Devin for Terminal while keeping Windows paths behind opaque
 phone-facing handles.
 
-Users of Store version 0.1.4.0 or 0.1.5.0 who see a blank QR, **Connector could not start**, or
+Connector 0.1.7.0 fixes two Windows-only Local creation failures found after 0.1.6.0 reached
+testers. Windows absolute workspace paths now remain valid when converted into opaque handles, and
+an unavailable live model catalog no longer makes an otherwise healthy paired Connector appear
+offline. Connector preserves reviewed recent model IDs when available and otherwise lets Devin use
+its default model; it never invents model IDs.
+
+Users of Store version 0.1.4.0 through 0.1.6.0 who see a blank QR, **Connector could not start**, or
 **could not load workspaces and models** should update through **Microsoft Store → Library → Get
-updates**, confirm version 0.1.6.0 or newer, and reopen
+updates**, confirm version 0.1.7.0 or newer, and reopen
 Connector. They do not need PowerShell, administrator access, a new pairing, or a manual file copy.
 
 The Store-signed package is publicly installable for controlled testing. A fully supported release

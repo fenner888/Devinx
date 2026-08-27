@@ -8,6 +8,7 @@ import {
   type AcpSessionActivity,
   type AcpSessionPage,
 } from '../../bridge/src/acp';
+import type { DevinCreateOptions } from '../../bridge/src/devin-session-store';
 import { FixedWindowRateLimiter } from '../../bridge/src/rate-limit';
 import { InMemoryReplayGuard } from '../../bridge/src/replay';
 import { BridgeService, type SessionDiscoveryAdapter } from '../../bridge/src/service';
@@ -92,7 +93,7 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
   continuedSessionId: string | null = null;
   promptFailure: Error | null = null;
   createSupported = true;
-  createOptions = {
+  createOptions: DevinCreateOptions = {
     workspaces: [{ path: '/Users/frank/Secret Project' }],
     models: [
       {
@@ -494,6 +495,57 @@ describe('authenticated Desktop Bridge service', () => {
       },
     });
     expect(adapter.createOptionRefreshes).toEqual([true]);
+  });
+
+  it('keeps workspace discovery and default-model creation usable without a model catalog', async () => {
+    adapter.createOptions = {
+      workspaces: [{ path: 'C:\\Users\\tester\\project' }],
+      models: [],
+      defaultModelId: null,
+      catalogSource: 'recent',
+    };
+    const bridge = service({ platform: 'windows' });
+    const options = await bridge.handle(
+      envelope('session.create_options', { refresh: true }, ['session:metadata:read']),
+      context(),
+    );
+
+    expect(options).toEqual({
+      status: 200,
+      body: {
+        workspaces: [
+          {
+            id: expect.stringMatching(/^workspace_[A-Za-z0-9_-]{43}$/),
+            name: 'project',
+          },
+        ],
+        models: [],
+        defaultModelId: null,
+        catalogSource: 'recent',
+      },
+    });
+    const workspaceId = (options.body as { workspaces: Array<{ id: string }> }).workspaces[0]?.id;
+
+    await expect(
+      bridge.handle(
+        envelope(
+          'session.create',
+          { workspaceId, modelId: null, text: 'Use Devin\'s default model.' },
+          ['session:create'],
+        ),
+        context(),
+      ),
+    ).resolves.toMatchObject({
+      status: 200,
+      body: { accepted: true, sessionId: expect.stringMatching(/^local_[A-Za-z0-9_-]{43}$/) },
+    });
+    expect(adapter.creations).toEqual([
+      {
+        cwd: 'C:\\Users\\tester\\project',
+        modelId: null,
+        text: 'Use Devin\'s default model.',
+      },
+    ]);
   });
 
   it('rejects malformed model-catalog refresh input before dispatch', async () => {
@@ -950,5 +1002,14 @@ describe('bridge rate limits and session handles', () => {
     expect(registry.resolve(handle, NOW + 60_001)).toBeNull();
     registry.destroy();
     expect(registry.resolve(handle, NOW)).toBeNull();
+  });
+
+  it('registers opaque handles for absolute Windows workspace paths', () => {
+    const registry = new WorkspaceHandleRegistry(BRIDGE_ID, randomBytes(32), 60_000, 2);
+    const path = String.raw`C:\Users\tester\Secret Project`;
+    const handle = registry.register(path, NOW);
+
+    expect(handle).toMatch(/^workspace_[A-Za-z0-9_-]{43}$/);
+    expect(registry.resolve(handle, NOW + 1)).toBe(path);
   });
 });
