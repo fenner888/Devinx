@@ -106,9 +106,9 @@ internal static class RuntimeBundle
         try
         {
             var staged = Stage();
-            if (!RunProbe(staged.NodePath, ["--version"], staged.WorkingDirectory, [0])) return false;
+            if (!RunProbe(staged.NodePath, ["--version"], staged.WorkingDirectory, 0)) return false;
             var helper = Path.Combine(Path.GetDirectoryName(staged.ScriptPath)!, "windows-dpapi-helper.exe");
-            return RunProbe(helper, ["probe"], staged.WorkingDirectory, [0]);
+            return RunProbe(helper, ["probe"], staged.WorkingDirectory, 0);
         }
         catch
         {
@@ -120,7 +120,7 @@ internal static class RuntimeBundle
         string executable,
         IReadOnlyList<string> arguments,
         string workingDirectory,
-        IReadOnlySet<int> acceptedExitCodes)
+        int acceptedExitCode)
     {
         using var process = new Process
         {
@@ -144,7 +144,7 @@ internal static class RuntimeBundle
             return false;
         }
         Task.WaitAll([outputTask, errorTask], 5_000);
-        return acceptedExitCodes.Contains(process.ExitCode);
+        return process.ExitCode == acceptedExitCode;
     }
 
     private static void ValidateSource(string sourceRoot)
