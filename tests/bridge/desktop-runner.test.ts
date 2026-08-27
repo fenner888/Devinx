@@ -172,6 +172,93 @@ describe('Desktop Bridge development runner', () => {
     await expect(adapter.listCreateOptions(true)).rejects.toThrow('live catalog unavailable');
   });
 
+  it('discovers Windows create options from ACP when no reviewed history store exists', async () => {
+    const listSessions = jest.fn(async (input?: unknown) => {
+      const cursor = (input as { cursor?: string } | undefined)?.cursor;
+      return cursor
+        ? {
+            sessions: [
+              { sessionId: 'session-3', cwd: '/workspaces/beta' },
+              { sessionId: 'session-4', cwd: '/workspaces/alpha' },
+            ],
+          }
+        : {
+            sessions: [
+              { sessionId: 'session-1', cwd: '/workspaces/alpha' },
+              { sessionId: 'session-2', cwd: '/workspaces/beta' },
+            ],
+            nextCursor: 'page-2',
+          };
+    });
+    const createSession = jest.fn(async () => 'session-created');
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace({
+      isSessionListSupported: () => true,
+      listSessions,
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new Error('not used');
+      },
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
+      isSessionCreateSupported: () => true,
+      listModelCatalog: async () => ({
+        defaultModelId: 'adaptive',
+        models: [
+          { id: 'adaptive', name: 'Adaptive' },
+          { id: 'swe-1.7', name: 'SWE-1.7', badge: 'free_promo', costTier: 'free' },
+        ],
+      }),
+      createSession,
+    });
+
+    expect(adapter.isSessionCreateSupported()).toBe(true);
+    await expect(adapter.listCreateOptions(true)).resolves.toEqual({
+      workspaces: [{ path: '/workspaces/alpha' }, { path: '/workspaces/beta' }],
+      models: [
+        { id: 'adaptive', name: 'Adaptive', recent: false, recommended: true },
+        {
+          id: 'swe-1.7',
+          name: 'SWE-1.7',
+          badge: 'free_promo',
+          costTier: 'free',
+          recent: false,
+          recommended: false,
+        },
+      ],
+      defaultModelId: 'adaptive',
+      catalogSource: 'live',
+    });
+    expect(listSessions).toHaveBeenCalledTimes(2);
+    await expect(
+      adapter.createSession('/workspaces/alpha', 'swe-1.7', 'Review this workspace.'),
+    ).resolves.toBe('session-created');
+    expect(createSession).toHaveBeenCalledWith(
+      '/workspaces/alpha',
+      'swe-1.7',
+      'Review this workspace.',
+    );
+  });
+
+  it('does not claim ACP-only creation when live model discovery is unavailable', async () => {
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace({
+      isSessionListSupported: () => true,
+      listSessions: async () => ({ sessions: [] }),
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new Error('not used');
+      },
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
+      isSessionCreateSupported: () => true,
+      createSession: async () => 'session-created',
+    });
+
+    expect(adapter.isSessionCreateSupported()).toBe(false);
+    await expect(adapter.listCreateOptions()).rejects.toThrow('Session creation is not enabled');
+  });
+
   it('securely rehydrates listed and loaded session state after ACP replacement', async () => {
     const replacementList = jest.fn(async (input?: unknown) => {
       const cursor = (input as { cursor?: string } | undefined)?.cursor;

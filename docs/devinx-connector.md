@@ -173,8 +173,14 @@ points and verifies every SHA-256 hash against the installed Store package befor
 runtime is downloaded and no user-selected executable is accepted. Interrupted and obsolete staged
 versions are removed automatically.
 
-Users of Store version 0.1.4.0 who see a blank QR or **Connector could not start** should update
-through **Microsoft Store → Library → Get updates**, confirm version 0.1.5.0 or newer, and reopen
+Connector 0.1.6.0 adds Windows-native Local creation options without depending on an undocumented
+session database. It discovers approved workspaces through bounded live ACP sessions and loads the
+authoritative model catalog from Devin for Terminal while keeping Windows paths behind opaque
+phone-facing handles.
+
+Users of Store version 0.1.4.0 or 0.1.5.0 who see a blank QR, **Connector could not start**, or
+**could not load workspaces and models** should update through **Microsoft Store → Library → Get
+updates**, confirm version 0.1.6.0 or newer, and reopen
 Connector. They do not need PowerShell, administrator access, a new pairing, or a manual file copy.
 
 The Store-signed package is publicly installable for controlled testing. A fully supported release

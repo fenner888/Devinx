@@ -156,6 +156,7 @@ const unavailableSessions: SessionDiscoveryAdapter = {
 };
 
 const MAXIMUM_REHYDRATION_PAGES = 100;
+const MAXIMUM_CREATE_WORKSPACES = 100;
 // Reserve one KiB for the omission marker and framing before ACP's 160 KiB limit.
 const MAXIMUM_CONTINUATION_CONTEXT_BYTES = 149 * 1024;
 
@@ -279,35 +280,40 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   }
 
   isSessionCreateSupported(): boolean {
+    const canDiscoverWorkspaces = Boolean(
+      this.history?.listCreateOptions || this.current.isSessionListSupported(),
+    );
     return Boolean(
       this.current.isSessionCreateSupported?.() &&
       this.current.createSession &&
-      this.history?.listCreateOptions,
+      this.current.listModelCatalog &&
+      canDiscoverWorkspaces,
     );
   }
 
   async listCreateOptions(forceRefresh = false): Promise<DevinCreateOptions> {
-    if (!this.isSessionCreateSupported() || !this.history?.listCreateOptions) {
+    if (!this.isSessionCreateSupported() || !this.current.listModelCatalog) {
       throw new Error('Session creation is not enabled');
     }
-    const historyOptions = await this.history.listCreateOptions();
-    const recentModelIds = new Set(historyOptions.models.map((model) => model.id));
+    const historyOptions = this.history?.listCreateOptions
+      ? await this.history.listCreateOptions()
+      : null;
+    const recentModelIds = new Set(historyOptions?.models.map((model) => model.id) ?? []);
+    const workspaces = historyOptions?.workspaces ?? (await this.listAcpWorkspaces());
     try {
-      const catalog = await this.current.listModelCatalog?.(forceRefresh);
-      if (catalog) {
-        return {
-          workspaces: historyOptions.workspaces,
-          models: catalog.models.map((model) => ({
-            ...model,
-            recent: recentModelIds.has(model.id),
-            recommended: model.id === catalog.defaultModelId,
-          })),
-          defaultModelId: catalog.defaultModelId,
-          catalogSource: 'live',
-        };
-      }
+      const catalog = await this.current.listModelCatalog(forceRefresh);
+      return {
+        workspaces,
+        models: catalog.models.map((model) => ({
+          ...model,
+          recent: recentModelIds.has(model.id),
+          recommended: model.id === catalog.defaultModelId,
+        })),
+        defaultModelId: catalog.defaultModelId,
+        catalogSource: 'live',
+      };
     } catch (error) {
-      if (forceRefresh) throw error;
+      if (forceRefresh || !historyOptions) throw error;
       // Recent history remains a safe fallback when live ACP discovery is temporarily unavailable.
     }
     return {
@@ -320,6 +326,24 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
       defaultModelId: null,
       catalogSource: 'recent',
     };
+  }
+
+  private async listAcpWorkspaces(): Promise<Array<{ path: string }>> {
+    if (!this.current.isSessionListSupported()) {
+      throw new Error('Workspace discovery is not enabled');
+    }
+    const paths = new Set<string>();
+    let cursor: string | undefined;
+    for (let pageCount = 0; pageCount < MAXIMUM_REHYDRATION_PAGES; pageCount += 1) {
+      const page = await this.current.listSessions(cursor ? { cursor } : {});
+      for (const session of page.sessions) {
+        if (isAbsolute(session.cwd)) paths.add(session.cwd);
+        if (paths.size >= MAXIMUM_CREATE_WORKSPACES) break;
+      }
+      if (paths.size >= MAXIMUM_CREATE_WORKSPACES || !page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+    return [...paths].map((path) => ({ path }));
   }
 
   async createSession(cwd: string, modelId: string | null, text: string): Promise<string> {

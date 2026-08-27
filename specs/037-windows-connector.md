@@ -58,6 +58,14 @@ The Windows adapter owns only:
 
 The Windows shell launches the bundled, checksum-verified Node runtime as a child with redirected standard input/output. The existing bounded newline-delimited IPC protocol is the only native-to-runtime channel. QR payloads stay in memory and are rendered only in the native window.
 
+Windows does not rely on an undocumented local Devin session database. Existing-session discovery
+and creation options use the live ACP session list when no reviewed history-store contract is
+available. Connector bounds pagination and result counts, deduplicates absolute working
+directories, converts them into process-local opaque handles before any phone response, and
+revalidates both the resolved workspace and exact selected model against fresh authenticated
+creation options before starting a session. Failure to obtain a live model catalog fails closed;
+the phone never receives a raw Windows path or a guessed model.
+
 ## Secure storage
 
 Connector state is encrypted with Windows DPAPI using `CRYPTPROTECT_UI_FORBIDDEN` and current-user scope. The encrypted blob lives under the signed-in user's local application-data directory in a dedicated DevinX Connector folder. Writes are bounded, atomic, and replace the prior encrypted blob only after encryption succeeds. The helper:
@@ -142,6 +150,8 @@ Automated:
 - in-memory .NET TLS identity generation, cryptographic key/certificate matching, bounded helper
   output, and encrypted persistence without an OpenSSL installation;
 - platform discovery tests covering `Path`, invalid/relative entries, absent ACP, and no shell execution;
+- ACP-only creation-option tests covering pagination, workspace deduplication and bounds, live model
+  metadata, catalog failure, opaque path handling, and exact selected-model forwarding;
 - shared pairing, authorization, rate-limit, replay, grant, revoke, endpoint-refresh, and generic-404 suites;
 - package contents, installer registration/uninstall lifecycle, MIT license, pinned runtime
   checksum, secret scan, dependency audit, and artifact checksum verification; and

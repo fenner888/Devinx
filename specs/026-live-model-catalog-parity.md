@@ -36,7 +36,9 @@ cannot enforce.
 
 `session.create_options` combines two local sources:
 
-1. the reviewed session store supplies opaque workspace handles and ordered recent model IDs;
+1. the reviewed session store supplies workspace history and ordered recent model IDs where that
+   store has a reviewed platform contract; Windows instead supplies a bounded, deduplicated
+   workspace list from the live ACP session list and does not invent recent-model markers;
 2. the installed Devin CLI supplies the authoritative account-scoped catalog through
    `devin models list --format json`.
 

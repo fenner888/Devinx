@@ -20,9 +20,12 @@ selectors sit directly beneath it without another outer card.
 
 ## Connector contract
 
-The phone never sends a filesystem path, raw session ID, CLI argument, or guessed model. The
-Connector derives workspace and model choices from the reviewed Devin session store, returns only
-sanitized labels plus deterministic opaque handles/IDs, and resolves workspace handles locally.
+The phone never sends a filesystem path, raw session ID, CLI argument, or guessed model. Where a
+reviewed Devin session store is available, Connector derives workspace history from that store. On
+platforms without a reviewed store contract, including Windows, Connector derives a bounded,
+deduplicated workspace list from the live ACP session list. In both cases it returns only sanitized
+labels plus deterministic opaque handles/IDs, resolves workspace handles locally, and uses the live
+Devin model catalog as the authority for selectable model IDs.
 
 New methods:
 
@@ -56,8 +59,8 @@ Mac-local.
   failed model selection.
 - Service tests cover permission separation, opaque workspace/session handles, IDOR, rate limits,
   and response minimization.
-- Store tests cover schema drift, hidden sessions, unique bounded workspaces/models, and path
-  non-disclosure.
+- Store and ACP-only tests cover schema drift, hidden sessions, paginated and deduplicated bounded
+  workspaces/models, launch failure, and path non-disclosure.
 - Mobile tests cover distinct Cloud/Computer pickers, destination switching, local creation, and
   dynamic model labels.
 - Physical validation creates a harmless session over LTE/Tailscale, confirms the selected model on
