@@ -196,6 +196,60 @@ process.stdout.write(JSON.stringify({
     ).toThrow('duplicate IDs');
   });
 
+  it('accepts the growing live catalog while enforcing a bounded model limit', () => {
+    const catalog = (count: number) => ({
+      families: [
+        {
+          variants: Array.from({ length: count }, (_, index) => ({
+            model_uid: `model-${index}`,
+            label: `Model ${index}`,
+            is_new: false,
+          })),
+        },
+      ],
+    });
+    expect(parseDevinCliModelCatalog(catalog(385)).models).toHaveLength(385);
+    expect(parseDevinCliModelCatalog(catalog(1_000)).models).toHaveLength(1_000);
+    expect(() => parseDevinCliModelCatalog(catalog(1_001))).toThrow();
+  });
+
+  it('loads models on a cold start without loading, creating, or locking a session', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'devinx-cold-models-'));
+    temporaryDirectories.push(directory);
+    const executable = join(directory, 'devin');
+    writeFileSync(
+      executable,
+      `#!/usr/bin/env node
+if (process.argv.slice(2).join(' ') === 'models list --format json') {
+  process.stdout.write(JSON.stringify({families:[{variants:[{model_uid:'adaptive',label:'Adaptive',is_new:false}]}]}));
+} else {
+  let buffer = '';
+  process.stdin.on('data', chunk => {
+    buffer += chunk;
+    let newline;
+    while ((newline = buffer.indexOf('\\n')) >= 0) {
+      const request = JSON.parse(buffer.slice(0, newline));
+      buffer = buffer.slice(newline + 1);
+      if (request.method !== 'initialize') process.exit(29);
+      process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:request.id,result:{protocolVersion:1,agentCapabilities:{}}})+'\\n');
+    }
+  });
+}
+`,
+    );
+    chmodSync(executable, 0o700);
+    const client = new AcpSessionClient({ executablePath: executable });
+    try {
+      await client.start();
+      expect((await client.listModelCatalog()).models).toEqual([
+        { id: 'adaptive', name: 'Adaptive' },
+      ]);
+      expect((await client.listModelCatalog()).models).toHaveLength(1);
+    } finally {
+      await client.stop();
+    }
+  });
+
   it('rejects oversized Devin CLI catalog output', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'devinx-model-catalog-oversized-'));
     temporaryDirectories.push(directory);

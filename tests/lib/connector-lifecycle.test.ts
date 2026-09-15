@@ -48,4 +48,13 @@ describe('macOS Connector lifecycle', () => {
     expect(connectorSource).toContain('$0.pairedAt > $1.pairedAt');
     expect(connectorSource).toContain('device.id == model.devices.first?.id');
   });
+
+  it('invalidates QR presentation on stop and termination and clears expired review state', () => {
+    expect(connectorSource).toMatch(/func stop\(\) \{\s*clearPairingCode\(\)/);
+    expect(connectorSource).toMatch(/func runtimeDidTerminate[^{]+\{\s*clearPairingCode\(\)/);
+    expect(connectorSource).toMatch(/case "pairing_offer":[\s\S]*?pendingPairingId = nil/);
+    expect(connectorSource).toContain('pairingCodeLifetime.consumeExpiry(now: Date())');
+    expect(connectorSource).toContain('Settings → Local → Scan pairing code');
+    expect(connectorSource).not.toContain('Settings → Computers');
+  });
 });

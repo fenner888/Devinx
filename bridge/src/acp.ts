@@ -19,6 +19,7 @@ const MAX_REPLAY_MESSAGES = 200;
 const MAX_REPLAY_TEXT_BYTES = 160 * 1024;
 const MAX_MESSAGE_TEXT_BYTES = 100 * 1024;
 const MAX_MODEL_CATALOG_BYTES = 1024 * 1024;
+const MAX_MODEL_OPTIONS = 1_000;
 const MODEL_CATALOG_TIMEOUT_MS = 10_000;
 const MAX_ELICITATION_FIELDS = 16;
 const MAX_ELICITATION_OPTIONS = 100;
@@ -155,7 +156,7 @@ const selectConfigOptionSchema = z
           })
           .passthrough(),
       )
-      .max(200),
+      .max(MAX_MODEL_OPTIONS),
   })
   .passthrough();
 
@@ -186,7 +187,7 @@ const devinModelCatalogSchema = z
                   })
                   .passthrough(),
               )
-              .max(200),
+              .max(MAX_MODEL_OPTIONS),
           })
           .passthrough(),
       )
@@ -878,7 +879,7 @@ export function parseDevinCliModelCatalog(
       };
     }),
   );
-  if (models.length === 0 || models.length > 200) {
+  if (models.length === 0 || models.length > MAX_MODEL_OPTIONS) {
     throw new Error('Devin CLI model catalog has an invalid size');
   }
   const ids = models.map((model) => model.id);
@@ -1190,17 +1191,17 @@ export class AcpSessionClient {
     const previousCatalog = this.modelCatalog ? cloneModelCatalog(this.modelCatalog) : null;
     if (forceRefresh) this.modelCatalog = null;
     try {
-      if (forceRefresh) {
-        try {
-          const catalog = await listDevinCliModelCatalog(
-            this.options.executablePath,
-            previousCatalog?.defaultModelId,
-          );
-          this.modelCatalog = catalog;
-          return cloneModelCatalog(catalog);
-        } catch {
-          // Older Devin CLI releases fall back to bounded ACP session discovery.
-        }
+      // Cold starts also need the account catalog: a new user may have no
+      // sessions, and model discovery must not acquire desktop session locks.
+      try {
+        const catalog = await listDevinCliModelCatalog(
+          this.options.executablePath,
+          previousCatalog?.defaultModelId,
+        );
+        this.modelCatalog = catalog;
+        return cloneModelCatalog(catalog);
+      } catch {
+        // Older Devin CLI releases fall back to bounded ACP session discovery.
       }
       if (!this.canListSessions || !this.canLoadSessions) {
         throw new Error('ACP agent does not support model discovery');

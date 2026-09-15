@@ -122,9 +122,7 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByText('Send assisted setup prompt')).toBeTruthy();
     expect(screen.getByText('Mac release')).toBeTruthy();
     expect(screen.getByText('Windows Store')).toBeTruthy();
-    expect(
-      screen.getByText(/Tailscale alone does not expose Devin sessions/),
-    ).toBeTruthy();
+    expect(screen.getByText(/Tailscale alone does not expose Devin sessions/)).toBeTruthy();
     expect(screen.queryByText('Pairing transport pending')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
@@ -171,12 +169,8 @@ describe('Computer connection onboarding', () => {
     const screen = render(<ComputerConnectionScreen />);
 
     await waitFor(() => expect(screen.getByText('Connector update required')).toBeTruthy());
-    expect(
-      screen.getByLabelText('Open official DevinX Connector update for Mac'),
-    ).toBeTruthy();
-    expect(
-      screen.getByLabelText('Open DevinX Connector update in Microsoft Store'),
-    ).toBeTruthy();
+    expect(screen.getByLabelText('Open official DevinX Connector update for Mac')).toBeTruthy();
+    expect(screen.getByLabelText('Open DevinX Connector update in Microsoft Store')).toBeTruthy();
     expect(screen.getByText(/0.1.2 or later/)).toBeTruthy();
   });
 
@@ -239,5 +233,21 @@ describe('Computer connection onboarding', () => {
         screen.getByText(/Confirm Tailscale is connected on this iPhone and local device/),
       ).toBeTruthy(),
     );
+  });
+
+  it.each([
+    ['pairing_version_incompatible', /different connection version/],
+    ['pairing_code_expired', /pairing code expired/],
+    ['pairing_code_invalid', /not a supported DevinX pairing code/],
+  ])('shows specific recovery guidance for %s and permits another scan', async (code, message) => {
+    mockPairComputer.mockRejectedValueOnce({ code });
+    const screen = render(<ComputerConnectionScreen />);
+    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('qr-scanner'));
+    await waitFor(() => expect(screen.getByText(message)).toBeTruthy());
+    expect(mockRefreshComputers).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
   });
 });

@@ -242,6 +242,7 @@ run('/usr/bin/xcrun', [
   'swiftc',
   resolve(repositoryRoot, 'connector', 'macos', 'ConnectorProcessSupervisor.swift'),
   resolve(repositoryRoot, 'connector', 'macos', 'DevinXConnector.swift'),
+  resolve(repositoryRoot, 'connector', 'macos', 'ConnectorPairingCode.swift'),
   '-parse-as-library',
   '-O',
   '-target',
@@ -284,7 +285,7 @@ signOwnedCode(appRoot, identity);
 run('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', appRoot]);
 
 const stagingRoot = resolve(outputRoot, 'dmg-staging');
-const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.7-macos-${architecture}.dmg`);
+const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.8-macos-${architecture}.dmg`);
 rmSync(stagingRoot, { recursive: true, force: true });
 rmSync(dmgPath, { force: true });
 mkdirSync(stagingRoot, { recursive: true });

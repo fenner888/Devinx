@@ -103,6 +103,8 @@ private final class ConnectorModel: ObservableObject {
     private var uninstalling = false
     private var uninstallFallbackRunning = false
     private var protectedStateRemovalConfirmed = false
+    private var pairingCodeLifetime = ConnectorPairingCodeLifetime()
+    private var pairingExpiryTask: Task<Void, Never>?
 
     init() {
         runtime.onOutput = { [weak self] data in
@@ -188,6 +190,7 @@ private final class ConnectorModel: ObservableObject {
 
     func start() {
         guard !runtime.isActive else { return }
+        clearPairingCode()
         status = .starting
         outputBuffer.removeAll(keepingCapacity: false)
         guard let resources = Bundle.main.resourceURL else {
@@ -219,11 +222,13 @@ private final class ConnectorModel: ObservableObject {
     }
 
     func stop() {
+        clearPairingCode()
         send(["version": ipcVersion, "type": "shutdown"])
         runtime.stop()
     }
 
     func regenerateCode() {
+        clearPairingCode()
         pendingDeviceName = nil
         pendingPairingId = nil
         allowSessionContent = false
@@ -375,6 +380,9 @@ private final class ConnectorModel: ObservableObject {
     }
 
     private func runtimeDidTerminate(_ terminationStatus: Int32) {
+        clearPairingCode()
+        pendingPairingId = nil
+        pendingDeviceName = nil
         if uninstalling {
             if !protectedStateRemovalConfirmed {
                 removeProtectedStateWithHelper()
@@ -390,12 +398,24 @@ private final class ConnectorModel: ObservableObject {
     private func handle(_ event: ConnectorEvent) {
         switch event.type {
         case "pairing_offer":
-            guard let payload = event.payload, let image = makeQRCode(payload) else {
+            clearPairingCode()
+            guard let payload = event.payload,
+                  let expiresAt = event.expiresAt,
+                  expiresAt.isFinite,
+                  expiresAt > Date().timeIntervalSince1970 * 1_000,
+                  let image = ConnectorPairingCode.render(payload) else {
                 status = .failed("The pairing code could not be rendered.")
                 return
             }
             qrImage = image
-            qrExpiresAt = event.expiresAt.map { Date(timeIntervalSince1970: $0 / 1_000) }
+            // The controller emits a fresh offer only after pending review ends.
+            pendingPairingId = nil
+            pendingDeviceName = nil
+            allowSessionContent = false
+            let expiry = Date(timeIntervalSince1970: expiresAt / 1_000)
+            qrExpiresAt = expiry
+            pairingCodeLifetime.receive(expiresAt: expiry)
+            schedulePairingExpiry(expiry)
             if pendingPairingId == nil { status = .ready }
         case "ready":
             guard event.transport == "tailscale_vpn" else {
@@ -423,6 +443,7 @@ private final class ConnectorModel: ObservableObject {
             pendingDeviceName = nil
             allowSessionContent = false
             status = .paired
+            regenerateCode()
         case "reset_complete":
             protectedStateRemovalConfirmed = true
             finishUninstall()
@@ -432,9 +453,15 @@ private final class ConnectorModel: ObservableObject {
                 return $0.deviceId > $1.deviceId
             }
         case "error":
+            if event.code == "pairing_expired" {
+                clearPairingCode()
+                pendingPairingId = nil
+                pendingDeviceName = nil
+                allowSessionContent = false
+                return
+            }
             let message: String
             switch event.code {
-            case "pairing_expired": message = "The pairing request expired. Generate a new code."
             case "command_invalid": message = "The connector received an invalid local command."
             case "tailscale_unavailable": message = "Connect this Mac to Tailscale, then try again."
             case "unsupported_platform": message = "This connector build does not support this Mac."
@@ -442,6 +469,7 @@ private final class ConnectorModel: ObservableObject {
             default: message = "The secure connector could not complete that action."
             }
             if event.code == "uninstall_failed" { uninstalling = false }
+            if event.code == "tailscale_unavailable" { clearPairingCode() }
             status = .failed(message)
         default:
             status = .failed("The connector needs to be updated.")
@@ -486,17 +514,30 @@ private final class ConnectorModel: ObservableObject {
         }
     }
 
-    private func makeQRCode(_ payload: String) -> NSImage? {
-        guard let data = payload.data(using: .utf8) else { return nil }
-        let filter = CIFilter.qrCodeGenerator()
-        filter.message = data
-        filter.correctionLevel = "M"
-        guard let output = filter.outputImage else { return nil }
-        let scaled = output.transformed(by: CGAffineTransform(scaleX: 7, y: 7))
-        let representation = NSCIImageRep(ciImage: scaled)
-        let image = NSImage(size: representation.size)
-        image.addRepresentation(representation)
-        return image
+    private func clearPairingCode() {
+        pairingExpiryTask?.cancel()
+        pairingExpiryTask = nil
+        pairingCodeLifetime.clear()
+        qrImage = nil
+        qrExpiresAt = nil
+    }
+
+    private func schedulePairingExpiry(_ expiry: Date) {
+        pairingExpiryTask = Task { [weak self] in
+            // Capped sleep also tolerates a corrupt runtime expiry without overflow.
+            let delay = min(900, max(0, expiry.timeIntervalSinceNow))
+            do { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
+            catch { return }
+            guard let self, !Task.isCancelled else { return }
+            guard self.pairingCodeLifetime.consumeExpiry(now: Date()) else {
+                self.schedulePairingExpiry(expiry)
+                return
+            }
+            self.qrImage = nil
+            self.qrExpiresAt = nil
+            // The controller owns refresh and the separate approval lifetime.
+            // This UI timer only hides stale offers if its event loop is delayed.
+        }
     }
 }
 
@@ -602,10 +643,10 @@ private struct ConnectorView: View {
                             .scaledToFit()
                             .frame(width: 360, height: 360)
                             .accessibilityLabel("DevinX iPhone pairing QR code")
-                        Text("On iPhone: DevinX → Settings → Computers → Add Mac")
+                        Text("On iPhone: DevinX → Settings → Local → Scan pairing code")
                             .font(.callout)
                             .multilineTextAlignment(.center)
-                        Text("The code expires automatically and is valid only for this computer.")
+                        Text("The code refreshes automatically and is valid only for this local device.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)

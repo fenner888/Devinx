@@ -40,20 +40,13 @@ import { NavMenu } from '@components/NavMenu';
 import { ModeSettings } from '@components/ModeSettings';
 import { AttachmentPickerSheet, type PickedAttachment } from '@components/AttachmentPickerSheet';
 import { DevinCompanion, HomeCompanionStage } from '@components/pets';
-import {
-  VoiceComposerStatus,
-  VoiceMicButton,
-  useVoiceComposer,
-} from '@components/VoiceInput';
+import { VoiceComposerStatus, VoiceMicButton, useVoiceComposer } from '@components/VoiceInput';
 import {
   ComputerDiscoveryNotices,
   ComputerSessionRow,
 } from '@components/sessions/ComputerSessionRow';
 import { ModelFamilyMark } from '@components/sessions/ModelFamilyMark';
-import {
-  ModelCostIndicator,
-  modelCostLabel,
-} from '@components/sessions/ModelCostIndicator';
+import { ModelCostIndicator, modelCostLabel } from '@components/sessions/ModelCostIndicator';
 import { useConnections } from '@auth/ConnectionContext';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
 import { connectionModeUsesComputer } from '@lib/connections';
@@ -230,16 +223,15 @@ export default function HomeScreen() {
     : createSession.isPending || localCreationPending
       ? 'working'
       : 'idle';
-  const homeIsReady =
-    (!usesCloud || hasCloudConnection) && (!usesComputer || Boolean(computer));
+  const localDiscoveryState = computerSessions.data?.computers.find(
+    (candidate) => candidate.bridgeId === computer?.bridgeId,
+  )?.state;
+  const localIsReady = Boolean(computer) && localDiscoveryState === 'ready';
+  const homeIsReady = (!usesCloud || hasCloudConnection) && (!usesComputer || localIsReady);
   const homeStatusLabel = homeIsReady ? 'Ready' : 'Connection needed';
   const homeConnectionSummary = [
     usesCloud ? (hasCloudConnection ? 'Cloud connected' : 'Cloud unavailable') : null,
-    usesComputer
-      ? computer
-        ? `${computer.computerName} paired`
-        : 'No local device paired'
-      : null,
+    usesComputer ? (computer ? `${computer.computerName} paired` : 'No local device paired') : null,
   ]
     .filter((part): part is string => Boolean(part))
     .join(' • ');
@@ -307,8 +299,8 @@ export default function HomeScreen() {
       tags: defaultTags,
     },
     scribeContext: {
-      destination: isComputerDestination ? computer?.computerName ?? 'Local' : 'Devin Cloud',
-      repository: isComputerDestination ? selectedWorkspace?.name : selectedRepo ?? undefined,
+      destination: isComputerDestination ? (computer?.computerName ?? 'Local') : 'Devin Cloud',
+      repository: isComputerDestination ? selectedWorkspace?.name : (selectedRepo ?? undefined),
     },
   });
 
@@ -337,7 +329,10 @@ export default function HomeScreen() {
 
   function openLocalPicker(kind: 'workspace' | 'model') {
     if (localOptions.isLoading) {
-      Alert.alert('Loading local options', 'DevinX is checking the approved options on your local device.');
+      Alert.alert(
+        'Loading local options',
+        'DevinX is checking the approved options on your local device.',
+      );
       return;
     }
     if (!localOptions.data) {
@@ -533,10 +528,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <NavMenu
-        visible={showMenu}
-        onClose={() => setShowMenu(false)}
-      />
+      <NavMenu visible={showMenu} onClose={() => setShowMenu(false)} />
 
       <OfflineBanner />
 
@@ -671,10 +663,7 @@ export default function HomeScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`Model: ${selectedFamily?.name ?? 'Default'}`}
                     >
-                      <ModelFamilyMark
-                        name={selectedFamily?.name ?? 'Default model'}
-                        size={17}
-                      />
+                      <ModelFamilyMark name={selectedFamily?.name ?? 'Default model'} size={17} />
                       <Text className="text-text-mid text-text13 ml-1.5 max-w-28" numberOfLines={1}>
                         {selectedFamily?.name ?? 'Default model'}
                       </Text>
@@ -1571,10 +1560,7 @@ export default function HomeScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               {selectedFamily?.variants.map((variant) => {
                 const selected = variant.model.id === selectedVariant?.model.id;
-                const costLabel = modelCostLabel(
-                  variant.model.costTier,
-                  variant.model.costSummary,
-                );
+                const costLabel = modelCostLabel(variant.model.costTier, variant.model.costSummary);
                 return (
                   <Pressable
                     key={variant.model.id}

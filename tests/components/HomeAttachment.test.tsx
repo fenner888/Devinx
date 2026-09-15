@@ -149,6 +149,28 @@ describe('home attachment control', () => {
     mockComputerBoard = { sessions: [], computers: [] };
   });
 
+  it('does not label a saved pairing as Ready when the local Connector is offline', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    };
+    mockComputerBoard = {
+      sessions: [],
+      computers: [
+        { bridgeId: 'bridge_1234567890', computerName: 'Studio Mac', state: 'unavailable' },
+      ],
+    };
+    const screen = render(
+      <ThemeProvider>
+        <HomeScreen />
+      </ThemeProvider>,
+    );
+    expect(screen.queryByText('Ready')).toBeNull();
+    expect(screen.getByText('Connection needed')).toBeTruthy();
+  });
+
   it('uses Devin as the prominent home-screen visual anchor', () => {
     const { getByText, getByLabelText, queryByText } = render(
       <ThemeProvider>

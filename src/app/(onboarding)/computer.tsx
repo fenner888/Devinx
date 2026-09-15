@@ -76,6 +76,15 @@ function pairingFailureMessage(error: unknown, stage: ComputerPairingStatus | nu
     typeof error === 'object' && error !== null && 'code' in error
       ? (error as { code?: unknown }).code
       : undefined;
+  if (code === 'pairing_version_incompatible') {
+    return 'This pairing code uses a different connection version. Update DevinX on this iPhone and DevinX Connector on your local device, then scan again.';
+  }
+  if (code === 'pairing_code_expired') {
+    return 'This pairing code expired. Generate a new code in DevinX Connector and scan it promptly. Check that both devices use automatic date and time.';
+  }
+  if (code === 'pairing_code_invalid') {
+    return 'This is not a supported DevinX pairing code. Scan the code shown inside DevinX Connector.';
+  }
   if (code === 'ERR_PINNED_HTTPS_NETWORK') {
     return 'DevinX could not reach DevinX Connector. Confirm Tailscale is connected on this iPhone and local device, then generate a new code.';
   }
@@ -521,9 +530,7 @@ export default function ComputerConnectionScreen() {
                           accessibilityRole="link"
                           accessibilityLabel="Open DevinX Connector update in Microsoft Store"
                         >
-                          <Text className="text-link text-text12 font-medium">
-                            Windows update
-                          </Text>
+                          <Text className="text-link text-text12 font-medium">Windows update</Text>
                         </Pressable>
                       </View>
                     </View>
@@ -580,8 +587,8 @@ export default function ComputerConnectionScreen() {
               </Text>
               {pairingStatus === 'waiting_for_approval' && (
                 <Text className="text-text-low text-text12 leading-4 text-center mt-2">
-                  Choose metadata-only or read-only session content in Connector. The request expires
-                  automatically if it is not approved.
+                  Choose metadata-only or read-only session content in Connector. The request
+                  expires automatically if it is not approved.
                 </Text>
               )}
               {phase === 'pairing' && (
