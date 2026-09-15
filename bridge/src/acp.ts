@@ -17,7 +17,7 @@ const MAX_CACHED_SESSIONS = 10_000;
 const MAX_REPLAY_NOTIFICATIONS = 10_000;
 const MAX_REPLAY_MESSAGES = 200;
 const MAX_REPLAY_TEXT_BYTES = 160 * 1024;
-const MAX_MESSAGE_TEXT_BYTES = 100 * 1024;
+const MAX_MESSAGE_TEXT_BYTES = 100_000;
 const MAX_MODEL_CATALOG_BYTES = 1024 * 1024;
 const MAX_MODEL_OPTIONS = 1_000;
 const MODEL_CATALOG_TIMEOUT_MS = 10_000;
@@ -1716,7 +1716,7 @@ export class AcpSessionClient {
     clearTimeout(pending.timer);
     if (message.error) {
       const kind: AcpOperationFailureKind =
-        message.error.code === -32600 &&
+        (message.error.code === -32600 || message.error.code === -32015) &&
         /already open in another process/i.test(message.error.message ?? '')
           ? 'session_in_use'
           : 'request_failed';

@@ -1098,8 +1098,10 @@ if (request.method === 'initialize') {
     }
   });
 
-  it('classifies an exclusively owned session without exposing its error text', async () => {
-    const executablePath = fakeCli(`
+  it.each([-32600, -32015])(
+    'classifies session ownership error %i without exposing text',
+    async (code) => {
+      const executablePath = fakeCli(`
 if (request.method === 'initialize') {
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
     protocolVersion: 1,
@@ -1111,21 +1113,24 @@ if (request.method === 'initialize') {
   } }) + '\\n');
 } else if (request.method === 'session/load') {
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, error: {
-    code: -32600, message: "Session 'private-id' is already open in another process"
+    code: ${code}, message: "Session 'private-id' is already open in another process"
   } }) + '\\n');
 }`);
-    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+      const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
 
-    try {
-      await client.start();
-      await client.listSessions();
-      const error = await client.loadSession('session-locked').catch((failure: unknown) => failure);
-      expect(isAcpSessionInUseError(error)).toBe(true);
-      expect(String(error)).not.toContain('private-id');
-    } finally {
-      await client.stop();
-    }
-  });
+      try {
+        await client.start();
+        await client.listSessions();
+        const error = await client
+          .loadSession('session-locked')
+          .catch((failure: unknown) => failure);
+        expect(isAcpSessionInUseError(error)).toBe(true);
+        expect(String(error)).not.toContain('private-id');
+      } finally {
+        await client.stop();
+      }
+    },
+  );
 
   it('bounds replayed text history to the newest 200 messages', async () => {
     const executablePath = fakeCli(`

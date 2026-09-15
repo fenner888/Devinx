@@ -53,4 +53,23 @@ cleanup. Do not roll back signing, consent, authentication, or permissions.
 
 ## Status
 
-Investigation in progress; nothing from this recovery has been published.
+Build 82 is Testing in both TestFlight groups; Mark confirms physical pairing
+works with Connector 0.1.8. Session read testing exposed these further failures:
+the installed Devin database is schema 17 (`subagent_heads`), and session/load
+now returns -32015 for a session already open in another process.
+
+### Connector 0.1.9 compatibility correction
+
+- Review and allow schemas 16 and 17 only. Schema 17 adds separate subagent
+  heads; continue reading exclusively `sessions.main_chain_id`, never subagent
+  chains, tools, reasoning or metadata. Preserve read-only SQL, owner/permissions,
+  column checks, bounds and per-iPhone content authorization.
+- Recognize both observed session-in-use error codes (-32600 and -32015) with
+  the existing message guard. Preserve ownership locks and the existing explicit
+  continuation behavior rather than trying to force access to desktop sessions.
+- Verify both schemas and rejection of unknown versions in fixtures, and load
+  current local sessions through the production adapter without logging content.
+- Align per-message clipping with the existing 100,000-character phone/bridge
+  contract; 100 KiB of ASCII previously exceeded it and rejected long histories.
+- Build, sign, notarize and install a new Connector before asking Mark to retest.
+  iOS build 82 remains unchanged; no new phone build is needed for these changes.

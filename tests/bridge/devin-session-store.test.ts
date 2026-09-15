@@ -73,86 +73,119 @@ describe('read-only Devin session store', () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  it('reads only minimized text from the active main chain during a WAL writer', async () => {
-    const databasePath = join(directory, 'sessions.db');
-    const writer = createFixture(databasePath);
-    const sessionId = 'session-main-chain';
-    writer
-      .prepare(
-        'INSERT INTO sessions(id, working_directory, main_chain_id) VALUES (?, ?, ?)',
-      )
-      .run(sessionId, '/Users/example/project', 5);
-    insertNode(writer, {
-      sessionId,
-      nodeId: 1,
-      role: 'system',
-      content: 'private-system-prompt',
-    });
-    insertNode(writer, {
-      sessionId,
-      nodeId: 2,
-      parentNodeId: 1,
-      role: 'user',
-      content: 'Build this.',
-      privateValue: 'private-user-metadata',
-    });
-    insertNode(writer, {
-      sessionId,
-      nodeId: 3,
-      parentNodeId: 2,
-      role: 'assistant',
-      content: 'Working.',
-      privateValue: 'private-reasoning',
-    });
-    insertNode(writer, {
-      sessionId,
-      nodeId: 4,
-      parentNodeId: 3,
-      role: 'tool',
-      content: 'private-tool-output',
-    });
-    insertNode(writer, {
-      sessionId,
-      nodeId: 5,
-      parentNodeId: 4,
-      role: 'assistant',
-      content: 'Done.',
-    });
-    insertNode(writer, {
-      sessionId,
-      nodeId: 6,
-      parentNodeId: 2,
-      role: 'assistant',
-      content: 'private-abandoned-branch',
-    });
-    await chmod(databasePath, 0o600);
-
-    try {
-      const store = new DevinSessionStore({ databasePath });
-      await store.start();
-      const loaded = await store.loadSession(sessionId);
-      expect(loaded).toEqual({
+  it.each([16, 17])(
+    'reads only main-chain text during a WAL writer on schema %i',
+    async (version) => {
+      const databasePath = join(directory, 'sessions.db');
+      const writer = createFixture(databasePath, version);
+      const sessionId = 'session-main-chain';
+      writer
+        .prepare('INSERT INTO sessions(id, working_directory, main_chain_id) VALUES (?, ?, ?)')
+        .run(sessionId, '/Users/example/project', 5);
+      insertNode(writer, {
         sessionId,
-        cwd: '/Users/example/project',
-        modelId: 'adaptive',
-        messages: [
-          { source: 'user', text: 'Build this.' },
-          { source: 'devin', text: 'Working.' },
-          { source: 'devin', text: 'Done.' },
-        ],
-        truncated: false,
+        nodeId: 1,
+        role: 'system',
+        content: 'private-system-prompt',
       });
-      expect(JSON.stringify(loaded)).not.toMatch(
-        /private-system-prompt|private-user-metadata|private-reasoning|private-tool-output|private-abandoned-branch/,
-      );
-    } finally {
-      writer.close();
-    }
+      insertNode(writer, {
+        sessionId,
+        nodeId: 2,
+        parentNodeId: 1,
+        role: 'user',
+        content: 'Build this.',
+        privateValue: 'private-user-metadata',
+      });
+      insertNode(writer, {
+        sessionId,
+        nodeId: 3,
+        parentNodeId: 2,
+        role: 'assistant',
+        content: 'Working.',
+        privateValue: 'private-reasoning',
+      });
+      insertNode(writer, {
+        sessionId,
+        nodeId: 4,
+        parentNodeId: 3,
+        role: 'tool',
+        content: 'private-tool-output',
+      });
+      insertNode(writer, {
+        sessionId,
+        nodeId: 5,
+        parentNodeId: 4,
+        role: 'assistant',
+        content: 'Done.',
+      });
+      insertNode(writer, {
+        sessionId,
+        nodeId: 6,
+        parentNodeId: 2,
+        role: 'assistant',
+        content: 'private-abandoned-branch',
+      });
+      if (version === 17) {
+        writer.exec(`CREATE TABLE subagent_heads (
+        session_id TEXT NOT NULL, agent_id TEXT NOT NULL,
+        chain_node_id INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+        PRIMARY KEY(session_id, agent_id)
+      )`);
+        writer
+          .prepare('INSERT INTO subagent_heads VALUES (?, ?, ?, ?)')
+          .run(sessionId, 'private-subagent', 6, 1);
+      }
+      await chmod(databasePath, 0o600);
+
+      try {
+        const store = new DevinSessionStore({ databasePath });
+        await store.start();
+        const loaded = await store.loadSession(sessionId);
+        expect(loaded).toEqual({
+          sessionId,
+          cwd: '/Users/example/project',
+          modelId: 'adaptive',
+          messages: [
+            { source: 'user', text: 'Build this.' },
+            { source: 'devin', text: 'Working.' },
+            { source: 'devin', text: 'Done.' },
+          ],
+          truncated: false,
+        });
+        expect(JSON.stringify(loaded)).not.toMatch(
+          /private-system-prompt|private-user-metadata|private-reasoning|private-tool-output|private-abandoned-branch/,
+        );
+      } finally {
+        writer.close();
+      }
+    },
+  );
+
+  it('clips large history messages to the phone response contract', async () => {
+    const databasePath = join(directory, 'sessions.db');
+    const writer = createFixture(databasePath, 17);
+    writer
+      .prepare('INSERT INTO sessions(id, working_directory, main_chain_id) VALUES (?, ?, ?)')
+      .run('large-message', '/tmp/project', 1);
+    insertNode(writer, {
+      sessionId: 'large-message',
+      nodeId: 1,
+      role: 'assistant',
+      content: 'a'.repeat(102_400),
+    });
+    writer.close();
+    await chmod(databasePath, 0o600);
+    const store = new DevinSessionStore({ databasePath });
+    await store.start();
+    const loaded = await store.loadSession('large-message');
+    expect(loaded.messages[0]?.text).toHaveLength(100_000);
+    expect(loaded.truncated).toBe(true);
+    await store.stop();
   });
 
   it('fails closed for an unreviewed schema version', async () => {
     const databasePath = join(directory, 'sessions.db');
-    const database = createFixture(databasePath, 17);
+    const database = createFixture(databasePath, 18);
     database.close();
     await chmod(databasePath, 0o600);
 

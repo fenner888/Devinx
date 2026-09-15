@@ -80,3 +80,30 @@ Archive with `IPHONEOS_DEPLOYMENT_TARGET=15.1` (the app's existing minimum),
 
 The existing Mac public release supports Apple Silicon. Intel cross-build/runtime
 qualification and Windows Store repackaging are not established by this Mac run.
+
+## Session compatibility follow-up (Connector 0.1.9)
+
+Mark confirmed build 82 pairing, then reported failure loading sessions. Live
+inspection found database schema 17 (`subagent_heads`) rejected by the schema-16
+reader; ACP fallback returned -32015 for desktop-owned sessions, while the
+existing continuation classifier only recognized -32600.
+
+Corrections: explicitly reviewed schemas 16/17, main-chain-only minimized reads,
+both observed ownership codes with the existing message guard, and 100,000-byte
+message clipping aligned to the existing phone contract. Unknown schema versions
+still fail closed. No iPhone, grant, token, or desktop ownership changes.
+
+Live pre-install checks passed: 20 recent session histories including the two
+previous failures; 385 models / 21 workspaces; new controlled test session with
+first reply and a second prompt/reply in the same session. Test prompts explicitly
+prohibited reading/changing files or using tools/network. No private history was
+logged. The test session was retained rather than deleting session data.
+
+Regression coverage includes schema-16/17 concurrent-WAL main-chain isolation,
+subagent exclusion, schema-18 rejection, both ownership codes, long-message
+clipping and existing permission/replay/rate-limit checks. TypeScript excludes
+generated artifacts/dist so DMG's Applications symlink cannot pull unrelated
+installed application source into typechecking. Product source/tests remain checked.
+
+Signing/notarization, installed verification, GitHub publication and physical
+iPhone session retest for 0.1.9 remain pending until recorded below.
