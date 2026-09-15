@@ -105,5 +105,17 @@ clipping and existing permission/replay/rate-limit checks. TypeScript excludes
 generated artifacts/dist so DMG's Applications symlink cannot pull unrelated
 installed application source into typechecking. Product source/tests remain checked.
 
-Signing/notarization, installed verification, GitHub publication and physical
-iPhone session retest for 0.1.9 remain pending until recorded below.
+0.1.9 validation: 89 suites / 697 tests, lint, typecheck, build and dependency
+audit gate passed (existing image-size exception unchanged); repository secret
+grep checks passed. App and DMG Developer ID signed, notarized Accepted, stapled
+and verified. DMG SHA-256:
+`653ce428bc5b8fd7158ef8117c1b9557df9dcaf009268acb4e1af29cf3fea6c2`.
+
+Installed in `/Applications/DevinX Connector.app` and restarted without wiping
+pairing data. Version 0.1.9 verified, signature/staple validation passed, runtime
+listens on the existing Tailscale endpoint. Parent and Node child sampled at 0%
+CPU. The installed bundled Node runtime supports the schema-17 history reader.
+Signed 0.1.8 rollback bundle retained. Fix pushed in commit d9578aa on PR #82.
+
+Public GitHub publication and physical iPhone session retest of 0.1.9 remain
+pending. No claim of full ACP desktop parity or Windows installed verification.
