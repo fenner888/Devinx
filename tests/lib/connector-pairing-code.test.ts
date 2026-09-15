@@ -23,7 +23,15 @@ it('expires codes once, recovers after restart, and decodes the native QR in lig
     );
     expect({ status: compile.status, stderr: compile.stderr }).toEqual({ status: 0, stderr: '' });
     const run = spawnSync(executable, [], { encoding: 'utf8', timeout: 30_000 });
-    expect({ status: run.status, stderr: run.stderr }).toEqual({ status: 0, stderr: '' });
+    // Vision on GitHub's virtualized Apple Silicon runner logs this missing
+    // hardware scaler even when decoding succeeds. Keep all other diagnostics
+    // fatal, and still require the harness exit code and decode assertions.
+    const diagnostics = run.stderr
+      .split(/\r?\n/)
+      .filter((line) => line !== 'IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver')
+      .join('\n')
+      .trim();
+    expect({ status: run.status, stderr: diagnostics }).toEqual({ status: 0, stderr: '' });
     expect(run.stdout).toContain('PASS expiry refresh-once stop restart QR light dark 360px');
   } finally {
     rmSync(directory, { recursive: true, force: true });

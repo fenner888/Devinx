@@ -63,12 +63,18 @@ Archive with `IPHONEOS_DEPLOYMENT_TARGET=15.1` (the app's existing minimum),
 - Final regression: 89 suites / 694 tests passed, including cross-boundary model
   catalog validation, pairing errors, native QR rendering, and child-exit soak.
   Typecheck and lint pass.
-- Build 82 archived and exported successfully using Xcode. Camera purpose string
-  retained. Final clean-source archive receipt still required before upload.
+- Build 82 archived, exported and uploaded successfully using Xcode. Camera
+  purpose string retained; clean-source receipt saved with the archive.
+  Apple accepted the upload with missing prebuilt React, ReactNativeDependencies
+  and Hermes framework dSYM warnings; this limits third-party crash symbolication.
 - Connector 0.1.8 Apple Silicon: Developer ID signed, app and DMG notarized and
   stapled, Gatekeeper/artifact verifier passed. DMG SHA-256:
   `99b3021565b18b933f313233bcecb2ac5987cfef61a9cceceac4a7b512914a18`.
-- Installed physical-device pairing, publication, App Store Connect processing
+- Installed Connector 0.1.8: forced runtime child exit left the app at 0% CPU
+  after 25 seconds; restart launched a new idle child. Existing pairing data was
+  preserved; a signed 0.1.7 rollback bundle is retained locally.
+- GitHub release 0.1.8 is a draft; uploaded DMG digest matches the local checksum.
+- Physical-device pairing, side-by-side UI parity screenshots, publication, App Store Connect processing
   and tester assignment: pending. Do not describe the release as shipped until
   individually verified.
 
