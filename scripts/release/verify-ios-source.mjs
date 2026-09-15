@@ -14,12 +14,15 @@ if (!config.ios.infoPlist.NSCameraUsageDescription) throw new Error('Camera purp
 const mobile = read('src/auth/computerPairing.ts').match(/const PROTOCOL_VERSION = (\d+)/)?.[1];
 const bridge = read('bridge/src/schemas.ts').match(/const BRIDGE_PROTOCOL_VERSION = (\d+)/)?.[1];
 if (mobile !== '2' || mobile !== bridge) throw new Error('Pairing protocol mismatch.');
+if (!read('src/auth/deviceSigning.ts').includes('export async function postTailnetBridgeJson(')) {
+  throw new Error('Tailscale transport is missing.');
+}
 if (
   !read('modules/devinx-device-crypto/ios/DevinXDeviceCryptoModule.swift').includes(
-    'postTailnetBridgeJson',
+    'View(DevinXQrScannerView.self)',
   )
 ) {
-  throw new Error('Native Tailscale transport is missing.');
+  throw new Error('Native pairing scanner is missing.');
 }
 if (!read('src/lib/connections.ts').includes("label: 'Local'"))
   throw new Error('Local mode label is missing.');
