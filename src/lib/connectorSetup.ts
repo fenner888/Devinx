@@ -3,6 +3,13 @@ import { branding } from './branding';
 export const CONNECTOR_RELEASE_PAGE = branding.links.connectorReleases;
 export const WINDOWS_CONNECTOR_STORE_PAGE = branding.links.windowsConnectorStore;
 
+export const CONNECTOR_UPDATE_NOTICE =
+  'Updating DevinX on your iPhone does not update DevinX Connector on your local device.';
+export const MAC_CONNECTOR_UPDATE_STEPS =
+  'On your Mac: download the latest official DMG. Choose Quit DevinX Connector from its menu-bar menu, open the DMG, drag DevinX Connector into Applications and choose Replace. Reopen Connector. Closing its window alone does not quit it. Your pairing is kept.';
+export const WINDOWS_CONNECTOR_UPDATE_STEPS =
+  'On your Windows PC: open DevinX Connector in Microsoft Store, install any available update, then reopen Connector. Your pairing is kept.';
+
 export const CONNECTOR_SETUP_PROMPT = `Set up DevinX Connector on this local device so I can securely connect the DevinX iPhone app to supported local Devin sessions through Tailscale.
 
 Before downloading anything, explain that Tailscale supplies only the private network route. DevinX Connector is the trusted local service that communicates with a supported local Devin ACP capability, authenticates this iPhone, and enforces its permissions. A Tailscale IP, server URL, or password cannot replace a compatible service running on this local device. Cloud-only DevinX use does not require Connector.
@@ -10,6 +17,8 @@ Before downloading anything, explain that Tailscale supplies only the private ne
 Detect whether this local device is running macOS or Windows.
 
 On macOS, open the official DevinX release page at ${CONNECTOR_RELEASE_PAGE}. Download Connector only when that page provides the signed Apple-silicon DMG plus its adjacent SHA-256 checksum. Verify the checksum, require a Developer ID Application signature, confirm Apple notarization, and require Gatekeeper acceptance.
+
+If Connector is already installed, explain the update steps: ${CONNECTOR_UPDATE_NOTICE} ${MAC_CONNECTOR_UPDATE_STEPS} ${WINDOWS_CONNECTOR_UPDATE_STEPS} Follow only the steps for the detected operating system. Do not uninstall Connector or erase its pairing data to update it.
 
 On Windows 11 x64, open the official Microsoft Store listing at ${WINDOWS_CONNECTOR_STORE_PAGE}. Install only the Store package named DevinX Connector, published by DevinX Tools, with Store ID 9N52Z3FVMFH8. After installation, confirm that Get-AppxPackage reports package identity DevinXTools.DevinXConnector, publisher CN=43D84E24-857C-4C40-9DAA-1A6983913CD9, and package family DevinXTools.DevinXConnector_ydtgrt4yd5wrc. Do not download, sideload, or execute an unsigned CI MSIX, EXE, or ZIP.
 

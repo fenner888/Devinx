@@ -603,12 +603,18 @@ private struct ConnectorView: View {
                                 .foregroundStyle(.blue)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Update available").font(.headline)
+                                Text("This update does not install automatically. Download the DMG, choose Quit DevinX Connector from the menu-bar menu, then drag the app into Applications and choose Replace. Reopen Connector. Your pairing is kept.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text("Closing this window does not quit Connector. Updating the iPhone app does not update Connector.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                                 Text("\(update.tagName) is available from the official DevinX release page.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Button("View update") { model.openAvailableUpdate() }
+                            Button("Download update") { model.openAvailableUpdate() }
                         }
                         .padding(6)
                     }
