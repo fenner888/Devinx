@@ -46,6 +46,8 @@
   ],
   "exclude": [
     "node_modules",
-    "audit-tools"
+    "audit-tools",
+    "artifacts",
+    "dist"
   ]
 }

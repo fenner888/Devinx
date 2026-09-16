@@ -195,7 +195,7 @@ const sessionCreateOptionsResponseSchema = z
     workspaces: z
       .array(z.object({ id: workspaceIdSchema, name: z.string().min(1).max(160) }).strict())
       .max(100),
-    models: z.array(computerModelSchema).max(200),
+    models: z.array(computerModelSchema).max(1_000),
     defaultModelId: modelIdSchema.nullable().default(null),
     catalogSource: z.enum(['live', 'recent']).default('recent'),
   })

@@ -828,7 +828,7 @@ export class BridgeService {
                   })
                   .strict(),
               )
-              .max(200),
+              .max(1_000),
             defaultModelId: modelIdSchema.nullable(),
             catalogSource: z.enum(['live', 'recent']),
           })

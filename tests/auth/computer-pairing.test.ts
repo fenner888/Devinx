@@ -129,6 +129,28 @@ describe('mobile computer pairing orchestration', () => {
     expect(() => canonicalJson({ invalid: Number.NaN })).toThrow('finite numbers');
   });
 
+  it('rejects incompatible protocol versions before touching keys or the network', async () => {
+    for (const protocolVersion of [1, 3]) {
+      await expect(
+        pairComputerFromQrPayload(JSON.stringify({ ...OFFER, protocolVersion }), {
+          computerName: 'Local device',
+        }),
+      ).rejects.toMatchObject({ code: 'pairing_version_incompatible' });
+    }
+    expect(mockCreateDeviceIdentity).not.toHaveBeenCalled();
+    expect(mockPostPinnedBridgeJson).not.toHaveBeenCalled();
+    expect(mockPostTailnetBridgeJson).not.toHaveBeenCalled();
+  });
+
+  it('reports expired offers distinctly without weakening validation', async () => {
+    await expect(
+      pairComputerFromQrPayload(JSON.stringify({ ...OFFER, expiresAt: NOW - 6_000 }), {
+        computerName: 'Local device',
+      }),
+    ).rejects.toMatchObject({ code: 'pairing_code_expired' });
+    expect(mockCreateDeviceIdentity).not.toHaveBeenCalled();
+  });
+
   it('pins both bridge identities, waits for approval, verifies, and stores atomically', async () => {
     const statuses: string[] = [];
     await expect(

@@ -300,7 +300,7 @@ describe('authenticated Desktop Bridge service', () => {
   it('returns the authenticated Connector version without changing the health contract', async () => {
     await expect(service().handle(envelope('bridge.version', {}), context())).resolves.toEqual({
       status: 200,
-      body: { version: '0.1.7' },
+      body: { version: '0.1.9' },
     });
   });
 
@@ -497,6 +497,22 @@ describe('authenticated Desktop Bridge service', () => {
     expect(adapter.createOptionRefreshes).toEqual([true]);
   });
 
+  it('delivers more than 200 validated model variants without truncation', async () => {
+    adapter.createOptions.models = Array.from({ length: 385 }, (_, index) => ({
+      id: `model-${index}`,
+      name: `Model ${index}`,
+      recent: false,
+      recommended: index === 0,
+    }));
+    adapter.createOptions.defaultModelId = 'model-0';
+    const result = await service().handle(
+      envelope('session.create_options', {}, ['session:metadata:read']),
+      context(),
+    );
+    expect(result.status).toBe(200);
+    expect((result.body as { models: unknown[] }).models).toHaveLength(385);
+  });
+
   it('keeps workspace discovery and default-model creation usable without a model catalog', async () => {
     adapter.createOptions = {
       workspaces: [{ path: 'C:\\Users\\tester\\project' }],
@@ -530,7 +546,7 @@ describe('authenticated Desktop Bridge service', () => {
       bridge.handle(
         envelope(
           'session.create',
-          { workspaceId, modelId: null, text: 'Use Devin\'s default model.' },
+          { workspaceId, modelId: null, text: "Use Devin's default model." },
           ['session:create'],
         ),
         context(),
@@ -543,7 +559,7 @@ describe('authenticated Desktop Bridge service', () => {
       {
         cwd: 'C:\\Users\\tester\\project',
         modelId: null,
-        text: 'Use Devin\'s default model.',
+        text: "Use Devin's default model.",
       },
     ]);
   });

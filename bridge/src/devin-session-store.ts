@@ -7,15 +7,22 @@ import { z } from 'zod';
 import type { AcpHistoryMessage, AcpLoadedSession } from './acp';
 import { sessionIdSchema } from './schemas';
 
-const REVIEWED_SCHEMA_VERSION = 16;
+// Schema 17 adds subagent_heads without changing the reviewed main-chain data.
+// Deliberately do not traverse that table or accept arbitrary future versions.
+const REVIEWED_SCHEMA_VERSIONS = new Set([16, 17]);
 const MAXIMUM_DATABASE_BYTES = 2 * 1024 * 1024 * 1024;
 const MAXIMUM_CHAIN_NODES = 10_000;
 const MAXIMUM_MESSAGES = 200;
-const MAXIMUM_MESSAGE_BYTES = 100 * 1024;
+// Must fit the bridge and phone's 100,000-character per-message contract.
+const MAXIMUM_MESSAGE_BYTES = 100_000;
 const MAXIMUM_HISTORY_BYTES = 160 * 1024;
 const MAXIMUM_CREATE_OPTIONS = 100;
 
-const modelIdSchema = z.string().min(1).max(160).regex(/^[A-Za-z0-9._:+-]+$/);
+const modelIdSchema = z
+  .string()
+  .min(1)
+  .max(160)
+  .regex(/^[A-Za-z0-9._:+-]+$/);
 
 const sessionRowSchema = z
   .object({
@@ -50,12 +57,7 @@ const requiredColumns = {
     'main_chain_id',
     'hidden',
   ]),
-  message_nodes: new Set([
-    'session_id',
-    'node_id',
-    'parent_node_id',
-    'chat_message',
-  ]),
+  message_nodes: new Set(['session_id', 'node_id', 'parent_node_id', 'chat_message']),
   refinery_schema_history: new Set(['version']),
 } as const;
 
@@ -186,7 +188,10 @@ export class DevinSessionStore {
         )
         .all(MAXIMUM_CREATE_OPTIONS)
         .map((row) =>
-          z.object({ path: z.string().min(1).max(4_096).refine(isAbsolute) }).strict().parse(row),
+          z
+            .object({ path: z.string().min(1).max(4_096).refine(isAbsolute) })
+            .strict()
+            .parse(row),
         );
       const models = database
         .prepare(
@@ -261,13 +266,7 @@ export class DevinSessionStore {
            ORDER BY depth ASC
            LIMIT ?`,
         )
-        .all(
-          sessionId,
-          session.mainChainId,
-          sessionId,
-          MAXIMUM_CHAIN_NODES,
-          MAXIMUM_MESSAGES + 1,
-        )
+        .all(sessionId, session.mainChainId, sessionId, MAXIMUM_CHAIN_NODES, MAXIMUM_MESSAGES + 1)
         .map((row) => historyRowSchema.parse(row));
       const boundary = chainBoundarySchema.parse(
         database
@@ -356,7 +355,7 @@ export class DevinSessionStore {
     const version = database
       .prepare('SELECT MAX(version) AS version FROM refinery_schema_history')
       .get() as { version?: unknown } | undefined;
-    if (version?.version !== REVIEWED_SCHEMA_VERSION) {
+    if (typeof version?.version !== 'number' || !REVIEWED_SCHEMA_VERSIONS.has(version.version)) {
       throw new Error('Devin session database schema is not supported');
     }
     for (const [table, expected] of Object.entries(requiredColumns)) {

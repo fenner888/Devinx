@@ -69,6 +69,25 @@ const COMPUTER = {
 };
 
 describe('authenticated mobile Computer Bridge client', () => {
+  it('accepts the expanded model catalog and still rejects oversized catalogs', async () => {
+    const options = (count: number) => ({
+      workspaces: [],
+      defaultModelId: 'model-0',
+      catalogSource: 'live',
+      models: Array.from({ length: count }, (_, index) => ({
+        id: `model-${index}`,
+        name: `Model ${index}`,
+        recent: false,
+        recommended: index === 0,
+      })),
+    });
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({ status: 200, body: options(385) });
+    expect((await getComputerCreateOptions(BRIDGE_ID)).models).toHaveLength(385);
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({ status: 200, body: options(1_001) });
+    await expect(getComputerCreateOptions(BRIDGE_ID)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Date, 'now').mockReturnValue(NOW);

@@ -234,21 +234,44 @@ function notify(options: PairComputerOptions, status: ComputerPairingStatus): vo
   }
 }
 
+export class ComputerPairingOfferError extends Error {
+  constructor(
+    readonly code: 'pairing_code_invalid' | 'pairing_version_incompatible' | 'pairing_code_expired',
+  ) {
+    super(
+      code === 'pairing_code_expired'
+        ? 'The pairing code has expired or has an invalid clock'
+        : code === 'pairing_version_incompatible'
+          ? 'The pairing code requires a compatible DevinX and Connector version'
+          : 'The pairing code is invalid',
+    );
+  }
+}
+
 function parseOffer(payload: string, now: number): ComputerPairingOffer {
   if (payload.length === 0 || payload.length > MAXIMUM_QR_BYTES) {
-    throw new Error('The pairing code is invalid');
+    throw new ComputerPairingOfferError('pairing_code_invalid');
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(payload);
   } catch {
-    throw new Error('The pairing code is invalid');
+    throw new ComputerPairingOfferError('pairing_code_invalid');
+  }
+  if (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    'protocolVersion' in parsed &&
+    typeof parsed.protocolVersion === 'number' &&
+    parsed.protocolVersion !== PROTOCOL_VERSION
+  ) {
+    throw new ComputerPairingOfferError('pairing_version_incompatible');
   }
   const result = computerPairingOfferSchema.safeParse(parsed);
-  if (!result.success) throw new Error('The pairing code is invalid');
+  if (!result.success) throw new ComputerPairingOfferError('pairing_code_invalid');
   const offer = result.data;
   if (offer.expiresAt <= now - 5_000 || offer.expiresAt > now + MAXIMUM_PAIRING_WINDOW_MS) {
-    throw new Error('The pairing code has expired or has an invalid clock');
+    throw new ComputerPairingOfferError('pairing_code_expired');
   }
   return offer;
 }
@@ -397,7 +420,8 @@ async function performComputerPairing(
       initialComputers = await removeRevokedComputerForFreshPairing(existingComputer, offer);
     }
   }
-  if (initialComputers.length >= 8) throw new Error('Remove a paired local device before adding another');
+  if (initialComputers.length >= 8)
+    throw new Error('Remove a paired local device before adding another');
 
   notify(options, 'creating_device_identity');
   const identity = await createDeviceIdentity();
