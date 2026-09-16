@@ -14,6 +14,9 @@ live release discovery.
 - Explain Windows updates through Microsoft Store on the PC, then reopen.
 - The Mac release banner must say installation is manual and use a clear
   download action. No auto-updater or installer behavior is added.
+- Always show Check for updates in Mac Connector, disable duplicate in-flight
+  checks, bypass cached release responses, and show success/failure feedback.
+  Preserve official-release URL and response validation.
 - Test rendering and links for legacy, compatible and unavailable Connectors,
   native copy and Swift compilation. Visual parity and new binaries remain
   release gates; existing published binaries are unchanged.

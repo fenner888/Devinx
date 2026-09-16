@@ -96,6 +96,8 @@ private final class ConnectorModel: ObservableObject {
     @Published var devices: [ConnectorDevice] = []
     @Published var showingUninstallConfirmation = false
     @Published var availableUpdate: ConnectorRelease?
+    @Published var isCheckingUpdate = false
+    @Published var updateCheckMessage: String?
 
     private let runtime = ConnectorProcessSupervisor()
     private var outputBuffer = Data()
@@ -127,9 +129,13 @@ private final class ConnectorModel: ObservableObject {
     }
 
     func checkForUpdate() {
+        guard !isCheckingUpdate else { return }
+        isCheckingUpdate = true
+        updateCheckMessage = nil
         let installedVersion = currentVersion
         var request = URLRequest(url: connectorReleaseApi)
         request.timeoutInterval = 10
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("DevinX-Connector/\(installedVersion)", forHTTPHeaderField: "User-Agent")
         URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
@@ -141,10 +147,22 @@ private final class ConnectorModel: ObservableObject {
                 let release = try? JSONDecoder().decode(ConnectorRelease.self, from: data),
                 let releaseVersion = Self.version(from: release.tagName),
                 let currentParts = Self.versionParts(installedVersion),
-                Self.isNewer(releaseVersion, than: currentParts),
                 Self.isOfficialReleaseUrl(release.htmlUrl)
-            else { return }
-            Task { @MainActor in self?.availableUpdate = release }
+            else {
+                Task { @MainActor in
+                    self?.isCheckingUpdate = false
+                    self?.updateCheckMessage = "Could not check for updates. Check your connection and try again."
+                }
+                return
+            }
+            let newer = Self.isNewer(releaseVersion, than: currentParts)
+            Task { @MainActor in
+                self?.isCheckingUpdate = false
+                self?.availableUpdate = newer ? release : nil
+                self?.updateCheckMessage = newer
+                    ? "An update is available. Download and install it on this Mac."
+                    : "You are up to date."
+            }
         }.resume()
     }
 
@@ -592,6 +610,24 @@ private struct ConnectorView: View {
                             detail: model.cliDetected ? "Detected securely" : "Not detected — pairing only",
                             available: model.cliDetected
                         )
+                    }
+                    .padding(6)
+                }
+
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Connector \(model.currentVersion)").font(.headline)
+                            Spacer()
+                            Button(model.isCheckingUpdate ? "Checking…" : "Check for updates") {
+                                model.checkForUpdate()
+                            }
+                            .disabled(model.isCheckingUpdate)
+                            .accessibilityLabel("Check for DevinX Connector updates")
+                        }
+                        if let message = model.updateCheckMessage {
+                            Text(message).font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                     .padding(6)
                 }
