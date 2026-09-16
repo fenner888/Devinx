@@ -73,3 +73,12 @@ now returns -32015 for a session already open in another process.
   contract; 100 KiB of ASCII previously exceeded it and rejected long histories.
 - Build, sign, notarize and install a new Connector before asking Mark to retest.
   iOS build 82 remains unchanged; no new phone build is needed for these changes.
+
+### Windows distribution follow-up
+
+Partner Center confirms the published Windows package is 0.1.7.0. Package the
+shared catalog and history compatibility corrections as Store version 0.1.8.0,
+retaining the existing identity, signing route and permissions. Windows CI must
+validate the bundled runtime, DPAPI helper, lifecycle and MSIX identity before
+upload. Store submission is not physical Windows acceptance; keep that gate
+explicit and do not describe the Mac checks as Windows end-to-end coverage.

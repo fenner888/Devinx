@@ -19,7 +19,7 @@
 <p align="center">
   <a href="https://github.com/fenner888/Devinx/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fenner888/Devinx/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <a href="https://testflight.apple.com/join/KBD25apN"><img alt="TestFlight Build 79" src="https://img.shields.io/badge/TestFlight-0.1.0%20(79)-0D96F6?logo=apple"></a>
+  <a href="https://testflight.apple.com/join/KBD25apN"><img alt="TestFlight Build 82" src="https://img.shields.io/badge/TestFlight-0.1.0%20(82)-0D96F6?logo=apple"></a>
 </p>
 
 > [!IMPORTANT]
@@ -32,10 +32,10 @@
 
 | Product                          | Current release     | Availability                                                                                      |
 | -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------- |
-| **DevinX for iPhone**            | `0.1.0 (79)`        | [External TestFlight beta](https://testflight.apple.com/join/KBD25apN) · up to 100 testers        |
+| **DevinX for iPhone**            | `0.1.0 (82)`        | Testing in Team (Expo) and [DevinX Early Access](https://testflight.apple.com/join/KBD25apN)        |
 | **Public App Store version**     | `1.0`               | Submitted to Apple and waiting for App Review · manual release after approval                     |
 | **DevinX Connector for macOS**   | `0.1.7`             | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
-| **DevinX Connector for Windows** | public test track   | Store-signed Windows 11 x64 package is live; physical acceptance remains before full support       |
+| **DevinX Connector for Windows** | `0.1.7.0` public test track | Store-signed Windows 11 x64 package is live; `0.1.8.0` compatibility update is being prepared, not yet submitted       |
 
 TestFlight access does not include a Devin account or shared Devin data. Each tester connects their
 own Devin organization, pairs a local device they control, or uses both.

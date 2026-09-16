@@ -119,3 +119,18 @@ Signed 0.1.8 rollback bundle retained. Fix pushed in commit d9578aa on PR #82.
 
 Public GitHub publication and physical iPhone session retest of 0.1.9 remain
 pending. No claim of full ACP desktop parity or Windows installed verification.
+
+## Distribution follow-through (September 15)
+
+- GitHub CI run 35031682107 passed on its rerun; its first attempt exited 139
+  in Node/Jest without an assertion failure. Local full regression also passed.
+  The intermittent process crash is not a proven fixed defect.
+- Build 82 is Testing in both Team (Expo) and DevinX Early Access, verified in
+  App Store Connect. Mark confirmed pairing; the 0.1.9 phone history/send
+  retest and required side-by-side parity evidence remain outstanding.
+- Partner Center live Submission 7 contains Windows package 0.1.7.0. The next
+  Store package is 0.1.8.0; it must pass Windows CI and package validation.
+- Mac 0.1.9 is signed, notarized and installed locally, not publicly released.
+  GitHub Latest remains 0.1.7. Updating source or creating a draft is not public
+  distribution. Existing Mac users must download/install the update; the
+  Connector only detects an update and opens GitHub, not automatic installation.
