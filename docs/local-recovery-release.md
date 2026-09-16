@@ -53,6 +53,9 @@ Archive with `IPHONEOS_DEPLOYMENT_TARGET=15.1` (the app's existing minimum),
 
 ## Evidence / pending
 
+This section records earlier checkpoints; see the final publication update below
+for current distribution state.
+
 - Baseline: 682/682 tests passed before changes.
 - Native QR: decode at 360px on white and black backgrounds; expiry, repeat,
   invalidation, restart and oversize checks passed.
@@ -122,6 +125,8 @@ pending. No claim of full ACP desktop parity or Windows installed verification.
 
 ## Distribution follow-through (September 15)
 
+The following bullets record the pre-publication checkpoint.
+
 - GitHub CI run 35031682107 passed on its rerun; its first attempt exited 139
   in Node/Jest without an assertion failure. Local full regression also passed.
   The intermittent process crash is not a proven fixed defect.
@@ -134,3 +139,22 @@ pending. No claim of full ACP desktop parity or Windows installed verification.
   GitHub Latest remains 0.1.7. Updating source or creating a draft is not public
   distribution. Existing Mac users must download/install the update; the
   Connector only detects an update and opens GitHub, not automatic installation.
+
+## Publication update (September 15, evening EDT)
+
+Mark reconfirmed that the phone history/send test had already succeeded and
+explicitly directed publication. Side-by-side parity screenshots remain
+unrecorded; this is a user-directed release exception, not a visual-test pass.
+
+- Mac Connector 0.1.9 is public and verified as GitHub Latest. The published
+  DMG digest matches the signed/notarized artifact recorded above.
+- Windows 0.1.8.0 passed build, runtime/DPAPI, installer lifecycle, MSIX identity
+  and dependency checks in Windows CI run 35039440059. Downloaded MSIX checksum:
+  `3af1cef35b7077ca81f0ed9a855ca5e6430760816d18c6295c9c03ffd967e83a`.
+- Partner Center accepted and saved the package in Submission 8, then showed
+  **Update in certification** after submission. This is not Store availability;
+  its current publishing setting requires Publish now after approval.
+- iPhone build 82 remains Testing in Team (Expo) and DevinX Early Access.
+- Existing Mac users must download/install the new Connector; no silent update
+  mechanism was added. Physical Windows acceptance and full ACP parity are not
+  established by this release.

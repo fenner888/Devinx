@@ -82,3 +82,10 @@ retaining the existing identity, signing route and permissions. Windows CI must
 validate the bundled runtime, DPAPI helper, lifecycle and MSIX identity before
 upload. Store submission is not physical Windows acceptance; keep that gate
 explicit and do not describe the Mac checks as Windows end-to-end coverage.
+
+### Publication decision
+
+Mark reconfirmed the iPhone history/send result and explicitly requested push
+after being informed that parity screenshots were still unrecorded. Record that
+release exception without claiming visual QA was completed. Mac 0.1.9 is public
+Latest; Windows 0.1.8.0 is submitted for certification, not yet public.

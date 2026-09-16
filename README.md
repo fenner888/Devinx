@@ -34,8 +34,8 @@
 | -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------- |
 | **DevinX for iPhone**            | `0.1.0 (82)`        | Testing in Team (Expo) and [DevinX Early Access](https://testflight.apple.com/join/KBD25apN)        |
 | **Public App Store version**     | `1.0`               | Submitted to Apple and waiting for App Review · manual release after approval                     |
-| **DevinX Connector for macOS**   | `0.1.7`             | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
-| **DevinX Connector for Windows** | `0.1.7.0` public test track | Store-signed Windows 11 x64 package is live; `0.1.8.0` compatibility update is being prepared, not yet submitted       |
+| **DevinX Connector for macOS**   | `0.1.9`             | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
+| **DevinX Connector for Windows** | `0.1.7.0` live; `0.1.8.0` in certification | Windows 11 x64 compatibility update submitted to Microsoft; publication follows approval       |
 
 TestFlight access does not include a Devin account or shared Devin data. Each tester connects their
 own Devin organization, pairs a local device they control, or uses both.
