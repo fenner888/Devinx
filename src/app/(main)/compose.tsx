@@ -38,9 +38,10 @@ import type { DevinMode, SessionSecretInput } from '@api/devin/types';
 import { useTheme } from '@theme/index';
 import { rememberSessionMode, rememberSessionRepository } from '@lib/session-repository';
 import { COMPOSE_DRAFT_KEY } from '@lib/localUserData';
-import { useAppPreferences } from '@store/preferences';
+import { useAppPreferences, type CloudLaunchProfile } from '@store/preferences';
 import { userFacingError } from '@lib/user-facing-error';
 import { repositoryIndexPresentation } from '@lib/repository-indexing';
+import { reconcileCloudResourceSelection } from '@lib/launch-profile';
 import {
   normalizeSessionSecrets,
   parseSessionLinks,
@@ -91,14 +92,24 @@ const emptyDraft: Draft = {
 export default function ComposeScreen() {
   const router = useRouter();
   const createSession = useCreateSession();
-  const { data: playbooks, isLoading: playbooksLoading } = usePlaybooks();
-  const { data: knowledge } = useKnowledge();
-  const { data: secrets } = useSecrets();
-  const { data: repositories } = useRepositories();
+  const playbooksQuery = usePlaybooks();
+  const knowledgeQuery = useKnowledge();
+  const secretsQuery = useSecrets();
+  const repositoriesQuery = useRepositories();
+  const { data: playbooks, isLoading: playbooksLoading } = playbooksQuery;
+  const { data: knowledge } = knowledgeQuery;
+  const { data: secrets } = secretsQuery;
+  const { data: repositories } = repositoriesQuery;
   const uploadAttachment = useUploadAttachment();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
   const defaultTags = useAppPreferences((state) => state.defaultTags);
+  const launchProfiles = useAppPreferences((state) => state.launchProfiles);
+  const activeLaunchProfileId = useAppPreferences((state) => state.activeLaunchProfileId);
+  const upsertLaunchProfile = useAppPreferences((state) => state.upsertLaunchProfile);
+  const setActiveLaunchProfile = useAppPreferences((state) => state.setActiveLaunchProfile);
+  const activeLaunchProfile =
+    launchProfiles.find((profile) => profile.id === activeLaunchProfileId) ?? null;
 
   const [attachments, setAttachments] = useState<
     { name: string; url: string; previewUri?: string }[]
@@ -110,6 +121,8 @@ export default function ComposeScreen() {
   const [showKnowledgePicker, setShowKnowledgePicker] = useState(false);
   const [showSecretsPicker, setShowSecretsPicker] = useState(false);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
+  const [showSaveProfile, setShowSaveProfile] = useState(false);
+  const [profileName, setProfileName] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [tagInput, setTagInput] = useState('');
   // Session-secret values deliberately never enter the persisted Draft. They
@@ -117,6 +130,11 @@ export default function ComposeScreen() {
   const [sessionSecrets, setSessionSecrets] = useState<TransientSessionSecret[]>([]);
   const sessionSecretSequence = useRef(0);
   const defaultTagsRef = useRef(defaultTags);
+  const activeLaunchProfileRef = useRef(activeLaunchProfile);
+
+  useEffect(() => {
+    activeLaunchProfileRef.current = activeLaunchProfile;
+  }, [activeLaunchProfile]);
 
   // Load draft from AsyncStorage on mount.
   useEffect(() => {
@@ -129,7 +147,21 @@ export default function ComposeScreen() {
             // ignore corrupt draft
           }
         } else {
-          setDraft({ ...emptyDraft, tags: defaultTagsRef.current });
+          const profile = activeLaunchProfileRef.current;
+          setDraft(
+            profile
+              ? {
+                  ...emptyDraft,
+                  repos: profile.repositoryPaths,
+                  playbookId: profile.playbookId ?? null,
+                  knowledgeIds: profile.knowledgeIds,
+                  secretIds: profile.secretIds,
+                  mode: profile.mode,
+                  tags: profile.tags,
+                  maxAcuLimit: profile.maxAcuLimit ? String(profile.maxAcuLimit) : '',
+                }
+              : { ...emptyDraft, tags: defaultTagsRef.current },
+          );
         }
       })
       .finally(() => setLoaded(true));
@@ -145,6 +177,48 @@ export default function ComposeScreen() {
     }, 500);
     return () => clearTimeout(id);
   }, [draft, loaded]);
+
+  // A device-local profile can outlive the Cloud resources it references.
+  // Reconcile only after each corresponding catalog has loaded successfully;
+  // a pending or failed request must never erase a valid selection.
+  useEffect(() => {
+    if (!loaded) return;
+    setDraft((current) => {
+      const reconciled = reconcileCloudResourceSelection(current, {
+        repositoryPaths: repositoriesQuery.isSuccess
+          ? (repositories ?? []).map((repository) => repository.repo_path)
+          : undefined,
+        playbookIds: playbooksQuery.isSuccess
+          ? (playbooks ?? []).map((playbook) => playbook.playbook_id)
+          : undefined,
+        knowledgeIds: knowledgeQuery.isSuccess
+          ? (knowledge ?? []).map((note) => note.note_id)
+          : undefined,
+        secretIds: secretsQuery.isSuccess
+          ? (secrets ?? []).map((secret) => secret.secret_id)
+          : undefined,
+      });
+      if (
+        reconciled.playbookId === current.playbookId &&
+        reconciled.repos.length === current.repos.length &&
+        reconciled.knowledgeIds.length === current.knowledgeIds.length &&
+        reconciled.secretIds.length === current.secretIds.length
+      ) {
+        return current;
+      }
+      return { ...current, ...reconciled };
+    });
+  }, [
+    knowledge,
+    knowledgeQuery.isSuccess,
+    loaded,
+    playbooks,
+    playbooksQuery.isSuccess,
+    repositories,
+    repositoriesQuery.isSuccess,
+    secrets,
+    secretsQuery.isSuccess,
+  ]);
 
   const canSubmit =
     draft.prompt.trim().length > 0 && !createSession.isPending && !uploadAttachment.isPending;
@@ -235,6 +309,31 @@ export default function ComposeScreen() {
 
   function removeSessionSecret(id: number) {
     setSessionSecrets((current) => current.filter((secret) => secret.id !== id));
+  }
+
+  function saveLaunchProfile() {
+    const name = profileName.trim().slice(0, 80);
+    if (!name) return;
+    const now = Date.now();
+    const acuLimit = Number(draft.maxAcuLimit);
+    const profile: CloudLaunchProfile = {
+      id: `cloud-${now.toString(36)}-${launchProfiles.length}`,
+      name,
+      target: 'cloud',
+      repositoryPaths: draft.repos,
+      mode: draft.mode,
+      playbookId: draft.playbookId ?? undefined,
+      knowledgeIds: draft.knowledgeIds,
+      secretIds: draft.secretIds,
+      tags: draft.tags,
+      maxAcuLimit: Number.isInteger(acuLimit) && acuLimit > 0 ? acuLimit : undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    upsertLaunchProfile(profile);
+    setActiveLaunchProfile(profile.id);
+    setProfileName('');
+    setShowSaveProfile(false);
   }
 
   async function handleSubmit() {
@@ -357,6 +456,24 @@ export default function ComposeScreen() {
               checkColor={tokens.brandText.hex}
               mutedColor={tokens.textLow.hex}
             />
+            <View className="border-t border-border-subtle mt-2 pt-2 pb-1 flex-row items-center">
+              <View className="flex-1 mr-3">
+                <Text className="text-text-hi text-text13 font-medium">
+                  {activeLaunchProfile ? activeLaunchProfile.name : 'No active launch profile'}
+                </Text>
+                <Text className="text-text-low text-text11 mt-0.5">
+                  Profiles save these Cloud defaults on this device only.
+                </Text>
+              </View>
+              <Pressable
+                className="bg-tint-secondary rounded-button px-3 py-2"
+                onPress={() => setShowSaveProfile(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Save current Cloud settings as a launch profile"
+              >
+                <Text className="text-brand-text text-text12 font-medium">Save profile</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* Repository picker */}
@@ -695,6 +812,62 @@ export default function ComposeScreen() {
         onClose={() => setShowAttachmentPicker(false)}
         onPick={handleAttachment}
       />
+
+      <Modal
+        statusBarTranslucent
+        visible={showSaveProfile}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowSaveProfile(false)}
+      >
+        <KeyboardAvoidingView
+          className="flex-1 bg-scrim justify-center px-5"
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View className="bg-surface1 rounded-card border border-border-subtle px-5 py-5">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-text-hi text-text17">Save launch profile</Text>
+              <Pressable
+                className="w-9 h-9 items-center justify-center"
+                onPress={() => setShowSaveProfile(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close save launch profile"
+              >
+                <Ionicons name="close" size={18} color={tokens.textMid.hex} />
+              </Pressable>
+            </View>
+            <Text className="text-text-low text-text12 mb-2">Profile name</Text>
+            <TextInput
+              className="bg-surface2 rounded-input px-3 py-3 text-text14 text-text-hi"
+              value={profileName}
+              onChangeText={(value) => setProfileName(value.slice(0, 80))}
+              placeholder="For example: Mobile release review"
+              placeholderTextColor={tokens.textLow.hex}
+              maxLength={80}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={saveLaunchProfile}
+            />
+            <Text className="text-text-low text-text11 mt-3 leading-4">
+              Saves selected repositories, mode, resource IDs, tags, and ACU limit. Prompt text,
+              credentials, and per-session secret values are never included.
+            </Text>
+            <Pressable
+              className={`rounded-button py-3 items-center mt-5 ${profileName.trim() ? 'bg-brand' : 'bg-tint-secondary'}`}
+              disabled={!profileName.trim()}
+              onPress={saveLaunchProfile}
+              accessibilityRole="button"
+              accessibilityLabel="Save launch profile"
+            >
+              <Text
+                className={`text-text14 font-medium ${profileName.trim() ? 'text-text-always-white' : 'text-text-low'}`}
+              >
+                Save profile
+              </Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Repository picker modal */}
       <Modal

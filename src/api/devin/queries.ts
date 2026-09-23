@@ -88,8 +88,8 @@ function isActiveStatus(status: SessionResponse['status'] | undefined): boolean 
   return status === 'running' || status === 'new' || status === 'claimed' || status === 'resuming';
 }
 
-export function useSessions(screen: ScreenContext = 'board') {
-  const { provider, isAuthenticated } = useAuth();
+export function useSessions(screen: ScreenContext = 'board', forceEnabled = false) {
+  const { provider, isAuthenticated, hasCloudCredentials } = useAuth();
 
   return useQuery({
     queryKey: queryKeys.sessions,
@@ -129,7 +129,7 @@ export function useSessions(screen: ScreenContext = 'board') {
         throw e;
       }
     },
-    enabled: isAuthenticated && !!provider,
+    enabled: (forceEnabled ? hasCloudCredentials : isAuthenticated) && !!provider,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     gcTime: 5 * 60_000,

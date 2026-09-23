@@ -214,10 +214,10 @@ export async function loadComputerSessionWithRecovery(
   }
 }
 
-export function useComputerSessions() {
+export function useComputerSessions(forceEnabled = false) {
   const queryClient = useQueryClient();
   const { mode, computers } = useConnections();
-  const enabled = connectionModeUsesComputer(mode) && computers.length > 0;
+  const enabled = (forceEnabled || connectionModeUsesComputer(mode)) && computers.length > 0;
   const bridgeIds = computers.map((computer) => computer.bridgeId).sort();
   const queryKey = ['computerSessions', ...bridgeIds] as const;
 

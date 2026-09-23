@@ -21,6 +21,10 @@ export default function MainGroup() {
       <Stack.Screen name="playbooks" />
       <Stack.Screen name="secrets" />
       <Stack.Screen name="review" />
+      <Stack.Screen name="action-center" />
+      <Stack.Screen name="launch-profiles" />
+      <Stack.Screen name="environment" />
+      <Stack.Screen name="computer-profile/[bridgeId]" />
       <Stack.Screen name="privacy" />
     </Stack>
   );
