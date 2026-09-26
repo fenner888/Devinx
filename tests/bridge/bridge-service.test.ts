@@ -21,6 +21,7 @@ import {
   type BridgePermission,
   type DeviceRecord,
   type SignedRequestEnvelope,
+  sessionListBodySchema,
 } from '../../bridge/src/schemas';
 
 const NOW = 1_800_000_000_000;
@@ -118,7 +119,7 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     return this.supported;
   }
 
-  async listSessions(): Promise<AcpSessionPage> {
+  async listSessions(_input?: unknown): Promise<AcpSessionPage> {
     this.calls += 1;
     if (this.failure) throw this.failure;
     if (this.pending) return this.pending;
@@ -926,6 +927,61 @@ describe('authenticated Desktop Bridge service', () => {
     await expect(
       bridge.handle(envelope('session.load', { sessionId: handle }, permissions), context()),
     ).resolves.toEqual({ status: 429, body: { error: 'rate_limited' } });
+  });
+
+  it('limits session listings separately from cursor continuation pages', async () => {
+    const pages = new Map<string | undefined, AcpSessionPage>([
+      [undefined, { sessions: adapter.page.sessions, nextCursor: 'cursor-one' }],
+      ['cursor-one', { sessions: adapter.page.sessions, nextCursor: 'cursor-two' }],
+      ['cursor-two', { sessions: adapter.page.sessions }],
+    ]);
+    adapter.listSessions = async (input?: unknown) => {
+      adapter.calls += 1;
+      const cursor = sessionListBodySchema.parse(input).cursor;
+      const page = pages.get(cursor);
+      if (!page) throw new Error('Unexpected session list cursor.');
+      return page;
+    };
+    const bridge = service({ sessionListLimit: 2, windowMs: 60_000 });
+    const listThreePages = async () => {
+      const statuses: number[] = [];
+      let cursor: string | undefined;
+      for (let pageIndex = 0; pageIndex < 3; pageIndex += 1) {
+        const result = await bridge.handle(
+          envelope('session.list', cursor ? { cursor } : {}),
+          context(),
+        );
+        statuses.push(result.status);
+        cursor = (result.body as { nextCursor?: string }).nextCursor;
+      }
+      return { statuses, cursor };
+    };
+
+    const firstListing = await listThreePages();
+    const secondListing = await listThreePages();
+
+    expect(firstListing).toEqual({ statuses: [200, 200, 200], cursor: undefined });
+    expect(secondListing).toEqual({ statuses: [200, 200, 200], cursor: undefined });
+    await expect(
+      bridge.handle(envelope('session.list', {}), context()),
+    ).resolves.toEqual({ status: 429, body: { error: 'rate_limited' } });
+    expect(adapter.calls).toBe(6);
+  });
+
+  it('rate-limits continuation pages separately while allowing a first page', async () => {
+    const bridge = service({ sessionListContinuationLimit: 2, windowMs: 60_000 });
+    const continuation = () =>
+      bridge.handle(envelope('session.list', { cursor: 'opaque-cursor' }), context());
+
+    await expect(continuation()).resolves.toMatchObject({ status: 200 });
+    await expect(continuation()).resolves.toMatchObject({ status: 200 });
+    await expect(continuation()).resolves.toEqual({
+      status: 429,
+      body: { error: 'rate_limited' },
+    });
+    await expect(bridge.handle(envelope('session.list', {}), context())).resolves.toMatchObject({
+      status: 200,
+    });
   });
 
   it('rate-limits malformed requests by transport peer before authentication', async () => {

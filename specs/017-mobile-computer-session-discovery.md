@@ -35,6 +35,8 @@ Discovery is bounded to:
 
 A malformed sequence fails that computer closed. An unavailable Mac does not hide valid results from another paired Mac. Computer session query data is memory-only in TanStack Query and is not written into the Cloud SQLite cache or AsyncStorage.
 
+Busy or rate-limited discovery keeps that Mac's last session list and shows an explicit busy notice, distinct from the offline notice.
+
 ## Privacy-preserving presentation
 
 Default pairing grants `session:metadata:read`, not `session:content:read`. The mobile row therefore accepts and displays only:

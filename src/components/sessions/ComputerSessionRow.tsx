@@ -88,6 +88,9 @@ function discoveryMessage(status: ComputerDiscoveryStatus): string | null {
   if (status.state === 'invalid_response') {
     return `${status.computerName} returned an incompatible session response.`;
   }
+  if (status.state === 'busy') {
+    return `${status.computerName} is busy. Showing the last session list — pull to refresh again in a moment.`;
+  }
   return `${status.computerName} is offline or DevinX Connector is not running.`;
 }
 

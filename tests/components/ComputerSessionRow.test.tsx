@@ -89,4 +89,21 @@ describe('Computer session presentation', () => {
     expect(screen.getByText(/Pairing Mac is paired/)).toBeTruthy();
     expect(screen.getByText(/Offline Mac is offline/)).toBeTruthy();
   });
+
+  it('shows a distinct busy notice instead of the offline notice', () => {
+    const screen = render(
+      <ComputerDiscoveryNotices
+        computers={[
+          { bridgeId: 'bridge_1234567890', computerName: 'Busy Mac', state: 'busy' },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        'Busy Mac is busy. Showing the last session list — pull to refresh again in a moment.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Busy Mac is offline/)).toBeNull();
+  });
 });

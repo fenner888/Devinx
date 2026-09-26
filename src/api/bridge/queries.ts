@@ -31,7 +31,12 @@ export interface ComputerSessionListItem extends ComputerSessionSummary {
 }
 
 export type ComputerDiscoveryState =
-  'ready' | 'session_discovery_off' | 'authorization_failed' | 'unavailable' | 'invalid_response';
+  | 'ready'
+  | 'session_discovery_off'
+  | 'authorization_failed'
+  | 'unavailable'
+  | 'invalid_response'
+  | 'busy';
 
 export interface ComputerDiscoveryStatus {
   bridgeId: string;
@@ -54,6 +59,7 @@ function stateForError(error: unknown): ComputerDiscoveryState {
     return 'authorization_failed';
   }
   if (error.code === 'invalid_response') return 'invalid_response';
+  if (error.code === 'busy' || error.code === 'rate_limited') return 'busy';
   return 'unavailable';
 }
 
@@ -172,7 +178,9 @@ export async function loadComputerSessionBoard(
     }),
   );
   const sessions = results.flatMap((result) => {
-    if (result.status.state !== 'unavailable') return result.sessions;
+    if (result.status.state !== 'unavailable' && result.status.state !== 'busy') {
+      return result.sessions;
+    }
     return (
       previousBoard?.sessions.filter((session) => session.bridgeId === result.status.bridgeId) ?? []
     );
