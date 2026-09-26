@@ -8,6 +8,8 @@ const mockCompanionProps = jest.fn();
 const mockAnswerMutate = jest.fn();
 const mockRefreshComputerCreateOptions = jest.fn(async () => undefined);
 const mockReact = React;
+const mockGetQueriesData = jest.fn();
+let mockSessionWorkspaceName: string | undefined = 'DevinX';
 let mockPromptError: Error | null = null;
 let mockSessionElicitationSupported = true;
 let mockSessionActivity:
@@ -24,6 +26,10 @@ let mockInteraction: {
   }>;
   createdAt: number;
 } | null = null;
+
+jest.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ getQueriesData: mockGetQueriesData }),
+}));
 
 jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) =>
@@ -62,7 +68,7 @@ jest.mock('../../src/api/bridge/queries', () => ({
       session: {
         id: `local_${'L'.repeat(43)}`,
         origin: 'computer',
-        workspaceName: 'DevinX',
+        workspaceName: mockSessionWorkspaceName,
         model: { id: 'swe-1.7-high', name: 'SWE-1.7 High' },
       },
       messages: [{ sequence: 1, source: 'devin', text: 'Ready.' }],
@@ -167,10 +173,44 @@ import { ComputerBridgeError } from '../../src/auth/computerBridge';
 describe('Computer session detail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetQueriesData.mockReturnValue([]);
+    mockSessionWorkspaceName = 'DevinX';
     mockPromptError = null;
     mockSessionElicitationSupported = true;
     mockSessionActivity = undefined;
     mockInteraction = null;
+  });
+
+  it('uses the cached list title with the workspace as a subtitle', () => {
+    mockSessionWorkspaceName = undefined;
+    mockGetQueriesData.mockReturnValue([
+      [
+        ['computerSessions', 'board'],
+        {
+          sessions: [
+            {
+              id: `local_${'L'.repeat(43)}`,
+              bridgeId: 'bridge_1234567890',
+              title: 'Review the release branch',
+              workspaceName: 'Workspace from list',
+            },
+          ],
+        },
+      ],
+    ]);
+
+    const screen = render(<ComputerSessionDetailScreen />);
+
+    expect(screen.getByText('Review the release branch')).toBeTruthy();
+    expect(screen.getByText('Workspace from list')).toBeTruthy();
+  });
+
+  it('falls back to the loaded workspace name without adding a subtitle when the list is uncached', () => {
+    mockSessionWorkspaceName = 'Loaded workspace';
+    const screen = render(<ComputerSessionDetailScreen />);
+
+    expect(screen.getAllByText('Loaded workspace').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Workspace from list')).toBeNull();
   });
 
   it('renders and submits a structured Devin question without using the chat composer', () => {

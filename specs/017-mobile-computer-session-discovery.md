@@ -28,14 +28,18 @@ Each foreground discovery cycle first requests authenticated `bridge.health` for
 Discovery is bounded to:
 
 - eight paired computers from the credential registry;
-- five pages per computer;
+- five pages per computer (50 ACP sessions per page, for a displayed limit of 250);
 - 5,000 sessions per computer;
 - unique session handles and non-repeating cursors; and
 - one 30-second foreground refresh cadence, plus focus/reconnect refresh.
 
-A malformed sequence fails that computer closed. An unavailable Mac does not hide valid results from another paired Mac. Computer session query data is memory-only in TanStack Query and is not written into the Cloud SQLite cache or AsyncStorage.
+A five-page response that still has a continuation cursor produces the `too_many_sessions` state and fails that computer closed: no partial pages or previous sessions are shown. The page bound and paging behavior are unchanged. A malformed sequence also fails that computer closed. An unavailable Mac does not hide valid results from another paired Mac. Computer session query data is memory-only in TanStack Query and is not written into the Cloud SQLite cache or AsyncStorage.
 
-Busy or rate-limited discovery keeps that Mac's last session list and shows an explicit busy notice, distinct from the offline notice.
+Busy or rate-limited discovery keeps that Mac's last session list and shows an explicit busy notice, distinct from the offline notice. A `too_many_sessions` notice says: “{computerName} has more sessions than DevinX can list right now (250). Newer sessions may be missing.”
+
+The Sessions screen freshness line is “Local list updated {relative time} · refreshes every 30s”. `lastSuccessfulAt` advances only when every paired computer is `ready` or `session_discovery_off`; otherwise it preserves the previous successful timestamp. An empty computer registry has no timestamp. The line re-renders every 15 seconds so the relative time stays current without changing the existing “just now” wording.
+
+In Computer-only mode, if there are no unfiltered sessions, at least one paired computer exists, and every computer is non-ready, the empty state is titled “Local sessions unavailable” with “Fix the connection above, then pull down to refresh.” When a local-only search has no matches, its empty copy is “No sessions match your search.” Cloud search retains “No sessions match your search or tag filters.”
 
 ## Privacy-preserving presentation
 
@@ -47,11 +51,11 @@ Default pairing grants `session:metadata:read`, not `session:content:read`. The 
 - optional update time; and
 - the locally assigned Mac name.
 
-The row says **Session title hidden** when the bridge reports title presence without title content. A title is rendered only if a future explicit content grant causes the validated bridge response to include it. Raw ACP session IDs, full paths, extra directories, `_meta`, and unknown fields never reach the component.
+The row says **Session title hidden** when the bridge reports title presence without title content. A title is rendered only if a future explicit content grant causes the validated bridge response to include it. Non-compact session rows can display a title on two lines; compact rows remain one line. On the Sessions screen, a single paired Mac's visible row omits the computer name and its separator, while the accessibility label still includes “on {computerName}”; with multiple Macs, the visible computer name remains. Home row usage is unchanged. Raw ACP session IDs, full paths, extra directories, `_meta`, and unknown fields never reach the component.
 
 Computer-only Home disables the Cloud composer and explains that a new local task starts from Devin CLI or desktop. In Cloud + Computer mode, Home Recent follows the active composer destination: Cloud shows Cloud sessions and Computer shows sessions from the selected Mac. The full Sessions screen remains the combined cross-origin view and searches Mac name, workspace, and an authorized title; Cloud tag filters do not pretend that local sessions have Cloud tags. Spec 032 supersedes the earlier merged Home Recent behavior.
 
-Local rows are intentionally not tappable in this phase. Opening one before `session.load` has a separately authorized, minimized, tested handler would create a misleading or insecure interaction.
+When a local session detail screen is available under its existing authorization gate, its header prefers the title from the cached session-list item. If that cached title is used, the workspace name appears directly below it as a subtitle, preferring the loaded session detail and falling back to the cached list item. Without a cached list title, the header falls back to the loaded workspace name or “Local session” and does not show a workspace subtitle.
 
 ## Validation
 

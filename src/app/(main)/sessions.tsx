@@ -23,6 +23,7 @@ import { useComputerSessions, type ComputerSessionListItem } from '@api/bridge/q
 import { BoardSkeleton, EmptyState, ErrorState } from '@components/Skeletons';
 import {
   ComputerDiscoveryNotices,
+  ComputerListFreshness,
   ComputerSessionRow,
 } from '@components/sessions/ComputerSessionRow';
 import { useConnections } from '@auth/ConnectionContext';
@@ -125,6 +126,12 @@ export default function SessionsScreen() {
   const hasUnfilteredSessions =
     (usesCloud && (cloudQuery.data?.length ?? 0) > 0) ||
     (usesComputer && (computerQuery.data?.sessions.length ?? 0) > 0);
+  const localBlocked =
+    usesComputer &&
+    !usesCloud &&
+    !hasUnfilteredSessions &&
+    (computerQuery.data?.computers ?? []).length > 0 &&
+    (computerQuery.data?.computers ?? []).every((computer) => computer.state !== 'ready');
 
   const refreshAll = useCallback(() => {
     const refreshes: Promise<unknown>[] = [];
@@ -282,6 +289,9 @@ export default function SessionsScreen() {
         sections.length === 0 && (
           <View className="flex-1 px-5">
             <ComputerDiscoveryNotices computers={computerQuery.data?.computers ?? []} />
+            <ComputerListFreshness
+              lastSuccessfulAt={usesComputer ? computerQuery.data?.lastSuccessfulAt : undefined}
+            />
             {usesCloud && usesComputer && cloudQuery.error && (
               <View className="rounded-card border border-border-subtle bg-surface1 px-3 py-2.5 mb-2">
                 <Text className="text-text-mid text-text12">
@@ -291,13 +301,23 @@ export default function SessionsScreen() {
             )}
             <EmptyState
               icon=">_"
-              title={hasUnfilteredSessions ? 'No matches' : 'No sessions yet'}
+              title={
+                localBlocked
+                  ? 'Local sessions unavailable'
+                  : hasUnfilteredSessions
+                    ? 'No matches'
+                    : 'No sessions yet'
+              }
               message={
-                hasUnfilteredSessions
-                  ? 'No sessions match your search or tag filters.'
-                  : usesComputer && !usesCloud
-                    ? 'Start or resume a session on your paired local device.'
-                    : 'Start a new session from Home.'
+                localBlocked
+                  ? 'Fix the connection above, then pull down to refresh.'
+                  : hasUnfilteredSessions
+                    ? usesCloud
+                      ? 'No sessions match your search or tag filters.'
+                      : 'No sessions match your search.'
+                    : usesComputer && !usesCloud
+                      ? 'Start or resume a session on your paired local device.'
+                      : 'Start a new session from Home.'
               }
             />
           </View>
@@ -316,6 +336,9 @@ export default function SessionsScreen() {
           ListHeaderComponent={
             <View>
               <ComputerDiscoveryNotices computers={computerQuery.data?.computers ?? []} />
+              <ComputerListFreshness
+                lastSuccessfulAt={usesComputer ? computerQuery.data?.lastSuccessfulAt : undefined}
+              />
               {usesCloud && cloudQuery.error && (
                 <View className="rounded-card border border-border-subtle bg-surface1 px-3 py-2.5 mb-2">
                   <Text className="text-text-mid text-text12">
@@ -339,6 +362,7 @@ export default function SessionsScreen() {
             item.kind === 'computer' ? (
               <ComputerSessionRow
                 session={item.session}
+                showComputerName={(computerQuery.data?.computers.length ?? 0) > 1}
                 onPress={
                   item.session.canLoad
                     ? () =>

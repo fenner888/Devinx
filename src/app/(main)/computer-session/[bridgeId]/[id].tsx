@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 
 import {
   useComputerBridgeFeatures,
@@ -27,6 +28,7 @@ import {
   usePromptComputerSession,
   useRespondComputerSessionElicitation,
 } from '@api/bridge/queries';
+import type { ComputerSessionBoard } from '@api/bridge/queries';
 import { ComputerBridgeError, type ComputerLoadedSession } from '@auth/computerBridge';
 import { useConnections } from '@auth/ConnectionContext';
 import { computerTransportLabel } from '@auth/pairedComputers';
@@ -187,6 +189,15 @@ export default function ComputerSessionDetailScreen() {
   );
   const mayReadContent = validParameters && Boolean(access.data?.capabilities.sessionLoad);
   const query = useComputerSessionDetail(bridgeId, sessionId, mayReadContent);
+  const queryClient = useQueryClient();
+  const listItem = queryClient
+    .getQueriesData<ComputerSessionBoard>({ queryKey: ['computerSessions'] })
+    .flatMap(([, board]) => board?.sessions ?? [])
+    .find((session) => session.bridgeId === bridgeId && session.id === sessionId);
+  const workspaceSubtitle =
+    listItem?.title !== undefined
+      ? (query.data?.session.workspaceName ?? listItem.workspaceName)
+      : undefined;
   const sessionActivity = useComputerSessionActivity(bridgeId, sessionId, mayReadContent);
   const prompt = usePromptComputerSession(bridgeId, sessionId);
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
@@ -415,8 +426,13 @@ export default function ComputerSessionDetailScreen() {
         <BackButton onPress={() => router.back()} />
         <View className="flex-1 min-w-0">
           <Text className="text-text-hi text-text16" numberOfLines={1}>
-            {query.data?.session.workspaceName ?? 'Local session'}
+            {listItem?.title ?? query.data?.session.workspaceName ?? 'Local session'}
           </Text>
+          {listItem?.title !== undefined && workspaceSubtitle ? (
+            <Text className="text-text-low text-text12" numberOfLines={1}>
+              {workspaceSubtitle}
+            </Text>
+          ) : null}
           <View className="mt-0.5 flex-row items-center">
             <Ionicons name="desktop-outline" size={12} color={tokens.brandText.hex} />
             <Text className="ml-1.5 text-brand-text text-text12" numberOfLines={1}>

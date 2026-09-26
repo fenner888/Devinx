@@ -1,6 +1,7 @@
 const mockGetComputerBridgeHealth = jest.fn();
 const mockListComputerSessions = jest.fn();
 const mockLoadComputerSession = jest.fn();
+let mockOpenComputerBridgesError: unknown;
 
 jest.mock('../../src/auth/computerBridge', () => {
   class MockComputerBridgeError extends Error {
@@ -13,8 +14,9 @@ jest.mock('../../src/auth/computerBridge', () => {
   }
   return {
     ComputerBridgeError: MockComputerBridgeError,
-    openComputerBridges: async (bridgeIds: string[]) =>
-      new Map(
+    openComputerBridges: async (bridgeIds: string[]) => {
+      if (mockOpenComputerBridgesError !== undefined) throw mockOpenComputerBridgesError;
+      return new Map(
         bridgeIds.map((bridgeId) => [
           bridgeId,
           {
@@ -24,7 +26,8 @@ jest.mock('../../src/auth/computerBridge', () => {
             loadSession: (sessionId: string) => mockLoadComputerSession(bridgeId, sessionId),
           },
         ]),
-      ),
+      );
+    },
   };
 });
 
@@ -67,6 +70,7 @@ function session(idCharacter: string, updatedAt: string) {
 describe('Computer session board query', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockOpenComputerBridgesError = undefined;
     mockGetComputerBridgeHealth.mockResolvedValue({
       protocolVersion: 2,
       status: 'ready',
@@ -78,7 +82,18 @@ describe('Computer session board query', () => {
     });
   });
 
+  afterEach(() => jest.restoreAllMocks());
+
+  it('returns no freshness timestamp when there are no computers', async () => {
+    await expect(loadComputerSessionBoard([])).resolves.toEqual({
+      sessions: [],
+      computers: [],
+    });
+  });
+
   it('checks health, follows bounded cursors, labels origin, and sorts across Macs', async () => {
+    const lastSuccessfulAt = 1_800_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(lastSuccessfulAt);
     mockListComputerSessions.mockImplementation(
       async (bridgeId: string, input: { cursor?: string }) => {
         if (bridgeId === FIRST.bridgeId && !input.cursor) {
@@ -116,6 +131,7 @@ describe('Computer session board query', () => {
       { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'ready' },
       { bridgeId: SECOND.bridgeId, computerName: SECOND.computerName, state: 'ready' },
     ]);
+    expect(result.lastSuccessfulAt).toBe(lastSuccessfulAt);
   });
 
   it('uses the authenticated Mac capability instead of a stale cached grant', async () => {
@@ -145,6 +161,8 @@ describe('Computer session board query', () => {
   });
 
   it('reports pairing-only bridges without requesting a session list', async () => {
+    const lastSuccessfulAt = 1_800_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(lastSuccessfulAt);
     mockGetComputerBridgeHealth.mockResolvedValue({
       protocolVersion: 2,
       status: 'ready',
@@ -164,6 +182,7 @@ describe('Computer session board query', () => {
           state: 'session_discovery_off',
         },
       ],
+      lastSuccessfulAt,
     });
     expect(mockListComputerSessions).not.toHaveBeenCalled();
   });
@@ -198,10 +217,12 @@ describe('Computer session board query', () => {
   });
 
   it('retains the last verified sessions during a transient bridge outage', async () => {
+    const dateNow = jest.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
     mockListComputerSessions.mockResolvedValue({
       sessions: [session('A', '2027-01-15T10:00:00.000Z')],
     });
     const previous = await loadComputerSessionBoard([FIRST]);
+    dateNow.mockReturnValue(1_800_000_000_001);
     mockGetComputerBridgeHealth.mockRejectedValueOnce(
       new ComputerBridgeError('private transport detail', 'unavailable'),
     );
@@ -212,15 +233,36 @@ describe('Computer session board query', () => {
     expect(result.computers).toEqual([
       { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'unavailable' },
     ]);
+    expect(result.lastSuccessfulAt).toBe(previous.lastSuccessfulAt);
+  });
+
+  it('preserves the previous timestamp when opening computer bridges fails', async () => {
+    const dateNow = jest.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
+    mockListComputerSessions.mockResolvedValue({
+      sessions: [session('A', '2027-01-15T10:00:00.000Z')],
+    });
+    const previous = await loadComputerSessionBoard([FIRST]);
+    dateNow.mockReturnValue(1_800_000_000_001);
+    mockOpenComputerBridgesError = new ComputerBridgeError('private transport detail', 'busy');
+
+    const result = await loadComputerSessionBoard([FIRST], previous);
+
+    expect(result.sessions).toEqual([]);
+    expect(result.computers).toEqual([
+      { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'busy' },
+    ]);
+    expect(result.lastSuccessfulAt).toBe(previous.lastSuccessfulAt);
   });
 
   it.each(['rate_limited', 'busy'] as const)(
     'retains the last verified sessions when discovery is %s',
     async (code) => {
+      const dateNow = jest.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
       mockListComputerSessions.mockResolvedValue({
         sessions: [session('A', '2027-01-15T10:00:00.000Z')],
       });
       const previous = await loadComputerSessionBoard([FIRST]);
+      dateNow.mockReturnValue(1_800_000_000_001);
       mockListComputerSessions.mockRejectedValueOnce(
         new ComputerBridgeError('private transport detail', code),
       );
@@ -231,8 +273,57 @@ describe('Computer session board query', () => {
       expect(result.computers).toEqual([
         { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'busy' },
       ]);
+      expect(result.lastSuccessfulAt).toBe(previous.lastSuccessfulAt);
     },
   );
+
+  it('leaves freshness undefined when busy discovery has no previous board', async () => {
+    mockListComputerSessions.mockRejectedValueOnce(
+      new ComputerBridgeError('private transport detail', 'busy'),
+    );
+
+    const result = await loadComputerSessionBoard([FIRST]);
+
+    expect(result.computers).toEqual([
+      { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'busy' },
+    ]);
+    expect(result.sessions).toEqual([]);
+    expect(result.lastSuccessfulAt).toBeUndefined();
+  });
+
+  it('fails closed when the fifth page has a continuation cursor', async () => {
+    const previous = {
+      sessions: [
+        {
+          ...session('Z', '2027-01-15T09:00:00.000Z'),
+          bridgeId: FIRST.bridgeId,
+          computerName: FIRST.computerName,
+          canLoad: false,
+        },
+      ],
+      computers: [
+        { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'ready' as const },
+      ],
+      lastSuccessfulAt: 1_800_000_000_000,
+    };
+    let pageNumber = 0;
+    mockListComputerSessions.mockImplementation(async () => {
+      pageNumber += 1;
+      return {
+        sessions: [session(String.fromCharCode(64 + pageNumber), '2027-01-15T10:00:00.000Z')],
+        nextCursor: `page-${pageNumber}`,
+      };
+    });
+
+    const result = await loadComputerSessionBoard([FIRST], previous);
+
+    expect(mockListComputerSessions).toHaveBeenCalledTimes(5);
+    expect(result.sessions).toEqual([]);
+    expect(result.computers).toEqual([
+      { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'too_many_sessions' },
+    ]);
+    expect(result.lastSuccessfulAt).toBe(previous.lastSuccessfulAt);
+  });
 
   it('rehydrates a restarted Connector handle through one authenticated list before retrying load', async () => {
     const listedSession = session('A', '2027-01-15T10:00:00.000Z');
