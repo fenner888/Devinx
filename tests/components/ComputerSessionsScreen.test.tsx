@@ -1,9 +1,11 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
+import { RefreshControl, ScrollView } from 'react-native';
 
 import type { ComputerSessionBoard } from '../../src/api/bridge/queries';
 
 let mockComputerBoard: ComputerSessionBoard;
+const mockRefetchComputerSessions = jest.fn(async () => undefined);
 
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
@@ -43,12 +45,11 @@ jest.mock('@api/devin/queries', () => ({
 }));
 jest.mock('@api/bridge/queries', () => ({
   COMPUTER_SESSIONS_REFRESH_INTERVAL_MS: 30_000,
-  MAXIMUM_LISTED_SESSIONS_PER_COMPUTER: 250,
   useComputerSessions: () => ({
     data: mockComputerBoard,
     isLoading: false,
     error: null,
-    refetch: jest.fn(),
+    refetch: mockRefetchComputerSessions,
     isRefetching: false,
   }),
 }));
@@ -58,6 +59,7 @@ import { ThemeProvider } from '../../src/theme/ThemeProvider';
 
 describe('Computer-only sessions screen', () => {
   beforeEach(() => {
+    mockRefetchComputerSessions.mockClear();
     mockComputerBoard = {
       sessions: [
         {
@@ -171,6 +173,25 @@ describe('Computer-only sessions screen', () => {
 
     expect(screen.getByText('Local sessions unavailable')).toBeTruthy();
     expect(screen.getByText('Fix the connection above, then pull down to refresh.')).toBeTruthy();
+  });
+
+  it('refreshes from the blocked empty state', () => {
+    mockComputerBoard.sessions = [];
+    mockComputerBoard.computers = [
+      { bridgeId: 'bridge_1234567890', computerName: 'Studio Mac', state: 'unavailable' },
+    ];
+
+    const screen = render(
+      <ThemeProvider>
+        <SessionsScreen />
+      </ThemeProvider>,
+    );
+
+    const scrollView = screen.UNSAFE_getByType(ScrollView);
+    expect(scrollView.props.refreshControl.type).toBe(RefreshControl);
+    scrollView.props.refreshControl.props.onRefresh();
+
+    expect(mockRefetchComputerSessions).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the regular empty state when any local computer is ready', () => {

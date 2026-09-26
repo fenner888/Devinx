@@ -59,6 +59,8 @@ interface BoardSection {
   data: BoardRow[];
 }
 
+const EMPTY_STATE_SCROLL_CONTENT_STYLE = { flexGrow: 1 } as const;
+
 export default function SessionsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
@@ -287,7 +289,17 @@ export default function SessionsScreen() {
       {!isLoading &&
         !(usesCloud && !usesComputer && cloudQuery.error && sections.length === 0) &&
         sections.length === 0 && (
-          <View className="flex-1 px-5">
+          <ScrollView
+            className="flex-1 px-5"
+            contentContainerStyle={EMPTY_STATE_SCROLL_CONTENT_STYLE}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={refreshAll}
+                tintColor={tokens.brand.hex}
+              />
+            }
+          >
             <ComputerDiscoveryNotices computers={computerQuery.data?.computers ?? []} />
             <ComputerListFreshness
               lastSuccessfulAt={usesComputer ? computerQuery.data?.lastSuccessfulAt : undefined}
@@ -320,7 +332,7 @@ export default function SessionsScreen() {
                       : 'Start a new session from Home.'
               }
             />
-          </View>
+          </ScrollView>
         )}
 
       {sections.length > 0 && (

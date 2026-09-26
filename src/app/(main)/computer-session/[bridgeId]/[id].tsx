@@ -25,6 +25,7 @@ import {
   useComputerSessionElicitation,
   useComputerCreateOptions,
   useComputerSessionDetail,
+  computerSessionsQueryKey,
   usePromptComputerSession,
   useRespondComputerSessionElicitation,
 } from '@api/bridge/queries';
@@ -190,9 +191,10 @@ export default function ComputerSessionDetailScreen() {
   const mayReadContent = validParameters && Boolean(access.data?.capabilities.sessionLoad);
   const query = useComputerSessionDetail(bridgeId, sessionId, mayReadContent);
   const queryClient = useQueryClient();
-  const listItem = queryClient
-    .getQueriesData<ComputerSessionBoard>({ queryKey: ['computerSessions'] })
-    .flatMap(([, board]) => board?.sessions ?? [])
+  const currentBoard = queryClient.getQueryData<ComputerSessionBoard>(
+    computerSessionsQueryKey(computers),
+  );
+  const listItem = (currentBoard?.sessions ?? [])
     .find((session) => session.bridgeId === bridgeId && session.id === sessionId);
   const workspaceSubtitle =
     listItem?.title !== undefined

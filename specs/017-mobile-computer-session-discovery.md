@@ -28,14 +28,14 @@ Each foreground discovery cycle first requests authenticated `bridge.health` for
 Discovery is bounded to:
 
 - eight paired computers from the credential registry;
-- five pages per computer (50 ACP sessions per page, for a displayed limit of 250);
+- five pages per computer;
 - 5,000 sessions per computer;
 - unique session handles and non-repeating cursors; and
 - one 30-second foreground refresh cadence, plus focus/reconnect refresh.
 
 A five-page response that still has a continuation cursor produces the `too_many_sessions` state and fails that computer closed: no partial pages or previous sessions are shown. The page bound and paging behavior are unchanged. A malformed sequence also fails that computer closed. An unavailable Mac does not hide valid results from another paired Mac. Computer session query data is memory-only in TanStack Query and is not written into the Cloud SQLite cache or AsyncStorage.
 
-Busy or rate-limited discovery keeps that Mac's last session list and shows an explicit busy notice, distinct from the offline notice. A `too_many_sessions` notice says: “{computerName} has more sessions than DevinX can list right now (250), so none are shown.”
+Busy or rate-limited discovery keeps that Mac's last session list and shows an explicit busy notice, distinct from the offline notice. A `too_many_sessions` notice says: “{computerName} has more sessions than DevinX can list right now, so none are shown.”
 
 The Sessions screen freshness line is “Local list updated {relative time} · refreshes every 30s”. `lastSuccessfulAt` advances only when every paired computer is `ready` or `session_discovery_off`; otherwise it preserves the previous successful timestamp. An empty computer registry has no timestamp. The line re-renders every 15 seconds so the relative time stays current without changing the existing “just now” wording.
 

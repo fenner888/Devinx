@@ -1,6 +1,7 @@
 import React from 'react';
 import { Keyboard } from 'react-native';
 import { fireEvent, render } from '@testing-library/react-native';
+import type { QueryClient } from '@tanstack/react-query';
 
 const mockMutate = jest.fn();
 const mockRefetch = jest.fn(async () => {});
@@ -8,7 +9,7 @@ const mockCompanionProps = jest.fn();
 const mockAnswerMutate = jest.fn();
 const mockRefreshComputerCreateOptions = jest.fn(async () => undefined);
 const mockReact = React;
-const mockGetQueriesData = jest.fn();
+let mockQueryClient: QueryClient;
 let mockSessionWorkspaceName: string | undefined = 'DevinX';
 let mockPromptError: Error | null = null;
 let mockSessionElicitationSupported = true;
@@ -28,7 +29,8 @@ let mockInteraction: {
 } | null = null;
 
 jest.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ getQueriesData: mockGetQueriesData }),
+  ...jest.requireActual('@tanstack/react-query'),
+  useQueryClient: () => mockQueryClient,
 }));
 
 jest.mock('expo-router', () => ({
@@ -51,6 +53,10 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../src/api/bridge/queries', () => ({
+  computerSessionsQueryKey: (computers: Array<{ bridgeId: string }>) => [
+    'computerSessions',
+    ...computers.map((computer) => computer.bridgeId).sort(),
+  ],
   useComputerBridgeFeatures: () => ({
     data: { sessionElicitation: mockSessionElicitationSupported },
   }),
@@ -173,7 +179,10 @@ import { ComputerBridgeError } from '../../src/auth/computerBridge';
 describe('Computer session detail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetQueriesData.mockReturnValue([]);
+    const { QueryClient } = jest.requireActual('@tanstack/react-query') as {
+      QueryClient: new () => QueryClient;
+    };
+    mockQueryClient = new QueryClient();
     mockSessionWorkspaceName = 'DevinX';
     mockPromptError = null;
     mockSessionElicitationSupported = true;
@@ -183,26 +192,50 @@ describe('Computer session detail', () => {
 
   it('uses the cached list title with the workspace as a subtitle', () => {
     mockSessionWorkspaceName = undefined;
-    mockGetQueriesData.mockReturnValue([
-      [
-        ['computerSessions', 'board'],
+    mockQueryClient.setQueryData(['computerSessions', 'bridge_1234567890'], {
+      sessions: [
         {
-          sessions: [
-            {
-              id: `local_${'L'.repeat(43)}`,
-              bridgeId: 'bridge_1234567890',
-              title: 'Review the release branch',
-              workspaceName: 'Workspace from list',
-            },
-          ],
+          id: `local_${'L'.repeat(43)}`,
+          bridgeId: 'bridge_1234567890',
+          title: 'Review the release branch',
+          workspaceName: 'Workspace from list',
         },
       ],
-    ]);
+    });
 
     const screen = render(<ComputerSessionDetailScreen />);
 
     expect(screen.getByText('Review the release branch')).toBeTruthy();
     expect(screen.getByText('Workspace from list')).toBeTruthy();
+  });
+
+  it('uses the current computer board instead of an older cached board', () => {
+    mockSessionWorkspaceName = undefined;
+    mockQueryClient.setQueryData(['computerSessions', 'bridge_old'], {
+      sessions: [
+        {
+          id: `local_${'L'.repeat(43)}`,
+          bridgeId: 'bridge_1234567890',
+          title: 'Draft',
+          workspaceName: 'Old workspace',
+        },
+      ],
+    });
+    mockQueryClient.setQueryData(['computerSessions', 'bridge_1234567890'], {
+      sessions: [
+        {
+          id: `local_${'L'.repeat(43)}`,
+          bridgeId: 'bridge_1234567890',
+          title: 'Final',
+          workspaceName: 'Current workspace',
+        },
+      ],
+    });
+
+    const screen = render(<ComputerSessionDetailScreen />);
+
+    expect(screen.getByText('Final')).toBeTruthy();
+    expect(screen.queryByText('Draft')).toBeNull();
   });
 
   it('falls back to the loaded workspace name without adding a subtitle when the list is uncached', () => {

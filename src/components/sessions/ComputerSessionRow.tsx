@@ -2,10 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import {
-  COMPUTER_SESSIONS_REFRESH_INTERVAL_MS,
-  MAXIMUM_LISTED_SESSIONS_PER_COMPUTER,
-} from '@api/bridge/queries';
+import { COMPUTER_SESSIONS_REFRESH_INTERVAL_MS } from '@api/bridge/queries';
 import type { ComputerDiscoveryStatus, ComputerSessionListItem } from '@api/bridge/queries';
 import { relativeTime } from '@lib/session-utils';
 import { useTheme } from '@theme/index';
@@ -97,7 +94,7 @@ function discoveryMessage(status: ComputerDiscoveryStatus): string | null {
     return `${status.computerName} needs to be paired again.`;
   }
   if (status.state === 'too_many_sessions') {
-    return `${status.computerName} has more sessions than DevinX can list right now (${MAXIMUM_LISTED_SESSIONS_PER_COMPUTER}), so none are shown.`;
+    return `${status.computerName} has more sessions than DevinX can list right now, so none are shown.`;
   }
   if (status.state === 'invalid_response') {
     return `${status.computerName} returned an incompatible session response.`;

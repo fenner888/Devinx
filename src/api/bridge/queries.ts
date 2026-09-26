@@ -22,10 +22,7 @@ import type { PairedComputerSummary } from '@auth/pairedComputers';
 import { connectionModeUsesComputer } from '@lib/connections';
 
 const MAXIMUM_PAGES_PER_COMPUTER = 5;
-const DEVIN_ACP_SESSION_PAGE_SIZE = 50;
 export const COMPUTER_SESSIONS_REFRESH_INTERVAL_MS = 30_000;
-export const MAXIMUM_LISTED_SESSIONS_PER_COMPUTER =
-  MAXIMUM_PAGES_PER_COMPUTER * DEVIN_ACP_SESSION_PAGE_SIZE;
 const MAXIMUM_SESSIONS_PER_COMPUTER = 5_000;
 
 export interface ComputerSessionListItem extends ComputerSessionSummary {
@@ -53,6 +50,10 @@ export interface ComputerSessionBoard {
   sessions: ComputerSessionListItem[];
   computers: ComputerDiscoveryStatus[];
   lastSuccessfulAt?: number;
+}
+
+export function computerSessionsQueryKey(computers: PairedComputerSummary[]) {
+  return ['computerSessions', ...computers.map((computer) => computer.bridgeId).sort()] as const;
 }
 
 function stateForError(error: unknown): ComputerDiscoveryState {
@@ -240,8 +241,7 @@ export function useComputerSessions() {
   const queryClient = useQueryClient();
   const { mode, computers } = useConnections();
   const enabled = connectionModeUsesComputer(mode) && computers.length > 0;
-  const bridgeIds = computers.map((computer) => computer.bridgeId).sort();
-  const queryKey = ['computerSessions', ...bridgeIds] as const;
+  const queryKey = computerSessionsQueryKey(computers);
 
   return useQuery({
     queryKey,
