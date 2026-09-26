@@ -63,9 +63,34 @@ function advisoryLeaves(packageName, vulnerabilities, trail = []) {
   );
 }
 
+function compareVersions(a, b) {
+  const [aParts, bParts] = [a, b].map((v) => v.split('.').map(Number));
+  for (let i = 0; i < 3; i += 1) {
+    if (aParts[i] !== bParts[i]) return aParts[i] - bParts[i];
+  }
+  return 0;
+}
+
+// Returns the highest inclusive upper bound across every `||` clause, or null when any clause
+// lacks a `<=` bound or contains anything other than `>=`/`<=` semver comparators.
 function rangeUpperBound(range) {
-  const match = /<=\s*(\d+\.\d+\.\d+)\s*$/.exec(typeof range === 'string' ? range.trim() : '');
-  return match ? match[1] : null;
+  if (typeof range !== 'string' || range.trim() === '') return null;
+  let highest = null;
+  for (const clause of range.split('||')) {
+    const comparators = clause.trim().split(/\s+/);
+    let upper = null;
+    for (const comparator of comparators) {
+      const match = /^(>=|<=)(\d+\.\d+\.\d+)$/.exec(comparator);
+      if (!match) return null;
+      if (match[1] === '<=') {
+        if (upper !== null) return null;
+        upper = match[2];
+      }
+    }
+    if (upper === null) return null;
+    if (highest === null || compareVersions(upper, highest) > 0) highest = upper;
+  }
+  return highest;
 }
 
 function isApprovedAdvisory(advisory) {

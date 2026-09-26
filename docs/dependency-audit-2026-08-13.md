@@ -23,11 +23,13 @@ No patched package version exists. The package reaches DevinX only through Metro
 Expo and React Native build toolchain. It is not imported by application code, and the macOS and
 Windows Connector builders now fail if `image-size` enters their esbuild runtime bundle.
 
-The audit gate still runs the complete npm audit. It permits only the two exact advisory source
-IDs, package name, severity, URL, and affected range above; any changed or additional high/critical
-advisory fails CI. The exception expires on September 30, 2026 so the upstream state must be reviewed
-again. A forced Expo 57 migration is not accepted as a release-hotfix because it would change the
-native SDK and require a separate full device-compatibility cycle.
+The audit gate still runs the complete npm audit. It permits only the two GHSA advisory URLs above
+with the `image-size` package name, `high` severity, and an affected range whose highest upper bound
+is `2.0.2` (npm reassigns its numeric advisory IDs and rewrites the range text, so those are not
+matched). Any changed or additional high/critical advisory fails CI. The exception expires on
+November 30, 2026 so the upstream state must be reviewed again. A forced Expo 57 migration is not
+accepted as a release-hotfix because it would change the native SDK and require a separate full
+device-compatibility cycle.
 
 ## Verification
 
