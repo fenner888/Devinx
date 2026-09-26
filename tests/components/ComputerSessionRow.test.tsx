@@ -143,7 +143,7 @@ describe('Computer session presentation', () => {
 
     expect(
       screen.getByText(
-        'Studio Mac has more sessions than DevinX can list right now (250). Newer sessions may be missing.',
+        'Studio Mac has more sessions than DevinX can list right now (250), so none are shown.',
       ),
     ).toBeTruthy();
   });

@@ -97,7 +97,7 @@ function discoveryMessage(status: ComputerDiscoveryStatus): string | null {
     return `${status.computerName} needs to be paired again.`;
   }
   if (status.state === 'too_many_sessions') {
-    return `${status.computerName} has more sessions than DevinX can list right now (${MAXIMUM_LISTED_SESSIONS_PER_COMPUTER}). Newer sessions may be missing.`;
+    return `${status.computerName} has more sessions than DevinX can list right now (${MAXIMUM_LISTED_SESSIONS_PER_COMPUTER}), so none are shown.`;
   }
   if (status.state === 'invalid_response') {
     return `${status.computerName} returned an incompatible session response.`;
