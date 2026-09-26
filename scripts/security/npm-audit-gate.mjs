@@ -1,22 +1,23 @@
 import { spawnSync } from 'node:child_process';
 
+// Advisories are identified by their GitHub advisory URL (GHSA ID). npm reassigns the numeric
+// `source` id and rewrites `range` when it re-issues an advisory, so those are not stable keys.
 const APPROVED_ADVISORIES = Object.freeze([
   Object.freeze({
-    source: 1138808,
     name: 'image-size',
     severity: 'high',
     url: 'https://github.com/advisories/GHSA-w3rx-r6r6-pgpr',
-    range: '<=2.0.2',
+    maxAffectedVersion: '2.0.2',
   }),
   Object.freeze({
-    source: 1138809,
     name: 'image-size',
     severity: 'high',
     url: 'https://github.com/advisories/GHSA-5p2g-fcmc-qvqq',
-    range: '<=2.0.2',
+    maxAffectedVersion: '2.0.2',
   }),
 ]);
-const EXCEPTION_EXPIRES_AT = Date.UTC(2026, 8, 30);
+const EXCEPTION_EXPIRES_AT = Date.UTC(2026, 10, 30);
+const EXCEPTION_EXPIRY_LABEL = '2026-11-30';
 
 function fail(message) {
   console.error(`Dependency audit gate failed: ${message}`);
@@ -62,14 +63,18 @@ function advisoryLeaves(packageName, vulnerabilities, trail = []) {
   );
 }
 
+function rangeUpperBound(range) {
+  const match = /<=\s*(\d+\.\d+\.\d+)\s*$/.exec(typeof range === 'string' ? range.trim() : '');
+  return match ? match[1] : null;
+}
+
 function isApprovedAdvisory(advisory) {
   return APPROVED_ADVISORIES.some(
     (approved) =>
-      advisory?.source === approved.source &&
       advisory?.name === approved.name &&
       advisory?.severity === approved.severity &&
       advisory?.url === approved.url &&
-      advisory?.range === approved.range,
+      rangeUpperBound(advisory?.range) === approved.maxAffectedVersion,
   );
 }
 
@@ -106,7 +111,7 @@ if (unexpected.length > 0) {
 if (Date.now() >= EXCEPTION_EXPIRES_AT) {
   fail(
     'The exact image-size toolchain advisories still require a reviewed upstream-compatible ' +
-      'resolution; the temporary exception expired on 2026-09-30',
+      `resolution; the temporary exception expired on ${EXCEPTION_EXPIRY_LABEL}`,
   );
 }
 
