@@ -49,6 +49,7 @@ const serviceOptionsSchema = z
     peerLimit: z.number().int().min(1).max(10_000).default(120),
     healthLimit: z.number().int().min(1).max(10_000).default(120),
     sessionListLimit: z.number().int().min(1).max(10_000).default(30),
+    sessionListContinuationLimit: z.number().int().min(1).max(10_000).default(120),
     sessionLoadLimit: z.number().int().min(1).max(10_000).default(30),
     sessionActivityLimit: z.number().int().min(1).max(10_000).default(180),
     mutationLimit: z.number().int().min(1).max(10_000).default(10),
@@ -278,6 +279,7 @@ export interface BridgeServiceOptions {
   peerLimit?: number;
   healthLimit?: number;
   sessionListLimit?: number;
+  sessionListContinuationLimit?: number;
   sessionLoadLimit?: number;
   sessionActivityLimit?: number;
   mutationLimit?: number;
@@ -416,6 +418,7 @@ export class BridgeService {
       peerLimit: dependencies.peerLimit,
       healthLimit: dependencies.healthLimit,
       sessionListLimit: dependencies.sessionListLimit,
+      sessionListContinuationLimit: dependencies.sessionListContinuationLimit,
       sessionLoadLimit: dependencies.sessionLoadLimit,
       sessionActivityLimit: dependencies.sessionActivityLimit,
       mutationLimit: dependencies.mutationLimit,
@@ -441,9 +444,17 @@ export class BridgeService {
     });
     if (!authorization.ok) return publicRejection(authorization);
 
-    const deviceLimit =
+    const sessionListBody =
       authorization.request.method === 'session.list'
-        ? this.rates.sessionListLimit
+        ? sessionListBodySchema.safeParse(authorization.request.body)
+        : undefined;
+    const isSessionListContinuation =
+      sessionListBody?.success === true && sessionListBody.data.cursor !== undefined;
+    const deviceLimit =
+      isSessionListContinuation
+        ? this.rates.sessionListContinuationLimit
+        : authorization.request.method === 'session.list'
+          ? this.rates.sessionListLimit
         : authorization.request.method === 'session.load'
           ? this.rates.sessionLoadLimit
           : authorization.request.method === 'session.activity' ||
@@ -456,7 +467,9 @@ export class BridgeService {
               : this.rates.mutationLimit;
     if (
       !this.consumeRate(
-        `device:${authorization.request.device.deviceId}:${authorization.request.method}`,
+        isSessionListContinuation
+          ? `device:${authorization.request.device.deviceId}:session.list.continuation`
+          : `device:${authorization.request.device.deviceId}:${authorization.request.method}`,
         deviceLimit,
         context.now,
       )

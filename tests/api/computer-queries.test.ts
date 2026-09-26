@@ -214,6 +214,26 @@ describe('Computer session board query', () => {
     ]);
   });
 
+  it.each(['rate_limited', 'busy'] as const)(
+    'retains the last verified sessions when discovery is %s',
+    async (code) => {
+      mockListComputerSessions.mockResolvedValue({
+        sessions: [session('A', '2027-01-15T10:00:00.000Z')],
+      });
+      const previous = await loadComputerSessionBoard([FIRST]);
+      mockListComputerSessions.mockRejectedValueOnce(
+        new ComputerBridgeError('private transport detail', code),
+      );
+
+      const result = await loadComputerSessionBoard([FIRST], previous);
+
+      expect(result.sessions).toEqual(previous.sessions);
+      expect(result.computers).toEqual([
+        { bridgeId: FIRST.bridgeId, computerName: FIRST.computerName, state: 'busy' },
+      ]);
+    },
+  );
+
   it('rehydrates a restarted Connector handle through one authenticated list before retrying load', async () => {
     const listedSession = session('A', '2027-01-15T10:00:00.000Z');
     const loadedSession = {

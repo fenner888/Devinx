@@ -29,6 +29,8 @@ No client-side state can bypass a server-side grant. Authentication, authorizati
 - `bridge.version`: authenticated Connector compatibility negotiation.
 - `session.list`: authenticated, grant-gated, rate-limited, single-flight read-only discovery.
 
+The per-device `session.list` limit counts cursorless first-page listings; continuation pages use a separate bounded `session.list.continuation` bucket (default 120 per minute).
+
 `session.load` and `session.prompt` remain schema-reserved but return 404 because their handlers and safety gates are not enabled.
 
 ## Session privacy policy
