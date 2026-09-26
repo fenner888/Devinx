@@ -77,16 +77,18 @@ function rangeUpperBound(range) {
   if (typeof range !== 'string' || range.trim() === '') return null;
   let highest = null;
   for (const clause of range.split('||')) {
-    const comparators = clause.trim().split(/\s+/);
+    const comparatorPattern = /\s*(>=|<=)\s*(\d+\.\d+\.\d+)\s*/gy;
+    const trimmed = clause.trim();
     let upper = null;
-    for (const comparator of comparators) {
-      const match = /^(>=|<=)(\d+\.\d+\.\d+)$/.exec(comparator);
-      if (!match) return null;
+    let consumed = 0;
+    for (let match = comparatorPattern.exec(trimmed); match; match = comparatorPattern.exec(trimmed)) {
+      consumed = comparatorPattern.lastIndex;
       if (match[1] === '<=') {
         if (upper !== null) return null;
         upper = match[2];
       }
     }
+    if (consumed !== trimmed.length) return null;
     if (upper === null) return null;
     if (highest === null || compareVersions(upper, highest) > 0) highest = upper;
   }
