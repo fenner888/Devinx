@@ -152,18 +152,12 @@ export async function loadComputerSessionBoard(
   try {
     bridges = await openComputerBridges(computers.map((computer) => computer.bridgeId));
   } catch (error) {
-    const state = stateForError(error);
     return {
-      sessions:
-        state === 'unavailable' || state === 'busy'
-          ? (previousBoard?.sessions.filter((session) =>
-              computers.some((computer) => computer.bridgeId === session.bridgeId),
-            ) ?? [])
-          : [],
+      sessions: [],
       computers: computers.map((computer) => ({
         bridgeId: computer.bridgeId,
         computerName: computer.computerName,
-        state,
+        state: stateForError(error),
       })),
     };
   }
