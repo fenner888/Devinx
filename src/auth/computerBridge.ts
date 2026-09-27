@@ -72,7 +72,9 @@ const bridgeHealthBodySchema = z.object({}).strict();
 const bridgeFeaturesBodySchema = z.object({}).strict();
 const bridgePlatformBodySchema = z.object({}).strict();
 const bridgeVersionBodySchema = z.object({}).strict();
-const computerBridgeFeaturesSchema = z.object({ sessionElicitation: z.boolean() }).strict();
+const computerBridgeFeaturesSchema = z
+  .object({ sessionElicitation: z.boolean(), activityTimeline: z.boolean().optional() })
+  .strict();
 const computerBridgePlatformSchema = z
   .object({ platform: z.enum(['macos', 'windows', 'linux']) })
   .strict();
@@ -84,20 +86,70 @@ const deviceRevokeResponseSchema = z.object({ revoked: z.literal(true) }).strict
 const sessionListBodySchema = z.object({ cursor: cursorSchema.optional() }).strict();
 const sessionLoadBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
 const sessionActivityBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
+const computerSessionActivityKindSchema = z.enum([
+  'thinking',
+  'reading',
+  'editing',
+  'executing',
+  'searching',
+  'fetching',
+  'responding',
+]);
+const computerActivityPathSchema = z
+  .string()
+  .min(1)
+  .max(512)
+  .refine(
+    (value) =>
+      !value.startsWith('/') &&
+      !value.startsWith('~') &&
+      !/^[A-Za-z]:[\\/]/.test(value) &&
+      !value.replace(/\\/g, '/').split('/').includes('..'),
+    'Activity paths must be workspace-relative',
+  );
+export const computerActivityEntrySchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    afterSequence: z.number().int().nonnegative(),
+    kind: z.enum(['thought', 'tool']),
+    toolKind: z
+      .enum(['read', 'edit', 'delete', 'move', 'search', 'execute', 'think', 'fetch', 'other'])
+      .optional(),
+    status: z.enum(['running', 'completed', 'failed', 'interrupted', 'unknown']),
+    title: z.string().min(1).max(200),
+    paths: z.array(computerActivityPathSchema).max(20).optional(),
+    detail: z
+      .discriminatedUnion('type', [
+        z.object({ type: z.literal('text'), text: z.string().max(16 * 1024 + 1024) }).strict(),
+        z
+          .object({
+            type: z.literal('diff'),
+            path: computerActivityPathSchema,
+            oldText: z.string().max(16 * 1024 + 1024).optional(),
+            newText: z.string().max(16 * 1024 + 1024).optional(),
+          })
+          .strict(),
+      ])
+      .optional(),
+    truncated: z.boolean(),
+    startedAt: z.number().int().nonnegative().optional(),
+    endedAt: z.number().int().nonnegative().optional(),
+  })
+  .strict();
 const computerSessionActivitySchema = z
   .object({
     active: z.boolean(),
-    kind: z.enum([
-      'thinking',
-      'reading',
-      'editing',
-      'executing',
-      'searching',
-      'fetching',
-      'responding',
-    ]),
+    kind: computerSessionActivityKindSchema,
     label: z.string().min(1).max(160),
     updatedAt: z.number().int().nonnegative(),
+    turn: z
+      .object({
+        startedAt: z.number().int().nonnegative(),
+        reply: z.string().max(100_000),
+        activity: z.array(computerActivityEntrySchema).max(500),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 const sessionElicitationBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
@@ -280,6 +332,14 @@ export const computerSessionSummarySchema = z
     title: z.string().min(1).max(10_000).optional(),
     updatedAt: z.string().datetime({ offset: true }).optional(),
     model: computerModelSchema.optional(),
+    activity: z
+      .object({
+        active: z.boolean(),
+        kind: computerSessionActivityKindSchema.optional(),
+        updatedAt: z.number().int().nonnegative(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -313,6 +373,7 @@ export const computerLoadedSessionSchema = z
           .strict(),
       )
       .max(200),
+    activity: z.array(computerActivityEntrySchema).max(500).optional(),
     truncated: z.boolean(),
   })
   .strict()
@@ -323,6 +384,15 @@ export const computerLoadedSessionSchema = z
           code: z.ZodIssueCode.custom,
           path: ['messages', index, 'sequence'],
           message: 'Message sequence must be contiguous',
+        });
+      }
+    });
+    value.activity?.forEach((entry, index) => {
+      if (entry.afterSequence > value.messages.length) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['activity', index, 'afterSequence'],
+          message: 'Activity sequence must reference an existing message',
         });
       }
     });
@@ -346,6 +416,9 @@ export type ComputerBridgeFeatures = z.infer<typeof computerBridgeFeaturesSchema
 export type ComputerBridgePlatform = z.infer<typeof computerBridgePlatformSchema>['platform'];
 export type ComputerBridgeVersionStatus =
   { kind: 'supported'; version: string } | { kind: 'legacy' };
+export type ComputerActivityEntry = z.infer<typeof computerActivityEntrySchema>;
+export type ComputerActivityToolKind = NonNullable<ComputerActivityEntry['toolKind']>;
+export type ComputerActivityStatus = ComputerActivityEntry['status'];
 export type ComputerSessionSummary = z.infer<typeof computerSessionSummarySchema>;
 export type ComputerSessionPage = z.infer<typeof computerSessionPageSchema>;
 export type ComputerLoadedSession = z.infer<typeof computerLoadedSessionSchema>;
@@ -557,10 +630,10 @@ async function requestFeatures(
         'invalid_response',
       );
     }
-    return result.data;
+    return { ...result.data, activityTimeline: result.data.activityTimeline ?? false };
   } catch (error) {
     if (error instanceof ComputerBridgeError && error.code === 'invalid_response') {
-      return { sessionElicitation: false };
+      return { sessionElicitation: false, activityTimeline: false };
     }
     throw error;
   }

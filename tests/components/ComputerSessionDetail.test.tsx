@@ -14,7 +14,20 @@ let mockSessionWorkspaceName: string | undefined = 'DevinX';
 let mockPromptError: Error | null = null;
 let mockSessionElicitationSupported = true;
 let mockSessionActivity:
-  { active: boolean; kind: 'thinking'; label: string; updatedAt: number } | undefined;
+  | {
+      active: boolean;
+      kind: string;
+      label: string;
+      updatedAt: number;
+      turn?: {
+        startedAt: number;
+        reply: string;
+        activity: Array<Record<string, unknown>>;
+      };
+    }
+  | undefined;
+let mockActivityTimeline: boolean | undefined;
+let mockLoadedActivity: Array<Record<string, unknown>> | undefined;
 let mockInteraction: {
   id: string;
   message: string;
@@ -58,7 +71,10 @@ jest.mock('../../src/api/bridge/queries', () => ({
     ...computers.map((computer) => computer.bridgeId).sort(),
   ],
   useComputerBridgeFeatures: () => ({
-    data: { sessionElicitation: mockSessionElicitationSupported },
+    data: {
+      sessionElicitation: mockSessionElicitationSupported,
+      ...(mockActivityTimeline === undefined ? {} : { activityTimeline: mockActivityTimeline }),
+    },
   }),
   useComputerSessionAccess: () => ({
     data: {
@@ -77,7 +93,11 @@ jest.mock('../../src/api/bridge/queries', () => ({
         workspaceName: mockSessionWorkspaceName,
         model: { id: 'swe-1.7-high', name: 'SWE-1.7 High' },
       },
-      messages: [{ sequence: 1, source: 'devin', text: 'Ready.' }],
+      messages: [
+        { sequence: 1, source: 'user', text: 'Do the tasks.' },
+        { sequence: 2, source: 'devin', text: 'Ready.' },
+      ],
+      ...(mockLoadedActivity ? { activity: mockLoadedActivity } : {}),
       truncated: false,
     },
     isLoading: false,
@@ -188,6 +208,8 @@ describe('Computer session detail', () => {
     mockSessionElicitationSupported = true;
     mockSessionActivity = undefined;
     mockInteraction = null;
+    mockActivityTimeline = undefined;
+    mockLoadedActivity = undefined;
   });
 
   it('uses the cached list title with the workspace as a subtitle', () => {
@@ -419,6 +441,81 @@ describe('Computer session detail', () => {
     expect(promptErrorMessage(new ComputerBridgeError('Revoked', 'authorization_failed'))).toBe(
       'This iPhone is no longer authorized. Re-pair this local device in Settings.',
     );
+  });
+
+  it('renders no activity groups for a Connector without activityTimeline', () => {
+    mockActivityTimeline = undefined;
+    mockLoadedActivity = [
+      {
+        id: 'tool_1',
+        afterSequence: 1,
+        kind: 'tool',
+        toolKind: 'read',
+        status: 'completed',
+        title: 'Read file',
+        truncated: false,
+      },
+    ];
+    mockSessionActivity = {
+      active: true,
+      kind: 'editing',
+      label: 'Editing files',
+      updatedAt: Date.now(),
+    };
+    const screen = render(<ComputerSessionDetailScreen />);
+
+    expect(screen.queryByTestId(/^activity-group-/)).toBeNull();
+    expect(screen.queryByTestId('computer-session-activity-indicator')).toBeNull();
+  });
+
+  it('renders activity groups between messages when the Connector supports them', () => {
+    mockActivityTimeline = true;
+    mockLoadedActivity = [
+      {
+        id: 'thought_1',
+        afterSequence: 1,
+        kind: 'thought',
+        status: 'completed',
+        title: 'Thought',
+        truncated: false,
+      },
+      {
+        id: 'tool_1',
+        afterSequence: 2,
+        kind: 'tool',
+        toolKind: 'edit',
+        status: 'completed',
+        title: 'Edit file',
+        truncated: false,
+      },
+    ];
+    const screen = render(<ComputerSessionDetailScreen />);
+
+    expect(screen.getByTestId('activity-group-g1')).toBeTruthy();
+    expect(screen.getByTestId('activity-group-g2')).toBeTruthy();
+  });
+
+  it('shows the running indicator only when the session activity is active', () => {
+    mockActivityTimeline = true;
+    mockSessionActivity = {
+      active: true,
+      kind: 'executing',
+      label: 'Running a command',
+      updatedAt: Date.now(),
+    };
+    const activeScreen = render(<ComputerSessionDetailScreen />);
+    expect(activeScreen.getByTestId('computer-session-activity-indicator')).toBeTruthy();
+    expect(activeScreen.getByText('Running a command')).toBeTruthy();
+    activeScreen.unmount();
+
+    mockSessionActivity = {
+      active: false,
+      kind: 'thinking',
+      label: 'Idle',
+      updatedAt: Date.now(),
+    };
+    const idleScreen = render(<ComputerSessionDetailScreen />);
+    expect(idleScreen.queryByTestId('computer-session-activity-indicator')).toBeNull();
   });
 
   it('keeps the composer read-only while the Connector reports active work', () => {

@@ -41,6 +41,11 @@ export const DEVIN_STATE_BY_STATUS_KEY: Record<StatusLabelKey, DevinPetState> = 
   approvalRequired: 'blocked',
   approveKnowledge: 'blocked',
   reviewPR: 'focused',
+  running: 'working',
+  completed: 'success',
+  failed: 'error',
+  interrupted: 'blocked',
+  unknown: 'waiting',
 };
 
 const ACTIONABLE_COMPANION_STATUSES: ReadonlySet<StatusLabelKey> = new Set([

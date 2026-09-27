@@ -33,6 +33,7 @@ import type { ComputerSessionBoard } from '@api/bridge/queries';
 import { ComputerBridgeError, type ComputerLoadedSession } from '@auth/computerBridge';
 import { useConnections } from '@auth/ConnectionContext';
 import { computerTransportLabel } from '@auth/pairedComputers';
+import { ActivityGroup, groupActivity } from '@components/sessions/ActivityGroup';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
 import { ComputerModelPickerSheets } from '@components/sessions/ComputerModelPickerSheets';
@@ -46,6 +47,7 @@ import {
   preferredFamilyVariant,
   splitComputerModelName,
 } from '@lib/computer-model-catalog';
+import { activityShortLabel } from '@lib/activity-labels';
 import { useTheme } from '@theme/index';
 import { activityForComputerSession } from '@/pets/devin/activity';
 
@@ -201,6 +203,14 @@ export default function ComputerSessionDetailScreen() {
       ? (query.data?.session.workspaceName ?? listItem.workspaceName)
       : undefined;
   const sessionActivity = useComputerSessionActivity(bridgeId, sessionId, mayReadContent);
+  const activitySupported = bridgeFeatures.data?.activityTimeline === true;
+  const activityGroups = activitySupported
+    ? groupActivity(query.data?.activity ?? [])
+    : new Map();
+  const liveTurn =
+    activitySupported && steeringActive ? (sessionActivity.data?.turn ?? null) : null;
+  const activityIndicatorKind =
+    activitySupported && sessionActivity.data?.active ? (sessionActivity.data.kind ?? 'thinking') : null;
   const prompt = usePromptComputerSession(bridgeId, sessionId);
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
   const mayAnswerQuestions =
@@ -408,7 +418,14 @@ export default function ComputerSessionDetailScreen() {
 
   useEffect(() => {
     if (nearBottomRef.current) historyRef.current?.scrollToEnd({ animated: true });
-  }, [activeElicitation?.id, pendingText, query.data?.messages.length, steeringActive]);
+  }, [
+    activeElicitation?.id,
+    pendingText,
+    query.data?.messages.length,
+    steeringActive,
+    liveTurn?.reply,
+    liveTurn?.activity.length,
+  ]);
 
   function handleHistoryScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
@@ -458,6 +475,23 @@ export default function ComputerSessionDetailScreen() {
                 <Text className="text-text-low text-text12">
                   {computerTransportLabel(computer.transportKind)}
                 </Text>
+              </>
+            )}
+            {activityIndicatorKind && (
+              <>
+                <Text className="mx-1.5 text-text-low text-text12">·</Text>
+                <View
+                  className="flex-row items-center"
+                  testID="computer-session-activity-indicator"
+                >
+                  <View
+                    className="mr-1 h-1.5 w-1.5 rounded-dot"
+                    style={{ backgroundColor: tokens.running.hex }}
+                  />
+                  <Text className="text-text-low text-text12">
+                    {activityShortLabel(activityIndicatorKind)}
+                  </Text>
+                </View>
               </>
             )}
           </View>
@@ -548,6 +582,15 @@ export default function ComputerSessionDetailScreen() {
                     </Text>
                   </View>
                 )}
+                {activitySupported && (activityGroups.get(0)?.length ?? 0) > 0 && (
+                  <ActivityGroup
+                    bridgeId={bridgeId}
+                    sessionId={sessionId}
+                    groupKey="g0"
+                    entries={activityGroups.get(0) ?? []}
+                    defaultExpanded={false}
+                  />
+                )}
                 {query.data.messages.length === 0 ? (
                   <View className="items-center py-12">
                     <Text className="text-text-mid text-text14">
@@ -555,9 +598,27 @@ export default function ComputerSessionDetailScreen() {
                     </Text>
                   </View>
                 ) : (
-                  query.data.messages.map((message) => (
-                    <HistoryMessage key={message.sequence} message={message} />
-                  ))
+                  query.data.messages.map((message) => {
+                    const group = activitySupported
+                      ? (activityGroups.get(message.sequence) ?? [])
+                      : [];
+                    const suppressTrailing =
+                      liveTurn !== null && message.sequence === query.data.messages.length;
+                    return (
+                      <View key={message.sequence}>
+                        <HistoryMessage message={message} />
+                        {group.length > 0 && !suppressTrailing && (
+                          <ActivityGroup
+                            bridgeId={bridgeId}
+                            sessionId={sessionId}
+                            groupKey={`g${message.sequence}`}
+                            entries={group}
+                            defaultExpanded={false}
+                          />
+                        )}
+                      </View>
+                    );
+                  })
                 )}
                 {pendingText && (
                   <View className="mb-4 max-w-[88%] self-end items-end opacity-70">
@@ -566,6 +627,17 @@ export default function ComputerSessionDetailScreen() {
                     </View>
                     <Text className="mt-1 text-text-low text-text11">Sending…</Text>
                   </View>
+                )}
+                {liveTurn && (
+                  <ActivityGroup
+                    bridgeId={bridgeId}
+                    sessionId={sessionId}
+                    groupKey="live"
+                    entries={liveTurn.activity}
+                    live
+                    defaultExpanded
+                    reply={liveTurn.reply || undefined}
+                  />
                 )}
                 {connectorQuestionUpdateRequired && (
                   <View className="mb-4 flex-row items-start rounded-card border border-border-subtle bg-surface1 px-3 py-3">

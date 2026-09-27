@@ -129,6 +129,14 @@ export interface ThemeTokens {
   tintBlue: ColorToken;
   /** Chart accent: amber (M-size bucket in analytics). */
   chartAmber: ColorToken;
+  /** Diff: added-line text (= finished). */
+  diffAddedText: ColorToken;
+  /** Diff: added-line background (= tintGreen). */
+  diffAddedTint: ColorToken;
+  /** Diff: removed-line text (= failed). */
+  diffRemovedText: ColorToken;
+  /** Diff: removed-line background (= tintRed). */
+  diffRemovedTint: ColorToken;
 }
 
 const c = (channels: string, hex: string): ColorToken => ({ channels, hex });
@@ -200,6 +208,12 @@ export const dark: ThemeTokens = {
   tintPurple: c('149 108 222 / .12', '#956CDE1F'),
   tintBlue: c('51 125 244 / .1', '#337DF41A'),
   chartAmber: c('245 195 58', '#F5C33A'),
+
+  // Diff colors reuse the finished/tintGreen and failed/tintRed values.
+  diffAddedText: c('0 236 126', '#00EC7E'),
+  diffAddedTint: c('0 236 126 / .08', '#00EC7E14'),
+  diffRemovedText: c('245 59 58', '#F53B3A'),
+  diffRemovedTint: c('245 59 58 / .12', '#F53B3A1F'),
 };
 
 // [FALLBACK-REPLACED §1.1] surface0 #FAF7F2 → #FCFCFC (Devin --bg-page light)
@@ -272,6 +286,12 @@ export const light: ThemeTokens = {
   tintPurple: c('149 108 222 / .12', '#956CDE1F'),
   tintBlue: c('51 125 244 / .1', '#337DF41A'),
   chartAmber: c('212 160 23', '#D4A017'),
+
+  // Diff colors reuse the finished/tintGreen and failed/tintRed values.
+  diffAddedText: c('0 165 88', '#00A558'),
+  diffAddedTint: c('62 237 155 / .2', '#3EED9B33'),
+  diffRemovedText: c('245 59 58', '#F53B3A'),
+  diffRemovedTint: c('245 59 58 / .12', '#F53B3A1F'),
 };
 
 /**
@@ -303,6 +323,11 @@ export const statusLabels = {
   approvalRequired: 'Approval required',
   approveKnowledge: 'Approve Knowledge',
   reviewPR: 'Review PR',
+  running: 'Running',
+  completed: 'Completed',
+  failed: 'Failed',
+  interrupted: 'Interrupted',
+  unknown: 'Unknown',
 } as const;
 
 export type StatusLabelKey = keyof typeof statusLabels;
