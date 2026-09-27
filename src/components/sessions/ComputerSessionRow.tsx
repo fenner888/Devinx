@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { COMPUTER_SESSIONS_REFRESH_INTERVAL_MS } from '@api/bridge/queries';
 import type { ComputerDiscoveryStatus, ComputerSessionListItem } from '@api/bridge/queries';
 import { relativeTime } from '@lib/session-utils';
 import { useTheme } from '@theme/index';
@@ -15,10 +17,12 @@ function sessionTime(updatedAt: string | undefined): string | null {
 export function ComputerSessionRow({
   session,
   compact = false,
+  showComputerName = true,
   onPress,
 }: {
   session: ComputerSessionListItem;
   compact?: boolean;
+  showComputerName?: boolean;
   onPress?: () => void;
 }) {
   const { tokens } = useTheme();
@@ -39,14 +43,18 @@ export function ComputerSessionRow({
         <Ionicons name="desktop-outline" size={15} color={tokens.brandText.hex} />
       </View>
       <View className="flex-1 min-w-0">
-        <Text className="text-text-hi text-text14" numberOfLines={1}>
+        <Text className="text-text-hi text-text14" numberOfLines={compact ? 1 : 2}>
           {primaryText}
         </Text>
         <View className="flex-row items-center mt-0.5">
-          <Text className="text-brand-text text-text12" numberOfLines={1}>
-            {session.computerName}
-          </Text>
-          <Text className="text-text-low text-text12 mx-1.5">·</Text>
+          {showComputerName && (
+            <>
+              <Text className="text-brand-text text-text12" numberOfLines={1}>
+                {session.computerName}
+              </Text>
+              <Text className="text-text-low text-text12 mx-1.5">·</Text>
+            </>
+          )}
           <Text className="text-text-low text-text12 flex-1" numberOfLines={1}>
             {detailText}{modelText ? ` · ${modelText}` : ''}
           </Text>
@@ -85,6 +93,9 @@ function discoveryMessage(status: ComputerDiscoveryStatus): string | null {
   if (status.state === 'authorization_failed') {
     return `${status.computerName} needs to be paired again.`;
   }
+  if (status.state === 'too_many_sessions') {
+    return `${status.computerName} has more sessions than DevinX can list right now, so none are shown.`;
+  }
   if (status.state === 'invalid_response') {
     return `${status.computerName} returned an incompatible session response.`;
   }
@@ -115,5 +126,22 @@ export function ComputerDiscoveryNotices({ computers }: { computers: ComputerDis
         </View>
       ))}
     </View>
+  );
+}
+
+export function ComputerListFreshness({ lastSuccessfulAt }: { lastSuccessfulAt?: number }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (lastSuccessfulAt === undefined) return;
+    const id = setInterval(() => setTick((tick) => tick + 1), 15_000);
+    return () => clearInterval(id);
+  }, [lastSuccessfulAt]);
+
+  if (lastSuccessfulAt === undefined) return null;
+  return (
+    <Text className="text-text-low text-text12 mb-2">
+      Local list updated {relativeTime(lastSuccessfulAt / 1000)} · refreshes every{' '}
+      {COMPUTER_SESSIONS_REFRESH_INTERVAL_MS / 1000}s
+    </Text>
   );
 }

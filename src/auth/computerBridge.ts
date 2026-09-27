@@ -371,7 +371,8 @@ export type ComputerBridgeErrorCode =
   | 'rate_limited'
   | 'unavailable'
   | 'unsupported_method'
-  | 'invalid_response';
+  | 'invalid_response'
+  | 'too_many_sessions';
 
 export class ComputerBridgeError extends Error {
   constructor(

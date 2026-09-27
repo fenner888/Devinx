@@ -22,6 +22,7 @@ import type { PairedComputerSummary } from '@auth/pairedComputers';
 import { connectionModeUsesComputer } from '@lib/connections';
 
 const MAXIMUM_PAGES_PER_COMPUTER = 5;
+export const COMPUTER_SESSIONS_REFRESH_INTERVAL_MS = 30_000;
 const MAXIMUM_SESSIONS_PER_COMPUTER = 5_000;
 
 export interface ComputerSessionListItem extends ComputerSessionSummary {
@@ -36,6 +37,7 @@ export type ComputerDiscoveryState =
   | 'authorization_failed'
   | 'unavailable'
   | 'invalid_response'
+  | 'too_many_sessions'
   | 'busy';
 
 export interface ComputerDiscoveryStatus {
@@ -47,6 +49,11 @@ export interface ComputerDiscoveryStatus {
 export interface ComputerSessionBoard {
   sessions: ComputerSessionListItem[];
   computers: ComputerDiscoveryStatus[];
+  lastSuccessfulAt?: number;
+}
+
+export function computerSessionsQueryKey(computers: PairedComputerSummary[]) {
+  return ['computerSessions', ...computers.map((computer) => computer.bridgeId).sort()] as const;
 }
 
 function stateForError(error: unknown): ComputerDiscoveryState {
@@ -59,6 +66,7 @@ function stateForError(error: unknown): ComputerDiscoveryState {
     return 'authorization_failed';
   }
   if (error.code === 'invalid_response') return 'invalid_response';
+  if (error.code === 'too_many_sessions') return 'too_many_sessions';
   if (error.code === 'busy' || error.code === 'rate_limited') return 'busy';
   return 'unavailable';
 }
@@ -105,7 +113,7 @@ async function discoverComputer(
       if (pageNumber === MAXIMUM_PAGES_PER_COMPUTER - 1) {
         throw new ComputerBridgeError(
           'The paired local device exceeded the bounded session page limit.',
-          'invalid_response',
+          'too_many_sessions',
         );
       }
       if (cursors.has(page.nextCursor)) {
@@ -159,6 +167,7 @@ export async function loadComputerSessionBoard(
         computerName: computer.computerName,
         state: stateForError(error),
       })),
+      lastSuccessfulAt: previousBoard?.lastSuccessfulAt,
     };
   }
   const results = await Promise.all(
@@ -185,11 +194,17 @@ export async function loadComputerSessionBoard(
       previousBoard?.sessions.filter((session) => session.bridgeId === result.status.bridgeId) ?? []
     );
   });
+  const lastSuccessfulAt = results.every(
+    ({ status }) => status.state === 'ready' || status.state === 'session_discovery_off',
+  )
+    ? Date.now()
+    : previousBoard?.lastSuccessfulAt;
   return {
     sessions: sessions.sort(
       (left, right) => updatedAtMilliseconds(right) - updatedAtMilliseconds(left),
     ),
     computers: results.map((result) => result.status),
+    lastSuccessfulAt,
   };
 }
 
@@ -226,8 +241,7 @@ export function useComputerSessions() {
   const queryClient = useQueryClient();
   const { mode, computers } = useConnections();
   const enabled = connectionModeUsesComputer(mode) && computers.length > 0;
-  const bridgeIds = computers.map((computer) => computer.bridgeId).sort();
-  const queryKey = ['computerSessions', ...bridgeIds] as const;
+  const queryKey = computerSessionsQueryKey(computers);
 
   return useQuery({
     queryKey,
@@ -236,7 +250,8 @@ export function useComputerSessions() {
     enabled,
     staleTime: 15_000,
     gcTime: 5 * 60_000,
-    refetchInterval: () => (AppState.currentState === 'active' ? 30_000 : false),
+    refetchInterval: () =>
+      AppState.currentState === 'active' ? COMPUTER_SESSIONS_REFRESH_INTERVAL_MS : false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: false,
