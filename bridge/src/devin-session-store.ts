@@ -127,6 +127,7 @@ export interface DevinSessionStoreOptions {
   expectedOwnerUid?: number;
   lockDirectory?: string;
   isProcessAlive?: (pid: number) => boolean;
+  openDatabase?: (path: string) => DatabaseSync;
 }
 
 interface TableColumnRow {
@@ -213,6 +214,30 @@ function livenessKindForTool(name: string): AcpActivityKind {
   }
 }
 
+function defaultOpenDatabase(path: string): DatabaseSync {
+  return new DatabaseSync(path, {
+    readOnly: true,
+    allowExtension: false,
+    enableForeignKeyConstraints: false,
+    enableDoubleQuotedStringLiterals: false,
+    timeout: 1_000,
+    defensive: true,
+    limits: {
+      length: 2 * 1024 * 1024,
+      sqlLength: 64 * 1024,
+      column: 64,
+      exprDepth: 64,
+      compoundSelect: 8,
+      vdbeOp: 250_000,
+      functionArg: 16,
+      attach: 0,
+      likePatternLength: 1_024,
+      variableNumber: 16,
+      triggerDepth: 0,
+    },
+  });
+}
+
 function defaultIsProcessAlive(pid: number): boolean {
   if (pid === process.pid) return false;
   try {
@@ -240,6 +265,7 @@ export class DevinSessionStore {
   private readonly expectedOwnerUid: number | undefined;
   private readonly lockDirectory: string;
   private readonly isProcessAlive: (pid: number) => boolean;
+  private readonly dbOpener: (path: string) => DatabaseSync;
   private supported = false;
 
   constructor(options: DevinSessionStoreOptions) {
@@ -248,6 +274,7 @@ export class DevinSessionStore {
     this.lockDirectory =
       options.lockDirectory ?? join(dirname(this.databasePath), 'session_locks');
     this.isProcessAlive = options.isProcessAlive ?? defaultIsProcessAlive;
+    this.dbOpener = options.openDatabase ?? defaultOpenDatabase;
   }
 
   isSessionLoadSupported(): boolean {
@@ -553,7 +580,8 @@ export class DevinSessionStore {
   async getSessionLiveness(sessionIdInput: unknown): Promise<SessionLiveness | null> {
     if (!this.supported) return null;
     const sessionId = sessionIdSchema.parse(sessionIdInput);
-    const lockAlive = await this.sessionLockAlive(sessionId);
+    // A dead lock answers the question without ever touching SQLite.
+    if (!(await this.sessionLockAlive(sessionId))) return null;
     const database = this.openDatabase();
     try {
       database.exec('PRAGMA query_only = ON; BEGIN;');
@@ -563,24 +591,45 @@ export class DevinSessionStore {
            FROM sessions WHERE id = ? AND hidden = 0`,
         )
         .get(sessionId) as { lastActivityAt?: unknown } | undefined;
-      if (!row) {
-        database.exec('ROLLBACK;');
-        return null;
-      }
-      const updatedAt = lastActivityMs(row.lastActivityAt);
-      if (!lockAlive) {
-        database.exec('ROLLBACK;');
-        return { active: false, updatedAt };
-      }
-      const tip = database
-        .prepare(
-          `SELECT chat_message AS chatMessage FROM message_nodes
-           WHERE session_id = ? ORDER BY row_id DESC LIMIT 1`,
-        )
-        .get(sessionId) as { chatMessage?: unknown } | undefined;
-      database.exec('ROLLBACK;');
-      const message =
+      const tip = row
+        ? (database
+            .prepare(
+              `SELECT chat_message AS chatMessage FROM message_nodes
+               WHERE session_id = ? ORDER BY row_id DESC LIMIT 1`,
+            )
+            .get(sessionId) as { chatMessage?: unknown } | undefined)
+        : undefined;
+      const tipMessage =
         typeof tip?.chatMessage === 'string' ? this.parseChatMessage(tip.chatMessage) : null;
+      const pending =
+        tipMessage?.role === 'assistant'
+          ? (tipMessage.tool_calls ?? [])
+              .map((raw) => storedToolCallSchema.safeParse(raw))
+              .filter((call) => call.success)
+              .map((call) => call.data)
+          : [];
+      const resolved = new Set<string>();
+      if (pending.length > 0) {
+        const resolvedRows = database
+          .prepare(
+            `SELECT chat_message AS chatMessage FROM message_nodes
+             WHERE session_id = ? ORDER BY row_id DESC LIMIT ?`,
+          )
+          .all(sessionId, MAXIMUM_CHAIN_NODES) as Array<{ chatMessage?: unknown }>;
+        for (const resolvedRow of resolvedRows) {
+          const resolvedMessage =
+            typeof resolvedRow.chatMessage === 'string'
+              ? this.parseChatMessage(resolvedRow.chatMessage)
+              : null;
+          if (resolvedMessage?.role === 'tool' && resolvedMessage.tool_call_id) {
+            resolved.add(resolvedMessage.tool_call_id);
+          }
+        }
+      }
+      database.exec('ROLLBACK;');
+      if (!row) return null;
+      const updatedAt = lastActivityMs(row.lastActivityAt);
+      const message = tipMessage;
       if (!message) {
         return {
           active: updatedAt > 0 && Date.now() - updatedAt <= ACTIVITY_RECENT_WINDOW_MS,
@@ -597,28 +646,6 @@ export class DevinSessionStore {
         return { active: true, kind: 'thinking', updatedAt };
       }
       if (message.role === 'assistant') {
-        const pending = (message.tool_calls ?? [])
-          .map((raw) => storedToolCallSchema.safeParse(raw))
-          .filter((call) => call.success)
-          .map((call) => call.data);
-        const resolved = new Set<string>();
-        if (pending.length > 0) {
-          const resolvedRows = database
-            .prepare(
-              `SELECT chat_message AS chatMessage FROM message_nodes
-               WHERE session_id = ? ORDER BY row_id DESC LIMIT ?`,
-            )
-            .all(sessionId, MAXIMUM_CHAIN_NODES) as Array<{ chatMessage?: unknown }>;
-          for (const resolvedRow of resolvedRows) {
-            const resolvedMessage =
-              typeof resolvedRow.chatMessage === 'string'
-                ? this.parseChatMessage(resolvedRow.chatMessage)
-                : null;
-            if (resolvedMessage?.role === 'tool' && resolvedMessage.tool_call_id) {
-              resolved.add(resolvedMessage.tool_call_id);
-            }
-          }
-        }
         const unresolved = pending.filter((call) => !resolved.has(call.id));
         if (unresolved.length === 0) {
           return { active: false, updatedAt };
@@ -788,27 +815,7 @@ export class DevinSessionStore {
   }
 
   private openDatabase(): DatabaseSync {
-    return new DatabaseSync(this.databasePath, {
-      readOnly: true,
-      allowExtension: false,
-      enableForeignKeyConstraints: false,
-      enableDoubleQuotedStringLiterals: false,
-      timeout: 1_000,
-      defensive: true,
-      limits: {
-        length: 2 * 1024 * 1024,
-        sqlLength: 64 * 1024,
-        column: 64,
-        exprDepth: 64,
-        compoundSelect: 8,
-        vdbeOp: 250_000,
-        functionArg: 16,
-        attach: 0,
-        likePatternLength: 1_024,
-        variableNumber: 16,
-        triggerDepth: 0,
-      },
-    });
+    return this.dbOpener(this.databasePath);
   }
 
   private async validateDatabaseFile(): Promise<void> {

@@ -951,9 +951,8 @@ describe('Devin session store activity timeline', () => {
       });
       await store.start();
       try {
-        await expect(store.getSessionLiveness(sessionId)).resolves.toMatchObject({
-          active: false,
-        });
+        // A dead lock short-circuits before SQLite opens.
+        await expect(store.getSessionLiveness(sessionId)).resolves.toBeNull();
       } finally {
         await store.stop();
       }
@@ -988,6 +987,111 @@ describe('Devin session store activity timeline', () => {
         content: 'Work.',
       });
       const store = new DevinSessionStore({ databasePath });
+      await store.start();
+      try {
+        await expect(store.getSessionLiveness(sessionId)).resolves.toBeNull();
+      } finally {
+        await store.stop();
+      }
+    });
+
+    it('never opens SQLite when no lock file exists', async () => {
+      const databasePath = await fixtureWithTip({
+        message_id: 'u1',
+        role: 'user',
+        content: 'Work.',
+      });
+      let opens = 0;
+      const store = new DevinSessionStore({
+        databasePath,
+        openDatabase: (path) => {
+          opens += 1;
+          return new DatabaseSync(path, { readOnly: true });
+        },
+      });
+      await store.start();
+      opens = 0;
+      try {
+        await expect(store.getSessionLiveness(sessionId)).resolves.toBeNull();
+        expect(opens).toBe(0);
+      } finally {
+        await store.stop();
+      }
+    });
+
+    it('opens SQLite exactly once for a live lock', async () => {
+      const databasePath = await fixtureWithTip({
+        message_id: 'u1',
+        role: 'user',
+        content: 'Work.',
+      });
+      const lockDirectory = await lockFile(424_242);
+      let opens = 0;
+      const store = new DevinSessionStore({
+        databasePath,
+        lockDirectory,
+        isProcessAlive: () => true,
+        openDatabase: (path) => {
+          opens += 1;
+          return new DatabaseSync(path, { readOnly: true });
+        },
+      });
+      await store.start();
+      opens = 0;
+      try {
+        await expect(store.getSessionLiveness(sessionId)).resolves.toMatchObject({
+          active: true,
+        });
+        expect(opens).toBe(1);
+      } finally {
+        await store.stop();
+      }
+    });
+
+    it('reports inactive for an assistant tip whose tool calls are all resolved', async () => {
+      // The assistant tip must be the newest row; its tool nodes precede it.
+      const databasePath = join(directory, 'sessions.db');
+      const writer = createTuiFixture(databasePath);
+      writer
+        .prepare(
+          `INSERT INTO sessions(id, working_directory, main_chain_id, last_activity_at)
+           VALUES (?, '/tmp/ws', 3, ?)`,
+        )
+        .run(sessionId, 1_800_000_000);
+      addNode(writer, {
+        sessionId,
+        nodeId: 1,
+        chatMessage: { role: 'tool', content: 'ok', tool_call_id: 'call_done_1' },
+      });
+      addNode(writer, {
+        sessionId,
+        nodeId: 2,
+        parentNodeId: 1,
+        chatMessage: { role: 'tool', content: 'ok', tool_call_id: 'call_done_2' },
+      });
+      addNode(writer, {
+        sessionId,
+        nodeId: 3,
+        parentNodeId: 2,
+        chatMessage: {
+          message_id: 'a1',
+          role: 'assistant',
+          content: '',
+          tool_calls: [
+            { id: 'call_done_1', name: 'exec', arguments: {}, kind: 'function' },
+            { id: 'call_done_2', name: 'read', arguments: {}, kind: 'function' },
+          ],
+          metadata: { finish_reason: 'tool_calls' },
+        },
+      });
+      writer.close();
+      await chmod(databasePath, 0o600);
+      const lockDirectory = await lockFile(424_242);
+      const store = new DevinSessionStore({
+        databasePath,
+        lockDirectory,
+        isProcessAlive: () => true,
+      });
       await store.start();
       try {
         await expect(store.getSessionLiveness(sessionId)).resolves.toMatchObject({
