@@ -34,7 +34,7 @@ const modelIdSchema = z
 
 const sessionRowSchema = z
   .object({
-    workingDirectory: z.string().min(1).max(4_096),
+    workingDirectory: z.string().min(1).max(4_096).refine(isAbsolute),
     mainChainId: z.number().int().nonnegative(),
     modelId: z.union([modelIdSchema, z.literal('')]),
   })
@@ -574,6 +574,11 @@ export class DevinSessionStore {
         };
       }
       if (message.role === 'user' || message.role === 'tool') {
+        // A TUI turn abandoned with Ctrl-C leaves a live lock forever; treat a
+        // stale tip as inactive rather than reporting it "running" forever.
+        if (updatedAt === 0 || Date.now() - updatedAt > 30 * 60_000) {
+          return { active: false, updatedAt };
+        }
         return { active: true, kind: 'thinking', updatedAt };
       }
       if (message.role === 'assistant') {

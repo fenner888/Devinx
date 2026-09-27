@@ -38,7 +38,7 @@ import type { SessionHandleRegistry } from './session-handles';
 import type { WorkspaceHandleRegistry } from './workspace-handles';
 
 const MAX_LOCAL_SESSION_RESPONSE_BYTES = 192 * 1024;
-const MAX_TOTAL_ACTIVITY_DETAIL_BYTES = 512 * 1024;
+const MAX_TOTAL_ACTIVITY_DETAIL_BYTES = 160 * 1024;
 
 const localSessionActivityKindSchema = z.enum([
   'thinking',
@@ -435,8 +435,29 @@ function withRenumberedMessages(
   };
 }
 
+function stripOldestActivityDetail(entries: ActivityEntry[]): ActivityEntry[] | null {
+  const index = entries.findIndex((entry) => entry.detail !== undefined);
+  if (index < 0) return null;
+  const next = entries.map((entry) => ({ ...entry }));
+  next[index]!.detail = undefined;
+  next[index]!.truncated = true;
+  return next;
+}
+
 function fitLoadedSessionResponse(input: LocalLoadedSession): LocalLoadedSession {
   let response = input;
+  // Activity detail is bounded per-entry, but the serialized response must fit
+  // the phone transport limit; shed activity payload before touching messages.
+  while (serializedBytes(response) > MAX_LOCAL_SESSION_RESPONSE_BYTES) {
+    if (!response.activity) break;
+    const stripped = stripOldestActivityDetail(response.activity);
+    if (stripped) {
+      response = { ...response, activity: stripped };
+      continue;
+    }
+    if (response.activity.length === 0) break;
+    response = { ...response, activity: response.activity.slice(1), truncated: true };
+  }
   while (
     serializedBytes(response) > MAX_LOCAL_SESSION_RESPONSE_BYTES &&
     response.messages.length > 1
@@ -467,6 +488,27 @@ function fitLoadedSessionResponse(input: LocalLoadedSession): LocalLoadedSession
   }
   if (!fitted) throw new Error('Local session response exceeded its byte limit');
   return fitted;
+}
+
+function fitActivityResponse(
+  body: z.infer<typeof localSessionActivitySchema>,
+): z.infer<typeof localSessionActivitySchema> {
+  let response = body;
+  // The reply text is already capped well under the transport limit, so only
+  // the turn's activity entries need shedding.
+  while (response.turn && serializedBytes(response) > MAX_LOCAL_SESSION_RESPONSE_BYTES) {
+    const stripped = stripOldestActivityDetail(response.turn.activity);
+    if (stripped) {
+      response = { ...response, turn: { ...response.turn, activity: stripped } };
+      continue;
+    }
+    if (response.turn.activity.length === 0) break;
+    response = {
+      ...response,
+      turn: { ...response.turn, activity: response.turn.activity.slice(1) },
+    };
+  }
+  return response;
 }
 
 export class BridgeService {
@@ -754,7 +796,7 @@ export class BridgeService {
         : null;
       return {
         status: 200,
-        body: localSessionActivitySchema.parse({
+        body: fitActivityResponse(localSessionActivitySchema.parse({
           active: activity?.active ?? false,
           kind: activity?.kind ?? 'thinking',
           label: cleanDisplayText(activity?.label ?? 'Waiting for the next step', 160, 'Working'),
@@ -767,7 +809,7 @@ export class BridgeService {
               }
             : undefined,
         }),
-      };
+      )};
     } catch (error) {
       if (error instanceof AcpBusyError) {
         return { status: 409, body: { error: 'conflict' } };

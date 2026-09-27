@@ -799,6 +799,28 @@ describe('Devin session store activity timeline', () => {
       }
     });
 
+    it('reports inactive for a stale user tip even with a live lock', async () => {
+      const staleSeconds = Math.floor(Date.now() / 1000) - 31 * 60;
+      const databasePath = await fixtureWithTip(
+        { message_id: 'u1', role: 'user', content: 'Work.' },
+        staleSeconds,
+      );
+      const lockDirectory = await lockFile(424_242);
+      const store = new DevinSessionStore({
+        databasePath,
+        lockDirectory,
+        isProcessAlive: () => true,
+      });
+      await store.start();
+      try {
+        await expect(store.getSessionLiveness(sessionId)).resolves.toMatchObject({
+          active: false,
+        });
+      } finally {
+        await store.stop();
+      }
+    });
+
     it('reports inactive when no lock file exists', async () => {
       const databasePath = await fixtureWithTip({
         message_id: 'u1',

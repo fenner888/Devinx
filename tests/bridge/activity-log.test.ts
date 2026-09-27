@@ -275,7 +275,7 @@ describe('ActivityLog', () => {
       (sum, entry) => sum + Buffer.byteLength((entry.detail as { text: string }).text, 'utf8'),
       0,
     );
-    expect(total).toBeLessThanOrEqual(512 * 1024);
+    expect(total).toBeLessThanOrEqual(160 * 1024);
     expect(withDetail.length).toBeLessThan(40);
     expect(log.truncated).toBe(true);
   });

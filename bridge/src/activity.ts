@@ -36,7 +36,7 @@ export interface ActivityEntry {
 export const ACTIVITY_LIMITS = {
   entries: 500,
   detailBytes: 16 * 1024,
-  totalDetailBytes: 512 * 1024,
+  totalDetailBytes: 160 * 1024,
   paths: 20,
   pathLength: 512,
   title: 200,
@@ -578,7 +578,7 @@ export class ActivityLog {
       }
     }
     if (typeof parsed.rawOutput === 'string') texts.push(parsed.rawOutput);
-    const terminalExit = parsed._meta?.['terminal_exit'];
+    const terminalExit = parsed._meta?.terminal_exit;
     const exitCode =
       terminalExit && typeof terminalExit === 'object' && !Array.isArray(terminalExit)
         ? (terminalExit as Record<string, unknown>).exit_code

@@ -1079,6 +1079,50 @@ describe('authenticated Desktop Bridge service', () => {
     });
   });
 
+  it('trims oversized activity detail before dropping messages on session.load', async () => {
+    const detail = { type: 'text' as const, text: 'd'.repeat(15 * 1024) };
+    adapter.loaded = {
+      sessionId: 'raw-private-session-id',
+      cwd: '/Users/frank/Secret Project',
+      messages: [
+        { source: 'user', text: 'Please review this.' },
+        { source: 'devin', text: 'Done.' },
+      ],
+      truncated: false,
+      activity: Array.from({ length: 20 }, (_, index) => ({
+        id: `tool_big_${index}`,
+        afterSequence: 1,
+        kind: 'tool' as const,
+        toolKind: 'read' as const,
+        status: 'completed' as const,
+        title: `Read file ${index}`,
+        detail,
+        truncated: false,
+      })),
+    };
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id;
+
+    const result = await bridge.handle(
+      envelope('session.load', { sessionId: handle }, ['session:content:read']),
+      context(),
+    );
+
+    expect(result.status).toBe(200);
+    const body = result.body as {
+      messages: unknown[];
+      activity: Array<{ detail?: unknown; truncated: boolean }>;
+      truncated: boolean;
+    };
+    expect(body.messages).toHaveLength(2);
+    expect(Buffer.byteLength(JSON.stringify(body), 'utf8')).toBeLessThanOrEqual(192 * 1024);
+    expect(
+      body.activity.filter((entry) => entry.detail !== undefined).length,
+    ).toBeLessThan(20);
+    expect(body.activity.some((entry) => entry.truncated)).toBe(true);
+  });
+
   it('rejects activity entries with unsafe titles or absolute paths through the schema', async () => {
     adapter.loaded = {
       ...adapter.loaded,
