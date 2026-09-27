@@ -644,6 +644,86 @@ describe('Devin session store activity timeline', () => {
     }
   });
 
+  it('completes persisted thoughts with real timestamps placed before the reply', async () => {
+    const databasePath = join(directory, 'sessions.db');
+    const writer = createTuiFixture(databasePath);
+    const cwd = '/Users/tester/ws';
+    writer
+      .prepare('INSERT INTO sessions(id, working_directory, main_chain_id) VALUES (?, ?, ?)')
+      .run('session-thought', cwd, 4);
+    addNode(writer, {
+      sessionId: 'session-thought',
+      nodeId: 1,
+      chatMessage: { message_id: 'u1', role: 'user', content: 'Fix it.' },
+    });
+    addNode(writer, {
+      sessionId: 'session-thought',
+      nodeId: 2,
+      parentNodeId: 1,
+      chatMessage: {
+        message_id: 'a1',
+        role: 'assistant',
+        content: 'Done.',
+        thinking: { thinking: 'Read first, then edit.', signature: 'sig' },
+        tool_calls: [
+          { id: 'call_x', name: 'read', arguments: { file_path: `${cwd}/notes.txt` }, kind: 'function' },
+        ],
+        metadata: {
+          finish_reason: 'stop',
+          started_generation_at: '2026-09-27T21:32:31.313571Z',
+          created_at: '2026-09-27T21:32:32.506413Z',
+        },
+      },
+    });
+    addNode(writer, {
+      sessionId: 'session-thought',
+      nodeId: 3,
+      parentNodeId: 2,
+      chatMessage: {
+        message_id: 't1',
+        role: 'tool',
+        content: 'contents',
+        tool_call_id: 'call_x',
+        metadata: { extensions: { 'chisel/tool_result_meta': { success: true, kind: 'read' } } },
+      },
+    });
+    addNode(writer, {
+      sessionId: 'session-thought',
+      nodeId: 4,
+      parentNodeId: 3,
+      chatMessage: {
+        message_id: 'a2',
+        role: 'assistant',
+        content: 'Reply.',
+        metadata: { finish_reason: 'stop' },
+      },
+    });
+    writer.close();
+    await chmod(databasePath, 0o600);
+
+    const store = new DevinSessionStore({ databasePath, isProcessAlive: () => false });
+    await store.start();
+    try {
+      const loaded = await store.loadSession('session-thought');
+      const activity = loaded.activity ?? [];
+      const thought = activity.find((entry) => entry.kind === 'thought');
+      const tool = activity.find((entry) => entry.kind === 'tool');
+      expect(thought).toMatchObject({
+        status: 'completed',
+        startedAt: Date.parse('2026-09-27T21:32:31.313571Z'),
+        endedAt: Date.parse('2026-09-27T21:32:32.506413Z'),
+      });
+      // The user message is sequence 1; the node's thought/tool work precedes
+      // its own assistant text, so they attach at the same boundary.
+      expect(thought?.afterSequence).toBe(1);
+      expect(tool?.afterSequence).toBe(1);
+      // Assistant a2 has no activity; nothing lands after the last message.
+      expect(activity.every((entry) => entry.afterSequence === 1)).toBe(true);
+    } finally {
+      await store.stop();
+    }
+  });
+
   it('skips unknown-shape nodes while keeping messages', async () => {
     const databasePath = join(directory, 'sessions.db');
     const writer = createTuiFixture(databasePath);

@@ -461,13 +461,13 @@ export class DevinSessionStore {
         if (message.message_id) seenMessageIds.add(message.message_id);
         if (typeof message.content !== 'string') continue;
 
+        const beforeSequence = textMessages.length;
         const clipped = utf8Tail(message.content, MAXIMUM_MESSAGE_BYTES);
         truncated ||= clipped.truncated;
         textMessages.push({
           source: message.role === 'user' ? 'user' : 'devin',
           text: clipped.text,
         });
-        const sequence = textMessages.length;
 
         const thinking = message.thinking;
         if (
@@ -476,7 +476,19 @@ export class DevinSessionStore {
           !Array.isArray(thinking) &&
           typeof (thinking as Record<string, unknown>).thinking === 'string'
         ) {
-          activity.beginThought(sequence, (thinking as { thinking: string }).thinking);
+          const metadata = message.metadata ?? {};
+          const startedAt = isoToMs(
+            typeof metadata['started_generation_at'] === 'string'
+              ? metadata['started_generation_at']
+              : undefined,
+          );
+          const endedAt = isoToMs(
+            typeof metadata['created_at'] === 'string' ? metadata['created_at'] : undefined,
+          );
+          // A persisted thinking block is always finished; real timestamps keep
+          // the group's duration accurate instead of showing a running thought.
+          activity.beginThought(beforeSequence, (thinking as { thinking: string }).thinking, startedAt);
+          activity.closeThought(endedAt ?? startedAt);
         }
 
         const toolCallContent = this.messageExtensions(message)['chisel/tool_call_content'];
@@ -485,7 +497,7 @@ export class DevinSessionStore {
           if (!call.success) continue;
           this.recordStoredToolCall(
             activity,
-            sequence,
+            beforeSequence,
             call.data,
             toolCallContent,
             toolCallStates.get(call.data.id),
