@@ -1,11 +1,17 @@
-import { lstat } from 'node:fs/promises';
-import { isAbsolute } from 'node:path';
+import { lstat, readFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { z } from 'zod';
 
-import type { AcpHistoryMessage, AcpLoadedSession } from './acp';
+import {
+  ActivityLog,
+  activityKindFromToolName,
+  type ActivityEntry,
+} from './activity';
+import type { AcpActivityKind, AcpHistoryMessage, AcpLoadedSession } from './acp';
 import { sessionIdSchema } from './schemas';
+import { utf8Tail } from './text';
 
 // Schema 17 adds subagent_heads without changing the reviewed main-chain data.
 // Deliberately do not traverse that table or accept arbitrary future versions.
@@ -17,6 +23,8 @@ const MAXIMUM_MESSAGES = 200;
 const MAXIMUM_MESSAGE_BYTES = 100_000;
 const MAXIMUM_HISTORY_BYTES = 160 * 1024;
 const MAXIMUM_CREATE_OPTIONS = 100;
+const MAXIMUM_LOCK_BYTES = 32;
+const ACTIVITY_RECENT_WINDOW_MS = 60_000;
 
 const modelIdSchema = z
   .string()
@@ -26,17 +34,17 @@ const modelIdSchema = z
 
 const sessionRowSchema = z
   .object({
-    workingDirectory: z.string().min(1).max(4_096).refine(isAbsolute),
+    workingDirectory: z.string().min(1).max(4_096),
     mainChainId: z.number().int().nonnegative(),
     modelId: z.union([modelIdSchema, z.literal('')]),
   })
   .strict();
 
-const historyRowSchema = z
+const chainRowSchema = z
   .object({
     depth: z.number().int().min(0).max(MAXIMUM_CHAIN_NODES),
-    role: z.enum(['user', 'assistant']),
-    content: z.string().max(1024 * 1024),
+    nodeId: z.number().int().nonnegative(),
+    chatMessage: z.string().max(2 * 1024 * 1024),
   })
   .strict();
 
@@ -46,6 +54,48 @@ const chainBoundarySchema = z
     parentNodeId: z.number().int().nonnegative().nullable(),
   })
   .strict();
+
+const chatMessageSchema = z
+  .object({
+    message_id: z.string().max(160).optional(),
+    role: z.string().max(40).optional(),
+    content: z.unknown().optional(),
+    tool_call_id: z.string().max(512).optional(),
+    tool_calls: z.array(z.unknown()).max(100).optional(),
+    thinking: z.unknown().optional(),
+    metadata: z.record(z.unknown()).optional(),
+  })
+  .passthrough();
+
+const storedToolCallSchema = z
+  .object({
+    id: z.string().min(1).max(512),
+    name: z.string().min(1).max(160),
+    arguments: z.unknown().optional(),
+  })
+  .passthrough();
+
+const toolCallStateRowSchema = z
+  .object({
+    toolCallId: z.string().min(1).max(512),
+    toolCallJson: z.string().max(2 * 1024 * 1024).nullable(),
+    toolCallUpdateJson: z.string().max(2 * 1024 * 1024).nullable(),
+  })
+  .strict();
+
+const toolResultMetaSchema = z
+  .object({
+    success: z.boolean().optional(),
+    kind: z.string().max(80).optional(),
+  })
+  .passthrough();
+
+const toolCallTimingSchema = z
+  .object({
+    started_at: z.string().max(80).optional(),
+    finished_at: z.string().max(80).optional(),
+  })
+  .passthrough();
 
 const requiredColumns = {
   sessions: new Set([
@@ -61,9 +111,22 @@ const requiredColumns = {
   refinery_schema_history: new Set(['version']),
 } as const;
 
-interface DevinSessionStoreOptions {
+// Present in reviewed schemas 16/17 but absent from minimal fixtures; enriched
+// fields are skipped rather than failing the load when the table is missing.
+const optionalColumns = {
+  tool_call_state: new Set([
+    'session_id',
+    'tool_call_id',
+    'tool_call_json',
+    'tool_call_update_json',
+  ]),
+} as const;
+
+export interface DevinSessionStoreOptions {
   databasePath: string;
   expectedOwnerUid?: number;
+  lockDirectory?: string;
+  isProcessAlive?: (pid: number) => boolean;
 }
 
 interface TableColumnRow {
@@ -92,30 +155,99 @@ export interface DevinCreateOptions {
   catalogSource?: 'live' | 'recent';
 }
 
-function utf8Tail(value: string, maximumBytes: number): { text: string; truncated: boolean } {
-  const bytes = Buffer.from(value, 'utf8');
-  try {
-    if (bytes.length <= maximumBytes) return { text: value, truncated: false };
-    let text = bytes.subarray(bytes.length - maximumBytes).toString('utf8');
-    while (text.startsWith('\uFFFD')) text = text.slice(1);
-    return { text, truncated: true };
-  } finally {
-    bytes.fill(0);
-  }
+export interface SessionLiveness {
+  active: boolean;
+  kind?: AcpActivityKind;
+  updatedAt: number;
 }
 
 function messageBytes(message: AcpHistoryMessage): number {
   return Buffer.byteLength(message.text, 'utf8');
 }
 
+function attachActivity<T extends object>(target: T, activity: ActivityEntry[]): T {
+  Object.defineProperty(target, 'activity', {
+    value: activity,
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+  return target;
+}
+
+function isoToMs(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function lastActivityMs(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    // Stored in whole seconds by the CLI.
+    return Math.floor(value * 1000);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/^\d+(\.\d+)?$/.test(trimmed)) return Math.floor(Number(trimmed) * 1000);
+    return Date.parse(trimmed) || 0;
+  }
+  return 0;
+}
+
+function livenessKindForTool(name: string): AcpActivityKind {
+  switch (activityKindFromToolName(name)) {
+    case 'read':
+      return 'reading';
+    case 'edit':
+    case 'delete':
+    case 'move':
+      return 'editing';
+    case 'execute':
+      return 'executing';
+    case 'search':
+      return 'searching';
+    case 'fetch':
+      return 'fetching';
+    default:
+      return 'thinking';
+  }
+}
+
+function defaultIsProcessAlive(pid: number): boolean {
+  if (pid === process.pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+interface ParsedChainNode {
+  nodeId: number;
+  message: z.infer<typeof chatMessageSchema>;
+}
+
+interface ToolResultRecord {
+  content: string;
+  success: boolean;
+  startedAt?: number;
+  finishedAt?: number;
+}
+
 export class DevinSessionStore {
   private readonly databasePath: string;
   private readonly expectedOwnerUid: number | undefined;
+  private readonly lockDirectory: string;
+  private readonly isProcessAlive: (pid: number) => boolean;
   private supported = false;
 
   constructor(options: DevinSessionStoreOptions) {
     this.databasePath = z.string().min(1).max(4_096).refine(isAbsolute).parse(options.databasePath);
     this.expectedOwnerUid = options.expectedOwnerUid ?? process.getuid?.();
+    this.lockDirectory =
+      options.lockDirectory ?? join(dirname(this.databasePath), 'session_locks');
+    this.isProcessAlive = options.isProcessAlive ?? defaultIsProcessAlive;
   }
 
   isSessionLoadSupported(): boolean {
@@ -236,13 +368,12 @@ export class DevinSessionStore {
           .get(sessionId),
       );
       const chainSql = `
-        WITH RECURSIVE chain(depth, node_id, parent_node_id, role, content) AS (
+        WITH RECURSIVE chain(depth, node_id, parent_node_id, chat_message) AS (
           SELECT
             0,
             node.node_id,
             node.parent_node_id,
-            json_extract(node.chat_message, '$.role'),
-            json_extract(node.chat_message, '$.content')
+            node.chat_message
           FROM message_nodes AS node
           WHERE node.session_id = ? AND node.node_id = ?
           UNION ALL
@@ -250,8 +381,7 @@ export class DevinSessionStore {
             chain.depth + 1,
             parent.node_id,
             parent.parent_node_id,
-            json_extract(parent.chat_message, '$.role'),
-            json_extract(parent.chat_message, '$.content')
+            parent.chat_message
           FROM message_nodes AS parent
           JOIN chain
             ON parent.session_id = ? AND parent.node_id = chain.parent_node_id
@@ -260,14 +390,13 @@ export class DevinSessionStore {
       const rows = database
         .prepare(
           `${chainSql}
-           SELECT depth, role, content
+           SELECT depth, node_id AS nodeId, chat_message AS chatMessage
            FROM chain
-           WHERE role IN ('user', 'assistant') AND typeof(content) = 'text'
            ORDER BY depth ASC
            LIMIT ?`,
         )
-        .all(sessionId, session.mainChainId, sessionId, MAXIMUM_CHAIN_NODES, MAXIMUM_MESSAGES + 1)
-        .map((row) => historyRowSchema.parse(row));
+        .all(sessionId, session.mainChainId, sessionId, MAXIMUM_CHAIN_NODES, MAXIMUM_CHAIN_NODES)
+        .map((row) => chainRowSchema.parse(row));
       const boundary = chainBoundarySchema.parse(
         database
           .prepare(
@@ -277,29 +406,123 @@ export class DevinSessionStore {
           )
           .get(sessionId, session.mainChainId, sessionId, MAXIMUM_CHAIN_NODES),
       );
+      const toolCallStates = this.loadToolCallStates(database, sessionId);
       database.exec('ROLLBACK;');
 
-      let truncated = rows.length > MAXIMUM_MESSAGES || boundary.parentNodeId !== null;
-      const chronological = rows.slice(0, MAXIMUM_MESSAGES).reverse();
-      const messages = chronological.map((row): AcpHistoryMessage => {
-        const clipped = utf8Tail(row.content, MAXIMUM_MESSAGE_BYTES);
+      let truncated = boundary.parentNodeId !== null;
+      const activity = new ActivityLog();
+      const lockAlive = await this.sessionLockAlive(sessionId);
+
+      // Chain rows are newest-first; process oldest-first so messages and
+      // activity entries land in chronological order.
+      const chronological = [...rows].reverse();
+      const seenMessageIds = new Set<string>();
+      const textMessages: Array<{ source: 'user' | 'devin'; text: string }> = [];
+
+      // Index tool-result nodes so a tool call can be resolved immediately when
+      // its assistant step is visited.
+      const toolResults = new Map<string, ToolResultRecord>();
+      for (const row of chronological) {
+        const parsed = this.parseChatMessage(row.chatMessage);
+        if (!parsed) continue;
+        if (parsed.role !== 'tool') continue;
+        const toolCallId = parsed.tool_call_id;
+        if (typeof toolCallId !== 'string' || typeof parsed.content !== 'string') continue;
+        const extensions = this.messageExtensions(parsed);
+        const meta = toolResultMetaSchema.safeParse(extensions['chisel/tool_result_meta']);
+        const timing = toolCallTimingSchema.safeParse(extensions['chisel/tool_call_timing']);
+        toolResults.set(toolCallId, {
+          content: parsed.content,
+          success: !meta.success || meta.data.success !== false,
+          ...(timing.success
+            ? {
+                startedAt: isoToMs(timing.data.started_at),
+                finishedAt: isoToMs(timing.data.finished_at),
+              }
+            : {}),
+        });
+      }
+
+      const nodes: ParsedChainNode[] = [];
+      for (const row of chronological) {
+        const parsed = this.parseChatMessage(row.chatMessage);
+        if (!parsed) {
+          truncated = true;
+          activity.markTruncated();
+          continue;
+        }
+        nodes.push({ nodeId: row.nodeId, message: parsed });
+      }
+
+      for (const node of nodes) {
+        const message = node.message;
+        if (message.role !== 'user' && message.role !== 'assistant') continue;
+        if (message.message_id && seenMessageIds.has(message.message_id)) continue;
+        if (message.message_id) seenMessageIds.add(message.message_id);
+        if (typeof message.content !== 'string') continue;
+
+        const clipped = utf8Tail(message.content, MAXIMUM_MESSAGE_BYTES);
         truncated ||= clipped.truncated;
-        return { source: row.role === 'user' ? 'user' : 'devin', text: clipped.text };
-      });
-      let totalBytes = messages.reduce((total, message) => total + messageBytes(message), 0);
-      while (messages.length > 0 && totalBytes > MAXIMUM_HISTORY_BYTES) {
-        const removed = messages.shift();
+        textMessages.push({
+          source: message.role === 'user' ? 'user' : 'devin',
+          text: clipped.text,
+        });
+        const sequence = textMessages.length;
+
+        const thinking = message.thinking;
+        if (
+          thinking &&
+          typeof thinking === 'object' &&
+          !Array.isArray(thinking) &&
+          typeof (thinking as Record<string, unknown>).thinking === 'string'
+        ) {
+          activity.beginThought(sequence, (thinking as { thinking: string }).thinking);
+        }
+
+        const toolCallContent = this.messageExtensions(message)['chisel/tool_call_content'];
+        for (const rawCall of message.tool_calls ?? []) {
+          const call = storedToolCallSchema.safeParse(rawCall);
+          if (!call.success) continue;
+          this.recordStoredToolCall(
+            activity,
+            sequence,
+            call.data,
+            toolCallContent,
+            toolCallStates.get(call.data.id),
+            toolResults.get(call.data.id),
+            session.workingDirectory,
+            lockAlive,
+          );
+        }
+      }
+
+      let totalBytes = textMessages.reduce((total, message) => total + messageBytes(message), 0);
+      let droppedMessages = 0;
+      while (textMessages.length > MAXIMUM_MESSAGES || totalBytes > MAXIMUM_HISTORY_BYTES) {
+        const removed = textMessages.shift();
         if (!removed) break;
         totalBytes -= messageBytes(removed);
+        droppedMessages += 1;
         truncated = true;
       }
-      return {
-        sessionId,
-        cwd: session.workingDirectory,
-        messages,
-        truncated,
-        ...(session.modelId ? { modelId: session.modelId } : {}),
-      };
+      const entries = activity
+        .list()
+        .map((entry) => ({
+          ...entry,
+          afterSequence: Math.max(0, entry.afterSequence - droppedMessages),
+        }))
+        .filter((entry) => entry.afterSequence <= textMessages.length);
+
+      return attachActivity(
+        {
+          sessionId,
+          cwd: session.workingDirectory,
+          messages: textMessages,
+          truncated: truncated || activity.truncated,
+          ...(session.modelId ? { modelId: session.modelId } : {}),
+        },
+        entries,
+      );
     } catch {
       try {
         database.exec('ROLLBACK;');
@@ -310,6 +533,237 @@ export class DevinSessionStore {
     } finally {
       database.close();
     }
+  }
+
+  async getSessionLiveness(sessionIdInput: unknown): Promise<SessionLiveness | null> {
+    if (!this.supported) return null;
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    const lockAlive = await this.sessionLockAlive(sessionId);
+    const database = this.openDatabase();
+    try {
+      database.exec('PRAGMA query_only = ON; BEGIN;');
+      const row = database
+        .prepare(
+          `SELECT last_activity_at AS lastActivityAt
+           FROM sessions WHERE id = ? AND hidden = 0`,
+        )
+        .get(sessionId) as { lastActivityAt?: unknown } | undefined;
+      if (!row) {
+        database.exec('ROLLBACK;');
+        return null;
+      }
+      const updatedAt = lastActivityMs(row.lastActivityAt);
+      if (!lockAlive) {
+        database.exec('ROLLBACK;');
+        return { active: false, updatedAt };
+      }
+      const tip = database
+        .prepare(
+          `SELECT chat_message AS chatMessage FROM message_nodes
+           WHERE session_id = ? ORDER BY row_id DESC LIMIT 1`,
+        )
+        .get(sessionId) as { chatMessage?: unknown } | undefined;
+      database.exec('ROLLBACK;');
+      const message =
+        typeof tip?.chatMessage === 'string' ? this.parseChatMessage(tip.chatMessage) : null;
+      if (!message) {
+        return {
+          active: updatedAt > 0 && Date.now() - updatedAt <= ACTIVITY_RECENT_WINDOW_MS,
+          kind: 'thinking',
+          updatedAt,
+        };
+      }
+      if (message.role === 'user' || message.role === 'tool') {
+        return { active: true, kind: 'thinking', updatedAt };
+      }
+      if (message.role === 'assistant') {
+        const pending = (message.tool_calls ?? [])
+          .map((raw) => storedToolCallSchema.safeParse(raw))
+          .filter((call) => call.success)
+          .map((call) => call.data);
+        const resolved = new Set<string>();
+        if (pending.length > 0) {
+          const resolvedRows = database
+            .prepare(
+              `SELECT chat_message AS chatMessage FROM message_nodes
+               WHERE session_id = ? ORDER BY row_id DESC LIMIT ?`,
+            )
+            .all(sessionId, MAXIMUM_CHAIN_NODES) as Array<{ chatMessage?: unknown }>;
+          for (const resolvedRow of resolvedRows) {
+            const resolvedMessage =
+              typeof resolvedRow.chatMessage === 'string'
+                ? this.parseChatMessage(resolvedRow.chatMessage)
+                : null;
+            if (resolvedMessage?.role === 'tool' && resolvedMessage.tool_call_id) {
+              resolved.add(resolvedMessage.tool_call_id);
+            }
+          }
+        }
+        const unresolved = pending.filter((call) => !resolved.has(call.id));
+        if (unresolved.length === 0) {
+          return { active: false, updatedAt };
+        }
+        return {
+          active: true,
+          kind: livenessKindForTool(unresolved[unresolved.length - 1]?.name ?? ''),
+          updatedAt,
+        };
+      }
+      return {
+        active: updatedAt > 0 && Date.now() - updatedAt <= ACTIVITY_RECENT_WINDOW_MS,
+        kind: 'thinking',
+        updatedAt,
+      };
+    } catch {
+      try {
+        database.exec('ROLLBACK;');
+      } catch {
+        // The database may have rejected the transaction before it began.
+      }
+      return null;
+    } finally {
+      database.close();
+    }
+  }
+
+  private recordStoredToolCall(
+    activity: ActivityLog,
+    afterSequence: number,
+    call: { id: string; name: string; arguments?: unknown },
+    toolCallContent: unknown,
+    toolCallState: { toolCallJson: string | null; toolCallUpdateJson: string | null } | undefined,
+    result: ToolResultRecord | undefined,
+    cwd: string,
+    lockAlive: boolean,
+  ): void {
+    const extensionInput =
+      toolCallContent && typeof toolCallContent === 'object' && !Array.isArray(toolCallContent)
+        ? (toolCallContent as Record<string, unknown>)[call.id]
+        : undefined;
+    let beginInput: unknown;
+    if (toolCallState?.toolCallJson) {
+      try {
+        beginInput = JSON.parse(toolCallState.toolCallJson);
+      } catch {
+        beginInput = undefined;
+      }
+    }
+    if (beginInput === undefined && extensionInput !== undefined) beginInput = extensionInput;
+    if (beginInput === undefined) {
+      beginInput = {
+        toolCallId: call.id,
+        title: call.name,
+        kind: activityKindFromToolName(call.name),
+        rawInput: call.arguments,
+      };
+    }
+    if (typeof beginInput === 'object' && beginInput !== null) {
+      beginInput = { toolCallId: call.id, ...(beginInput as Record<string, unknown>) };
+    }
+    activity.beginTool(afterSequence, beginInput, cwd, result?.startedAt);
+    if (result) {
+      activity.updateTool(call.id, {
+        status: result.success ? 'completed' : 'failed',
+        content: [{ type: 'content', content: { type: 'text', text: result.content } }],
+      }, result.finishedAt);
+      return;
+    }
+    let stateStatus: string | undefined;
+    if (toolCallState?.toolCallUpdateJson) {
+      try {
+        const update = JSON.parse(toolCallState.toolCallUpdateJson) as { status?: unknown };
+        if (typeof update.status === 'string') stateStatus = update.status;
+      } catch {
+        stateStatus = undefined;
+      }
+    }
+    if (stateStatus === 'completed' || stateStatus === 'failed') {
+      activity.updateTool(call.id, { status: stateStatus });
+      return;
+    }
+    // Unresolved calls reflect an interrupted turn unless the session lock is
+    // held by a live process that is still working on them.
+    if (lockAlive) {
+      activity.updateTool(call.id, { status: 'in_progress' });
+      return;
+    }
+    activity.interruptTool(call.id);
+  }
+
+  private parseChatMessage(raw: string): z.infer<typeof chatMessageSchema> | null {
+    try {
+      const parsed = chatMessageSchema.safeParse(JSON.parse(raw));
+      return parsed.success ? parsed.data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private messageExtensions(
+    message: z.infer<typeof chatMessageSchema>,
+  ): Record<string, unknown> {
+    const extensions = message.metadata?.extensions;
+    return extensions && typeof extensions === 'object' && !Array.isArray(extensions)
+      ? (extensions as Record<string, unknown>)
+      : {};
+  }
+
+  private loadToolCallStates(
+    database: DatabaseSync,
+    sessionId: string,
+  ): Map<string, { toolCallJson: string | null; toolCallUpdateJson: string | null }> {
+    const states = new Map<
+      string,
+      { toolCallJson: string | null; toolCallUpdateJson: string | null }
+    >();
+    if (!this.hasColumns(database, 'tool_call_state', optionalColumns.tool_call_state)) {
+      return states;
+    }
+    const rows = database
+      .prepare(
+        `SELECT tool_call_id AS toolCallId, tool_call_json AS toolCallJson,
+                tool_call_update_json AS toolCallUpdateJson
+         FROM tool_call_state WHERE session_id = ?`,
+      )
+      .all(sessionId);
+    for (const row of rows) {
+      const parsed = toolCallStateRowSchema.safeParse(row);
+      if (parsed.success) {
+        states.set(parsed.data.toolCallId, {
+          toolCallJson: parsed.data.toolCallJson,
+          toolCallUpdateJson: parsed.data.toolCallUpdateJson,
+        });
+      }
+    }
+    return states;
+  }
+
+  private async sessionLockAlive(sessionId: string): Promise<boolean> {
+    try {
+      const content = await readFile(join(this.lockDirectory, `${sessionId}.lock`));
+      const pid = Number.parseInt(content.subarray(0, MAXIMUM_LOCK_BYTES).toString('utf8'), 10);
+      if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+      return this.isProcessAlive(pid);
+    } catch {
+      return false;
+    }
+  }
+
+  private hasColumns(
+    database: DatabaseSync,
+    table: string,
+    expected: ReadonlySet<string>,
+  ): boolean {
+    const actual = new Set(
+      database
+        .prepare(`PRAGMA table_info('${table}')`)
+        .all()
+        .map((row) => z.string().parse((row as unknown as TableColumnRow).name)),
+    );
+    for (const column of expected) {
+      if (!actual.has(column)) return false;
+    }
+    return true;
   }
 
   private openDatabase(): DatabaseSync {
@@ -359,16 +813,8 @@ export class DevinSessionStore {
       throw new Error('Devin session database schema is not supported');
     }
     for (const [table, expected] of Object.entries(requiredColumns)) {
-      const actual = new Set(
-        database
-          .prepare(`PRAGMA table_info('${table}')`)
-          .all()
-          .map((row) => z.string().parse((row as unknown as TableColumnRow).name)),
-      );
-      for (const column of expected) {
-        if (!actual.has(column)) {
-          throw new Error('Devin session database schema is not supported');
-        }
+      if (!this.hasColumns(database, table, expected)) {
+        throw new Error('Devin session database schema is not supported');
       }
     }
   }

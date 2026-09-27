@@ -7,6 +7,7 @@ import {
   type AcpPendingElicitation,
   type AcpSessionActivity,
   type AcpSessionPage,
+  type AcpSessionTurn,
 } from '../../bridge/src/acp';
 import type { DevinCreateOptions } from '../../bridge/src/devin-session-store';
 import { FixedWindowRateLimiter } from '../../bridge/src/rate-limit';
@@ -162,6 +163,8 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     this.elicitation = null;
   }
 
+  getSessionTurn?: (sessionId: string) => AcpSessionTurn | null;
+
   isSessionPromptSupported(): boolean {
     return this.promptSupported;
   }
@@ -285,16 +288,17 @@ describe('authenticated Desktop Bridge service', () => {
   it('advertises structured question support through the additive feature handshake', async () => {
     await expect(service().handle(envelope('bridge.features', {}), context())).resolves.toEqual({
       status: 200,
-      body: { sessionElicitation: true },
+      body: { sessionElicitation: true, activityTimeline: true },
     });
 
     const unavailable = new FakeSessionAdapter();
     unavailable.elicitationSupported = false;
+    unavailable.loadSupported = false;
     await expect(
       service({ sessions: unavailable }).handle(envelope('bridge.features', {}), context()),
     ).resolves.toEqual({
       status: 200,
-      body: { sessionElicitation: false },
+      body: { sessionElicitation: false, activityTimeline: false },
     });
   });
 
@@ -1017,6 +1021,169 @@ describe('authenticated Desktop Bridge service', () => {
     const result = await service().handle(envelope('session.list', {}), context());
     expect(result).toEqual({ status: 503, body: { error: 'temporarily_unavailable' } });
     expect(JSON.stringify(result)).not.toContain('/private/path');
+  });
+
+  it('includes validated activity entries with remapped sequences on session.load', async () => {
+    adapter.loaded = {
+      sessionId: 'raw-private-session-id',
+      cwd: '/Users/frank/Secret Project',
+      messages: [
+        { source: 'devin', text: '' },
+        { source: 'user', text: 'Please review this.' },
+        { source: 'devin', text: 'Done.' },
+      ],
+      truncated: false,
+      activity: [
+        {
+          id: 'thought_1',
+          afterSequence: 1,
+          kind: 'thought',
+          status: 'completed',
+          title: 'Thought',
+          detail: { type: 'text', text: 'private reasoning is attached but not dropped' },
+          truncated: false,
+        },
+        {
+          id: 'tool_abc',
+          afterSequence: 3,
+          kind: 'tool',
+          toolKind: 'read',
+          status: 'completed',
+          title: 'Read file',
+          paths: ['notes.txt'],
+          truncated: false,
+        },
+      ],
+    };
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id;
+
+    const result = await bridge.handle(
+      envelope('session.load', { sessionId: handle }, ['session:content:read']),
+      context(),
+    );
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        messages: [
+          { sequence: 1, source: 'user', text: 'Please review this.' },
+          { sequence: 2, source: 'devin', text: 'Done.' },
+        ],
+        activity: [
+          { id: 'thought_1', afterSequence: 0 },
+          { id: 'tool_abc', afterSequence: 2, paths: ['notes.txt'] },
+        ],
+      },
+    });
+  });
+
+  it('rejects activity entries with unsafe titles or absolute paths through the schema', async () => {
+    adapter.loaded = {
+      ...adapter.loaded,
+      activity: [
+        {
+          id: 'tool_bad',
+          afterSequence: 1,
+          kind: 'tool',
+          status: 'completed',
+          title: 'x'.repeat(600),
+          truncated: false,
+        },
+      ],
+    };
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id;
+    const result = await bridge.handle(
+      envelope('session.load', { sessionId: handle }, ['session:content:read']),
+      context(),
+    );
+    expect(result).toEqual({ status: 503, body: { error: 'temporarily_unavailable' } });
+
+    adapter.loaded = {
+      ...adapter.loaded,
+      activity: [
+        {
+          id: 'tool_abs',
+          afterSequence: 1,
+          kind: 'tool',
+          status: 'completed',
+          title: 'Read file',
+          paths: ['/Users/frank/secret.txt'],
+          truncated: false,
+        },
+      ],
+    };
+    const second = await bridge.handle(
+      envelope('session.load', { sessionId: handle }, ['session:content:read']),
+      context('loopback-peer-2'),
+    );
+    expect(second).toEqual({ status: 503, body: { error: 'temporarily_unavailable' } });
+  });
+
+  it('includes the live turn on session.activity only when the adapter exposes one', async () => {
+    adapter.getSessionTurn = () => ({
+      startedAt: NOW - 500,
+      reply: 'Working on it.',
+      replyTruncated: false,
+      activity: [
+        {
+          id: 'tool_live',
+          afterSequence: 0,
+          kind: 'tool',
+          toolKind: 'execute',
+          status: 'running',
+          title: 'Ran tests',
+          truncated: false,
+        },
+      ],
+    });
+    const bridge = service();
+    const listed = await bridge.handle(envelope('session.list', {}), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+
+    const withTurn = await bridge.handle(
+      envelope('session.activity', { sessionId: handle }, ['session:content:read']),
+      context(),
+    );
+    expect(withTurn).toMatchObject({
+      status: 200,
+      body: {
+        active: true,
+        turn: {
+          startedAt: NOW - 500,
+          reply: 'Working on it.',
+          activity: [{ id: 'tool_live', toolKind: 'execute' }],
+        },
+      },
+    });
+
+    adapter.getSessionTurn = undefined;
+    const withoutTurn = await bridge.handle(
+      envelope('session.activity', { sessionId: handle }, ['session:content:read']),
+      context('loopback-peer-2'),
+    );
+    expect(withoutTurn.status).toBe(200);
+    expect((withoutTurn.body as { turn?: unknown }).turn).toBeUndefined();
+  });
+
+  it('passes per-session activity through session.list items', async () => {
+    adapter.page = {
+      sessions: [
+        {
+          sessionId: 'raw-private-session-id',
+          cwd: '/Users/frank/Secret Project',
+          activity: { active: true, kind: 'executing', updatedAt: NOW },
+        },
+      ],
+    };
+    const result = await service().handle(envelope('session.list', {}), context());
+    expect(result).toMatchObject({
+      status: 200,
+      body: { sessions: [{ activity: { active: true, kind: 'executing', updatedAt: NOW } }] },
+    });
   });
 
   it('keeps schema-reserved mutation methods disabled', async () => {

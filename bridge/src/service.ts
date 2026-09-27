@@ -2,6 +2,7 @@ import { basename, win32 } from 'node:path';
 
 import { z } from 'zod';
 
+import { activityEntrySchema, type ActivityEntry } from './activity';
 import {
   AcpBusyError,
   type AcpLoadedSession,
@@ -9,6 +10,7 @@ import {
   type AcpPendingElicitation,
   type AcpSessionActivity,
   type AcpSessionPage,
+  type AcpSessionTurn,
 } from './acp';
 import type { RateLimiter, RateLimitRule } from './rate-limit';
 import type { ReplayGuard } from './replay';
@@ -36,6 +38,17 @@ import type { SessionHandleRegistry } from './session-handles';
 import type { WorkspaceHandleRegistry } from './workspace-handles';
 
 const MAX_LOCAL_SESSION_RESPONSE_BYTES = 192 * 1024;
+const MAX_TOTAL_ACTIVITY_DETAIL_BYTES = 512 * 1024;
+
+const localSessionActivityKindSchema = z.enum([
+  'thinking',
+  'reading',
+  'editing',
+  'executing',
+  'searching',
+  'fetching',
+  'responding',
+]);
 
 const requestContextSchema = z
   .object({
@@ -74,6 +87,14 @@ const localSessionSchema = z
       .object({ id: modelIdSchema, name: z.string().min(1).max(160) })
       .strict()
       .optional(),
+    activity: z
+      .object({
+        active: z.boolean(),
+        kind: localSessionActivityKindSchema.optional(),
+        updatedAt: z.number().int().nonnegative(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -94,6 +115,7 @@ const healthResponseSchema = z
 const featuresResponseSchema = z
   .object({
     sessionElicitation: z.boolean(),
+    activityTimeline: z.boolean(),
   })
   .strict();
 
@@ -134,6 +156,7 @@ const localLoadedSessionSchema = z
       })
       .strict(),
     messages: z.array(localHistoryMessageSchema).max(200),
+    activity: z.array(activityEntrySchema).max(500).optional(),
     truncated: z.boolean(),
   })
   .strict();
@@ -141,17 +164,17 @@ const localLoadedSessionSchema = z
 const localSessionActivitySchema = z
   .object({
     active: z.boolean(),
-    kind: z.enum([
-      'thinking',
-      'reading',
-      'editing',
-      'executing',
-      'searching',
-      'fetching',
-      'responding',
-    ]),
+    kind: localSessionActivityKindSchema,
     label: z.string().min(1).max(160),
     updatedAt: z.number().int().nonnegative(),
+    turn: z
+      .object({
+        startedAt: z.number().int().nonnegative(),
+        reply: z.string().max(100_000),
+        activity: z.array(activityEntrySchema).max(500),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -225,6 +248,7 @@ export interface SessionDiscoveryAdapter {
   loadSession(sessionId: string): Promise<AcpLoadedSession>;
   isSessionActivitySupported?(): boolean;
   getSessionActivity?(sessionId: string): Promise<AcpSessionActivity | null>;
+  getSessionTurn?(sessionId: string): AcpSessionTurn | null | Promise<AcpSessionTurn | null>;
   isSessionElicitationSupported?(): boolean;
   getPendingElicitation?(sessionId: string): AcpPendingElicitation | null;
   respondToElicitation?(
@@ -360,14 +384,53 @@ function serializedBytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value), 'utf8');
 }
 
+function remapActivitySequences(
+  entries: ActivityEntry[],
+  map: (sequence: number) => number,
+): ActivityEntry[] {
+  return entries.map((entry) => ({
+    ...entry,
+    afterSequence: Math.max(0, map(entry.afterSequence)),
+  }));
+}
+
+function detailBytes(entry: ActivityEntry): number {
+  if (!entry.detail) return 0;
+  if (entry.detail.type === 'text') return Buffer.byteLength(entry.detail.text, 'utf8');
+  return (
+    Buffer.byteLength(entry.detail.path, 'utf8') +
+    Buffer.byteLength(entry.detail.oldText ?? '', 'utf8') +
+    Buffer.byteLength(entry.detail.newText ?? '', 'utf8')
+  );
+}
+
+function boundActivityDetail(entries: ActivityEntry[]): ActivityEntry[] {
+  const bounded = entries.map((entry) => ({ ...entry }));
+  let total = bounded.reduce((sum, entry) => sum + detailBytes(entry), 0);
+  for (const entry of bounded) {
+    if (total <= MAX_TOTAL_ACTIVITY_DETAIL_BYTES) break;
+    if (!entry.detail) continue;
+    total -= detailBytes(entry);
+    entry.detail = undefined;
+    entry.truncated = true;
+  }
+  return bounded;
+}
+
 function withRenumberedMessages(
   response: LocalLoadedSession,
   messages: LocalLoadedSession['messages'],
   truncated: boolean,
+  droppedMessages = 0,
 ): LocalLoadedSession {
   return {
     ...response,
     messages: messages.map((message, index) => ({ ...message, sequence: index + 1 })),
+    activity: response.activity
+      ? remapActivitySequences(response.activity, (sequence) =>
+          Math.min(sequence - droppedMessages, messages.length),
+        )
+      : response.activity,
     truncated,
   };
 }
@@ -378,7 +441,7 @@ function fitLoadedSessionResponse(input: LocalLoadedSession): LocalLoadedSession
     serializedBytes(response) > MAX_LOCAL_SESSION_RESPONSE_BYTES &&
     response.messages.length > 1
   ) {
-    response = withRenumberedMessages(response, response.messages.slice(1), true);
+    response = withRenumberedMessages(response, response.messages.slice(1), true, 1);
   }
   if (serializedBytes(response) <= MAX_LOCAL_SESSION_RESPONSE_BYTES) return response;
 
@@ -504,6 +567,7 @@ export class BridgeService {
             this.dependencies.sessions.getPendingElicitation &&
             this.dependencies.sessions.respondToElicitation,
           ),
+          activityTimeline: this.dependencies.sessions.isSessionLoadSupported(),
         }),
       };
     }
@@ -591,6 +655,13 @@ export class BridgeService {
           model: session.modelId
             ? { id: session.modelId, name: modelDisplayName(session.modelId) }
             : undefined,
+          activity: session.activity
+            ? {
+                active: session.activity.active,
+                kind: session.activity.kind,
+                updatedAt: session.activity.updatedAt,
+              }
+            : undefined,
         })),
         nextCursor: page.nextCursor,
       });
@@ -620,6 +691,22 @@ export class BridgeService {
       if (loaded.sessionId !== rawSessionId) {
         throw new Error('Loaded ACP session did not match the requested session');
       }
+      const keptOldIndexes = loaded.messages
+        .map((message, index) => ({ message, index }))
+        .filter(({ message }) => message.text.trim().length > 0)
+        .map(({ index }) => index);
+      const remappedActivity = loaded.activity
+        ? boundActivityDetail(
+            remapActivitySequences(loaded.activity, (sequence) => {
+              let kept = 0;
+              for (const index of keptOldIndexes) {
+                if (index < sequence) kept += 1;
+                else break;
+              }
+              return kept;
+            }),
+          )
+        : undefined;
       const response = localLoadedSessionSchema.parse({
         session: {
           id: body.sessionId,
@@ -636,6 +723,7 @@ export class BridgeService {
             source: message.source,
             text: message.text,
           })),
+        activity: remappedActivity,
         truncated: loaded.truncated,
       });
       return { status: 200, body: fitLoadedSessionResponse(response) };
@@ -661,6 +749,9 @@ export class BridgeService {
     if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
     try {
       const activity = await this.dependencies.sessions.getSessionActivity(rawSessionId);
+      const turn = this.dependencies.sessions.getSessionTurn
+        ? await this.dependencies.sessions.getSessionTurn(rawSessionId)
+        : null;
       return {
         status: 200,
         body: localSessionActivitySchema.parse({
@@ -668,6 +759,13 @@ export class BridgeService {
           kind: activity?.kind ?? 'thinking',
           label: cleanDisplayText(activity?.label ?? 'Waiting for the next step', 160, 'Working'),
           updatedAt: activity?.updatedAt ?? now,
+          turn: turn
+            ? {
+                startedAt: turn.startedAt,
+                reply: turn.reply,
+                activity: boundActivityDetail(turn.activity),
+              }
+            : undefined,
         }),
       };
     } catch (error) {

@@ -5,7 +5,9 @@ import { StringDecoder } from 'node:string_decoder';
 
 import { z, type ZodType } from 'zod';
 
+import { ActivityLog, type ActivityEntry } from './activity';
 import { sessionIdSchema, sessionListBodySchema } from './schemas';
+import { utf8Tail } from './text';
 
 const ACP_PROTOCOL_VERSION = 1 as const;
 
@@ -41,6 +43,7 @@ const SAFE_ENVIRONMENT_KEYS = [
   'TMPDIR',
   'USER',
   'USERPROFILE',
+  'WINDSURF_API_KEY',
   'XDG_CACHE_HOME',
   'XDG_CONFIG_HOME',
   'XDG_DATA_HOME',
@@ -458,6 +461,7 @@ export interface AcpSessionMetadata {
   title?: string;
   updatedAt?: string;
   modelId?: string;
+  activity?: { active: boolean; kind?: AcpActivityKind; updatedAt: number };
 }
 
 export interface AcpSessionPage {
@@ -516,6 +520,41 @@ export interface AcpLoadedSession {
   messages: AcpHistoryMessage[];
   truncated: boolean;
   modelId?: string;
+  // Attached as a non-enumerable own property by loaders so the established
+  // wire/serialization shape (JSON.stringify, spreads) is unchanged; read it
+  // via `loaded.activity` before any serialization boundary.
+  activity?: ActivityEntry[];
+}
+
+export interface AcpSessionTurn {
+  startedAt: number;
+  reply: string;
+  replyTruncated: boolean;
+  activity: ActivityEntry[];
+}
+
+function attachActivity<T extends object>(target: T, activity: ActivityEntry[]): T {
+  Object.defineProperty(target, 'activity', {
+    value: activity,
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+  return target;
+}
+
+function acpReplayTimestamp(update: Record<string, unknown>): number | undefined {
+  const meta = update._meta;
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return undefined;
+  const value = (meta as Record<string, unknown>)['cognition.ai/timestamp'];
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+    return Math.floor(value);
+  }
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
 }
 
 export type AcpModelBadge = 'new' | 'free_promo';
@@ -575,6 +614,7 @@ interface CollectedReplayMessage extends AcpHistoryMessage {
 
 interface ReplayCollector {
   sessionId: string;
+  cwd: string;
   notifications: number;
   messages: CollectedReplayMessage[];
   textBytes: number;
@@ -582,6 +622,15 @@ interface ReplayCollector {
   accepting: boolean;
   failed: boolean;
   mergeBarrier: boolean;
+  activity: ActivityLog;
+}
+
+interface ActiveTurn {
+  sessionId: string;
+  startedAt: number;
+  reply: string;
+  replyTruncated: boolean;
+  activity: ActivityLog;
 }
 
 interface PendingRequest {
@@ -959,18 +1008,6 @@ function cloneModelCatalog(catalog: AcpModelCatalog): AcpModelCatalog {
   };
 }
 
-function utf8Tail(value: string, maximumBytes: number): { text: string; truncated: boolean } {
-  const bytes = Buffer.from(value, 'utf8');
-  try {
-    if (bytes.length <= maximumBytes) return { text: value, truncated: false };
-    let text = bytes.subarray(bytes.length - maximumBytes).toString('utf8');
-    while (text.startsWith('\uFFFD')) text = text.slice(1);
-    return { text, truncated: true };
-  } finally {
-    bytes.fill(0);
-  }
-}
-
 function messageBytes(message: AcpHistoryMessage): number {
   return Buffer.byteLength(message.text, 'utf8');
 }
@@ -991,6 +1028,7 @@ export class AcpSessionClient {
   private readonly loadedSessions = new Set<string>();
   private activeLoad: ReplayCollector | null = null;
   private activePromptSessionId: string | null = null;
+  private activeTurn: ActiveTurn | null = null;
   private activeActivity: ActiveAcpSessionActivity | null = null;
   private readonly pendingElicitations = new Map<string, PendingElicitationRecord>();
   private creatingContinuation = false;
@@ -1012,6 +1050,7 @@ export class AcpSessionClient {
     this.loadedSessions.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
     this.creatingContinuation = false;
@@ -1120,6 +1159,18 @@ export class AcpSessionClient {
     if (this.activeActivity?.sessionId !== sessionId) return null;
     const { kind, label, active, updatedAt } = this.activeActivity;
     return { kind, label, active, updatedAt };
+  }
+
+  getSessionTurn(sessionIdInput: unknown): AcpSessionTurn | null {
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    const turn = this.activeTurn;
+    if (!turn || turn.sessionId !== sessionId) return null;
+    return {
+      startedAt: turn.startedAt,
+      reply: turn.reply,
+      replyTruncated: turn.replyTruncated,
+      activity: turn.activity.list(),
+    };
   }
 
   getPendingElicitation(sessionIdInput: unknown): AcpPendingElicitation | null {
@@ -1255,6 +1306,7 @@ export class AcpSessionClient {
 
     const collector: ReplayCollector = {
       sessionId,
+      cwd: metadata.cwd,
       notifications: 0,
       messages: [],
       textBytes: 0,
@@ -1262,6 +1314,7 @@ export class AcpSessionClient {
       accepting: true,
       failed: false,
       mergeBarrier: false,
+      activity: new ActivityLog(),
     };
     this.activeLoad = collector;
     try {
@@ -1281,13 +1334,16 @@ export class AcpSessionClient {
       collector.accepting = false;
       if (collector.failed) throw new Error('ACP session replay failed validation');
       this.loadedSessions.add(sessionId);
-      return {
-        sessionId,
-        cwd: metadata.cwd,
-        messages: collector.messages.map(({ source, text }) => ({ source, text })),
-        truncated: collector.truncated,
-        modelId: this.sessionModelSelectors.get(sessionId)?.catalog.defaultModelId,
-      };
+      return attachActivity(
+        {
+          sessionId,
+          cwd: metadata.cwd,
+          messages: collector.messages.map(({ source, text }) => ({ source, text })),
+          truncated: collector.truncated || collector.activity.truncated,
+          modelId: this.sessionModelSelectors.get(sessionId)?.catalog.defaultModelId,
+        },
+        collector.activity.list(),
+      );
     } finally {
       if (this.activeLoad === collector) this.activeLoad = null;
     }
@@ -1431,12 +1487,16 @@ export class AcpSessionClient {
     }
     const listedSessions = [...this.listedSessions.entries()];
     const modelCatalog = this.modelCatalog ? cloneModelCatalog(this.modelCatalog) : null;
+    const finishedTurn = this.activeTurn?.sessionId === sessionId ? this.activeTurn : null;
     await this.stop();
     await this.start();
     for (const [listedSessionId, metadata] of listedSessions) {
       this.listedSessions.set(listedSessionId, { ...metadata });
     }
     this.modelCatalog = modelCatalog;
+    if (finishedTurn && !this.activeTurn && !this.activePromptSessionId) {
+      this.activeTurn = finishedTurn;
+    }
   }
 
   private async selectSessionModel(sessionId: string, modelInput: unknown): Promise<void> {
@@ -1469,6 +1529,13 @@ export class AcpSessionClient {
       throw new AcpBusyError();
     }
     this.activePromptSessionId = sessionId;
+    this.activeTurn = {
+      sessionId,
+      startedAt: Date.now(),
+      reply: '',
+      replyTruncated: false,
+      activity: new ActivityLog(),
+    };
     this.activeActivity = {
       sessionId,
       kind: 'thinking',
@@ -1492,6 +1559,9 @@ export class AcpSessionClient {
     if (this.activePromptSessionId !== sessionId) return;
     this.pendingElicitations.delete(sessionId);
     this.activePromptSessionId = null;
+    // Keep the turn snapshot readable until the next prompt or a stop() so the
+    // phone can still render the completed turn right after end_turn.
+    this.activeTurn?.activity.finishTurn();
     await this.releaseSessionOwnership(sessionId).catch(() => this.stop().catch(() => {}));
     if (!this.activePromptSessionId) {
       this.activeActivity = {
@@ -1516,6 +1586,7 @@ export class AcpSessionClient {
     this.sessionModelSelectors.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
     this.creatingContinuation = false;
@@ -1770,6 +1841,7 @@ export class AcpSessionClient {
       // Devin ACP currently omits messageId on replay. Private thought/tool
       // events still form a trustworthy boundary between otherwise adjacent
       // same-author messages, even though their content must never be exposed.
+      this.collectReplayActivity(collector, notificationResult.data.update);
       collector.mergeBarrier = true;
       return;
     }
@@ -1792,8 +1864,72 @@ export class AcpSessionClient {
     });
   }
 
+  private collectReplayActivity(
+    collector: ReplayCollector,
+    update: Record<string, unknown>,
+  ): void {
+    const updateType = update.sessionUpdate;
+    const at = acpReplayTimestamp(update);
+    const afterSequence = collector.messages.length;
+    if (updateType === 'agent_thought_chunk') {
+      const content = update.content;
+      const text =
+        content && typeof content === 'object' && !Array.isArray(content)
+          ? (content as Record<string, unknown>).text
+          : undefined;
+      if ((content as { type?: unknown } | undefined)?.type === 'text' && typeof text === 'string') {
+        collector.activity.beginThought(afterSequence, text, at);
+      }
+      return;
+    }
+    if (updateType === 'tool_call') {
+      collector.activity.beginTool(afterSequence, update, collector.cwd, at);
+      return;
+    }
+    if (updateType === 'tool_call_update') {
+      const toolCallId = update.toolCallId;
+      if (typeof toolCallId === 'string') {
+        collector.activity.updateTool(toolCallId, update, at);
+      }
+    }
+  }
+
+  private collectPromptTurn(sessionId: string, update: Record<string, unknown>): void {
+    const turn = this.activeTurn;
+    if (!turn || turn.sessionId !== sessionId) return;
+    const updateType = update.sessionUpdate;
+    const cwd = this.listedSessions.get(sessionId)?.cwd ?? '/';
+    if (updateType === 'agent_message_chunk' || updateType === 'agent_thought_chunk') {
+      const content = update.content;
+      const text =
+        content && typeof content === 'object' && !Array.isArray(content)
+          ? (content as Record<string, unknown>).text
+          : undefined;
+      if ((content as { type?: unknown } | undefined)?.type !== 'text' || typeof text !== 'string') {
+        return;
+      }
+      if (updateType === 'agent_message_chunk') {
+        const merged = utf8Tail(`${turn.reply}${text}`, MAX_MESSAGE_TEXT_BYTES);
+        turn.reply = merged.text;
+        turn.replyTruncated ||= merged.truncated;
+      } else {
+        turn.activity.beginThought(0, text);
+      }
+      return;
+    }
+    if (updateType === 'tool_call') {
+      turn.activity.beginTool(0, update, cwd);
+      return;
+    }
+    if (updateType === 'tool_call_update') {
+      const toolCallId = update.toolCallId;
+      if (typeof toolCallId === 'string') turn.activity.updateTool(toolCallId, update);
+    }
+  }
+
   private updatePromptActivity(sessionId: string, update: Record<string, unknown>): void {
     const updateType = update.sessionUpdate;
+    this.collectPromptTurn(sessionId, update);
     if (updateType === 'tool_call' || updateType === 'tool_call_update') {
       const parsed = toolActivityUpdateSchema.safeParse(update);
       if (!parsed.success) return;
@@ -1914,6 +2050,7 @@ export class AcpSessionClient {
     if (this.activeLoad) this.activeLoad.failed = true;
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
     this.creatingContinuation = false;
@@ -1942,6 +2079,7 @@ export class AcpSessionClient {
     if (this.activeLoad) this.activeLoad.failed = true;
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
     this.creatingContinuation = false;
