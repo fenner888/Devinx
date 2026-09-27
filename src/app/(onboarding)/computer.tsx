@@ -36,7 +36,10 @@ import { DevinXQrScanner } from '@components/connections/DevinXQrScanner';
 import {
   CONNECTOR_RELEASE_PAGE,
   CONNECTOR_SETUP_PROMPT,
+  CONNECTOR_UPDATE_NOTICE,
+  MAC_CONNECTOR_UPDATE_STEPS,
   WINDOWS_CONNECTOR_STORE_PAGE,
+  WINDOWS_CONNECTOR_UPDATE_STEPS,
 } from '@lib/connectorSetup';
 import {
   isConnectorUpdateRequired,
@@ -498,45 +501,52 @@ export default function ComputerConnectionScreen() {
                   </View>
                 ))}
               </View>
-              {updateRequiredBridgeIds.size > 0 && (
-                <View className="bg-tint-blue border border-border-subtle rounded-card px-4 py-3 mt-3">
-                  <View className="flex-row items-start">
-                    <Ionicons
-                      name="arrow-up-circle-outline"
-                      size={18}
-                      color={tokens.brandText.hex}
-                    />
-                    <View className="ml-2 flex-1">
-                      <Text className="text-text-hi text-text13 font-semibold">
-                        Connector update required
-                      </Text>
+              <View className="bg-tint-blue border border-border-subtle rounded-card px-4 py-3 mt-3">
+                <View className="flex-row items-start">
+                  <Ionicons name="arrow-up-circle-outline" size={18} color={tokens.brandText.hex} />
+                  <View className="ml-2 flex-1">
+                    <Text className="text-text-hi text-text13 font-semibold">
+                      {updateRequiredBridgeIds.size > 0
+                        ? 'Connector update required'
+                        : 'Updating DevinX Connector'}
+                    </Text>
+                    {updateRequiredBridgeIds.size > 0 && (
                       <Text className="text-text-mid text-text12 leading-4 mt-1">
                         Install DevinX Connector {MINIMUM_SUPPORTED_CONNECTOR_VERSION} or later to
                         keep local sessions compatible.
                       </Text>
-                      <View className="flex-row mt-2">
-                        <Pressable
-                          className="mr-4"
-                          onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
-                          accessibilityRole="link"
-                          accessibilityLabel="Open official DevinX Connector update for Mac"
-                        >
-                          <Text className="text-link text-text12 font-medium">Mac update</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() =>
-                            Linking.openURL(WINDOWS_CONNECTOR_STORE_PAGE).catch(() => {})
-                          }
-                          accessibilityRole="link"
-                          accessibilityLabel="Open DevinX Connector update in Microsoft Store"
-                        >
-                          <Text className="text-link text-text12 font-medium">Windows update</Text>
-                        </Pressable>
-                      </View>
+                    )}
+                    <Text className="text-text-mid text-text12 leading-4 mt-2">
+                      {CONNECTOR_UPDATE_NOTICE}
+                    </Text>
+                    <Text className="text-text-mid text-text12 leading-4 mt-2">
+                      {MAC_CONNECTOR_UPDATE_STEPS}
+                    </Text>
+                    <Text className="text-text-mid text-text12 leading-4 mt-2">
+                      {WINDOWS_CONNECTOR_UPDATE_STEPS}
+                    </Text>
+                    <View className="flex-row mt-2">
+                      <Pressable
+                        className="mr-4"
+                        onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
+                        accessibilityRole="link"
+                        accessibilityLabel="Open official DevinX Connector update for Mac"
+                      >
+                        <Text className="text-link text-text12 font-medium">Mac update</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() =>
+                          Linking.openURL(WINDOWS_CONNECTOR_STORE_PAGE).catch(() => {})
+                        }
+                        accessibilityRole="link"
+                        accessibilityLabel="Open DevinX Connector update in Microsoft Store"
+                      >
+                        <Text className="text-link text-text12 font-medium">Windows update</Text>
+                      </Pressable>
                     </View>
                   </View>
                 </View>
-              )}
+              </View>
             </View>
           )}
 

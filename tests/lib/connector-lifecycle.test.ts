@@ -11,6 +11,19 @@ const supervisorSource = readFileSync(
 );
 
 describe('macOS Connector lifecycle', () => {
+  it('explains manual installation in the update notice', () => {
+    expect(connectorSource).toContain('"Check for updates"');
+    expect(connectorSource).toContain('.disabled(model.isCheckingUpdate)');
+    expect(connectorSource).toContain('guard !isCheckingUpdate else { return }');
+    expect(connectorSource).toContain('.reloadIgnoringLocalCacheData');
+    expect(connectorSource).toContain('Could not check for updates.');
+    expect(connectorSource).toContain('You are up to date.');
+    expect(connectorSource).toContain('Button("Download update")');
+    expect(connectorSource).toContain('This update does not install automatically');
+    expect(connectorSource).toContain('Applications and choose Replace');
+    expect(connectorSource).toContain('Updating the iPhone app does not update Connector');
+    expect(connectorSource).toContain('Your pairing is kept');
+  });
   it('keeps the runtime available after the window closes and exposes explicit menu actions', () => {
     expect(connectorSource).toMatch(
       /applicationShouldTerminateAfterLastWindowClosed[\s\S]*?\n\s*false/,

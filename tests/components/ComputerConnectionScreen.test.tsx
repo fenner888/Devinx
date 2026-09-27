@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text } from 'react-native';
+import { Linking, Pressable, Text } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 const mockReact = React;
@@ -101,6 +101,13 @@ jest.mock('../../src/theme/index', () => ({
 }));
 
 import ComputerConnectionScreen from '../../src/app/(onboarding)/computer';
+import {
+  CONNECTOR_RELEASE_PAGE,
+  CONNECTOR_UPDATE_NOTICE,
+  MAC_CONNECTOR_UPDATE_STEPS,
+  WINDOWS_CONNECTOR_STORE_PAGE,
+  WINDOWS_CONNECTOR_UPDATE_STEPS,
+} from '../../src/lib/connectorSetup';
 
 describe('Computer connection onboarding', () => {
   beforeEach(() => {
@@ -186,6 +193,42 @@ describe('Computer connection onboarding', () => {
     );
     expect(screen.getByLabelText('Paired local-device name').props.returnKeyType).toBe('done');
   });
+
+  it.each(['compatible', 'unavailable'] as const)(
+    'keeps manual update help and official links visible when Connector is %s',
+    async (status) => {
+      mockComputers = [
+        {
+          bridgeId: 'bridge_1234567890',
+          computerName: 'My Mac',
+          pairedAt: 1_800_000_000_000,
+          permissions: ['bridge:health', 'session:metadata:read'],
+          transportKind: 'tailscale_vpn',
+        },
+      ];
+      if (status === 'unavailable') {
+        mockGetComputerBridgeVersion.mockRejectedValueOnce(new Error('offline'));
+      } else {
+        mockGetComputerBridgeVersion.mockResolvedValueOnce({ kind: 'supported', version: '0.1.9' });
+      }
+      const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      try {
+        const screen = render(<ComputerConnectionScreen />);
+        await waitFor(() => expect(mockGetComputerBridgeVersion).toHaveBeenCalled());
+        expect(screen.getByText('Updating DevinX Connector')).toBeTruthy();
+        expect(screen.queryByText('Connector update required')).toBeNull();
+        expect(screen.getByText(CONNECTOR_UPDATE_NOTICE)).toBeTruthy();
+        expect(screen.getByText(MAC_CONNECTOR_UPDATE_STEPS)).toBeTruthy();
+        expect(screen.getByText(WINDOWS_CONNECTOR_UPDATE_STEPS)).toBeTruthy();
+        fireEvent.press(screen.getByLabelText('Open official DevinX Connector update for Mac'));
+        expect(openURL).toHaveBeenLastCalledWith(CONNECTOR_RELEASE_PAGE);
+        fireEvent.press(screen.getByLabelText('Open DevinX Connector update in Microsoft Store'));
+        expect(openURL).toHaveBeenLastCalledWith(WINDOWS_CONNECTOR_STORE_PAGE);
+      } finally {
+        openURL.mockRestore();
+      }
+    },
+  );
 
   it('requests first-use permission and sends a scanned payload directly to pairing', async () => {
     mockGetPermission.mockResolvedValueOnce('notDetermined');
