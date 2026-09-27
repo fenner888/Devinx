@@ -518,6 +518,42 @@ describe('Computer session detail', () => {
     expect(idleScreen.queryByTestId('computer-session-activity-indicator')).toBeNull();
   });
 
+  it('hides a stale Connector turn while steering and shows the in-flight one', () => {
+    mockActivityTimeline = true;
+    const entry = {
+      id: 'tool_live',
+      afterSequence: 0,
+      kind: 'tool',
+      toolKind: 'execute',
+      status: 'running',
+      title: 'Ran tests',
+      truncated: false,
+    };
+    mockSessionActivity = {
+      active: false,
+      kind: 'executing',
+      label: 'Running a command',
+      updatedAt: Date.now(),
+      turn: { startedAt: Date.now() - 60_000, reply: 'Old turn', activity: [entry] },
+    };
+
+    const screen = render(<ComputerSessionDetailScreen />);
+    fireEvent.changeText(screen.getByLabelText('Local session message'), 'Continue the task.');
+    fireEvent.press(screen.getByLabelText('Send local session message'));
+
+    expect(mockMutate).toHaveBeenCalled();
+    expect(screen.queryByTestId(/^activity-group-live-/)).toBeNull();
+
+    mockSessionActivity = {
+      ...mockSessionActivity,
+      turn: { startedAt: Date.now(), reply: 'Fresh turn', activity: [entry] },
+    };
+    screen.rerender(<ComputerSessionDetailScreen />);
+    expect(screen.getByTestId(/^activity-group-live-/)).toBeTruthy();
+    expect(screen.getByText('Ran tests')).toBeTruthy();
+    expect(screen.getByText('Generating…')).toBeTruthy();
+  });
+
   it('keeps the composer read-only while the Connector reports active work', () => {
     mockSessionActivity = {
       active: true,

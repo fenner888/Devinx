@@ -180,6 +180,7 @@ export default function ComputerSessionDetailScreen() {
   const historyRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const promptStartedAt = useRef<number | null>(null);
   const refreshGeneration = useRef(0);
   const continuationRefreshStarted = useRef(false);
   const validParameters =
@@ -207,10 +208,16 @@ export default function ComputerSessionDetailScreen() {
   const activityGroups = activitySupported
     ? groupActivity(query.data?.activity ?? [])
     : new Map();
-  const liveTurn =
-    activitySupported && steeringActive ? (sessionActivity.data?.turn ?? null) : null;
   const activityIndicatorKind =
     activitySupported && sessionActivity.data?.active ? (sessionActivity.data.kind ?? 'thinking') : null;
+  const liveTurn =
+    activitySupported &&
+    steeringActive &&
+    promptStartedAt.current !== null &&
+    sessionActivity.data?.turn !== undefined &&
+    sessionActivity.data.turn.startedAt >= promptStartedAt.current
+      ? sessionActivity.data.turn
+      : null;
   const prompt = usePromptComputerSession(bridgeId, sessionId);
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
   const mayAnswerQuestions =
@@ -315,6 +322,9 @@ export default function ComputerSessionDetailScreen() {
     if (!text || !canPrompt || prompt.isPending || steeringActive || sessionBusy) return;
     Keyboard.dismiss();
     setSteeringActive(true);
+    // The Connector keeps the previous turn until the next prompt starts;
+    // the skew slack keeps a just-started turn visible under clock drift.
+    promptStartedAt.current = Date.now() - 5_000;
     setPendingText(text);
     setDraft('');
     const generation = refreshGeneration.current + 1;
@@ -350,6 +360,7 @@ export default function ComputerSessionDetailScreen() {
               if (hasSettledNewDevinReply(baselineReply, observedReply, currentReply)) {
                 setPendingText(null);
                 setSteeringActive(false);
+                promptStartedAt.current = null;
                 return;
               }
               observedReply = currentReply === baselineReply ? null : currentReply;
@@ -357,6 +368,7 @@ export default function ComputerSessionDetailScreen() {
             if (attempt >= MAXIMUM_HISTORY_REFRESH_ATTEMPTS) {
               setPendingText(null);
               setSteeringActive(false);
+              promptStartedAt.current = null;
               return;
             }
             refreshTimer.current = setTimeout(
@@ -374,6 +386,7 @@ export default function ComputerSessionDetailScreen() {
             setPendingText(null);
             setDraft(text);
             setSteeringActive(false);
+            promptStartedAt.current = null;
           }
         },
       },
@@ -385,6 +398,7 @@ export default function ComputerSessionDetailScreen() {
     answerElicitation.mutate(response, {
       onSuccess: () => {
         setSteeringActive(true);
+        promptStartedAt.current = Date.now() - 5_000;
         const generation = refreshGeneration.current + 1;
         refreshGeneration.current = generation;
         let observedReply: string | null = null;
@@ -396,11 +410,13 @@ export default function ComputerSessionDetailScreen() {
             : baselineReply;
           if (hasSettledNewDevinReply(baselineReply, observedReply, currentReply)) {
             setSteeringActive(false);
+            promptStartedAt.current = null;
             return;
           }
           observedReply = currentReply === baselineReply ? null : currentReply;
           if (attempt >= MAXIMUM_HISTORY_REFRESH_ATTEMPTS) {
             setSteeringActive(false);
+            promptStartedAt.current = null;
             return;
           }
           refreshTimer.current = setTimeout(
@@ -632,7 +648,7 @@ export default function ComputerSessionDetailScreen() {
                   <ActivityGroup
                     bridgeId={bridgeId}
                     sessionId={sessionId}
-                    groupKey="live"
+                    groupKey={`live-${liveTurn.startedAt}`}
                     entries={liveTurn.activity}
                     live
                     defaultExpanded
