@@ -307,4 +307,30 @@ describe('ActivityLog', () => {
     log.beginTool(0, toolCall({ title: 'Read\n\nfile\tnow  ' }), CWD);
     expect(log.list()[0]?.title).toBe('Read file now');
   });
+
+  it('leaves timestamps unset without wall-clock fallback when implicitTimestamps is off', () => {
+    const log = new ActivityLog({ implicitTimestamps: false });
+    log.beginTool(0, toolCall({ toolCallId: 'call_a', title: 'A' }), CWD);
+    log.updateTool('call_a', { status: 'completed' });
+    log.beginTool(0, toolCall({ toolCallId: 'call_b', title: 'B' }), CWD);
+    log.interruptTool('call_b');
+    log.beginThought(0, 'musing');
+    log.finishTurn();
+    const [a, b, thought] = log.list();
+    expect(a).toMatchObject({ status: 'completed' });
+    expect(a?.startedAt).toBeUndefined();
+    expect(a?.endedAt).toBeUndefined();
+    expect(b).toMatchObject({ status: 'interrupted' });
+    expect(b?.endedAt).toBeUndefined();
+    expect(thought?.status).toBe('completed');
+    expect(thought?.endedAt).toBeUndefined();
+  });
+
+  it('still applies explicit timestamps when implicitTimestamps is off', () => {
+    const log = new ActivityLog({ implicitTimestamps: false });
+    log.beginTool(0, toolCall({ toolCallId: 'call_ts' }), CWD, 500);
+    log.updateTool('call_ts', { status: 'failed' }, 900);
+    const [entry] = log.list();
+    expect(entry).toMatchObject({ status: 'failed', startedAt: 500, endedAt: 900 });
+  });
 });

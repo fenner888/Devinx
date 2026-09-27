@@ -410,7 +410,9 @@ export class DevinSessionStore {
       database.exec('ROLLBACK;');
 
       let truncated = boundary.parentNodeId !== null;
-      const activity = new ActivityLog();
+      // Persisted activity carries only recorded timestamps; wall-clock
+      // fallbacks would inflate durations on every reload.
+      const activity = new ActivityLog({ implicitTimestamps: false });
       const lockAlive = await this.sessionLockAlive(sessionId);
 
       // Chain rows are newest-first; process oldest-first so messages and
@@ -462,6 +464,15 @@ export class DevinSessionStore {
         if (typeof message.content !== 'string') continue;
 
         const beforeSequence = textMessages.length;
+        const metadata = message.metadata ?? {};
+        const thoughtStartedAt = isoToMs(
+          typeof metadata.started_generation_at === 'string'
+            ? metadata.started_generation_at
+            : undefined,
+        );
+        const assistantIssuedAt = isoToMs(
+          typeof metadata.created_at === 'string' ? metadata.created_at : undefined,
+        );
         const clipped = utf8Tail(message.content, MAXIMUM_MESSAGE_BYTES);
         truncated ||= clipped.truncated;
         textMessages.push({
@@ -476,19 +487,10 @@ export class DevinSessionStore {
           !Array.isArray(thinking) &&
           typeof (thinking as Record<string, unknown>).thinking === 'string'
         ) {
-          const metadata = message.metadata ?? {};
-          const startedAt = isoToMs(
-            typeof metadata.started_generation_at === 'string'
-              ? metadata.started_generation_at
-              : undefined,
-          );
-          const endedAt = isoToMs(
-            typeof metadata.created_at === 'string' ? metadata.created_at : undefined,
-          );
           // A persisted thinking block is always finished; real timestamps keep
           // the group's duration accurate instead of showing a running thought.
-          activity.beginThought(beforeSequence, (thinking as { thinking: string }).thinking, startedAt);
-          activity.closeThought(endedAt ?? startedAt);
+          activity.beginThought(beforeSequence, (thinking as { thinking: string }).thinking, thoughtStartedAt);
+          activity.closeThought(assistantIssuedAt ?? thoughtStartedAt);
         }
 
         const toolCallContent = this.messageExtensions(message)['chisel/tool_call_content'];
@@ -504,6 +506,7 @@ export class DevinSessionStore {
             toolResults.get(call.data.id),
             session.workingDirectory,
             lockAlive,
+            assistantIssuedAt,
           );
         }
       }
@@ -652,6 +655,7 @@ export class DevinSessionStore {
     result: ToolResultRecord | undefined,
     cwd: string,
     lockAlive: boolean,
+    assistantIssuedAt?: number,
   ): void {
     const extensionInput =
       toolCallContent && typeof toolCallContent === 'object' && !Array.isArray(toolCallContent)
@@ -677,7 +681,7 @@ export class DevinSessionStore {
     if (typeof beginInput === 'object' && beginInput !== null) {
       beginInput = { toolCallId: call.id, ...(beginInput as Record<string, unknown>) };
     }
-    activity.beginTool(afterSequence, beginInput, cwd, result?.startedAt);
+    activity.beginTool(afterSequence, beginInput, cwd, result?.startedAt ?? assistantIssuedAt);
     if (result) {
       activity.updateTool(call.id, {
         status: result.success ? 'completed' : 'failed',

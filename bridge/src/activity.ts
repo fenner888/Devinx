@@ -309,6 +309,12 @@ function inferenceToolName(meta: Record<string, unknown> | undefined): string | 
   return typeof value === 'string' && value.length <= 80 ? value : undefined;
 }
 
+export interface ActivityLogOptions {
+  // Wall-clock fallback for missing timestamps; disabled for replayed
+  // history where only persisted times are meaningful.
+  implicitTimestamps?: boolean;
+}
+
 export class ActivityLog {
   private readonly entries: ActivityEntry[] = [];
   private readonly toolsByCallId = new Map<string, ActivityEntry>();
@@ -316,6 +322,15 @@ export class ActivityLog {
   private thoughtCounter = 0;
   private detailBytes = 0;
   private overflowed = false;
+  private readonly implicitTimestamps: boolean;
+
+  constructor(options: ActivityLogOptions = {}) {
+    this.implicitTimestamps = options.implicitTimestamps ?? true;
+  }
+
+  private effectiveAt(at?: number): number | undefined {
+    return at ?? (this.implicitTimestamps ? Date.now() : undefined);
+  }
 
   get truncated(): boolean {
     return this.overflowed;
@@ -356,7 +371,8 @@ export class ActivityLog {
       const entry = this.toolsByCallId.get(callId);
       if (entry && entry.status === 'running') {
         entry.status = 'interrupted';
-        entry.endedAt = at ?? Date.now();
+        const ended = this.effectiveAt(at);
+        if (ended !== undefined) entry.endedAt = ended;
       }
     } catch {
       this.overflowed = true;
@@ -372,16 +388,16 @@ export class ActivityLog {
   }
 
   finishTurn(at?: number): void {
-    const now = at ?? Date.now();
+    const now = this.effectiveAt(at);
     if (this.openThought) {
       this.openThought.status = 'completed';
-      this.openThought.endedAt = now;
+      if (now !== undefined) this.openThought.endedAt = now;
       this.openThought = null;
     }
     for (const entry of this.entries) {
       if (entry.kind === 'tool' && entry.status === 'running') {
         entry.status = 'interrupted';
-        entry.endedAt = now;
+        if (now !== undefined) entry.endedAt = now;
       }
     }
   }
@@ -548,8 +564,9 @@ export class ActivityLog {
       ...(detail ? { detail } : {}),
       truncated,
       ...(at !== undefined ? { startedAt: at } : {}),
-      ...(status === 'completed' || status === 'failed'
-        ? { endedAt: at ?? Date.now() }
+      ...((status === 'completed' || status === 'failed') &&
+      this.effectiveAt(at) !== undefined
+        ? { endedAt: this.effectiveAt(at) }
         : {}),
     };
     this.toolsByCallId.set(parsed.toolCallId, entry);
@@ -606,7 +623,8 @@ export class ActivityLog {
       }
     }
     if (entry.status === 'completed' || entry.status === 'failed' || entry.status === 'interrupted') {
-      entry.endedAt = at ?? Date.now();
+      const ended = this.effectiveAt(at);
+      if (ended !== undefined) entry.endedAt = ended;
     }
     this.enforceBounds();
   }

@@ -724,6 +724,86 @@ describe('Devin session store activity timeline', () => {
     }
   });
 
+  it('uses persisted timestamps for state-only tools and stays stable across reloads', async () => {
+    const databasePath = join(directory, 'sessions.db');
+    const writer = createTuiFixture(databasePath);
+    const cwd = '/Users/tester/ws';
+    writer
+      .prepare('INSERT INTO sessions(id, working_directory, main_chain_id) VALUES (?, ?, ?)')
+      .run('session-stateonly', cwd, 3);
+    addNode(writer, {
+      sessionId: 'session-stateonly',
+      nodeId: 1,
+      chatMessage: { message_id: 'u1', role: 'user', content: 'Try it.' },
+    });
+    addNode(writer, {
+      sessionId: 'session-stateonly',
+      nodeId: 2,
+      parentNodeId: 1,
+      chatMessage: {
+        message_id: 'a1',
+        role: 'assistant',
+        content: '',
+        tool_calls: [
+          { id: 'call_fail', name: 'exec', arguments: { command: 'false' }, kind: 'function' },
+          { id: 'call_open', name: 'exec', arguments: { command: 'sleep 9' }, kind: 'function' },
+        ],
+        metadata: {
+          finish_reason: 'tool_calls',
+          started_generation_at: '2026-09-27T21:32:31.000000Z',
+          created_at: '2026-09-27T21:32:33.000000Z',
+        },
+      },
+    });
+    addNode(writer, {
+      sessionId: 'session-stateonly',
+      nodeId: 3,
+      parentNodeId: 2,
+      chatMessage: {
+        message_id: 'a2',
+        role: 'assistant',
+        content: 'That failed.',
+        metadata: { finish_reason: 'stop' },
+      },
+    });
+    // tool_call_state marks one call failed with no tool-result node; the
+    // other stays unresolved (dead lock -> interrupted).
+    addState(
+      writer,
+      'session-stateonly',
+      'call_fail',
+      { toolCallId: 'call_fail', title: 'Ran false', kind: 'execute' },
+      { toolCallId: 'call_fail', status: 'failed' },
+    );
+    addState(writer, 'session-stateonly', 'call_open', {
+      toolCallId: 'call_open',
+      title: 'Ran sleep',
+      kind: 'execute',
+    });
+    writer.close();
+    await chmod(databasePath, 0o600);
+
+    const store = new DevinSessionStore({ databasePath, isProcessAlive: () => false });
+    await store.start();
+    try {
+      const first = await store.loadSession('session-stateonly');
+      const failed = (first.activity ?? []).find(
+        (entry) => entry.toolKind === 'execute' && entry.status === 'failed',
+      );
+      const interrupted = (first.activity ?? []).find((entry) => entry.status === 'interrupted');
+      // assistant metadata.created_at is the best recorded start time.
+      expect(failed?.startedAt).toBe(Date.parse('2026-09-27T21:32:33.000000Z'));
+      expect(failed?.endedAt).toBeUndefined();
+      expect(interrupted?.startedAt).toBe(Date.parse('2026-09-27T21:32:33.000000Z'));
+      expect(interrupted?.endedAt).toBeUndefined();
+
+      const second = await store.loadSession('session-stateonly');
+      expect(second.activity).toEqual(first.activity);
+    } finally {
+      await store.stop();
+    }
+  });
+
   it('skips unknown-shape nodes while keeping messages', async () => {
     const databasePath = join(directory, 'sessions.db');
     const writer = createTuiFixture(databasePath);
