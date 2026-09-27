@@ -367,6 +367,10 @@ export class ActivityLog {
     this.overflowed = true;
   }
 
+  closeThought(at?: number): void {
+    this.closeOpenThought(at);
+  }
+
   finishTurn(at?: number): void {
     const now = at ?? Date.now();
     if (this.openThought) {

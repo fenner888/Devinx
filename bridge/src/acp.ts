@@ -623,6 +623,7 @@ interface ReplayCollector {
   failed: boolean;
   mergeBarrier: boolean;
   activity: ActivityLog;
+  lastAt?: number;
 }
 
 interface ActiveTurn {
@@ -1333,6 +1334,9 @@ export class AcpSessionClient {
       }
       collector.accepting = false;
       if (collector.failed) throw new Error('ACP session replay failed validation');
+      // A loaded session is never mid-turn: close any trailing open thought
+      // and mark still-running tools interrupted.
+      collector.activity.finishTurn(collector.lastAt);
       this.loadedSessions.add(sessionId);
       return attachActivity(
         {
@@ -1837,6 +1841,8 @@ export class AcpSessionClient {
       return;
     }
     const updateType = notificationResult.data.update.sessionUpdate;
+    const replayAt = acpReplayTimestamp(notificationResult.data.update);
+    if (replayAt !== undefined) collector.lastAt = replayAt;
     if (updateType !== 'user_message_chunk' && updateType !== 'agent_message_chunk') {
       // Devin ACP currently omits messageId on replay. Private thought/tool
       // events still form a trustworthy boundary between otherwise adjacent
@@ -1857,6 +1863,7 @@ export class AcpSessionClient {
       collector.mergeBarrier = true;
       return;
     }
+    collector.activity.closeThought(replayAt);
     this.collectReplayText(collector, {
       source: updateResult.data.sessionUpdate === 'user_message_chunk' ? 'user' : 'devin',
       text: updateResult.data.content.text,
@@ -1909,6 +1916,7 @@ export class AcpSessionClient {
         return;
       }
       if (updateType === 'agent_message_chunk') {
+        turn.activity.closeThought();
         const merged = utf8Tail(`${turn.reply}${text}`, MAX_MESSAGE_TEXT_BYTES);
         turn.reply = merged.text;
         turn.replyTruncated ||= merged.truncated;

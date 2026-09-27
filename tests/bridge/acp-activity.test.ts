@@ -242,6 +242,103 @@ else if (request.method === 'session/load') {
     }
   });
 
+  it('closes an open thought when a replay message chunk follows it', async () => {
+    const executablePath = fakeCli(`${READY}
+else if (request.method === 'session/load') {
+  const updates = [
+    { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Go.' } },
+    { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Thinking hard.' },
+      _meta: { 'cognition.ai/timestamp': '2026-09-27T21:28:38.000Z' } },
+    { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Done.' },
+      _meta: { 'cognition.ai/timestamp': '2026-09-27T21:28:40.000Z' } },
+  ];
+  for (const update of updates) {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0', method: 'session/update',
+      params: { sessionId: 's1', update }
+    }) + '\\n');
+  }
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 2_000 });
+    try {
+      await client.start();
+      await client.listSessions();
+      const loaded = await client.loadSession('s1');
+      const thought = (loaded.activity ?? []).find((entry) => entry.kind === 'thought');
+      expect(thought?.status).toBe('completed');
+      expect(thought?.endedAt).toBe(Date.parse('2026-09-27T21:28:40.000Z'));
+    } finally {
+      await client.stop();
+    }
+  });
+
+  it('marks a tool still in progress at the end of replay as interrupted', async () => {
+    const executablePath = fakeCli(`${READY}
+else if (request.method === 'session/load') {
+  const updates = [
+    { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Watch.' } },
+    { sessionUpdate: 'tool_call', toolCallId: 'call_stuck', title: 'Ran watch', kind: 'execute',
+      _meta: { 'cognition.ai/timestamp': '2026-09-27T21:28:39.000Z' } },
+  ];
+  for (const update of updates) {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0', method: 'session/update',
+      params: { sessionId: 's1', update }
+    }) + '\\n');
+  }
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 2_000 });
+    try {
+      await client.start();
+      await client.listSessions();
+      const loaded = await client.loadSession('s1');
+      const tool = (loaded.activity ?? []).find((entry) => entry.kind === 'tool');
+      expect(tool?.status).toBe('interrupted');
+      expect(tool?.endedAt).toBe(Date.parse('2026-09-27T21:28:39.000Z'));
+    } finally {
+      await client.stop();
+    }
+  });
+
+  it('closes an open thought when a live message chunk follows it', async () => {
+    const executablePath = fakeCli(`${READY}
+else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  const updates = [
+    { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Almost done.' } },
+    { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Finished.' } },
+  ];
+  for (const update of updates) {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0', method: 'session/update',
+      params: { sessionId: 's1', update }
+    }) + '\\n');
+  }
+  setTimeout(() => process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' }
+  }) + '\\n'), 30);
+}`);
+    const client = new AcpSessionClient({
+      executablePath,
+      requestTimeoutMs: 2_000,
+      promptTimeoutMs: 2_000,
+    });
+    try {
+      await client.start();
+      await client.listSessions();
+      await client.loadSession('s1');
+      await client.promptSession('s1', 'Wrap up.');
+      const turn = await turnEventually(client, 's1', (value) => value.reply === 'Finished.');
+      const thought = turn?.activity.find((entry) => entry.kind === 'thought');
+      expect(thought?.status).toBe('completed');
+    } finally {
+      await client.stop();
+    }
+  });
+
   it('clips the live reply to the 100 KiB message contract', async () => {
     const executablePath = fakeCli(`${READY}
 else if (request.method === 'session/load') {
