@@ -473,6 +473,23 @@ export default function ComputerSessionDetailScreen() {
             <Text className="ml-1.5 text-brand-text text-text12" numberOfLines={1}>
               {computer?.computerName ?? 'Paired local device'}
             </Text>
+            {activityIndicatorKind && (
+              <>
+                <Text className="mx-1.5 text-text-low text-text12">·</Text>
+                <View
+                  className="flex-row items-center"
+                  testID="computer-session-activity-indicator"
+                >
+                  <View
+                    className="mr-1 h-1.5 w-1.5 rounded-dot"
+                    style={{ backgroundColor: tokens.running.hex }}
+                  />
+                  <Text className="text-text-low text-text12">
+                    {activityShortLabel(activityIndicatorKind)}
+                  </Text>
+                </View>
+              </>
+            )}
             <Text className="mx-1.5 text-text-low text-text12">·</Text>
             <Text className="text-text-low text-text12">
               {canPrompt ? 'Steering enabled' : 'Read only'}
@@ -491,23 +508,6 @@ export default function ComputerSessionDetailScreen() {
                 <Text className="text-text-low text-text12">
                   {computerTransportLabel(computer.transportKind)}
                 </Text>
-              </>
-            )}
-            {activityIndicatorKind && (
-              <>
-                <Text className="mx-1.5 text-text-low text-text12">·</Text>
-                <View
-                  className="flex-row items-center"
-                  testID="computer-session-activity-indicator"
-                >
-                  <View
-                    className="mr-1 h-1.5 w-1.5 rounded-dot"
-                    style={{ backgroundColor: tokens.running.hex }}
-                  />
-                  <Text className="text-text-low text-text12">
-                    {activityShortLabel(activityIndicatorKind)}
-                  </Text>
-                </View>
               </>
             )}
           </View>
