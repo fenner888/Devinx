@@ -478,12 +478,12 @@ export class DevinSessionStore {
         ) {
           const metadata = message.metadata ?? {};
           const startedAt = isoToMs(
-            typeof metadata['started_generation_at'] === 'string'
-              ? metadata['started_generation_at']
+            typeof metadata.started_generation_at === 'string'
+              ? metadata.started_generation_at
               : undefined,
           );
           const endedAt = isoToMs(
-            typeof metadata['created_at'] === 'string' ? metadata['created_at'] : undefined,
+            typeof metadata.created_at === 'string' ? metadata.created_at : undefined,
           );
           // A persisted thinking block is always finished; real timestamps keep
           // the group's duration accurate instead of showing a running thought.

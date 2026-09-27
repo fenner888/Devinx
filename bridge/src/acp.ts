@@ -438,7 +438,7 @@ function activityKindForTool(
   return 'thinking';
 }
 
-function defaultActivityLabel(kind: AcpActivityKind): string {
+export function defaultActivityLabel(kind: AcpActivityKind): string {
   if (kind === 'reading') return 'Reading project files';
   if (kind === 'editing') return 'Editing files';
   if (kind === 'executing') return 'Running a command';

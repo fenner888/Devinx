@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import {
   AcpSessionClient,
+  defaultActivityLabel,
   isAcpSessionInUseError,
   type AcpElicitationResponse,
   type AcpHistoryMessage,
@@ -241,12 +242,32 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   }
 
   isSessionActivitySupported(): boolean {
-    return Boolean(this.current.isSessionActivitySupported?.());
+    return Boolean(
+      this.current.isSessionActivitySupported?.() || this.history?.getSessionLiveness,
+    );
   }
 
   async getSessionActivity(input: string): Promise<AcpSessionActivity | null> {
     await this.ensureSessionListed(input);
-    return this.current.getSessionActivity?.(input) ?? null;
+    const live = (await this.current.getSessionActivity?.(input)) ?? null;
+    if (live?.active) return live;
+    if (this.history?.getSessionLiveness) {
+      try {
+        const liveness = await this.history.getSessionLiveness(input);
+        if (liveness?.active) {
+          const kind = liveness.kind ?? 'thinking';
+          return {
+            kind,
+            label: defaultActivityLabel(kind),
+            active: true,
+            updatedAt: liveness.updatedAt,
+          };
+        }
+      } catch {
+        // Liveness is best-effort; fall back to the live report.
+      }
+    }
+    return live;
   }
 
   async getSessionTurn(input: string): Promise<AcpSessionTurn | null> {
