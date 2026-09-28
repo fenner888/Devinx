@@ -16,6 +16,7 @@ import {
 
 const BRIDGE_PROTOCOL_VERSION = 2 as const;
 const REQUEST_LIFETIME_MS = 15_000;
+const BRIDGE_FEATURES_CACHE_TTL_MS = 60_000;
 
 const opaqueIdSchema = z
   .string()
@@ -34,12 +35,19 @@ const bridgeIdListSchema = z
   });
 const localSessionIdSchema = z.string().regex(/^local_[A-Za-z0-9_-]{43}$/);
 const interactionIdSchema = z.string().regex(/^interaction_[A-Za-z0-9_-]{43}$/);
+const permissionIdSchema = z.string().regex(/^permission_[A-Za-z0-9_-]{43}$/);
 const workspaceIdSchema = z.string().regex(/^workspace_[A-Za-z0-9_-]{43}$/);
 const modelIdSchema = z
   .string()
   .min(1)
   .max(160)
   .regex(/^[A-Za-z0-9._:+-]+$/);
+type CachedBridgeFeatures = {
+  expiresAt: number;
+  promise: Promise<ComputerBridgeFeatures>;
+  value?: ComputerBridgeFeatures;
+};
+const bridgeFeaturesCache = new Map<string, CachedBridgeFeatures>();
 const computerModelSchema = z
   .object({
     id: modelIdSchema,
@@ -64,17 +72,23 @@ const bridgeMethodSchema = z.enum([
   'session.activity',
   'session.elicitation',
   'session.elicitation.respond',
+  'session.permission',
+  'session.permission.respond',
   'session.prompt',
   'session.create_options',
   'session.create',
 ]);
 const bridgeHealthBodySchema = z.object({}).strict();
-const bridgeFeaturesBodySchema = z.object({}).strict();
+const interactionOptInSchema = z.literal(true).optional();
+const bridgeFeaturesBodySchema = z.object({ interaction: interactionOptInSchema }).strict();
 const bridgePlatformBodySchema = z.object({}).strict();
 const bridgeVersionBodySchema = z.object({}).strict();
 const computerBridgeFeaturesSchema = z
-  .object({ sessionElicitation: z.boolean(), activityTimeline: z.boolean().optional() })
-  .strict();
+  .object({
+    sessionElicitation: z.boolean(),
+    activityTimeline: z.boolean().optional(),
+    permissionPrompts: z.boolean().optional(),
+  });
 const computerBridgePlatformSchema = z
   .object({ platform: z.enum(['macos', 'windows', 'linux']) })
   .strict();
@@ -83,9 +97,15 @@ export const computerBridgeVersionSchema = z
   .strict();
 const deviceRevokeBodySchema = z.object({}).strict();
 const deviceRevokeResponseSchema = z.object({ revoked: z.literal(true) }).strict();
-const sessionListBodySchema = z.object({ cursor: cursorSchema.optional() }).strict();
-const sessionLoadBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
-const sessionActivityBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
+const sessionListBodySchema = z
+  .object({ cursor: cursorSchema.optional(), interaction: interactionOptInSchema })
+  .strict();
+const sessionLoadBodySchema = z
+  .object({ sessionId: localSessionIdSchema, interaction: interactionOptInSchema })
+  .strict();
+const sessionActivityBodySchema = z
+  .object({ sessionId: localSessionIdSchema, interaction: interactionOptInSchema })
+  .strict();
 const computerSessionActivityKindSchema = z.enum([
   'thinking',
   'reading',
@@ -115,7 +135,15 @@ export const computerActivityEntrySchema = z
     toolKind: z
       .enum(['read', 'edit', 'delete', 'move', 'search', 'execute', 'think', 'fetch', 'other'])
       .optional(),
-    status: z.enum(['running', 'completed', 'failed', 'interrupted', 'unknown']),
+    status: z.enum([
+      'running',
+      'completed',
+      'failed',
+      'interrupted',
+      'unknown',
+      'awaiting_input',
+      'timed_out',
+    ]),
     title: z.string().min(1).max(200),
     paths: z.array(computerActivityPathSchema).max(20).optional(),
     detail: z
@@ -142,6 +170,25 @@ const computerSessionActivitySchema = z
     kind: computerSessionActivityKindSchema,
     label: z.string().min(1).max(160),
     updatedAt: z.number().int().nonnegative(),
+    awaiting: z.enum(['answer', 'approval']).optional(),
+    terminalQuestion: z
+      .object({
+        questions: z
+          .array(
+            z
+              .object({
+                question: z.string().min(1).max(500),
+                header: z.string().min(1).max(120).optional(),
+                options: z.array(z.string().min(1).max(200)).max(20),
+                multiSelect: z.boolean(),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(4),
+      })
+      .strict()
+      .optional(),
     turn: z
       .object({
         startedAt: z.number().int().nonnegative(),
@@ -191,6 +238,7 @@ const computerSessionElicitationSchema = z
                   )
                   .max(100)
                   .optional(),
+                allowOther: z.literal(true).optional(),
                 minimum: z.number().finite().optional(),
                 maximum: z.number().finite().optional(),
                 minLength: z.number().int().min(0).max(10_000).optional(),
@@ -227,6 +275,35 @@ const sessionElicitationResponseBodySchema = z.union([
     .strict(),
 ]);
 const sessionElicitationResponseSchema = z.object({ accepted: z.literal(true) }).strict();
+const sessionPermissionBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
+const sessionPermissionDecisionSchema = z.enum(['allow_once', 'allow_session', 'reject_once']);
+const computerSessionPermissionSchema = z
+  .object({
+    permission: z
+      .object({
+        id: permissionIdSchema,
+        title: z.string().min(1).max(200),
+        toolKind: z
+          .enum(['read', 'edit', 'delete', 'move', 'search', 'execute', 'think', 'fetch', 'other'])
+          .optional(),
+        command: z.string().max(2_000).optional(),
+        paths: z.array(computerActivityPathSchema).max(20).optional(),
+        decisions: z.array(sessionPermissionDecisionSchema).min(1).max(3),
+        createdAt: z.number().int().nonnegative(),
+        expiresAt: z.number().int().nonnegative(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+const sessionPermissionResponseBodySchema = z
+  .object({
+    sessionId: localSessionIdSchema,
+    permissionId: permissionIdSchema,
+    decision: sessionPermissionDecisionSchema,
+  })
+  .strict();
+const sessionPermissionResponseSchema = z.object({ accepted: z.literal(true) }).strict();
 const sessionPromptBodySchema = z
   .object({
     sessionId: localSessionIdSchema,
@@ -337,6 +414,7 @@ export const computerSessionSummarySchema = z
         active: z.boolean(),
         kind: computerSessionActivityKindSchema.optional(),
         updatedAt: z.number().int().nonnegative(),
+        awaiting: z.enum(['answer', 'approval']).optional(),
       })
       .strict()
       .optional(),
@@ -433,6 +511,14 @@ export type ComputerElicitationAnswer =
       content: Record<string, string | number | boolean | string[]>;
     }
   | { interactionId: string; action: 'decline' | 'cancel' };
+export type ComputerSessionPermission = NonNullable<
+  z.infer<typeof computerSessionPermissionSchema>['permission']
+>;
+export type ComputerSessionPermissionDecision = z.infer<typeof sessionPermissionDecisionSchema>;
+export type ComputerPermissionAnswer = {
+  permissionId: string;
+  decision: ComputerSessionPermissionDecision;
+};
 export type ComputerCreateOptions = z.infer<typeof sessionCreateOptionsResponseSchema>;
 export type ComputerModel = z.infer<typeof computerModelSchema>;
 
@@ -470,6 +556,8 @@ const permissionByMethod = {
   'session.activity': 'session:content:read',
   'session.elicitation': 'session:content:read',
   'session.elicitation.respond': 'session:prompt:send',
+  'session.permission': 'session:content:read',
+  'session.permission.respond': 'session:prompt:send',
   'session.prompt': 'session:prompt:send',
   'session.create_options': 'session:metadata:read',
   'session.create': 'session:create',
@@ -487,6 +575,10 @@ function bodyForMethod(method: SupportedMethod, input: unknown): object {
   if (method === 'session.elicitation') return sessionElicitationBodySchema.parse(input);
   if (method === 'session.elicitation.respond') {
     return sessionElicitationResponseBodySchema.parse(input);
+  }
+  if (method === 'session.permission') return sessionPermissionBodySchema.parse(input);
+  if (method === 'session.permission.respond') {
+    return sessionPermissionResponseBodySchema.parse(input);
   }
   if (method === 'session.prompt') return sessionPromptBodySchema.parse(input);
   if (method === 'session.create_options') return sessionCreateOptionsBodySchema.parse(input);
@@ -621,22 +713,80 @@ async function requestHealth(credential: PairedComputerCredential): Promise<Comp
 async function requestFeatures(
   credential: PairedComputerCredential,
 ): Promise<ComputerBridgeFeatures> {
+  const cached = bridgeFeaturesCache.get(credential.bridgeId);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+
+  const entry: CachedBridgeFeatures = {
+    expiresAt: Date.now() + BRIDGE_FEATURES_CACHE_TTL_MS,
+    promise: Promise.resolve({ sessionElicitation: false }),
+  };
+  const promise = requestFeaturesUncached(credential);
+  entry.promise = promise;
+  bridgeFeaturesCache.set(credential.bridgeId, entry);
+  promise.then(
+    (features) => {
+      if (features.permissionPrompts === undefined) {
+        if (bridgeFeaturesCache.get(credential.bridgeId) === entry) {
+          bridgeFeaturesCache.delete(credential.bridgeId);
+        }
+        return;
+      }
+      entry.value = features;
+    },
+    () => {
+      if (bridgeFeaturesCache.get(credential.bridgeId) === entry) {
+        bridgeFeaturesCache.delete(credential.bridgeId);
+      }
+    },
+  );
+  return promise;
+}
+
+async function requestFeaturesUncached(
+  credential: PairedComputerCredential,
+): Promise<ComputerBridgeFeatures> {
   try {
-    const response = await requestComputer(credential, 'bridge.features', {});
-    const result = computerBridgeFeaturesSchema.safeParse(response.body);
-    if (!result.success) {
-      throw new ComputerBridgeError(
-        'The paired local device returned invalid feature information.',
-        'invalid_response',
-      );
-    }
-    return { ...result.data, activityTimeline: result.data.activityTimeline ?? false };
+    return await requestFeatureResponse(credential, { interaction: true });
   } catch (error) {
     if (error instanceof ComputerBridgeError && error.code === 'invalid_response') {
-      return { sessionElicitation: false, activityTimeline: false };
+      try {
+        return await requestFeatureResponse(credential, {});
+      } catch (legacyError) {
+        if (legacyError instanceof ComputerBridgeError && legacyError.code === 'invalid_response') {
+          return { sessionElicitation: false, activityTimeline: false };
+        }
+        throw legacyError;
+      }
     }
     throw error;
   }
+}
+
+async function requestFeatureResponse(
+  credential: PairedComputerCredential,
+  body: { interaction?: true },
+): Promise<ComputerBridgeFeatures> {
+  const response = await requestComputer(credential, 'bridge.features', body);
+  const result = computerBridgeFeaturesSchema.safeParse(response.body);
+  if (!result.success) {
+    throw new ComputerBridgeError(
+      'The paired local device returned invalid feature information.',
+      'invalid_response',
+    );
+  }
+  return {
+    ...result.data,
+    activityTimeline: result.data.activityTimeline ?? false,
+  };
+}
+
+function interactionSupported(credential: PairedComputerCredential): boolean {
+  const cached = bridgeFeaturesCache.get(credential.bridgeId);
+  return Boolean(
+    cached &&
+      cached.expiresAt > Date.now() &&
+      cached.value?.permissionPrompts === true,
+  );
 }
 
 async function requestPlatform(
@@ -693,7 +843,7 @@ async function requestDeviceRevocation(credential: PairedComputerCredential): Pr
 
 async function requestSessionList(
   credential: PairedComputerCredential,
-  input: { cursor?: string } = {},
+  input: { cursor?: string; interaction?: true } = {},
 ): Promise<ComputerSessionPage> {
   const body = sessionListBodySchema.parse(input);
   const response = await requestComputer(credential, 'session.list', body);
@@ -718,7 +868,7 @@ async function requestSessionList(
 
 async function requestSessionLoad(
   credential: PairedComputerCredential,
-  input: { sessionId: string },
+  input: { sessionId: string; interaction?: true },
 ): Promise<ComputerLoadedSession> {
   const body = sessionLoadBodySchema.parse(input);
   const response = await requestComputer(credential, 'session.load', body);
@@ -734,7 +884,7 @@ async function requestSessionLoad(
 
 async function requestSessionActivity(
   credential: PairedComputerCredential,
-  input: { sessionId: string },
+  input: { sessionId: string; interaction?: true },
 ): Promise<ComputerSessionActivity> {
   const body = sessionActivityBodySchema.parse(input);
   const response = await requestComputer(credential, 'session.activity', body);
@@ -773,6 +923,36 @@ async function requestSessionElicitationResponse(
   if (!sessionElicitationResponseSchema.safeParse(response.body).success) {
     throw new ComputerBridgeError(
       'The paired local device returned an invalid question response.',
+      'invalid_response',
+    );
+  }
+}
+
+async function requestSessionPermission(
+  credential: PairedComputerCredential,
+  input: { sessionId: string },
+): Promise<ComputerSessionPermission | null> {
+  const body = sessionPermissionBodySchema.parse(input);
+  const response = await requestComputer(credential, 'session.permission', body);
+  const result = computerSessionPermissionSchema.safeParse(response.body);
+  if (!result.success) {
+    throw new ComputerBridgeError(
+      'The paired local device returned an invalid command permission.',
+      'invalid_response',
+    );
+  }
+  return result.data.permission;
+}
+
+async function requestSessionPermissionResponse(
+  credential: PairedComputerCredential,
+  input: { sessionId: string } & ComputerPermissionAnswer,
+): Promise<void> {
+  const body = sessionPermissionResponseBodySchema.parse(input);
+  const response = await requestComputer(credential, 'session.permission.respond', body);
+  if (!sessionPermissionResponseSchema.safeParse(response.body).success) {
+    throw new ComputerBridgeError(
+      'The paired local device returned an invalid command permission response.',
       'invalid_response',
     );
   }
@@ -836,6 +1016,8 @@ export interface ComputerBridgeConnection {
   getSessionActivity(sessionId: string): Promise<ComputerSessionActivity>;
   getSessionElicitation(sessionId: string): Promise<ComputerSessionElicitation>;
   respondToSessionElicitation(input: ComputerElicitationResponse): Promise<void>;
+  getSessionPermission(sessionId: string): Promise<ComputerSessionPermission | null>;
+  respondToSessionPermission(input: { sessionId: string } & ComputerPermissionAnswer): Promise<void>;
   promptSession(
     sessionId: string,
     text: string,
@@ -855,11 +1037,25 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
     getHealth: () => requestHealth(credential),
     getFeatures: () => requestFeatures(credential),
     getVersion: () => requestVersion(credential),
-    listSessions: (input = {}) => requestSessionList(credential, input),
-    loadSession: (sessionId) => requestSessionLoad(credential, { sessionId }),
-    getSessionActivity: (sessionId) => requestSessionActivity(credential, { sessionId }),
+    listSessions: (input = {}) =>
+      requestSessionList(credential, {
+        ...input,
+        ...(interactionSupported(credential) ? { interaction: true as const } : {}),
+      }),
+    loadSession: (sessionId) =>
+      requestSessionLoad(credential, {
+        sessionId,
+        ...(interactionSupported(credential) ? { interaction: true as const } : {}),
+      }),
+    getSessionActivity: (sessionId) =>
+      requestSessionActivity(credential, {
+        sessionId,
+        ...(interactionSupported(credential) ? { interaction: true as const } : {}),
+      }),
     getSessionElicitation: (sessionId) => requestSessionElicitation(credential, { sessionId }),
     respondToSessionElicitation: (input) => requestSessionElicitationResponse(credential, input),
+    getSessionPermission: (sessionId) => requestSessionPermission(credential, { sessionId }),
+    respondToSessionPermission: (input) => requestSessionPermissionResponse(credential, input),
     promptSession: (sessionId, text, modelId) =>
       requestSessionPrompt(credential, {
         sessionId,
@@ -966,6 +1162,20 @@ export async function respondToComputerSessionElicitation(
   input: ComputerElicitationResponse,
 ): Promise<void> {
   return (await openComputerBridge(bridgeId)).respondToSessionElicitation(input);
+}
+
+export async function getComputerSessionPermission(
+  bridgeId: string,
+  sessionId: string,
+): Promise<ComputerSessionPermission | null> {
+  return (await openComputerBridge(bridgeId)).getSessionPermission(sessionId);
+}
+
+export async function respondToComputerSessionPermission(
+  bridgeId: string,
+  input: { sessionId: string } & ComputerPermissionAnswer,
+): Promise<void> {
+  return (await openComputerBridge(bridgeId)).respondToSessionPermission(input);
 }
 
 export async function promptComputerSession(
