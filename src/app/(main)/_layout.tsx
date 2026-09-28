@@ -9,6 +9,8 @@ export default function MainGroup() {
       <Stack.Screen name="security-work" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="connections" />
+      <Stack.Screen name="credentials" />
+      <Stack.Screen name="validate" />
       <Stack.Screen name="repositories" />
       <Stack.Screen name="wiki" />
       <Stack.Screen name="computer" />

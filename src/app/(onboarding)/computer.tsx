@@ -20,6 +20,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 
 import { useConnections } from '@auth/ConnectionContext';
+import { useConnectDevinCloud } from '@components/CloudRequired';
 import {
   ComputerBridgeError,
   disconnectComputer,
@@ -126,6 +127,7 @@ export default function ComputerConnectionScreen() {
   const { computers = [], refreshComputers } = useConnections();
   const mode = useAppPreferences((state) => state.connectionMode);
   const setConnectionMode = useAppPreferences((state) => state.setConnectionMode);
+  const connectDevinCloud = useConnectDevinCloud();
   const isCombinedSetup = mode === 'both';
   const [computerName, setComputerName] = useState('My local device');
   const [phase, setPhase] = useState<ScreenPhase>('intro');
@@ -187,8 +189,7 @@ export default function ComputerConnectionScreen() {
 
   function useCloudInstead() {
     abortRef.current?.abort();
-    setConnectionMode('cloud');
-    router.replace('/(onboarding)/credentials');
+    connectDevinCloud();
   }
 
   function confirmDisconnect(bridgeId: string, computerLabel: string) {
@@ -669,16 +670,25 @@ export default function ComputerConnectionScreen() {
           )}
 
           {mode === 'computer' && phase === 'intro' && (
-            <Pressable
-              className="border border-border rounded-button px-buttonPrimaryX py-buttonPrimaryY mt-3"
-              onPress={useCloudInstead}
-              accessibilityRole="button"
-              accessibilityLabel="Connect Devin Cloud instead"
-            >
-              <Text className="text-text-hi text-text14 font-medium text-center">
-                Connect Devin Cloud instead
-              </Text>
-            </Pressable>
+            <>
+              <Pressable
+                className="border border-border rounded-button px-buttonPrimaryX py-buttonPrimaryY mt-3"
+                onPress={useCloudInstead}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  computers.length > 0 ? 'Also connect Devin Cloud' : 'Connect Devin Cloud instead'
+                }
+              >
+                <Text className="text-text-hi text-text14 font-medium text-center">
+                  {computers.length > 0 ? 'Also connect Devin Cloud' : 'Connect Devin Cloud instead'}
+                </Text>
+              </Pressable>
+              {computers.length > 0 && (
+                <Text className="text-text-low text-text12 text-center mt-2">
+                  Your paired devices stay connected.
+                </Text>
+              )}
+            </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
