@@ -20,6 +20,18 @@ const QUESTION_ARGUMENTS = {
     },
   ],
 };
+const QUESTION_ARGUMENTS_WITHOUT_MULTI_SELECT = {
+  questions: [
+    {
+      question: 'Which file should I summarize?',
+      header: 'File choice',
+      options: [
+        { label: 'scratch.txt', description: '…' },
+        { label: 'delete-me.txt', description: '…' },
+      ],
+    },
+  ],
+};
 
 describe('Terminal question history', () => {
   let directory: string;
@@ -138,6 +150,34 @@ describe('Terminal question history', () => {
       }),
     ]);
     expect(JSON.stringify(liveness?.pendingQuestion)).not.toContain('/Users/example/workspace');
+  });
+
+  it('defaults omitted multiSelect to false for Terminal question history', async () => {
+    const sessionStore = await createStore(QUESTION_ARGUMENTS_WITHOUT_MULTI_SELECT);
+
+    const liveness = await sessionStore.getSessionLiveness(SESSION_ID);
+    expect(liveness).toMatchObject({
+      active: true,
+      pendingQuestion: {
+        questions: [
+          {
+            question: 'Which file should I summarize?',
+            header: 'File choice',
+            options: ['scratch.txt', 'delete-me.txt'],
+            multiSelect: false,
+          },
+        ],
+      },
+    });
+
+    const loaded = await sessionStore.loadSession(SESSION_ID);
+    expect(loaded.activity).toEqual([
+      expect.objectContaining({
+        kind: 'tool',
+        status: 'awaiting_input',
+        title: 'ask_user_question',
+      }),
+    ]);
   });
 
   it('omits malformed questions instead of returning unbounded Terminal data', async () => {

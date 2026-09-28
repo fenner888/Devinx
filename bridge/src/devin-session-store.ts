@@ -111,7 +111,7 @@ const terminalQuestionSchema = z
             question: z.string().min(1).max(500),
             header: z.string().max(120).optional(),
             options: z.array(z.object({ label: z.string().max(200) }).passthrough()).max(20),
-            multiSelect: z.boolean(),
+            multiSelect: z.boolean().optional(),
           })
           .passthrough(),
       )
@@ -196,7 +196,7 @@ function terminalQuestionFromArguments(
       question: question.question,
       ...(question.header === undefined ? {} : { header: question.header }),
       options: question.options.map((option) => option.label),
-      multiSelect: question.multiSelect,
+      multiSelect: question.multiSelect ?? false,
     })),
   };
 }
