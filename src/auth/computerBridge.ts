@@ -45,9 +45,9 @@ const modelIdSchema = z
 type CachedBridgeFeatures = {
   expiresAt: number;
   promise: Promise<ComputerBridgeFeatures>;
-  value?: ComputerBridgeFeatures;
 };
 const bridgeFeaturesCache = new Map<string, CachedBridgeFeatures>();
+const bridgeInteractionSupport = new Map<string, boolean>();
 const computerModelSchema = z
   .object({
     id: modelIdSchema,
@@ -530,6 +530,7 @@ export type ComputerBridgeErrorCode =
   | 'rate_limited'
   | 'unavailable'
   | 'unsupported_method'
+  | 'invalid_request'
   | 'invalid_response'
   | 'too_many_sessions';
 
@@ -620,6 +621,12 @@ function publicResponseError(
     return new ComputerBridgeError(
       'The paired local device does not support version negotiation.',
       'unsupported_method',
+    );
+  }
+  if (status === 400 && body.error === 'invalid_request') {
+    return new ComputerBridgeError(
+      'The paired local device rejected an invalid request.',
+      'invalid_request',
     );
   }
   return new ComputerBridgeError(
@@ -725,13 +732,17 @@ async function requestFeatures(
   bridgeFeaturesCache.set(credential.bridgeId, entry);
   promise.then(
     (features) => {
+      if (features.permissionPrompts === true) {
+        bridgeInteractionSupport.set(credential.bridgeId, true);
+      } else {
+        bridgeInteractionSupport.delete(credential.bridgeId);
+      }
       if (features.permissionPrompts === undefined) {
         if (bridgeFeaturesCache.get(credential.bridgeId) === entry) {
           bridgeFeaturesCache.delete(credential.bridgeId);
         }
         return;
       }
-      entry.value = features;
     },
     () => {
       if (bridgeFeaturesCache.get(credential.bridgeId) === entry) {
@@ -748,11 +759,17 @@ async function requestFeaturesUncached(
   try {
     return await requestFeatureResponse(credential, { interaction: true });
   } catch (error) {
-    if (error instanceof ComputerBridgeError && error.code === 'invalid_response') {
+    if (
+      error instanceof ComputerBridgeError &&
+      (error.code === 'invalid_request' || error.code === 'invalid_response')
+    ) {
       try {
         return await requestFeatureResponse(credential, {});
       } catch (legacyError) {
-        if (legacyError instanceof ComputerBridgeError && legacyError.code === 'invalid_response') {
+        if (
+          legacyError instanceof ComputerBridgeError &&
+          (legacyError.code === 'invalid_request' || legacyError.code === 'invalid_response')
+        ) {
           return { sessionElicitation: false, activityTimeline: false };
         }
         throw legacyError;
@@ -781,12 +798,24 @@ async function requestFeatureResponse(
 }
 
 function interactionSupported(credential: PairedComputerCredential): boolean {
-  const cached = bridgeFeaturesCache.get(credential.bridgeId);
-  return Boolean(
-    cached &&
-      cached.expiresAt > Date.now() &&
-      cached.value?.permissionPrompts === true,
-  );
+  return bridgeInteractionSupport.get(credential.bridgeId) === true;
+}
+
+async function requestWithInteractionFallback<T>(
+  credential: PairedComputerCredential,
+  request: (includeInteraction: boolean) => Promise<T>,
+): Promise<T> {
+  if (!interactionSupported(credential)) return request(false);
+
+  try {
+    return await request(true);
+  } catch (error) {
+    if (!(error instanceof ComputerBridgeError) || error.code !== 'invalid_request') {
+      throw error;
+    }
+    bridgeInteractionSupport.delete(credential.bridgeId);
+    return request(false);
+  }
 }
 
 async function requestPlatform(
@@ -1038,20 +1067,26 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
     getFeatures: () => requestFeatures(credential),
     getVersion: () => requestVersion(credential),
     listSessions: (input = {}) =>
-      requestSessionList(credential, {
-        ...input,
-        ...(interactionSupported(credential) ? { interaction: true as const } : {}),
-      }),
+      requestWithInteractionFallback(credential, (includeInteraction) =>
+        requestSessionList(credential, {
+          ...input,
+          ...(includeInteraction ? { interaction: true as const } : {}),
+        }),
+      ),
     loadSession: (sessionId) =>
-      requestSessionLoad(credential, {
-        sessionId,
-        ...(interactionSupported(credential) ? { interaction: true as const } : {}),
-      }),
+      requestWithInteractionFallback(credential, (includeInteraction) =>
+        requestSessionLoad(credential, {
+          sessionId,
+          ...(includeInteraction ? { interaction: true as const } : {}),
+        }),
+      ),
     getSessionActivity: (sessionId) =>
-      requestSessionActivity(credential, {
-        sessionId,
-        ...(interactionSupported(credential) ? { interaction: true as const } : {}),
-      }),
+      requestWithInteractionFallback(credential, (includeInteraction) =>
+        requestSessionActivity(credential, {
+          sessionId,
+          ...(includeInteraction ? { interaction: true as const } : {}),
+        }),
+      ),
     getSessionElicitation: (sessionId) => requestSessionElicitation(credential, { sessionId }),
     respondToSessionElicitation: (input) => requestSessionElicitationResponse(credential, input),
     getSessionPermission: (sessionId) => requestSessionPermission(credential, { sessionId }),

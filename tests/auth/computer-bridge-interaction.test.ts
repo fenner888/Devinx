@@ -140,6 +140,42 @@ describe('Computer Bridge interaction compatibility', () => {
     );
   });
 
+  it('keeps interaction enabled after the feature promise cache expires', async () => {
+    mockLoadPairedComputers.mockResolvedValue([credential('bridge_interaction_ttl')]);
+    mockPostBridgeJson.mockImplementation(async (_endpoint: string, _path: string, envelope: unknown) => {
+      const request = envelope as { method: string };
+      if (request.method === 'bridge.features') {
+        return {
+          status: 200,
+          body: { sessionElicitation: true, activityTimeline: true, permissionPrompts: true },
+        };
+      }
+      if (request.method === 'session.activity') {
+        return {
+          status: 200,
+          body: {
+            active: true,
+            kind: 'thinking',
+            label: 'Waiting for your answer',
+            updatedAt: NOW,
+            awaiting: 'answer',
+          },
+        };
+      }
+      throw new Error(`Unexpected method ${request.method}`);
+    });
+
+    await getComputerBridgeFeatures('bridge_interaction_ttl');
+    jest.spyOn(Date, 'now').mockReturnValue(NOW + 60_001);
+    await getComputerSessionActivity('bridge_interaction_ttl', SESSION_ID);
+
+    expect(requestEnvelopes('bridge.features')).toHaveLength(1);
+    expect(requestEnvelopes('session.activity')[0]?.body).toEqual({
+      sessionId: SESSION_ID,
+      interaction: true,
+    });
+  });
+
   it('retries old Connector feature negotiation without interaction and keeps opt-in disabled', async () => {
     mockLoadPairedComputers.mockResolvedValue([credential('bridge_legacy_connector')]);
     mockPostBridgeJson
@@ -148,7 +184,24 @@ describe('Computer Bridge interaction compatibility', () => {
         status: 200,
         body: { sessionElicitation: false, activityTimeline: false },
       })
-      .mockResolvedValueOnce({ status: 200, body: { sessions: [] } });
+      .mockResolvedValueOnce({ status: 200, body: { sessions: [] } })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          session: { id: SESSION_ID, origin: 'computer', workspaceName: 'Workspace' },
+          messages: [{ sequence: 1, source: 'devin', text: 'Ready.' }],
+          truncated: false,
+        },
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          active: true,
+          kind: 'thinking',
+          label: 'Thinking',
+          updatedAt: NOW,
+        },
+      });
 
     const features = await getComputerBridgeFeatures('bridge_legacy_connector');
     expect(features).toMatchObject({
@@ -157,12 +210,69 @@ describe('Computer Bridge interaction compatibility', () => {
     });
     expect(features.permissionPrompts ?? false).toBe(false);
     await listComputerSessions('bridge_legacy_connector');
+    await loadComputerSession('bridge_legacy_connector', SESSION_ID);
+    await getComputerSessionActivity('bridge_legacy_connector', SESSION_ID);
 
     expect(requestEnvelopes('bridge.features').map(({ body }) => body)).toEqual([
       { interaction: true },
       {},
     ]);
     expect(requestEnvelopes('session.list')[0]?.body).toEqual({});
+    expect(requestEnvelopes('session.load')[0]?.body).toEqual({ sessionId: SESSION_ID });
+    expect(requestEnvelopes('session.activity')[0]?.body).toEqual({ sessionId: SESSION_ID });
+  });
+
+  it('downgrades after an invalid interaction request and omits opt-in thereafter', async () => {
+    mockLoadPairedComputers.mockResolvedValue([credential('bridge_interaction_downgrade')]);
+    const activity = {
+      active: true,
+      kind: 'thinking',
+      label: 'Waiting for your approval',
+      updatedAt: NOW,
+      awaiting: 'approval',
+    };
+    mockPostBridgeJson
+      .mockResolvedValueOnce({
+        status: 200,
+        body: { sessionElicitation: true, activityTimeline: true, permissionPrompts: true },
+      })
+      .mockResolvedValueOnce({ status: 400, body: { error: 'invalid_request' } })
+      .mockResolvedValueOnce({ status: 200, body: activity })
+      .mockResolvedValueOnce({ status: 200, body: activity });
+
+    await getComputerBridgeFeatures('bridge_interaction_downgrade');
+    await expect(
+      getComputerSessionActivity('bridge_interaction_downgrade', SESSION_ID),
+    ).resolves.toMatchObject({ awaiting: 'approval' });
+    await getComputerSessionActivity('bridge_interaction_downgrade', SESSION_ID);
+
+    expect(requestEnvelopes('session.activity').map(({ body }) => body)).toEqual([
+      { sessionId: SESSION_ID, interaction: true },
+      { sessionId: SESSION_ID },
+      { sessionId: SESSION_ID },
+    ]);
+    expect(requestEnvelopes('bridge.features')).toHaveLength(1);
+  });
+
+  it('does not retry interaction requests for unrelated Connector errors', async () => {
+    mockLoadPairedComputers.mockResolvedValue([credential('bridge_interaction_error')]);
+    mockPostBridgeJson
+      .mockResolvedValueOnce({
+        status: 200,
+        body: { sessionElicitation: true, activityTimeline: true, permissionPrompts: true },
+      })
+      .mockResolvedValueOnce({ status: 503, body: { error: 'temporarily_unavailable' } });
+
+    await getComputerBridgeFeatures('bridge_interaction_error');
+    await expect(
+      getComputerSessionActivity('bridge_interaction_error', SESSION_ID),
+    ).rejects.toMatchObject({ code: 'unavailable' });
+
+    expect(requestEnvelopes('session.activity')).toHaveLength(1);
+    expect(requestEnvelopes('session.activity')[0]?.body).toEqual({
+      sessionId: SESSION_ID,
+      interaction: true,
+    });
   });
 
   it('reads and responds to bounded command permissions using the granted methods', async () => {
