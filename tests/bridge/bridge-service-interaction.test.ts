@@ -1,6 +1,10 @@
 import { generateKeyPairSync, randomBytes, randomUUID, sign } from 'node:crypto';
 
-import type { AcpLoadedSession, AcpPendingPermission } from '../../bridge/src/acp';
+import type {
+  AcpLoadedSession,
+  AcpPendingElicitation,
+  AcpPendingPermission,
+} from '../../bridge/src/acp';
 import type { ActivityEntry } from '../../bridge/src/activity';
 import { FixedWindowRateLimiter } from '../../bridge/src/rate-limit';
 import { InMemoryReplayGuard } from '../../bridge/src/replay';
@@ -246,6 +250,87 @@ describe('Bridge service interaction compatibility', () => {
         sessionId: RAW_SESSION_ID,
         permissionId: PERMISSION_ID,
         decision: 'allow_once',
+      },
+    ]);
+  });
+
+  it('returns and accepts free-text answers for an allowOther elicitation field', async () => {
+    const bridge = service();
+    const listed = await bridge.handle(
+      envelope('session.list', {}, ['session:metadata:read']),
+      context,
+    );
+    const sessionId = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+    const interactionId = `interaction_${'I'.repeat(43)}`;
+    const pendingElicitation: AcpPendingElicitation = {
+      sessionId: RAW_SESSION_ID,
+      id: interactionId,
+      message: 'Which files should I list?',
+      fields: [
+        {
+          key: 'q0',
+          type: 'single_select',
+          title: 'Files',
+          required: true,
+          allowOther: true,
+          options: [
+            { value: 'all', label: 'All files' },
+            { value: 'changed', label: 'Changed files' },
+          ],
+        },
+      ],
+      createdAt: NOW - 1_000,
+    };
+    const elicitationResponses: Array<{
+      sessionId: string;
+      interactionId: string;
+      response: Parameters<
+        NonNullable<SessionDiscoveryAdapter['respondToElicitation']>
+      >[2];
+    }> = [];
+    adapter.isSessionElicitationSupported = () => true;
+    adapter.getPendingElicitation = (rawSessionId) =>
+      rawSessionId === RAW_SESSION_ID ? pendingElicitation : null;
+    adapter.respondToElicitation = (rawSessionId, id, response) => {
+      elicitationResponses.push({ sessionId: rawSessionId, interactionId: id, response });
+    };
+
+    await expect(
+      bridge.handle(
+        envelope('session.elicitation', { sessionId }, ['session:content:read']),
+        context,
+      ),
+    ).resolves.toMatchObject({
+      status: 200,
+      body: {
+        interaction: {
+          id: interactionId,
+          fields: [{ key: 'q0', type: 'single_select', allowOther: true }],
+        },
+      },
+    });
+
+    const answer = 'Neither — just list the files';
+    await expect(
+      bridge.handle(
+        envelope(
+          'session.elicitation.respond',
+          {
+            sessionId,
+            interactionId,
+            action: 'accept',
+            content: { q0: answer },
+          },
+          ['session:prompt:send'],
+        ),
+        context,
+      ),
+    ).resolves.toEqual({ status: 200, body: { accepted: true } });
+    expect(elicitationResponses).toEqual([
+      {
+        sessionId: RAW_SESSION_ID,
+        interactionId,
+        response: { action: 'accept', content: { q0: answer } },
       },
     ]);
   });

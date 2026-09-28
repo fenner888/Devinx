@@ -296,6 +296,7 @@ const localSessionElicitationSchema = z
                 maxLength: z.number().int().min(0).max(10_000).optional(),
                 minItems: z.number().int().min(0).max(100).optional(),
                 maxItems: z.number().int().min(0).max(100).optional(),
+                allowOther: z.literal(true).optional(),
                 defaultValue: elicitationValueSchema.optional(),
               })
               .strict(),
