@@ -152,6 +152,7 @@ describe('authenticated mobile Computer Bridge client', () => {
 
     await expect(getComputerBridgeFeatures(BRIDGE_ID)).resolves.toEqual({
       sessionElicitation: true,
+      activityTimeline: false,
     });
   });
 
@@ -160,6 +161,7 @@ describe('authenticated mobile Computer Bridge client', () => {
 
     await expect(getComputerBridgeFeatures(BRIDGE_ID)).resolves.toEqual({
       sessionElicitation: false,
+      activityTimeline: false,
     });
   });
 
@@ -601,5 +603,88 @@ describe('authenticated mobile Computer Bridge client', () => {
         message: 'The paired local device could not be reached securely.',
       }),
     );
+  });
+});
+
+describe('computer bridge activity timeline schemas', () => {
+  const sessionId = `local_${'L'.repeat(43)}`;
+  const contentComputer = {
+    ...COMPUTER,
+    permissions: [...COMPUTER.permissions, 'session:content:read'],
+  };
+  const loadedBody = (overrides: Record<string, unknown> = {}) => ({
+    session: { id: sessionId, origin: 'computer', workspaceName: 'Repo' },
+    messages: [{ sequence: 1, source: 'devin', text: 'Ready.' }],
+    truncated: false,
+    ...overrides,
+  });
+  const activityEntry = (overrides: Record<string, unknown> = {}) => ({
+    id: 'tool_abc',
+    afterSequence: 1,
+    kind: 'tool',
+    toolKind: 'read',
+    status: 'completed',
+    title: 'Read file',
+    truncated: false,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    mockLoadPairedComputers.mockResolvedValue([contentComputer]);
+    mockCreateRequestIdentity.mockResolvedValue({ requestId: REQUEST_ID, nonce: NONCE });
+    mockSign.mockResolvedValue(SIGNATURE);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('parses a legacy features response that omits activityTimeline', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: { sessionElicitation: true },
+    });
+    await expect(getComputerBridgeFeatures(BRIDGE_ID)).resolves.toEqual({
+      sessionElicitation: true,
+      activityTimeline: false,
+    });
+  });
+
+  it('accepts a loaded session with well-formed activity entries', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: loadedBody({
+        activity: [
+          activityEntry({ paths: ['notes.txt'], detail: { type: 'text', text: 'output' } }),
+        ],
+      }),
+    });
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).resolves.toMatchObject({
+      activity: [{ id: 'tool_abc', paths: ['notes.txt'] }],
+    });
+  });
+
+  it('rejects activity entries with absolute paths', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: loadedBody({
+        activity: [activityEntry({ paths: ['/Users/frank/secret.txt'] })],
+      }),
+    });
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
+
+  it('rejects activity afterSequence beyond the returned messages', async () => {
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: loadedBody({ activity: [activityEntry({ afterSequence: 2 })] }),
+    });
+    await expect(loadComputerSession(BRIDGE_ID, sessionId)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
   });
 });

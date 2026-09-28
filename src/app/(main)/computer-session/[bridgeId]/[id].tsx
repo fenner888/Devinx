@@ -33,6 +33,7 @@ import type { ComputerSessionBoard } from '@api/bridge/queries';
 import { ComputerBridgeError, type ComputerLoadedSession } from '@auth/computerBridge';
 import { useConnections } from '@auth/ConnectionContext';
 import { computerTransportLabel } from '@auth/pairedComputers';
+import { ActivityGroup, groupActivity } from '@components/sessions/ActivityGroup';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
 import { ComputerModelPickerSheets } from '@components/sessions/ComputerModelPickerSheets';
@@ -46,6 +47,7 @@ import {
   preferredFamilyVariant,
   splitComputerModelName,
 } from '@lib/computer-model-catalog';
+import { activityShortLabel } from '@lib/activity-labels';
 import { useTheme } from '@theme/index';
 import { activityForComputerSession } from '@/pets/devin/activity';
 
@@ -178,6 +180,7 @@ export default function ComputerSessionDetailScreen() {
   const historyRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const promptStartedAt = useRef<number | null>(null);
   const refreshGeneration = useRef(0);
   const continuationRefreshStarted = useRef(false);
   const validParameters =
@@ -201,6 +204,20 @@ export default function ComputerSessionDetailScreen() {
       ? (query.data?.session.workspaceName ?? listItem.workspaceName)
       : undefined;
   const sessionActivity = useComputerSessionActivity(bridgeId, sessionId, mayReadContent);
+  const activitySupported = bridgeFeatures.data?.activityTimeline === true;
+  const activityGroups = activitySupported
+    ? groupActivity(query.data?.activity ?? [])
+    : new Map();
+  const activityIndicatorKind =
+    activitySupported && sessionActivity.data?.active ? (sessionActivity.data.kind ?? 'thinking') : null;
+  const liveTurn =
+    activitySupported &&
+    steeringActive &&
+    promptStartedAt.current !== null &&
+    sessionActivity.data?.turn !== undefined &&
+    sessionActivity.data.turn.startedAt >= promptStartedAt.current
+      ? sessionActivity.data.turn
+      : null;
   const prompt = usePromptComputerSession(bridgeId, sessionId);
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
   const mayAnswerQuestions =
@@ -305,6 +322,9 @@ export default function ComputerSessionDetailScreen() {
     if (!text || !canPrompt || prompt.isPending || steeringActive || sessionBusy) return;
     Keyboard.dismiss();
     setSteeringActive(true);
+    // The Connector keeps the previous turn until the next prompt starts;
+    // the skew slack keeps a just-started turn visible under clock drift.
+    promptStartedAt.current = Date.now() - 5_000;
     setPendingText(text);
     setDraft('');
     const generation = refreshGeneration.current + 1;
@@ -340,6 +360,7 @@ export default function ComputerSessionDetailScreen() {
               if (hasSettledNewDevinReply(baselineReply, observedReply, currentReply)) {
                 setPendingText(null);
                 setSteeringActive(false);
+                promptStartedAt.current = null;
                 return;
               }
               observedReply = currentReply === baselineReply ? null : currentReply;
@@ -347,6 +368,7 @@ export default function ComputerSessionDetailScreen() {
             if (attempt >= MAXIMUM_HISTORY_REFRESH_ATTEMPTS) {
               setPendingText(null);
               setSteeringActive(false);
+              promptStartedAt.current = null;
               return;
             }
             refreshTimer.current = setTimeout(
@@ -364,6 +386,7 @@ export default function ComputerSessionDetailScreen() {
             setPendingText(null);
             setDraft(text);
             setSteeringActive(false);
+            promptStartedAt.current = null;
           }
         },
       },
@@ -375,6 +398,7 @@ export default function ComputerSessionDetailScreen() {
     answerElicitation.mutate(response, {
       onSuccess: () => {
         setSteeringActive(true);
+        promptStartedAt.current = Date.now() - 5_000;
         const generation = refreshGeneration.current + 1;
         refreshGeneration.current = generation;
         let observedReply: string | null = null;
@@ -386,11 +410,13 @@ export default function ComputerSessionDetailScreen() {
             : baselineReply;
           if (hasSettledNewDevinReply(baselineReply, observedReply, currentReply)) {
             setSteeringActive(false);
+            promptStartedAt.current = null;
             return;
           }
           observedReply = currentReply === baselineReply ? null : currentReply;
           if (attempt >= MAXIMUM_HISTORY_REFRESH_ATTEMPTS) {
             setSteeringActive(false);
+            promptStartedAt.current = null;
             return;
           }
           refreshTimer.current = setTimeout(
@@ -408,7 +434,14 @@ export default function ComputerSessionDetailScreen() {
 
   useEffect(() => {
     if (nearBottomRef.current) historyRef.current?.scrollToEnd({ animated: true });
-  }, [activeElicitation?.id, pendingText, query.data?.messages.length, steeringActive]);
+  }, [
+    activeElicitation?.id,
+    pendingText,
+    query.data?.messages.length,
+    steeringActive,
+    liveTurn?.reply,
+    liveTurn?.activity.length,
+  ]);
 
   function handleHistoryScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
@@ -440,6 +473,23 @@ export default function ComputerSessionDetailScreen() {
             <Text className="ml-1.5 text-brand-text text-text12" numberOfLines={1}>
               {computer?.computerName ?? 'Paired local device'}
             </Text>
+            {activityIndicatorKind && (
+              <>
+                <Text className="mx-1.5 text-text-low text-text12">·</Text>
+                <View
+                  className="flex-row items-center"
+                  testID="computer-session-activity-indicator"
+                >
+                  <View
+                    className="mr-1 h-1.5 w-1.5 rounded-dot"
+                    style={{ backgroundColor: tokens.running.hex }}
+                  />
+                  <Text className="text-text-low text-text12">
+                    {activityShortLabel(activityIndicatorKind)}
+                  </Text>
+                </View>
+              </>
+            )}
             <Text className="mx-1.5 text-text-low text-text12">·</Text>
             <Text className="text-text-low text-text12">
               {canPrompt ? 'Steering enabled' : 'Read only'}
@@ -548,6 +598,15 @@ export default function ComputerSessionDetailScreen() {
                     </Text>
                   </View>
                 )}
+                {activitySupported && (activityGroups.get(0)?.length ?? 0) > 0 && (
+                  <ActivityGroup
+                    bridgeId={bridgeId}
+                    sessionId={sessionId}
+                    groupKey="g0"
+                    entries={activityGroups.get(0) ?? []}
+                    defaultExpanded={false}
+                  />
+                )}
                 {query.data.messages.length === 0 ? (
                   <View className="items-center py-12">
                     <Text className="text-text-mid text-text14">
@@ -555,9 +614,27 @@ export default function ComputerSessionDetailScreen() {
                     </Text>
                   </View>
                 ) : (
-                  query.data.messages.map((message) => (
-                    <HistoryMessage key={message.sequence} message={message} />
-                  ))
+                  query.data.messages.map((message) => {
+                    const group = activitySupported
+                      ? (activityGroups.get(message.sequence) ?? [])
+                      : [];
+                    const suppressTrailing =
+                      liveTurn !== null && message.sequence === query.data.messages.length;
+                    return (
+                      <View key={message.sequence}>
+                        <HistoryMessage message={message} />
+                        {group.length > 0 && !suppressTrailing && (
+                          <ActivityGroup
+                            bridgeId={bridgeId}
+                            sessionId={sessionId}
+                            groupKey={`g${message.sequence}`}
+                            entries={group}
+                            defaultExpanded={false}
+                          />
+                        )}
+                      </View>
+                    );
+                  })
                 )}
                 {pendingText && (
                   <View className="mb-4 max-w-[88%] self-end items-end opacity-70">
@@ -566,6 +643,17 @@ export default function ComputerSessionDetailScreen() {
                     </View>
                     <Text className="mt-1 text-text-low text-text11">Sending…</Text>
                   </View>
+                )}
+                {liveTurn && (
+                  <ActivityGroup
+                    bridgeId={bridgeId}
+                    sessionId={sessionId}
+                    groupKey={`live-${liveTurn.startedAt}`}
+                    entries={liveTurn.activity}
+                    live
+                    defaultExpanded
+                    reply={liveTurn.reply || undefined}
+                  />
                 )}
                 {connectorQuestionUpdateRequired && (
                   <View className="mb-4 flex-row items-start rounded-card border border-border-subtle bg-surface1 px-3 py-3">

@@ -440,6 +440,87 @@ describe('Desktop Bridge development runner', () => {
     expect(releaseSessionOwnership).toHaveBeenCalledWith('session-readable');
   });
 
+  it('serves SQLite liveness from session.activity when ACP reports inactive', async () => {
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace({
+      isSessionListSupported: () => true,
+      listSessions: async () => ({
+        sessions: [{ sessionId: 'session-tui', cwd: '/tmp/project' }],
+      }),
+      isSessionLoadSupported: () => false,
+      loadSession: async () => {
+        throw new Error('unreachable');
+      },
+      isSessionPromptSupported: () => false,
+      promptSession: async () => {},
+      isSessionActivitySupported: () => true,
+      getSessionActivity: async () => ({
+        sessionId: 'session-tui',
+        kind: 'thinking',
+        label: 'Idle',
+        active: false,
+        updatedAt: 0,
+      }),
+    });
+    adapter.setHistory({
+      start: async () => {},
+      stop: async () => {},
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new Error('unreachable');
+      },
+      getSessionLiveness: async () => ({ active: true, kind: 'executing', updatedAt: 1_234 }),
+    });
+
+    expect(adapter.isSessionActivitySupported()).toBe(true);
+    await expect(adapter.getSessionActivity('session-tui')).resolves.toMatchObject({
+      kind: 'executing',
+      label: 'Running a command',
+      active: true,
+      updatedAt: 1_234,
+    });
+  });
+
+  it('prefers live ACP activity over SQLite liveness', async () => {
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace({
+      isSessionListSupported: () => true,
+      listSessions: async () => ({
+        sessions: [{ sessionId: 'session-live', cwd: '/tmp/project' }],
+      }),
+      isSessionLoadSupported: () => false,
+      loadSession: async () => {
+        throw new Error('unreachable');
+      },
+      isSessionPromptSupported: () => false,
+      promptSession: async () => {},
+      isSessionActivitySupported: () => true,
+      getSessionActivity: async () => ({
+        sessionId: 'session-live',
+        kind: 'editing',
+        label: 'Custom live label',
+        active: true,
+        updatedAt: 5_000,
+      }),
+    });
+    adapter.setHistory({
+      start: async () => {},
+      stop: async () => {},
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new Error('unreachable');
+      },
+      getSessionLiveness: async () => ({ active: true, kind: 'executing', updatedAt: 1_234 }),
+    });
+
+    await expect(adapter.getSessionActivity('session-live')).resolves.toMatchObject({
+      kind: 'editing',
+      label: 'Custom live label',
+      active: true,
+      updatedAt: 5_000,
+    });
+  });
+
   it('discovers only active private IPv4 addresses and requires an exact interface match', () => {
     expect(discoverPrivateLanAddresses(interfaces())).toEqual(['100.127.166.87', '192.168.1.141']);
     expect(validateAdvertisedLanHost('192.168.1.141', interfaces())).toBe('192.168.1.141');

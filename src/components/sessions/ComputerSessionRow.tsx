@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { COMPUTER_SESSIONS_REFRESH_INTERVAL_MS } from '@api/bridge/queries';
 import type { ComputerDiscoveryStatus, ComputerSessionListItem } from '@api/bridge/queries';
+import { activityShortLabel } from '@lib/activity-labels';
 import { relativeTime } from '@lib/session-utils';
 import { useTheme } from '@theme/index';
 
@@ -36,7 +37,7 @@ export function ComputerSessionRow({
       : 'Local session';
   const modelText = session.model?.name;
 
-  const accessibilityLabel = `${primaryText}, on ${session.computerName}, ${detailText}${modelText ? `, ${modelText}` : ''}${time ? `, ${time}` : ''}${onPress ? ', open history' : ''}`;
+  const accessibilityLabel = `${primaryText}, on ${session.computerName}, ${detailText}${modelText ? `, ${modelText}` : ''}${session.activity?.active ? `, ${activityShortLabel(session.activity.kind ?? 'thinking')}` : ''}${time ? `, ${time}` : ''}${onPress ? ', open history' : ''}`;
   const content = (
     <>
       <View className="w-8 h-8 rounded-card bg-tint-blue items-center justify-center mr-3">
@@ -58,6 +59,17 @@ export function ComputerSessionRow({
           <Text className="text-text-low text-text12 flex-1" numberOfLines={1}>
             {detailText}{modelText ? ` · ${modelText}` : ''}
           </Text>
+          {session.activity?.active && (
+            <View className="ml-2 flex-row items-center" testID="computer-session-row-activity">
+              <View
+                className="mr-1 h-1.5 w-1.5 rounded-dot"
+                style={{ backgroundColor: tokens.running.hex }}
+              />
+              <Text className="text-brand-text text-text12">
+                {activityShortLabel(session.activity.kind ?? 'thinking')}
+              </Text>
+            </View>
+          )}
           {time && <Text className="text-text-low text-text12 ml-2">{time}</Text>}
         </View>
       </View>

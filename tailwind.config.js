@@ -43,6 +43,10 @@ module.exports = {
         'text-always-black': 'rgb(var(--color-text-always-black))',
         'text-hi-strong': 'rgb(var(--color-text-hi-strong))',
         'brand-text': 'rgb(var(--color-brand-text))',
+        'diff-added-text': 'rgb(var(--color-diff-added-text))',
+        'diff-added-tint': 'rgb(var(--color-diff-added-tint))',
+        'diff-removed-text': 'rgb(var(--color-diff-removed-text))',
+        'diff-removed-tint': 'rgb(var(--color-diff-removed-tint))',
       },
       spacing: {
         // Component paddings from spec §1.7 (extracted from app.devin.ai)

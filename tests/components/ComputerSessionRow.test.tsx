@@ -9,6 +9,7 @@ jest.mock('../../src/theme/index', () => ({
       brandText: { hex: '#0088ff' },
       textMid: { hex: '#777777' },
       textLow: { hex: '#555555' },
+      running: { hex: '#0088ff' },
     },
   }),
 }));
@@ -75,6 +76,34 @@ describe('Computer session presentation', () => {
 
     const compactScreen = render(<ComputerSessionRow session={session} compact />);
     expect(compactScreen.getByText('Review the release branch').props.numberOfLines).toBe(1);
+  });
+
+  it('shows the running label and dot when the session activity is active', () => {
+    const screen = render(
+      <ComputerSessionRow
+        session={{
+          ...SESSION,
+          activity: { active: true, kind: 'executing', updatedAt: Date.now() },
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('computer-session-row-activity')).toBeTruthy();
+    expect(screen.getByText('Running a command')).toBeTruthy();
+    expect(screen.getByLabelText(/Running a command/)).toBeTruthy();
+  });
+
+  it('renders identically to before when the session activity is idle', () => {
+    const screen = render(
+      <ComputerSessionRow
+        session={{
+          ...SESSION,
+          activity: { active: false, updatedAt: Date.now() },
+        }}
+      />,
+    );
+
+    expect(screen.queryByTestId('computer-session-row-activity')).toBeNull();
   });
 
   it('becomes a button only when an authorized history action is supplied', () => {

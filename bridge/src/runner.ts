@@ -5,12 +5,14 @@ import { z } from 'zod';
 
 import {
   AcpSessionClient,
+  defaultActivityLabel,
   isAcpSessionInUseError,
   type AcpElicitationResponse,
   type AcpHistoryMessage,
   type AcpModelCatalog,
   type AcpPendingElicitation,
   type AcpSessionActivity,
+  type AcpSessionTurn,
 } from './acp';
 import {
   DevinSessionStore,
@@ -116,6 +118,9 @@ export interface SessionHistoryLifecycle {
   loadSession(sessionId: string): ReturnType<SessionDiscoveryAdapter['loadSession']>;
   getSessionPresentation?(sessionId: string): Promise<DevinSessionPresentation>;
   listCreateOptions?(forceRefresh?: boolean): Promise<DevinCreateOptions>;
+  getSessionLiveness?(
+    sessionId: string,
+  ): Promise<{ active: boolean; kind?: AcpSessionActivity['kind']; updatedAt: number } | null>;
 }
 
 export interface DesktopBridgeRunnerDependencies {
@@ -209,13 +214,24 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   async listSessions(input?: unknown): ReturnType<SessionDiscoveryAdapter['listSessions']> {
     const page = await this.current.listSessions(input);
     for (const session of page.sessions) this.listedSessionIds.add(session.sessionId);
-    if (this.history?.getSessionPresentation) {
-      for (const session of page.sessions.slice(0, 200)) {
-        try {
+    for (const session of page.sessions.slice(0, 200)) {
+      try {
+        if (this.history?.getSessionPresentation) {
           session.modelId = (await this.history.getSessionPresentation(session.sessionId)).modelId;
-        } catch {
-          // Model display is optional; never fail session discovery for it.
         }
+      } catch {
+        // Model display is optional; never fail session discovery for it.
+      }
+      try {
+        const live = await this.current.getSessionActivity?.(session.sessionId);
+        if (live?.active) {
+          session.activity = { active: true, kind: live.kind, updatedAt: live.updatedAt };
+        } else if (this.history?.getSessionLiveness) {
+          const liveness = await this.history.getSessionLiveness(session.sessionId);
+          if (liveness) session.activity = liveness;
+        }
+      } catch {
+        // Liveness is best-effort; never fail session discovery for it.
       }
     }
     return page;
@@ -226,12 +242,36 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   }
 
   isSessionActivitySupported(): boolean {
-    return Boolean(this.current.isSessionActivitySupported?.());
+    return Boolean(
+      this.current.isSessionActivitySupported?.() || this.history?.getSessionLiveness,
+    );
   }
 
   async getSessionActivity(input: string): Promise<AcpSessionActivity | null> {
     await this.ensureSessionListed(input);
-    return this.current.getSessionActivity?.(input) ?? null;
+    const live = (await this.current.getSessionActivity?.(input)) ?? null;
+    if (live?.active) return live;
+    if (this.history?.getSessionLiveness) {
+      try {
+        const liveness = await this.history.getSessionLiveness(input);
+        if (liveness?.active) {
+          const kind = liveness.kind ?? 'thinking';
+          return {
+            kind,
+            label: defaultActivityLabel(kind),
+            active: true,
+            updatedAt: liveness.updatedAt,
+          };
+        }
+      } catch {
+        // Liveness is best-effort; fall back to the live report.
+      }
+    }
+    return live;
+  }
+
+  async getSessionTurn(input: string): Promise<AcpSessionTurn | null> {
+    return this.current.getSessionTurn?.(input) ?? null;
   }
 
   isSessionElicitationSupported(): boolean {
