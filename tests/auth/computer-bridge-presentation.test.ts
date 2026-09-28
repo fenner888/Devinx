@@ -85,7 +85,7 @@ describe('Computer Bridge presentation compatibility', () => {
     jest.restoreAllMocks();
   });
 
-  it('requests presentation separately and ignores unrelated feature fields', async () => {
+  it('requests presentation separately and passes through unrelated feature fields', async () => {
     const bridgeId = 'bridge_presentation_standalone';
     mockLoadPairedComputers.mockResolvedValue([credential(bridgeId)]);
     mockPostBridgeJson.mockImplementation(
@@ -108,6 +108,9 @@ describe('Computer Bridge presentation compatibility', () => {
     );
 
     await expect(getComputerBridgePresentation(bridgeId)).resolves.toEqual({
+      sessionElicitation: true,
+      activityTimeline: true,
+      permissionPrompts: true,
       messageTimestamps: true,
       grants: { viewSessions: true, sendPrompts: false, startSessions: true },
     });

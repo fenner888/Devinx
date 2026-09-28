@@ -94,7 +94,8 @@ const computerBridgeFeaturesSchema = z
     sessionElicitation: z.boolean(),
     activityTimeline: z.boolean().optional(),
     permissionPrompts: z.boolean().optional(),
-  });
+  })
+  .passthrough();
 const computerGrantsSchema = z
   .object({
     viewSessions: z.boolean(),
@@ -104,7 +105,7 @@ const computerGrantsSchema = z
 const computerBridgePresentationSchema = z.object({
   messageTimestamps: z.boolean(),
   grants: computerGrantsSchema.strict(),
-});
+}).passthrough();
 const computerBridgePlatformSchema = z
   .object({ platform: z.enum(['macos', 'windows', 'linux']) })
   .strict();
