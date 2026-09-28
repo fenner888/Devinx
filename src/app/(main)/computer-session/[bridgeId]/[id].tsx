@@ -31,6 +31,7 @@ import {
   useRespondComputerSessionElicitation,
 } from '@api/bridge/queries';
 import type { ComputerSessionBoard } from '@api/bridge/queries';
+import { useComputerGrants, useComputerPresentation } from '@api/bridge/presentation';
 import {
   ComputerBridgeError,
   type ComputerElicitationAnswer,
@@ -201,35 +202,8 @@ function HistoryMessage({
 
   const messageWrapperClass = isUser
     ? 'mb-4 max-w-[88%] self-end items-end'
-    : 'mb-5 self-start items-start';
+    : 'mb-5';
 
-  if (isUser) {
-    return (
-      <>
-        {daySeparator && (
-          <Text
-            className="mb-4 w-full text-center text-text-low text-text11"
-            testID="message-day-separator"
-          >
-            {daySeparator}
-          </Text>
-        )}
-        {hasTimestamp ? (
-          <Pressable
-            className={messageWrapperClass}
-            onLongPress={() => setShowFullDate((visible) => !visible)}
-            delayLongPress={350}
-            accessibilityLabel={`${isUser ? 'You' : 'Devin'}: ${message.text}`}
-            accessibilityHint="Long press to show the full date"
-          >
-            {messageContent}
-          </Pressable>
-        ) : (
-          <View className={messageWrapperClass}>{messageContent}</View>
-        )}
-      </>
-    );
-  }
   return (
     <>
       {daySeparator && (
@@ -245,7 +219,7 @@ function HistoryMessage({
           className={messageWrapperClass}
           onLongPress={() => setShowFullDate((visible) => !visible)}
           delayLongPress={350}
-          accessibilityLabel={`${isUser ? 'You' : 'Devin'}: ${message.text}`}
+          accessibilityLabel={`${author}: ${message.text}`}
           accessibilityHint="Long press to show the full date"
         >
           {messageContent}
@@ -312,24 +286,17 @@ export default function ComputerSessionDetailScreen() {
     BRIDGE_ID_PATTERN.test(bridgeId) && LOCAL_SESSION_ID_PATTERN.test(sessionId);
   const computer = computers.find((item) => item.bridgeId === bridgeId);
   const access = useComputerSessionAccess(bridgeId, validParameters && Boolean(computer));
-  const bridgeFeatures = useComputerBridgeFeatures(
-    bridgeId,
-    validParameters && Boolean(computer) && Boolean(access.data),
-  );
-  const computerGrants = bridgeFeatures.data?.grants
-    ? { grants: bridgeFeatures.data.grants, source: 'connector' as const }
-    : computer
-      ? {
-          grants: {
-            viewSessions: computer.permissions.includes('session:content:read'),
-            sendPrompts: computer.permissions.includes('session:prompt:send'),
-            startSessions: computer.permissions.includes('session:create'),
-          },
-          source: 'pairing' as const,
-        }
-      : undefined;
+  const presentationEnabled = validParameters && Boolean(computer) && Boolean(access.data);
+  const bridgeFeatures = useComputerBridgeFeatures(bridgeId, presentationEnabled);
+  const presentation = useComputerPresentation(bridgeId, presentationEnabled);
+  const computerGrants = useComputerGrants(bridgeId, presentationEnabled);
   const mayReadContent = validParameters && Boolean(access.data?.capabilities.sessionLoad);
-  const query = useComputerSessionDetail(bridgeId, sessionId, mayReadContent);
+  const query = useComputerSessionDetail(
+    bridgeId,
+    sessionId,
+    mayReadContent && presentation.settled,
+    { timestamps: presentation.data?.messageTimestamps === true },
+  );
   const queryClient = useQueryClient();
   const currentBoard = queryClient.getQueryData<ComputerSessionBoard>(
     computerSessionsQueryKey(computers),

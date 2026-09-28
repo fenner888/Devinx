@@ -6,6 +6,7 @@ const mockRouterPush = jest.fn();
 const mockCompanionProps = jest.fn();
 const mockCreateComputerSession = jest.fn();
 const mockCreateSession = jest.fn();
+const mockUseComputerCreateOptions = jest.fn();
 let mockConnection: {
   mode: 'cloud' | 'computer' | 'both';
   hasCloudConnection: boolean;
@@ -42,20 +43,25 @@ jest.mock('@api/devin/queries', () => ({
 }));
 jest.mock('@api/bridge/queries', () => ({
   useComputerSessions: () => ({ data: mockComputerBoard }),
-  useComputerCreateOptions: () => ({
-    data: {
-      workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
-      models: [],
-      defaultModelId: null,
-      catalogSource: 'recent',
-    },
-    isLoading: false,
-    error: null,
-    refreshCatalog: jest.fn(),
-    isRefreshingCatalog: false,
-    refreshCatalogError: null,
-  }),
+  useComputerCreateOptions: (...arguments_: unknown[]) => {
+    mockUseComputerCreateOptions(...arguments_);
+    return {
+      data: {
+        workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],
+        models: [],
+        defaultModelId: null,
+        catalogSource: 'recent',
+      },
+      isLoading: false,
+      error: null,
+      refreshCatalog: jest.fn(),
+      isRefreshingCatalog: false,
+      refreshCatalogError: null,
+    };
+  },
   useCreateComputerSession: () => ({ isPending: false, mutate: mockCreateComputerSession }),
+}));
+jest.mock('@api/bridge/presentation', () => ({
   useComputerGrants: () => mockGrantInfo,
 }));
 jest.mock('@auth/ConnectionContext', () => ({
@@ -193,7 +199,27 @@ describe('Local Home grant priority', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/(main)/computer');
   });
 
-  it('keeps the read-only guidance visible when there are no recent sessions', () => {
+  it('keeps Connector read-only guidance visible when there are no recent sessions', () => {
+    mockConnection = {
+      mode: 'computer',
+      hasCloudConnection: false,
+      usesCloud: false,
+      computers: [{ bridgeId, computerName: 'Studio Mac', permissions: ['session:content:read'] }],
+    };
+    mockGrantInfo = {
+      grants: { viewSessions: true, sendPrompts: false, startSessions: false },
+      source: 'connector',
+    };
+
+    const screen = renderHome();
+
+    expect(screen.getByTestId('home-read-only-card')).toBeTruthy();
+    expect(screen.getByTestId('home-companion-stage')).toBeTruthy();
+    expect(screen.queryByTestId('home-recent')).toBeNull();
+    expect(screen.queryByLabelText('Session prompt')).toBeNull();
+  });
+
+  it('keeps the composer available when pairing grants do not include session creation', () => {
     mockConnection = {
       mode: 'computer',
       hasCloudConnection: false,
@@ -207,10 +233,10 @@ describe('Local Home grant priority', () => {
 
     const screen = renderHome();
 
-    expect(screen.getByTestId('home-read-only-card')).toBeTruthy();
-    expect(screen.getByTestId('home-companion-stage')).toBeTruthy();
-    expect(screen.queryByTestId('home-recent')).toBeNull();
-    expect(screen.queryByLabelText('Session prompt')).toBeNull();
+    expect(screen.getByTestId('home-composer-heading')).toBeTruthy();
+    expect(screen.getByLabelText('Session prompt')).toBeTruthy();
+    expect(screen.queryByTestId('home-read-only-card')).toBeNull();
+    expect(mockUseComputerCreateOptions).toHaveBeenLastCalledWith(bridgeId, true);
   });
 
   it('shows at most three Recent rows before a reduced companion and the composer', () => {

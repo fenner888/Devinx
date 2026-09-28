@@ -17,6 +17,7 @@ jest.mock('../../src/auth/deviceSigning', () => ({
 
 import {
   computerLoadedSessionSchema,
+  getComputerBridgePresentation,
   getComputerBridgeFeatures,
   loadComputerSession,
 } from '../../src/auth/computerBridge';
@@ -84,44 +85,82 @@ describe('Computer Bridge presentation compatibility', () => {
     jest.restoreAllMocks();
   });
 
-  it('falls back from presentation through interaction and legacy, then remembers the rejection', async () => {
-    const bridgeId = 'bridge_presentation_fallback';
+  it('requests presentation separately and ignores unrelated feature fields', async () => {
+    const bridgeId = 'bridge_presentation_standalone';
     mockLoadPairedComputers.mockResolvedValue([credential(bridgeId)]);
-    let interactionAttempts = 0;
     mockPostBridgeJson.mockImplementation(
       async (_endpoint: string, _path: string, envelope: unknown) => {
         const request = envelope as { method: string; body: Record<string, unknown> };
         if (request.method !== 'bridge.features') {
           throw new Error(`Unexpected method ${request.method}`);
         }
-        if (request.body.presentation === true) {
-          return { status: 200, body: { sessionElicitation: 'invalid' } };
-        }
-        if (request.body.interaction === true) {
-          interactionAttempts += 1;
-          if (interactionAttempts === 1) {
-            return { status: 400, body: { error: 'invalid_request' } };
-          }
-        }
         return {
           status: 200,
-          body: { sessionElicitation: false, activityTimeline: false },
+          body: {
+            sessionElicitation: true,
+            activityTimeline: true,
+            permissionPrompts: true,
+            messageTimestamps: true,
+            grants: { viewSessions: true, sendPrompts: false, startSessions: true },
+          },
         };
       },
     );
 
-    await getComputerBridgeFeatures(bridgeId);
-    await getComputerBridgeFeatures(bridgeId);
+    await expect(getComputerBridgePresentation(bridgeId)).resolves.toEqual({
+      messageTimestamps: true,
+      grants: { viewSessions: true, sendPrompts: false, startSessions: true },
+    });
 
     expect(requests('bridge.features').map((request) => request.body)).toEqual([
-      { interaction: true, presentation: true },
-      { interaction: true },
-      {},
-      { interaction: true },
+      { presentation: true },
     ]);
   });
 
-  it('requests bounded timestamps with session history only when advertised', async () => {
+  it('remembers invalid presentation responses without changing interaction negotiation', async () => {
+    const bridgeId = 'bridge_presentation_invalid_response';
+    mockLoadPairedComputers.mockResolvedValue([credential(bridgeId)]);
+    mockPostBridgeJson.mockResolvedValue({
+      status: 200,
+      body: {
+        messageTimestamps: true,
+        grants: { viewSessions: true, sendPrompts: true, startSessions: true, unexpected: true },
+      },
+    });
+
+    await expect(getComputerBridgePresentation(bridgeId)).resolves.toBeNull();
+    await expect(getComputerBridgePresentation(bridgeId)).resolves.toBeNull();
+    expect(requests('bridge.features').map((request) => request.body)).toEqual([
+      { presentation: true },
+    ]);
+  });
+
+  it('remembers invalid presentation requests and propagates other errors', async () => {
+    const bridgeId = 'bridge_presentation_invalid_request';
+    mockLoadPairedComputers.mockResolvedValue([credential(bridgeId)]);
+    mockPostBridgeJson.mockResolvedValue({
+      status: 400,
+      body: { error: 'invalid_request' },
+    });
+
+    await expect(getComputerBridgePresentation(bridgeId)).resolves.toBeNull();
+    await expect(getComputerBridgePresentation(bridgeId)).resolves.toBeNull();
+    expect(requests('bridge.features').map((request) => request.body)).toEqual([
+      { presentation: true },
+    ]);
+
+    const unavailableBridgeId = 'bridge_presentation_unavailable';
+    mockLoadPairedComputers.mockResolvedValue([credential(unavailableBridgeId)]);
+    mockPostBridgeJson.mockResolvedValue({
+      status: 503,
+      body: { error: 'unavailable' },
+    });
+    await expect(getComputerBridgePresentation(unavailableBridgeId)).rejects.toMatchObject({
+      code: 'unavailable',
+    });
+  });
+
+  it('requests bounded timestamps only when enabled with session history', async () => {
     const bridgeId = 'bridge_presentation_timestamps';
     mockLoadPairedComputers.mockResolvedValue([credential(bridgeId)]);
     mockPostBridgeJson.mockImplementation(
@@ -132,10 +171,7 @@ describe('Computer Bridge presentation compatibility', () => {
             status: 200,
             body: {
               sessionElicitation: true,
-              activityTimeline: true,
               permissionPrompts: true,
-              messageTimestamps: true,
-              grants: { viewSessions: true, sendPrompts: true, startSessions: true },
             },
           };
         }
@@ -147,11 +183,10 @@ describe('Computer Bridge presentation compatibility', () => {
     );
 
     await getComputerBridgeFeatures(bridgeId);
-    await loadComputerSession(bridgeId, SESSION_ID);
+    await loadComputerSession(bridgeId, SESSION_ID, { timestamps: true });
 
     expect(requests('bridge.features')[0]?.body).toEqual({
       interaction: true,
-      presentation: true,
     });
     expect(requests('session.load')[0]?.body).toEqual({
       sessionId: SESSION_ID,
@@ -159,30 +194,7 @@ describe('Computer Bridge presentation compatibility', () => {
       timestamps: true,
     });
 
-    mockLoadPairedComputers.mockResolvedValue([credential('bridge_presentation_no_timestamps')]);
-    mockPostBridgeJson.mockImplementation(
-      async (_endpoint: string, _path: string, envelope: unknown) => {
-        const request = envelope as { method: string; body: Record<string, unknown> };
-        if (request.method === 'bridge.features') {
-          return {
-            status: 200,
-            body: {
-              sessionElicitation: true,
-              permissionPrompts: true,
-              messageTimestamps: false,
-            },
-          };
-        }
-        if (request.method === 'session.load') {
-          return { status: 200, body: loadedSession() };
-        }
-        throw new Error(`Unexpected method ${request.method}`);
-      },
-    );
-
-    await getComputerBridgeFeatures('bridge_presentation_no_timestamps');
-    await loadComputerSession('bridge_presentation_no_timestamps', SESSION_ID);
-
+    await loadComputerSession(bridgeId, SESSION_ID);
     expect(requests('session.load').at(-1)?.body).toEqual({
       sessionId: SESSION_ID,
       interaction: true,
@@ -202,7 +214,6 @@ describe('Computer Bridge presentation compatibility', () => {
             body: {
               sessionElicitation: false,
               permissionPrompts: true,
-              messageTimestamps: true,
             },
           };
         }
@@ -216,7 +227,7 @@ describe('Computer Bridge presentation compatibility', () => {
     );
 
     await getComputerBridgeFeatures(bridgeId);
-    await loadComputerSession(bridgeId, SESSION_ID);
+    await loadComputerSession(bridgeId, SESSION_ID, { timestamps: true });
 
     expect(requests('session.load').map((request) => request.body)).toEqual([
       { sessionId: SESSION_ID, interaction: true, timestamps: true },

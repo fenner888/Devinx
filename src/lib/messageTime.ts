@@ -43,7 +43,7 @@ function localDayKey(ms: number): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-function localDateLabel(ms: number, now: number): string {
+export function formatDayLabel(ms: number, now: number): string {
   const date = new Date(ms);
   const current = new Date(now);
   if (localDayKey(ms) === localDayKey(now)) return 'Today';
@@ -64,10 +64,6 @@ export function formatClockTime(ms: number): string {
   const displayHour = hour % 12 || 12;
   const minute = `${date.getMinutes()}`.padStart(2, '0');
   return `${displayHour}:${minute} ${hour < 12 ? 'AM' : 'PM'}`;
-}
-
-export function formatDayLabel(ms: number, now: number): string {
-  return localDateLabel(ms, now);
 }
 
 export function formatFullDate(ms: number): string {

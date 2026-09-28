@@ -5,11 +5,9 @@ sessions while preserving legacy Connector and Cloud behavior.
 
 ## Compatibility and data
 
-- The phone requests `bridge.features` with
-  `{ interaction: true, presentation: true }`. If an older Connector rejects
-  presentation, the phone retries with `{ interaction: true }`, then `{}`.
-  A rejected presentation capability is remembered per bridge; a successful
-  presentation response clears that fallback. The Connector includes
+- The phone keeps the legacy interaction feature negotiation unchanged and
+  requests presentation separately with `{ presentation: true }`. A rejected
+  presentation capability is remembered per bridge. The Connector includes
   `messageTimestamps` and strict `grants` only for a presentation request.
 - The three grant values describe permission to view sessions, send prompts,
   and start sessions. The phone prefers Connector-reported grants, falls back
@@ -35,18 +33,21 @@ sessions while preserving legacy Connector and Cloud behavior.
 
 Only `connectionMode === "computer"` uses grant-priority ordering:
 
-- When `startSessions` is known to be false, Home shows connection status,
+- Only Connector-reported `startSessions: false` makes Home read-only. In that
+  case Home shows connection status,
   Recent with up to five rows and View all, a compact Connector-permissions
   guidance card, discovery notices, and the companion. The card remains
   visible with no recent sessions. Composer controls and their heading are
   omitted.
-- When session creation is allowed or grants are unknown and recent sessions
-  exist, Home shows connection status, up to three Recent rows, a reduced
-  companion, and the composer. The reduced companion is sized responsively;
-  at 393 pt width it is 141 pt (165 pt including the stage's 24 pt inset).
-- With no recent sessions and no known read-only grant, Local Home retains its
-  existing composer-first layout. Cloud and Cloud + Local retain their
-  existing layout and behavior.
+- Pairing-stored permissions are only a fallback for permission guidance and
+  do not change Home's composer-first layout, because those grants may be stale.
+- When Connector-reported session creation is allowed or grants are unknown
+  and recent sessions exist, Home shows connection status, up to three Recent
+  rows, a reduced companion, and the composer. The reduced companion is sized
+  responsively; at 393 pt width it is 141 pt (165 pt including the stage's
+  24 pt inset). With no recent sessions and no Connector-reported read-only
+  grant, Local Home retains its existing composer-first layout. Cloud and
+  Cloud + Local retain their existing layout and behavior.
 
 ## Validation
 

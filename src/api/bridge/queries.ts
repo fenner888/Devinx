@@ -214,6 +214,7 @@ export async function loadComputerSessionBoard(
 export async function loadComputerSessionWithRecovery(
   computer: PairedComputerSummary,
   sessionId: string,
+  options?: { timestamps?: boolean },
 ): Promise<ComputerLoadedSession> {
   const bridges = await openComputerBridges([computer.bridgeId]);
   const bridge = bridges.get(computer.bridgeId);
@@ -225,7 +226,7 @@ export async function loadComputerSessionWithRecovery(
   }
 
   try {
-    return await bridge.loadSession(sessionId);
+    return await bridge.loadSession(sessionId, options);
   } catch (error) {
     if (!(error instanceof ComputerBridgeError) || error.code !== 'authorization_failed') {
       throw error;
@@ -236,7 +237,7 @@ export async function loadComputerSessionWithRecovery(
       recovery.status.state === 'ready' &&
       recovery.sessions.some((session) => session.id === sessionId && session.canLoad);
     if (!handleWasRehydrated) throw error;
-    return bridge.loadSession(sessionId);
+    return bridge.loadSession(sessionId, options);
   }
 }
 
@@ -261,12 +262,17 @@ export function useComputerSessions() {
   });
 }
 
-export function useComputerSessionDetail(bridgeId: string, sessionId: string, enabled = true) {
+export function useComputerSessionDetail(
+  bridgeId: string,
+  sessionId: string,
+  enabled = true,
+  options: { timestamps?: boolean } = {},
+) {
   const { computers } = useConnections();
   const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
 
   return useQuery<ComputerLoadedSession, ComputerBridgeError>({
-    queryKey: ['computerSession', bridgeId, sessionId],
+    queryKey: ['computerSession', bridgeId, sessionId, options.timestamps === true],
     queryFn: () => {
       if (!computer) {
         throw new ComputerBridgeError(
@@ -274,7 +280,7 @@ export function useComputerSessionDetail(bridgeId: string, sessionId: string, en
           'not_paired',
         );
       }
-      return loadComputerSessionWithRecovery(computer, sessionId);
+      return loadComputerSessionWithRecovery(computer, sessionId, options);
     },
     enabled: enabled && computer !== undefined,
     staleTime: 30_000,
@@ -380,25 +386,6 @@ export function useComputerBridgeFeatures(bridgeId: string, enabled = true) {
     staleTime: 60_000,
     retry: false,
   });
-}
-
-export function useComputerGrants(bridgeId: string) {
-  const { computers } = useConnections();
-  const features = useComputerBridgeFeatures(bridgeId, bridgeId.length > 0);
-  const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
-
-  if (features.data?.grants) {
-    return { grants: features.data.grants, source: 'connector' as const };
-  }
-  if (!computer) return undefined;
-  return {
-    grants: {
-      viewSessions: computer.permissions.includes('session:content:read'),
-      sendPrompts: computer.permissions.includes('session:prompt:send'),
-      startSessions: computer.permissions.includes('session:create'),
-    },
-    source: 'pairing' as const,
-  };
 }
 
 export function usePromptComputerSession(bridgeId: string, sessionId: string) {

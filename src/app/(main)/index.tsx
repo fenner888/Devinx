@@ -26,9 +26,9 @@ import {
   useComputerSessions,
   useComputerCreateOptions,
   useCreateComputerSession,
-  useComputerGrants as useComputerGrantsHook,
   type ComputerSessionListItem,
 } from '@api/bridge/queries';
+import { useComputerGrants } from '@api/bridge/presentation';
 import {
   useSessions,
   useCreateSession,
@@ -96,9 +96,6 @@ function localOptionsFailureCopy(error: unknown): { title: string; message: stri
       'DevinX Connector could not load workspaces and models. Confirm Connector and Devin for Terminal are ready, then try again.',
   };
 }
-
-const useHomeComputerGrants: typeof useComputerGrantsHook =
-  typeof useComputerGrantsHook === 'function' ? useComputerGrantsHook : () => undefined;
 
 function HomeRecent({ items }: { items: RecentSession[] }) {
   const router = useRouter();
@@ -188,8 +185,9 @@ export default function HomeScreen() {
   );
   const computer =
     computers.find((candidate) => candidate.bridgeId === selectedComputerBridgeId) ?? computers[0];
-  const computerGrantInfo = useHomeComputerGrants(
+  const computerGrantInfo = useComputerGrants(
     connectionMode === 'computer' ? (computer?.bridgeId ?? '') : '',
+    connectionMode === 'computer' && Boolean(computer),
   );
   const [destination, setDestination] = useState<'cloud' | 'computer'>(
     connectionMode === 'computer' ? 'computer' : 'cloud',
@@ -200,7 +198,7 @@ export default function HomeScreen() {
       Boolean(computer) &&
       !(
         connectionMode === 'computer' &&
-        computerGrantInfo !== undefined &&
+        computerGrantInfo?.source === 'connector' &&
         computerGrantInfo.grants.startSessions === false
       ),
   );
@@ -376,7 +374,7 @@ export default function HomeScreen() {
   const localRecentCompanionSize = Math.round(Math.min(148, Math.max(132, width * 0.36)));
   const readOnlyLocalHome =
     connectionMode === 'computer' &&
-    computerGrantInfo !== undefined &&
+    computerGrantInfo?.source === 'connector' &&
     computerGrantInfo.grants.startSessions === false;
   const localRecentBeforeComposer =
     connectionMode === 'computer' && !readOnlyLocalHome && recent.length > 0;
