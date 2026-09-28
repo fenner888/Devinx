@@ -382,6 +382,25 @@ export function useComputerBridgeFeatures(bridgeId: string, enabled = true) {
   });
 }
 
+export function useComputerGrants(bridgeId: string) {
+  const { computers } = useConnections();
+  const features = useComputerBridgeFeatures(bridgeId, bridgeId.length > 0);
+  const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
+
+  if (features.data?.grants) {
+    return { grants: features.data.grants, source: 'connector' as const };
+  }
+  if (!computer) return undefined;
+  return {
+    grants: {
+      viewSessions: computer.permissions.includes('session:content:read'),
+      sendPrompts: computer.permissions.includes('session:prompt:send'),
+      startSessions: computer.permissions.includes('session:create'),
+    },
+    source: 'pairing' as const,
+  };
+}
+
 export function usePromptComputerSession(bridgeId: string, sessionId: string) {
   return useMutation({
     mutationFn: (input: { text: string; modelId?: string }) =>

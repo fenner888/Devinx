@@ -40,6 +40,7 @@ import {
 import { useConnections } from '@auth/ConnectionContext';
 import { computerTransportLabel } from '@auth/pairedComputers';
 import { ActivityGroup, groupActivity } from '@components/sessions/ActivityGroup';
+import { ComputerPermissionsSheet } from '@components/connections/ComputerPermissionsSheet';
 import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
 import { ComputerModelPickerSheets } from '@components/sessions/ComputerModelPickerSheets';
@@ -60,6 +61,7 @@ import {
   splitComputerModelName,
 } from '@lib/computer-model-catalog';
 import { activityShortLabel } from '@lib/activity-labels';
+import { formatFullDate, messageTimeLabels } from '@lib/messageTime';
 import { useTheme } from '@theme/index';
 import { activityForComputerSession } from '@/pets/devin/activity';
 
@@ -145,25 +147,113 @@ function BackButton({ onPress }: { onPress: () => void }) {
   );
 }
 
-function HistoryMessage({ message }: { message: ComputerLoadedSession['messages'][number] }) {
+function HistoryMessage({
+  message,
+  daySeparator,
+  time,
+}: {
+  message: ComputerLoadedSession['messages'][number];
+  daySeparator?: string;
+  time?: string;
+}) {
+  const [showFullDate, setShowFullDate] = useState(false);
   const isUser = message.source === 'user';
+  const hasTimestamp = message.createdAt !== undefined;
+  const author = isUser ? 'You' : 'Devin';
+  const authorLine = time ? `${author} · ${time}` : author;
+
+  function authorLabel() {
+    return (
+      <>
+        <Text
+          className={isUser ? 'mt-1 text-text-low text-text11' : 'mt-1.5 text-text-low text-text11'}
+          testID={time ? `message-time-${message.sequence}` : undefined}
+        >
+          {authorLine}
+        </Text>
+        {showFullDate && message.createdAt !== undefined && (
+          <Text
+            className="mt-0.5 text-text-low text-text11"
+            testID={`message-full-date-${message.sequence}`}
+          >
+            {formatFullDate(message.createdAt)}
+          </Text>
+        )}
+      </>
+    );
+  }
+
+  const messageContent = isUser ? (
+    <>
+      <View className="rounded-2xl bg-tint-primary px-4 py-3">
+        <Text className="text-text-hi text-text14" selectable>
+          {message.text}
+        </Text>
+      </View>
+      {authorLabel()}
+    </>
+  ) : (
+    <>
+      <DevinMarkdown>{message.text}</DevinMarkdown>
+      {authorLabel()}
+    </>
+  );
+
+  const messageWrapperClass = isUser
+    ? 'mb-4 max-w-[88%] self-end items-end'
+    : 'mb-5 self-start items-start';
+
   if (isUser) {
     return (
-      <View className="mb-4 max-w-[88%] self-end items-end">
-        <View className="rounded-2xl bg-tint-primary px-4 py-3">
-          <Text className="text-text-hi text-text14" selectable>
-            {message.text}
+      <>
+        {daySeparator && (
+          <Text
+            className="mb-4 w-full text-center text-text-low text-text11"
+            testID="message-day-separator"
+          >
+            {daySeparator}
           </Text>
-        </View>
-        <Text className="mt-1 text-text-low text-text11">You</Text>
-      </View>
+        )}
+        {hasTimestamp ? (
+          <Pressable
+            className={messageWrapperClass}
+            onLongPress={() => setShowFullDate((visible) => !visible)}
+            delayLongPress={350}
+            accessibilityLabel={`${isUser ? 'You' : 'Devin'}: ${message.text}`}
+            accessibilityHint="Long press to show the full date"
+          >
+            {messageContent}
+          </Pressable>
+        ) : (
+          <View className={messageWrapperClass}>{messageContent}</View>
+        )}
+      </>
     );
   }
   return (
-    <View className="mb-5">
-      <DevinMarkdown>{message.text}</DevinMarkdown>
-      <Text className="mt-1.5 text-text-low text-text11">Devin</Text>
-    </View>
+    <>
+      {daySeparator && (
+        <Text
+          className="mb-4 w-full text-center text-text-low text-text11"
+          testID="message-day-separator"
+        >
+          {daySeparator}
+        </Text>
+      )}
+      {hasTimestamp ? (
+        <Pressable
+          className={messageWrapperClass}
+          onLongPress={() => setShowFullDate((visible) => !visible)}
+          delayLongPress={350}
+          accessibilityLabel={`${isUser ? 'You' : 'Devin'}: ${message.text}`}
+          accessibilityHint="Long press to show the full date"
+        >
+          {messageContent}
+        </Pressable>
+      ) : (
+        <View className={messageWrapperClass}>{messageContent}</View>
+      )}
+    </>
   );
 }
 
@@ -211,6 +301,7 @@ export default function ComputerSessionDetailScreen() {
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showVariantPicker, setShowVariantPicker] = useState(false);
+  const [showPermissions, setShowPermissions] = useState(false);
   const historyRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -225,6 +316,18 @@ export default function ComputerSessionDetailScreen() {
     bridgeId,
     validParameters && Boolean(computer) && Boolean(access.data),
   );
+  const computerGrants = bridgeFeatures.data?.grants
+    ? { grants: bridgeFeatures.data.grants, source: 'connector' as const }
+    : computer
+      ? {
+          grants: {
+            viewSessions: computer.permissions.includes('session:content:read'),
+            sendPrompts: computer.permissions.includes('session:prompt:send'),
+            startSessions: computer.permissions.includes('session:create'),
+          },
+          source: 'pairing' as const,
+        }
+      : undefined;
   const mayReadContent = validParameters && Boolean(access.data?.capabilities.sessionLoad);
   const query = useComputerSessionDetail(bridgeId, sessionId, mayReadContent);
   const queryClient = useQueryClient();
@@ -242,6 +345,7 @@ export default function ComputerSessionDetailScreen() {
   const activityGroups = activitySupported
     ? groupActivity(query.data?.activity ?? [])
     : new Map();
+  const timeLabels = messageTimeLabels(query.data?.messages ?? [], Date.now());
   const activityIndicatorKind =
     activitySupported && sessionActivity.data?.active ? (sessionActivity.data.kind ?? 'thinking') : null;
   const liveTurn =
@@ -571,9 +675,21 @@ export default function ComputerSessionDetailScreen() {
               </>
             )}
             <Text className="mx-1.5 text-text-low text-text12">·</Text>
-            <Text className="text-text-low text-text12">
-              {canPrompt ? 'Steering enabled' : 'Read only'}
-            </Text>
+            <Pressable
+              className="flex-row items-center rounded-full bg-tint-secondary px-2 py-0.5"
+              onPress={() => setShowPermissions(true)}
+              testID="computer-session-permissions-chip"
+              accessibilityRole="button"
+              accessibilityLabel={`${canPrompt ? 'Steering enabled' : 'Read only'}. Show permissions`}
+            >
+              {!canPrompt && (
+                <Ionicons name="lock-closed-outline" size={11} color={tokens.textLow.hex} />
+              )}
+              <Text className="mx-1 text-text-low text-text12">
+                {canPrompt ? 'Steering enabled' : 'Read only'}
+              </Text>
+              <Ionicons name="chevron-forward" size={10} color={tokens.textLow.hex} />
+            </Pressable>
             {query.data?.session.model && (
               <>
                 <Text className="mx-1.5 text-text-low text-text12">·</Text>
@@ -697,7 +813,7 @@ export default function ComputerSessionDetailScreen() {
                     </Text>
                   </View>
                 ) : (
-                  query.data.messages.map((message) => {
+                  query.data.messages.map((message, index) => {
                     const group = activitySupported
                       ? (activityGroups.get(message.sequence) ?? [])
                       : [];
@@ -705,7 +821,11 @@ export default function ComputerSessionDetailScreen() {
                       liveTurn !== null && message.sequence === query.data.messages.length;
                     return (
                       <View key={message.sequence}>
-                        <HistoryMessage message={message} />
+                        <HistoryMessage
+                          message={message}
+                          daySeparator={timeLabels[index]?.daySeparator}
+                          time={timeLabels[index]?.time}
+                        />
                         {group.length > 0 && !suppressTrailing && (
                           <ActivityGroup
                             bridgeId={bridgeId}
@@ -953,6 +1073,15 @@ export default function ComputerSessionDetailScreen() {
         refreshing={localOptions.isRefreshingCatalog}
         refreshError={Boolean(localOptions.refreshCatalogError)}
       />
+      {computer && computerGrants && (
+        <ComputerPermissionsSheet
+          visible={showPermissions}
+          onClose={() => setShowPermissions(false)}
+          computerName={computer.computerName}
+          grants={computerGrants.grants}
+          source={computerGrants.source}
+        />
+      )}
     </SafeAreaView>
   );
 }
