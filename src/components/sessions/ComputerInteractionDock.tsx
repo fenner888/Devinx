@@ -30,12 +30,12 @@ export function ComputerInteractionDock({
   );
 }
 
-export function ComputerInteractionAnsweredRow({ summary }: { summary: string }) {
+export function ComputerInteractionAnsweredRow({ sentence }: { sentence: string }) {
   return (
     <View className="flex-row items-center rounded-card border border-border bg-surface1 px-4 py-3">
       <View className="mr-2 h-2 w-2 rounded-dot bg-brand" />
       <Text className="flex-1 text-text-mid text-text12" numberOfLines={2}>
-        You answered · {summary}
+        {sentence}
       </Text>
     </View>
   );

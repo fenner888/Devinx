@@ -19,8 +19,11 @@ for `ask_user_question`; earlier testing against 3000.1.27 did not exercise this
   free-text answer up to the field's declared limit (or 2,000 characters). Typing clears the selected
   chip; selecting a chip clears free text.
 - The local question card is docked above the composer, outside the transcript scroll view. After a
-  successful response, a collapsed “You answered” row retains a bounded summary until another
-  interaction appears or a prompt is sent.
+  successful accept, the collapsed row says “You answered · <summary>”; a decline says
+  “You skipped this question”. The row stays visible until another interaction appears or a prompt
+  is sent.
+- While a question or command approval is pending, the session header and Local session list both
+  say “Waiting for your answer” and use the brand status dot.
 - Accepted content is validated again against the original requested schema on the Mac before it
   is returned to Devin. Field names and raw ACP request IDs are never exposed as authority-bearing
   bridge identifiers.

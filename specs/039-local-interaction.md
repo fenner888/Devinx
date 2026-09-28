@@ -103,9 +103,14 @@ fields may allow free text when request metadata contains
 `cognition.ai/allowOther: true`; the answer is trimmed and bounded by the
 field's maximum (default 2,000 characters). Typing clears the selected chip,
 and choosing a chip clears free text. After a successful answer or decline, a
-collapsed local-only row summarizes the chosen labels/free text, skipped
-question, or permission outcome. It clears when a new interaction appears or a
-message is sent.
+collapsed local-only row says “You answered · <summary>” or “You skipped this
+question”. Approval outcomes say “You allowed this command once”, “You allowed
+this command for this session”, or “You denied this command”. It clears when a
+new interaction appears or a message is sent.
+
+While either a question or command approval is pending, the session header and
+Local session list both say “Waiting for your answer” and use the brand status
+dot.
 
 ## Terminal sessions are read-only for interactions
 

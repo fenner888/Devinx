@@ -24,13 +24,11 @@ import {
   useComputerSessionAccess,
   useComputerSessionActivity,
   useComputerSessionElicitation,
-  useComputerSessionPermission,
   useComputerCreateOptions,
   useComputerSessionDetail,
   computerSessionsQueryKey,
   usePromptComputerSession,
   useRespondComputerSessionElicitation,
-  useRespondComputerSessionPermission,
 } from '@api/bridge/queries';
 import type { ComputerSessionBoard } from '@api/bridge/queries';
 import {
@@ -38,7 +36,6 @@ import {
   type ComputerElicitationAnswer,
   type ComputerElicitationInteraction,
   type ComputerLoadedSession,
-  type ComputerSessionPermissionDecision,
 } from '@auth/computerBridge';
 import { useConnections } from '@auth/ConnectionContext';
 import { computerTransportLabel } from '@auth/pairedComputers';
@@ -51,7 +48,7 @@ import {
   ComputerInteractionAnsweredRow,
   ComputerInteractionDock,
 } from '@components/sessions/ComputerInteractionDock';
-import { ComputerPermissionCard } from '@components/sessions/ComputerPermissionCard';
+import { ComputerPermissionDockItem } from '@components/sessions/ComputerPermissionDockItem';
 import { ComputerTerminalQuestionCard } from '@components/sessions/ComputerTerminalQuestionCard';
 import { ModelFamilyMark } from '@components/sessions/ModelFamilyMark';
 import { KeyboardDismissButton } from '@components/KeyboardDismissButton';
@@ -70,20 +67,6 @@ const BRIDGE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 const LOCAL_SESSION_ID_PATTERN = /^local_[A-Za-z0-9_-]{43}$/;
 const HISTORY_REFRESH_INTERVAL_MS = 3_000;
 const MAXIMUM_HISTORY_REFRESH_ATTEMPTS = 39;
-const usePermissionQuery: typeof useComputerSessionPermission =
-  typeof useComputerSessionPermission === 'function'
-    ? useComputerSessionPermission
-    : ((_bridgeId: string, _sessionId: string, _enabled?: boolean) =>
-        ({ data: undefined }) as ReturnType<typeof useComputerSessionPermission>);
-const usePermissionResponse: typeof useRespondComputerSessionPermission =
-  typeof useRespondComputerSessionPermission === 'function'
-    ? useRespondComputerSessionPermission
-    : ((_bridgeId: string, _sessionId: string) =>
-        ({
-          mutate: () => undefined,
-          isPending: false,
-          error: null,
-        }) as unknown as ReturnType<typeof useRespondComputerSessionPermission>);
 
 export function devinReplySignature(session: ComputerLoadedSession | undefined): string {
   return JSON.stringify(
@@ -200,7 +183,7 @@ function elicitationSummary(
     if (typeof value === 'boolean') return [value ? 'Yes' : 'No'];
     return [field.options?.find((option) => option.value === String(value))?.label ?? String(value)];
   });
-  return (values.join(', ') || 'Answered').slice(0, 200);
+  return `You answered · ${values.join(', ') || 'Answered'}`.slice(0, 200);
 }
 
 export default function ComputerSessionDetailScreen() {
@@ -274,6 +257,7 @@ export default function ComputerSessionDetailScreen() {
   const awaiting =
     sessionActivity.data?.awaiting ??
     (sessionActivity.data?.label === 'Waiting for your answer' ? 'answer' : undefined);
+  const awaitingInteraction = awaiting === 'answer' || awaiting === 'approval';
   const mayAnswerQuestions =
     mayReadContent &&
     canPrompt &&
@@ -288,8 +272,6 @@ export default function ComputerSessionDetailScreen() {
     canPrompt &&
     bridgeFeatures.data?.permissionPrompts === true &&
     awaiting === 'approval';
-  const permission = usePermissionQuery(bridgeId, sessionId, mayApprove);
-  const activePermission = mayApprove ? permission.data : null;
   const terminalQuestions =
     awaiting === 'answer' ? sessionActivity.data?.terminalQuestion?.questions : undefined;
   const terminalQuestionPresent = Boolean(terminalQuestions?.length);
@@ -299,16 +281,15 @@ export default function ComputerSessionDetailScreen() {
     sessionActivity.data?.label === 'Waiting for your answer' &&
     bridgeFeatures.data?.sessionElicitation === false;
   const answerElicitation = useRespondComputerSessionElicitation(bridgeId, sessionId);
-  const answerPermission = usePermissionResponse(bridgeId, sessionId);
   const sessionBusy = Boolean(sessionActivity.data?.active);
   const composerOverlayHeight = canPrompt && mayReadContent ? Math.max(composerHeight, 160) : 0;
   const interactionDockVisible = Boolean(
-    activeElicitation || activePermission || terminalQuestionPresent || answeredSummary,
+    activeElicitation || mayApprove || terminalQuestionPresent || answeredSummary,
   );
   const interactionKey = activeElicitation
     ? `elicitation:${activeElicitation.id}`
-    : activePermission
-      ? `permission:${activePermission.id}`
+    : mayApprove
+      ? 'permission:pending'
       : terminalQuestionPresent
         ? `terminal:${JSON.stringify(terminalQuestions)}`
         : null;
@@ -520,24 +501,6 @@ export default function ComputerSessionDetailScreen() {
     });
   }
 
-  function answerCommandPermission(decision: ComputerSessionPermissionDecision) {
-    if (!activePermission) return;
-    answerPermission.mutate(
-      { permissionId: activePermission.id, decision },
-      {
-        onSuccess: () => {
-          setAnsweredSummary(
-            decision === 'allow_once'
-              ? 'Allowed once'
-              : decision === 'allow_session'
-                ? 'Allowed for this session'
-                : 'Denied',
-          );
-        },
-      },
-    );
-  }
-
   useEffect(() => {
     if (nearBottomRef.current) historyRef.current?.scrollToEnd({ animated: true });
   }, [
@@ -579,7 +542,7 @@ export default function ComputerSessionDetailScreen() {
             <Text className="ml-1.5 text-brand-text text-text12" numberOfLines={1}>
               {computer?.computerName ?? 'Paired local device'}
             </Text>
-            {(activityIndicatorKind || awaiting === 'answer') && (
+            {(activityIndicatorKind || awaitingInteraction) && (
               <>
                 <Text className="mx-1.5 text-text-low text-text12">·</Text>
                 <View
@@ -590,17 +553,17 @@ export default function ComputerSessionDetailScreen() {
                     className="mr-1 h-1.5 w-1.5 rounded-dot"
                     style={{
                       backgroundColor:
-                        awaiting === 'answer' ? tokens.brand.hex : tokens.running.hex,
+                        awaitingInteraction ? tokens.brand.hex : tokens.running.hex,
                     }}
                   />
                   <Text
                     className={
-                      awaiting === 'answer'
+                      awaitingInteraction
                         ? 'text-brand-text text-text12'
                         : 'text-text-low text-text12'
                     }
                   >
-                    {awaiting === 'answer'
+                    {awaitingInteraction
                       ? 'Waiting for your answer'
                       : activityShortLabel(activityIndicatorKind ?? 'thinking')}
                   </Text>
@@ -804,7 +767,7 @@ export default function ComputerSessionDetailScreen() {
                 />
               </View>
             )}
-            {query.data && interactionDockVisible && (
+            {interactionDockVisible && (
               <ComputerInteractionDock
                 bottom={composerOverlayHeight}
                 maxHeight={window.height * 0.55}
@@ -815,7 +778,7 @@ export default function ComputerSessionDetailScreen() {
                 }
               >
                 {answeredSummary ? (
-                  <ComputerInteractionAnsweredRow summary={answeredSummary} />
+                  <ComputerInteractionAnsweredRow sentence={answeredSummary} />
                 ) : activeElicitation ? (
                   <ComputerElicitationCard
                     interaction={activeElicitation}
@@ -827,16 +790,11 @@ export default function ComputerSessionDetailScreen() {
                     }
                     onRespond={answerQuestion}
                   />
-                ) : activePermission ? (
-                  <ComputerPermissionCard
-                    permission={activePermission}
-                    pending={answerPermission.isPending}
-                    error={
-                      answerPermission.error
-                        ? 'Your decision could not be sent securely. Try again.'
-                        : undefined
-                    }
-                    onRespond={answerCommandPermission}
+                ) : mayApprove ? (
+                  <ComputerPermissionDockItem
+                    bridgeId={bridgeId}
+                    sessionId={sessionId}
+                    onAnswered={setAnsweredSummary}
                   />
                 ) : (
                   terminalQuestions?.map((question, index) => (

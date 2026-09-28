@@ -96,17 +96,25 @@ if (request.method === 'initialize') {
     if (outcome?.outcome !== 'cancelled') process.exit(41);
     process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: {
       sessionId: '${SESSION_ID}', update: {
-        sessionUpdate: 'tool_call_update', toolCallId: 'tool-call-1', status: 'failed'
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: 'permission-cancelled' }
       }
     } }) + '\\n');
     setTimeout(() => process.stdout.write(JSON.stringify({
       jsonrpc: '2.0', method: 'session/update', params: {
         sessionId: '${SESSION_ID}', update: {
-          sessionUpdate: 'agent_message_chunk',
-          content: { type: 'text', text: 'permission-cancelled' }
+          sessionUpdate: 'tool_call_update', toolCallId: 'tool-call-1', status: 'failed'
         }
       }
     }) + '\\n'), 50);
+    setTimeout(() => process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0', method: 'session/update', params: {
+        sessionId: '${SESSION_ID}', update: {
+          sessionUpdate: 'agent_message_chunk',
+          content: { type: 'text', text: '|after-failed-update' }
+        }
+      }
+    }) + '\\n'), 100);
     setTimeout(() => process.stdout.write(JSON.stringify({
       jsonrpc: '2.0', id: globalThis.promptRequestId, result: { stopReason: 'end_turn' }
     }) + '\\n'), 500);
@@ -204,12 +212,15 @@ if (request.method === 'initialize') {
       expect(pending).toBeNull();
       for (
         let attempt = 0;
-        attempt < 100 && client.getSessionTurn(SESSION_ID)?.reply !== 'permission-cancelled';
+        attempt < 100 &&
+        !client.getSessionTurn(SESSION_ID)?.reply.includes('after-failed-update');
         attempt += 1
       ) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
-      expect(client.getSessionTurn(SESSION_ID)?.reply).toBe('permission-cancelled');
+      expect(client.getSessionTurn(SESSION_ID)?.reply).toBe(
+        'permission-cancelled|after-failed-update',
+      );
     } finally {
       await client.stop();
     }
@@ -307,7 +318,7 @@ if (request.method === 'initialize') {
     }
   });
 
-  it('times out, cancels, and keeps the timed-out activity sticky', async () => {
+  it('keeps the timed-out activity sticky while later chunks resume the response label', async () => {
     const client = await startPermissionClient(
       permissionOptions,
       { outcome: 'cancelled' },
@@ -315,21 +326,18 @@ if (request.method === 'initialize') {
     );
     try {
       expect(await waitForPermission(client)).not.toBeNull();
-      let activity = await client.getSessionActivity(SESSION_ID);
-      for (let attempt = 0; attempt < 150 && activity?.label !== 'Checking the next step'; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        activity = await client.getSessionActivity(SESSION_ID);
-      }
-      expect(activity?.label).toBe('Checking the next step');
       for (
         let attempt = 0;
-        attempt < 100 && client.getSessionTurn(SESSION_ID)?.reply !== 'permission-cancelled';
+        attempt < 150 &&
+        !client.getSessionTurn(SESSION_ID)?.reply.includes('after-failed-update');
         attempt += 1
       ) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
-      expect(client.getSessionTurn(SESSION_ID)?.reply).toBe('permission-cancelled');
-      expect((await client.getSessionActivity(SESSION_ID))?.label).toBe('Checking the next step');
+      expect(client.getSessionTurn(SESSION_ID)?.reply).toBe(
+        'permission-cancelled|after-failed-update',
+      );
+      expect((await client.getSessionActivity(SESSION_ID))?.label).toBe('Writing a response');
       expect(client.getPendingPermission(SESSION_ID)).toBeNull();
       expect(client.getSessionTurn(SESSION_ID)?.activity[0]).toMatchObject({
         status: 'timed_out',

@@ -1184,6 +1184,7 @@ export class AcpSessionClient {
   private activeLoad: ReplayCollector | null = null;
   private activePromptSessionId: string | null = null;
   private latestQuestionToolCallId: string | null = null;
+  private timedOutToolCallId: string | null = null;
   private activeTurn: ActiveTurn | null = null;
   private activeActivity: ActiveAcpSessionActivity | null = null;
   private readonly pendingElicitations = new Map<string, PendingElicitationRecord>();
@@ -1208,6 +1209,7 @@ export class AcpSessionClient {
     this.activeLoad = null;
     this.activePromptSessionId = null;
     this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
@@ -1743,6 +1745,7 @@ export class AcpSessionClient {
     }
     this.activePromptSessionId = sessionId;
     this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     this.activeTurn = {
       sessionId,
       startedAt: Date.now(),
@@ -1775,6 +1778,7 @@ export class AcpSessionClient {
     this.clearPendingPermission(sessionId, true);
     this.activePromptSessionId = null;
     this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     // Keep the turn snapshot readable until the next prompt or a stop() so the
     // phone can still render the completed turn right after end_turn.
     this.activeTurn?.activity.finishTurn();
@@ -1804,6 +1808,7 @@ export class AcpSessionClient {
     this.activeLoad = null;
     this.activePromptSessionId = null;
     this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
@@ -2244,11 +2249,9 @@ export class AcpSessionClient {
     }
     if (pendingPermission || pendingElicitation) return;
     if (
-      (updateType === 'tool_call_update' || updateType === 'agent_message_chunk') &&
-      this.activeActivity?.sessionId === sessionId &&
-      this.activeActivity.label === 'Checking the next step' &&
-      (updateType === 'agent_message_chunk' ||
-        this.activeActivity.toolCallId === update.toolCallId)
+      updateType === 'tool_call_update' &&
+      this.timedOutToolCallId !== null &&
+      update.toolCallId === this.timedOutToolCallId
     ) {
       return;
     }
@@ -2388,6 +2391,7 @@ export class AcpSessionClient {
   private timeOutPermission(sessionId: string, permissionId: string): void {
     const pending = this.pendingPermissions.get(sessionId);
     if (!pending || pending.public.id !== permissionId) return;
+    this.timedOutToolCallId = pending.toolCallId;
     this.clearPendingPermission(sessionId, true);
     this.activeTurn?.activity.timeOutTool(pending.toolCallId);
     if (this.activePromptSessionId === sessionId) {
@@ -2415,6 +2419,7 @@ export class AcpSessionClient {
     this.activeLoad = null;
     this.activePromptSessionId = null;
     this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
@@ -2446,6 +2451,7 @@ export class AcpSessionClient {
     this.activeLoad = null;
     this.activePromptSessionId = null;
     this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
