@@ -39,7 +39,7 @@ DevinX Connector. Cloud sessions are unchanged.
 | `afterSequence` | int ≥ 0; index of the preceding chat message (0 = before the first). Must be ≤ `messages.length` after trimming |
 | `kind` | `'thought' \| 'tool'` |
 | `toolKind` | optional: `read / edit / delete / move / search / execute / think / fetch / other` |
-| `status` | `running / completed / failed / interrupted / unknown` |
+| `status` | `running / completed / failed / interrupted / unknown / awaiting_input / timed_out` |
 | `title` | 1–200 chars, whitespace-collapsed, no control chars |
 | `paths` | ≤ 20 entries, each ≤ 512 chars, workspace-relative only |
 | `detail` | `{type:'text'}` ≤ 16 KiB, or `{type:'diff', path, oldText?, newText?}` each ≤ 16 KiB |
@@ -90,6 +90,10 @@ Observed update shapes (discovery notes, `session/update` notifications):
   `startedAt`/`endedAt`. Live updates carry no timestamp.
 - Replay does **not** include command output — output text only appears live.
 - Any entry still `running` at `end_turn` becomes `interrupted`.
+- A tool blocked on a supported phone question or approval becomes
+  `awaiting_input`; it returns to `running` when answered. A permission that
+  reaches its timeout becomes `timed_out`, and later updates cannot overwrite
+  that terminal status.
 
 Replay `afterSequence` = `collector.messages.length` at arrival; the service
 remaps it through message filtering/renumbering/dropping so it always indexes
@@ -127,6 +131,14 @@ session load. The phone parses it as **optional**: an older Connector that
 omits the field still yields `sessionElicitation` correctly and the phone
 renders exactly as before — no groups, no live turn, no indicator. A
 malformed features response still fails closed to all-false.
+
+Interaction-specific statuses and fields are separately opt-in per request.
+The phone first negotiates `permissionPrompts`; only then does it send
+`interaction: true` with `bridge.features`, `session.list`, `session.load`, and
+`session.activity`. Without that flag, the Connector omits all new response
+fields and maps `awaiting_input` to legacy `running` and `timed_out` to legacy
+`failed`. This keeps responses compatible with older phones that strictly
+parse the original status set.
 
 ## Live turn
 
@@ -172,7 +184,9 @@ the session:
   (`Read N file(s)`, `Edited N file(s)`, `Changed N file(s)`,
   `Ran N command(s)`, `Searched`, `Fetched N page(s)`, `N step(s)`) + elapsed
   seconds — plus a status dot (pulsing while running) and a non-completed
-  status label using `statusLabels` (`running/completed/failed/interrupted/unknown`).
+  status label using `statusLabels`. Group status priority is
+  `awaiting_input > running > failed > timed_out > interrupted > unknown`.
+  Awaiting input uses the brand dot; timeout uses the blocked dot.
 - Step rows show a per-kind glyph, title, relative-path chips (≤3 + `+N`),
   and expand to detail: diffs render with common prefix/suffix context lines
   and `diffAddedText/diffAddedTint` / `diffRemovedText/diffRemovedTint`
@@ -180,14 +194,16 @@ the session:
   "Show more"); thought text in muted italic; clipped content shows a
   "Trimmed" caption.
 - Session list rows and the detail header show a running dot +
-  `activityShortLabel(kind)` only while `activity.active`; idle sessions are
-  pixel-identical to before.
+  `activityShortLabel(kind)` only while `activity.active`, except that an
+  awaiting answer is labeled `Waiting for your answer`. Idle sessions remain
+  unchanged.
 
 ## Compatibility & fail-closed
 
 | Condition | Behavior |
 | --- | --- |
 | Connector without `activityTimeline` | Phone renders exactly as before |
+| Request without `interaction: true` | New fields omitted; statuses use legacy mapping |
 | Connector without `session.activity.turn` | `turn` omitted; list/persisted views unaffected |
 | `tool_call_state` table missing | Extension/synthesized tool inputs; load succeeds |
 | Unknown `chat_message` shape | Node skipped, `truncated:true`, messages returned |

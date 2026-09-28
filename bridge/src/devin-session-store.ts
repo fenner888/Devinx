@@ -9,7 +9,12 @@ import {
   activityKindFromToolName,
   type ActivityEntry,
 } from './activity';
-import type { AcpActivityKind, AcpHistoryMessage, AcpLoadedSession } from './acp';
+import type {
+  AcpActivityKind,
+  AcpHistoryMessage,
+  AcpLoadedSession,
+  AcpTerminalQuestion,
+} from './acp';
 import { sessionIdSchema } from './schemas';
 import { utf8Tail } from './text';
 
@@ -97,6 +102,24 @@ const toolCallTimingSchema = z
   })
   .passthrough();
 
+const terminalQuestionSchema = z
+  .object({
+    questions: z
+      .array(
+        z
+          .object({
+            question: z.string().min(1).max(500),
+            header: z.string().max(120).optional(),
+            options: z.array(z.object({ label: z.string().max(200) }).passthrough()).max(20),
+            multiSelect: z.boolean(),
+          })
+          .passthrough(),
+      )
+      .min(1)
+      .max(4),
+  })
+  .passthrough();
+
 const requiredColumns = {
   sessions: new Set([
     'id',
@@ -160,6 +183,22 @@ export interface SessionLiveness {
   active: boolean;
   kind?: AcpActivityKind;
   updatedAt: number;
+  pendingQuestion?: AcpTerminalQuestion;
+}
+
+function terminalQuestionFromArguments(
+  input: unknown,
+): AcpTerminalQuestion | undefined {
+  const parsed = terminalQuestionSchema.safeParse(input);
+  if (!parsed.success) return undefined;
+  return {
+    questions: parsed.data.questions.map((question) => ({
+      question: question.question,
+      ...(question.header === undefined ? {} : { header: question.header }),
+      options: question.options.map((option) => option.label),
+      multiSelect: question.multiSelect,
+    })),
+  };
 }
 
 function messageBytes(message: AcpHistoryMessage): number {
@@ -650,10 +689,16 @@ export class DevinSessionStore {
         if (unresolved.length === 0) {
           return { active: false, updatedAt };
         }
+        const questionCalls = unresolved.filter((call) => call.name === 'ask_user_question');
+        const pendingQuestion =
+          questionCalls.length === 1
+            ? terminalQuestionFromArguments(questionCalls[0]?.arguments)
+            : undefined;
         return {
           active: true,
           kind: livenessKindForTool(unresolved[unresolved.length - 1]?.name ?? ''),
           updatedAt,
+          ...(pendingQuestion ? { pendingQuestion } : {}),
         };
       }
       return {
@@ -727,6 +772,11 @@ export class DevinSessionStore {
     }
     if (stateStatus === 'completed' || stateStatus === 'failed') {
       activity.updateTool(call.id, { status: stateStatus });
+      return;
+    }
+    if (lockAlive && call.name === 'ask_user_question' && terminalQuestionFromArguments(call.arguments)) {
+      activity.updateTool(call.id, { status: 'in_progress' });
+      activity.markAwaitingInput(call.id);
       return;
     }
     // Unresolved calls reflect an interrupted turn unless the session lock is

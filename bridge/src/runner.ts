@@ -11,8 +11,10 @@ import {
   type AcpHistoryMessage,
   type AcpModelCatalog,
   type AcpPendingElicitation,
+  type AcpPendingPermission,
   type AcpSessionActivity,
   type AcpSessionTurn,
+  type AcpTerminalQuestion,
 } from './acp';
 import {
   DevinSessionStore,
@@ -120,7 +122,12 @@ export interface SessionHistoryLifecycle {
   listCreateOptions?(forceRefresh?: boolean): Promise<DevinCreateOptions>;
   getSessionLiveness?(
     sessionId: string,
-  ): Promise<{ active: boolean; kind?: AcpSessionActivity['kind']; updatedAt: number } | null>;
+  ): Promise<{
+    active: boolean;
+    kind?: AcpSessionActivity['kind'];
+    updatedAt: number;
+    pendingQuestion?: AcpTerminalQuestion;
+  } | null>;
 }
 
 export interface DesktopBridgeRunnerDependencies {
@@ -153,6 +160,11 @@ const unavailableSessions: SessionDiscoveryAdapter = {
   respondToElicitation: () => {
     throw new Error('Session questions are not enabled');
   },
+  isSessionPermissionSupported: () => false,
+  getPendingPermission: () => null,
+  respondToPermission: () => {
+    throw new Error('Session permissions are not enabled');
+  },
   isSessionPromptSupported: () => false,
   promptSession: () => Promise.reject(new Error('Session prompting is not enabled')),
   isSessionCreateSupported: () => false,
@@ -164,6 +176,12 @@ const MAXIMUM_REHYDRATION_PAGES = 100;
 const MAXIMUM_CREATE_WORKSPACES = 100;
 // Reserve one KiB for the omission marker and framing before ACP's 160 KiB limit.
 const MAXIMUM_CONTINUATION_CONTEXT_BYTES = 149 * 1024;
+
+function awaitingFromLabel(label: string | undefined): 'answer' | 'approval' | undefined {
+  if (label === 'Waiting for your answer') return 'answer';
+  if (label === 'Waiting for your approval') return 'approval';
+  return undefined;
+}
 
 function continuationContext(messages: AcpHistoryMessage[], truncated: boolean): string {
   const blocks: string[] = [];
@@ -225,10 +243,23 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
       try {
         const live = await this.current.getSessionActivity?.(session.sessionId);
         if (live?.active) {
-          session.activity = { active: true, kind: live.kind, updatedAt: live.updatedAt };
+          const awaiting = live.awaiting ?? awaitingFromLabel(live.label);
+          session.activity = {
+            active: true,
+            kind: live.kind,
+            updatedAt: live.updatedAt,
+            ...(awaiting ? { awaiting } : {}),
+          };
         } else if (this.history?.getSessionLiveness) {
           const liveness = await this.history.getSessionLiveness(session.sessionId);
-          if (liveness) session.activity = liveness;
+          if (liveness) {
+            session.activity = {
+              active: liveness.active,
+              kind: liveness.kind,
+              updatedAt: liveness.updatedAt,
+              ...(liveness.pendingQuestion ? { awaiting: 'answer' } : {}),
+            };
+          }
         }
       } catch {
         // Liveness is best-effort; never fail session discovery for it.
@@ -250,7 +281,10 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   async getSessionActivity(input: string): Promise<AcpSessionActivity | null> {
     await this.ensureSessionListed(input);
     const live = (await this.current.getSessionActivity?.(input)) ?? null;
-    if (live?.active) return live;
+    if (live?.active) {
+      const awaiting = live.awaiting ?? awaitingFromLabel(live.label);
+      return { ...live, ...(awaiting ? { awaiting } : {}) };
+    }
     if (this.history?.getSessionLiveness) {
       try {
         const liveness = await this.history.getSessionLiveness(input);
@@ -258,9 +292,14 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
           const kind = liveness.kind ?? 'thinking';
           return {
             kind,
-            label: defaultActivityLabel(kind),
+            label: liveness.pendingQuestion
+              ? 'Waiting for your answer in Terminal'
+              : defaultActivityLabel(kind),
             active: true,
             updatedAt: liveness.updatedAt,
+            ...(liveness.pendingQuestion
+              ? { awaiting: 'answer' as const, terminalQuestion: liveness.pendingQuestion }
+              : {}),
           };
         }
       } catch {
@@ -296,6 +335,30 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
       throw new Error('Session questions are not enabled');
     }
     this.current.respondToElicitation(sessionId, interactionId, response);
+  }
+
+  isSessionPermissionSupported(): boolean {
+    return Boolean(
+      this.current.isSessionPermissionSupported?.() &&
+      this.current.getPendingPermission &&
+      this.current.respondToPermission,
+    );
+  }
+
+  getPendingPermission(sessionId: string): AcpPendingPermission | null {
+    if (!this.isSessionPermissionSupported() || !this.current.getPendingPermission) return null;
+    return this.current.getPendingPermission(sessionId);
+  }
+
+  respondToPermission(
+    sessionId: string,
+    permissionId: string,
+    decision: AcpPendingPermission['decisions'][number],
+  ): void {
+    if (!this.isSessionPermissionSupported() || !this.current.respondToPermission) {
+      throw new Error('Session permissions are not enabled');
+    }
+    this.current.respondToPermission(sessionId, permissionId, decision);
   }
 
   async loadSession(input: string): ReturnType<SessionDiscoveryAdapter['loadSession']> {

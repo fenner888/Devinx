@@ -19,6 +19,7 @@ export const modelIdSchema = z
   .max(160)
   .regex(/^[A-Za-z0-9._:+-]+$/);
 export const interactionIdSchema = z.string().regex(/^interaction_[A-Za-z0-9_-]{43}$/);
+export const permissionIdSchema = z.string().regex(/^permission_[A-Za-z0-9_-]{43}$/);
 const cursorSchema = z.string().min(1).max(4096);
 export const deviceNameSchema = z
   .string()
@@ -45,6 +46,8 @@ export const bridgeMethodSchema = z.enum([
   'session.activity',
   'session.elicitation',
   'session.elicitation.respond',
+  'session.permission',
+  'session.permission.respond',
   'session.prompt',
   'session.create_options',
   'session.create',
@@ -57,6 +60,12 @@ export const bridgePermissionSchema = z.enum([
   'session:prompt:send',
   'session:create',
 ]);
+export const sessionPermissionDecisionSchema = z.enum([
+  'allow_once',
+  'allow_session',
+  'reject_once',
+]);
+export type SessionPermissionDecision = z.infer<typeof sessionPermissionDecisionSchema>;
 
 export const signedRequestEnvelopeSchema = z
   .object({
@@ -87,7 +96,9 @@ export const signedRequestEnvelopeSchema = z
   });
 
 export const bridgeHealthBodySchema = z.object({}).strict();
-export const bridgeFeaturesBodySchema = z.object({}).strict();
+export const bridgeFeaturesBodySchema = z
+  .object({ interaction: z.literal(true).optional() })
+  .strict();
 export const bridgePlatformBodySchema = z.object({}).strict();
 export const bridgeVersionBodySchema = z.object({}).strict();
 export const deviceRevokeBodySchema = z.object({}).strict();
@@ -95,18 +106,35 @@ export const deviceRevokeBodySchema = z.object({}).strict();
 export const sessionListBodySchema = z
   .object({
     cursor: cursorSchema.optional(),
+    interaction: z.literal(true).optional(),
   })
   .strict();
 
 export const sessionLoadBodySchema = z
   .object({
     sessionId: sessionIdSchema,
+    interaction: z.literal(true).optional(),
   })
   .strict();
 
 export const sessionActivityBodySchema = z
   .object({
     sessionId: sessionIdSchema,
+    interaction: z.literal(true).optional(),
+  })
+  .strict();
+
+export const sessionPermissionBodySchema = z
+  .object({
+    sessionId: sessionIdSchema,
+  })
+  .strict();
+
+export const sessionPermissionResponseBodySchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    permissionId: permissionIdSchema,
+    decision: sessionPermissionDecisionSchema,
   })
   .strict();
 
@@ -211,6 +239,8 @@ export const bodySchemas = {
   'session.activity': sessionActivityBodySchema,
   'session.elicitation': sessionElicitationBodySchema,
   'session.elicitation.respond': sessionElicitationResponseBodySchema,
+  'session.permission': sessionPermissionBodySchema,
+  'session.permission.respond': sessionPermissionResponseBodySchema,
   'session.prompt': sessionPromptBodySchema,
   'session.create_options': sessionCreateOptionsBodySchema,
   'session.create': sessionCreateBodySchema,
@@ -227,6 +257,8 @@ export const permissionByMethod = {
   'session.activity': 'session:content:read',
   'session.elicitation': 'session:content:read',
   'session.elicitation.respond': 'session:prompt:send',
+  'session.permission': 'session:content:read',
+  'session.permission.respond': 'session:prompt:send',
   'session.prompt': 'session:prompt:send',
   'session.create_options': 'session:metadata:read',
   'session.create': 'session:create',
@@ -246,6 +278,8 @@ export type SessionLoadBody = z.infer<typeof sessionLoadBodySchema>;
 export type SessionActivityBody = z.infer<typeof sessionActivityBodySchema>;
 export type SessionElicitationBody = z.infer<typeof sessionElicitationBodySchema>;
 export type SessionElicitationResponseBody = z.infer<typeof sessionElicitationResponseBodySchema>;
+export type SessionPermissionBody = z.infer<typeof sessionPermissionBodySchema>;
+export type SessionPermissionResponseBody = z.infer<typeof sessionPermissionResponseBodySchema>;
 export type SessionPromptBody = z.infer<typeof sessionPromptBodySchema>;
 export type SessionCreateOptionsBody = z.infer<typeof sessionCreateOptionsBodySchema>;
 export type SessionCreateBody = z.infer<typeof sessionCreateBodySchema>;
@@ -261,6 +295,8 @@ export type BridgeBodyByMethod = {
   'session.activity': SessionActivityBody;
   'session.elicitation': SessionElicitationBody;
   'session.elicitation.respond': SessionElicitationResponseBody;
+  'session.permission': SessionPermissionBody;
+  'session.permission.respond': SessionPermissionResponseBody;
   'session.prompt': SessionPromptBody;
   'session.create_options': SessionCreateOptionsBody;
   'session.create': SessionCreateBody;
