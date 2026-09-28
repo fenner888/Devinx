@@ -93,6 +93,9 @@ terminal status. The opted-in phone UI uses the **Timed out** status; without
 opt-in it receives the legacy `failed` mapping. Allowing a pending command
 resumes the activity as `running`; a phone decision is never an implicit
 approval.
+This timeout mark is retained only in Connector memory, so after a Connector
+restart an older timed-out step appears as **Failed** because `sessions.db`
+persists only the "rejected" result.
 
 ## Devin questions
 

@@ -789,6 +789,9 @@ interface PendingPermissionRecord {
   public: AcpPendingPermission;
 }
 
+const MAX_TIMED_OUT_SESSIONS = 100;
+const MAX_TIMED_OUT_TOOL_CALLS_PER_SESSION = 50;
+
 function enumOptions(
   property: z.infer<typeof elicitationPropertySchema>,
 ): AcpElicitationOption[] | undefined {
@@ -1189,6 +1192,7 @@ export class AcpSessionClient {
   private activeActivity: ActiveAcpSessionActivity | null = null;
   private readonly pendingElicitations = new Map<string, PendingElicitationRecord>();
   private readonly pendingPermissions = new Map<string, PendingPermissionRecord>();
+  private readonly timedOutToolCalls = new Map<string, Set<string>>();
   private creatingContinuation = false;
   private modelCatalog: AcpModelCatalog | null = null;
   private readonly sessionModelSelectors = new Map<string, AcpModelSelector>();
@@ -1213,6 +1217,7 @@ export class AcpSessionClient {
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
+    this.timedOutToolCalls.clear();
     this.clearPendingPermissions(false);
     this.creatingContinuation = false;
     this.modelCatalog = null;
@@ -1365,6 +1370,11 @@ export class AcpSessionClient {
           ...(pending.paths ? { paths: [...pending.paths] } : {}),
         }
       : null;
+  }
+
+  getTimedOutToolCallIds(sessionIdInput: unknown): ReadonlySet<string> {
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    return new Set(this.timedOutToolCalls.get(sessionId) ?? []);
   }
 
   respondToElicitation(
@@ -1703,8 +1713,14 @@ export class AcpSessionClient {
     const listedSessions = [...this.listedSessions.entries()];
     const modelCatalog = this.modelCatalog ? cloneModelCatalog(this.modelCatalog) : null;
     const finishedTurn = this.activeTurn?.sessionId === sessionId ? this.activeTurn : null;
+    const timedOutToolCalls = new Map(
+      [...this.timedOutToolCalls].map(([id, toolCallIds]) => [id, new Set(toolCallIds)]),
+    );
     await this.stop();
     await this.start();
+    for (const [id, toolCallIds] of timedOutToolCalls) {
+      this.timedOutToolCalls.set(id, toolCallIds);
+    }
     for (const [listedSessionId, metadata] of listedSessions) {
       this.listedSessions.set(listedSessionId, { ...metadata });
     }
@@ -1812,6 +1828,7 @@ export class AcpSessionClient {
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
+    this.timedOutToolCalls.clear();
     this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
@@ -2391,6 +2408,7 @@ export class AcpSessionClient {
   private timeOutPermission(sessionId: string, permissionId: string): void {
     const pending = this.pendingPermissions.get(sessionId);
     if (!pending || pending.public.id !== permissionId) return;
+    this.rememberTimedOutToolCall(sessionId, pending.toolCallId);
     this.timedOutToolCallId = pending.toolCallId;
     this.clearPendingPermission(sessionId, true);
     this.activeTurn?.activity.timeOutTool(pending.toolCallId);
@@ -2403,6 +2421,24 @@ export class AcpSessionClient {
         active: true,
         updatedAt: Date.now(),
       };
+    }
+  }
+
+  private rememberTimedOutToolCall(sessionId: string, toolCallId: string): void {
+    let toolCallIds = this.timedOutToolCalls.get(sessionId);
+    if (!toolCallIds) {
+      if (this.timedOutToolCalls.size >= MAX_TIMED_OUT_SESSIONS) {
+        const oldestSessionId = this.timedOutToolCalls.keys().next().value;
+        if (oldestSessionId !== undefined) this.timedOutToolCalls.delete(oldestSessionId);
+      }
+      toolCallIds = new Set();
+      this.timedOutToolCalls.set(sessionId, toolCallIds);
+    }
+
+    toolCallIds.add(toolCallId);
+    if (toolCallIds.size > MAX_TIMED_OUT_TOOL_CALLS_PER_SESSION) {
+      const oldestToolCallId = toolCallIds.values().next().value;
+      if (oldestToolCallId !== undefined) toolCallIds.delete(oldestToolCallId);
     }
   }
 
@@ -2423,6 +2459,7 @@ export class AcpSessionClient {
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
+    this.timedOutToolCalls.clear();
     this.clearPendingPermissions(false);
     this.creatingContinuation = false;
     this.buffer = '';
@@ -2455,6 +2492,7 @@ export class AcpSessionClient {
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
+    this.timedOutToolCalls.clear();
     this.clearPendingPermissions(false);
     this.creatingContinuation = false;
     this.buffer = '';

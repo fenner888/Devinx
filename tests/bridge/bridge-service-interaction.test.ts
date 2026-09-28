@@ -410,4 +410,42 @@ describe('Bridge service interaction compatibility', () => {
       body: { activity: [{ status: 'awaiting_input' }] },
     });
   });
+
+  it('projects Connector-memory timeouts as failed for legacy session loads', async () => {
+    adapter.loadSession = async (sessionId) => ({
+      sessionId,
+      cwd: '/Users/frank/DevinX',
+      messages: [{ source: 'devin', text: 'The command was rejected.' }],
+      activity: [
+        {
+          id: 'tool_timed_out',
+          afterSequence: 1,
+          kind: 'tool',
+          toolKind: 'execute',
+          status: 'timed_out',
+          title: 'Run the release command',
+          truncated: false,
+        },
+      ],
+      truncated: false,
+    });
+    const bridge = service();
+    const listed = await bridge.handle(
+      envelope('session.list', {}, ['session:metadata:read']),
+      context,
+    );
+    const sessionId = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+
+    const legacy = await bridge.handle(
+      envelope('session.load', { sessionId }, ['session:content:read']),
+      context,
+    );
+    expect((legacy.body as { activity: ActivityEntry[] }).activity[0]?.status).toBe('failed');
+
+    const optedIn = await bridge.handle(
+      envelope('session.load', { sessionId, interaction: true }, ['session:content:read']),
+      context,
+    );
+    expect((optedIn.body as { activity: ActivityEntry[] }).activity[0]?.status).toBe('timed_out');
+  });
 });

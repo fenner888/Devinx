@@ -325,6 +325,23 @@ function toolEntryId(toolCallId: string): string {
   return `tool_${createHash('sha256').update(toolCallId, 'utf8').digest('hex').slice(0, 32)}`;
 }
 
+export function markTimedOutEntries(
+  entries: ActivityEntry[],
+  toolCallIds: ReadonlySet<string>,
+): ActivityEntry[] {
+  if (entries.length === 0 || toolCallIds.size === 0) return entries;
+  const timedOutEntryIds = new Set([...toolCallIds].map(toolEntryId));
+  return entries.map((entry) => {
+    if (
+      timedOutEntryIds.has(entry.id) &&
+      (entry.status === 'failed' || entry.status === 'interrupted' || entry.status === 'running')
+    ) {
+      return { ...entry, status: 'timed_out' };
+    }
+    return entry;
+  });
+}
+
 function inferenceToolName(meta: Record<string, unknown> | undefined): string | undefined {
   const value = meta?.['cognition.ai/inferenceToolName'];
   return typeof value === 'string' && value.length <= 80 ? value : undefined;

@@ -7,6 +7,7 @@ import {
   AcpSessionClient,
   defaultActivityLabel,
   isAcpSessionInUseError,
+  type AcpLoadedSession,
   type AcpElicitationResponse,
   type AcpHistoryMessage,
   type AcpModelCatalog,
@@ -16,6 +17,7 @@ import {
   type AcpSessionTurn,
   type AcpTerminalQuestion,
 } from './acp';
+import { markTimedOutEntries } from './activity';
 import {
   DevinSessionStore,
   type DevinCreateOptions,
@@ -209,6 +211,21 @@ function continuationContext(messages: AcpHistoryMessage[], truncated: boolean):
   return `${base}${omission}\n\n${blocks.join('\n\n')}`;
 }
 
+function markLoadedSessionTimeouts(
+  loaded: AcpLoadedSession,
+  toolCallIds: ReadonlySet<string>,
+): AcpLoadedSession {
+  if (!loaded.activity || toolCallIds.size === 0) return loaded;
+  const marked = { ...loaded };
+  Object.defineProperty(marked, 'activity', {
+    value: markTimedOutEntries(loaded.activity, toolCallIds),
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+  return marked;
+}
+
 export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapter {
   private current: SessionDiscoveryAdapter = unavailableSessions;
   private history: SessionHistoryLifecycle | null = null;
@@ -310,7 +327,11 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   }
 
   async getSessionTurn(input: string): Promise<AcpSessionTurn | null> {
-    return this.current.getSessionTurn?.(input) ?? null;
+    const turn = (await this.current.getSessionTurn?.(input)) ?? null;
+    if (!turn) return null;
+    const toolCallIds = this.current.getTimedOutToolCallIds?.(input);
+    if (!toolCallIds?.size) return turn;
+    return { ...turn, activity: markTimedOutEntries(turn.activity, toolCallIds) };
   }
 
   isSessionElicitationSupported(): boolean {
@@ -365,7 +386,9 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     await this.ensureSessionListed(input);
     if (this.history?.isSessionLoadSupported()) {
       try {
-        return await this.history.loadSession(input);
+        const loaded = await this.history.loadSession(input);
+        const toolCallIds = this.current.getTimedOutToolCallIds?.(input);
+        return toolCallIds?.size ? markLoadedSessionTimeouts(loaded, toolCallIds) : loaded;
       } catch {
         // Fall back to negotiated ACP loading when the reviewed store cannot
         // provide this specific session without exposing its private error.
@@ -375,7 +398,8 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     this.acpLoadedSessionIds.add(input);
     await this.current.releaseSessionOwnership?.(input);
     this.acpLoadedSessionIds.delete(input);
-    return loaded;
+    const toolCallIds = this.current.getTimedOutToolCallIds?.(input);
+    return toolCallIds?.size ? markLoadedSessionTimeouts(loaded, toolCallIds) : loaded;
   }
 
   isSessionPromptSupported(): boolean {

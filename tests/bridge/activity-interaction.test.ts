@@ -2,6 +2,8 @@ import {
   ActivityLog,
   activityEntrySchema,
   legacyActivityStatus,
+  markTimedOutEntries,
+  type ActivityEntry,
 } from '../../bridge/src/activity';
 
 describe('local interaction activity states', () => {
@@ -41,6 +43,35 @@ describe('local interaction activity states', () => {
       status: 'timed_out',
       endedAt: 300,
     });
+  });
+
+  it('marks matching failed, interrupted, and running entries without mutating input', () => {
+    const source = activityFor('call-recovered').entryForToolCall('call-recovered');
+    if (!source) throw new Error('Expected a tool activity entry');
+    const entries: ActivityEntry[] = [
+      { ...source, status: 'failed' },
+      { ...source, status: 'interrupted' },
+      { ...source, status: 'running' },
+      { ...source, status: 'completed' },
+      { ...source, status: 'awaiting_input' },
+      { ...source, id: 'unrelated-entry', status: 'failed' },
+    ];
+    const originalEntries = entries.map((entry) => ({ ...entry }));
+
+    const marked = markTimedOutEntries(entries, new Set(['call-recovered']));
+
+    expect(marked.map((entry) => entry.status)).toEqual([
+      'timed_out',
+      'timed_out',
+      'timed_out',
+      'completed',
+      'awaiting_input',
+      'failed',
+    ]);
+    expect(marked[0]).not.toBe(entries[0]);
+    expect(marked[3]).toBe(entries[3]);
+    expect(marked[5]).toBe(entries[5]);
+    expect(entries).toEqual(originalEntries);
   });
 
   it('returns copies of tool entries and maps only new statuses for legacy clients', () => {

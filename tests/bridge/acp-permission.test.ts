@@ -322,7 +322,10 @@ if (request.method === 'initialize') {
     const client = await startPermissionClient(
       permissionOptions,
       { outcome: 'cancelled' },
-      { permissionTimeoutMs: 1_000 },
+      {
+        permissionTimeoutMs: 1_000,
+        extraRequests: 'setInterval(() => {}, 60_000);',
+      },
     );
     try {
       expect(await waitForPermission(client)).not.toBeNull();
@@ -342,8 +345,72 @@ if (request.method === 'initialize') {
       expect(client.getSessionTurn(SESSION_ID)?.activity[0]).toMatchObject({
         status: 'timed_out',
       });
+      for (let attempt = 0; attempt < 150; attempt += 1) {
+        if ((await client.getSessionActivity(SESSION_ID))?.active === false) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect((await client.getSessionActivity(SESSION_ID))?.active).toBe(false);
+      expect([...client.getTimedOutToolCallIds(SESSION_ID)]).toEqual(['tool-call-1']);
+      expect(client.getTimedOutToolCallIds('other-session').size).toBe(0);
     } finally {
       await client.stop();
+    }
+  });
+
+  it('bounds timed-out call memory by session and per-session insertion order', async () => {
+    type PendingPermissionState = {
+      public: { id: string };
+      toolCallId: string;
+      timer: ReturnType<typeof setTimeout>;
+    };
+    type ClientState = {
+      pendingPermissions: Map<string, PendingPermissionState>;
+      timeOutPermission(sessionId: string, permissionId: string): void;
+    };
+    const createClient = () =>
+      new AcpSessionClient({
+        executablePath: process.execPath,
+        requestTimeoutMs: 1_000,
+        promptTimeoutMs: 5_000,
+      });
+    const timeOut = (
+      state: ClientState,
+      sessionId: string,
+      toolCallId: string,
+    ) => {
+      const permissionId = `permission-${toolCallId}`;
+      state.pendingPermissions.set(sessionId, {
+        public: { id: permissionId },
+        toolCallId,
+        timer: setTimeout(() => {}, 60_000),
+      });
+      state.timeOutPermission(sessionId, permissionId);
+    };
+    const sessionClient = createClient();
+    const sessionState = sessionClient as unknown as ClientState;
+    try {
+      for (let index = 0; index <= 100; index += 1) {
+        timeOut(sessionState, `session-cap-${index}`, `call-${index}`);
+      }
+      expect(sessionClient.getTimedOutToolCallIds('session-cap-0').size).toBe(0);
+      expect([...sessionClient.getTimedOutToolCallIds('session-cap-100')]).toEqual([
+        'call-100',
+      ]);
+    } finally {
+      await sessionClient.stop();
+    }
+
+    const callClient = createClient();
+    const callState = callClient as unknown as ClientState;
+    try {
+      for (let index = 0; index <= 50; index += 1) {
+        timeOut(callState, 'session-call-cap', `call-${index}`);
+      }
+      expect(callClient.getTimedOutToolCallIds('session-call-cap').size).toBe(50);
+      expect(callClient.getTimedOutToolCallIds('session-call-cap').has('call-0')).toBe(false);
+      expect(callClient.getTimedOutToolCallIds('session-call-cap').has('call-50')).toBe(true);
+    } finally {
+      await callClient.stop();
     }
   });
 
