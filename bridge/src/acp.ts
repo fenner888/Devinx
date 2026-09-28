@@ -5,14 +5,21 @@ import { StringDecoder } from 'node:string_decoder';
 
 import { z, type ZodType } from 'zod';
 
-import { ActivityLog, type ActivityEntry } from './activity';
-import { sessionIdSchema, sessionListBodySchema } from './schemas';
+import { ActivityLog, type ActivityEntry, type ActivityToolKind } from './activity';
+import {
+  permissionIdSchema,
+  sessionIdSchema,
+  sessionListBodySchema,
+  sessionPermissionDecisionSchema,
+  type SessionPermissionDecision,
+} from './schemas';
 import { utf8Tail } from './text';
 
 const ACP_PROTOCOL_VERSION = 1 as const;
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 5_000;
 const DEFAULT_PROMPT_TIMEOUT_MS = 30 * 60_000;
+const DEFAULT_PERMISSION_TIMEOUT_MS = 10 * 60_000;
 const MAX_JSON_RPC_BYTES = 1024 * 1024;
 const MAX_UNMATCHED_MESSAGES = 100;
 const MAX_CACHED_SESSIONS = 10_000;
@@ -59,6 +66,12 @@ const acpClientOptionsSchema = z
       .min(1_000)
       .max(60 * 60_000)
       .default(DEFAULT_PROMPT_TIMEOUT_MS),
+    permissionTimeoutMs: z
+      .number()
+      .int()
+      .min(1_000)
+      .max(60 * 60_000)
+      .default(DEFAULT_PERMISSION_TIMEOUT_MS),
   })
   .strict();
 
@@ -369,6 +382,7 @@ const formElicitationRequestSchema = z
     message: z.string().min(1).max(4_000),
     sessionId: sessionIdSchema,
     toolCallId: z.string().min(1).max(512).nullable().optional(),
+    _meta: z.record(z.unknown()).optional(),
     requestedSchema: z
       .object({
         type: z.literal('object').optional(),
@@ -404,22 +418,114 @@ const formElicitationRequestSchema = z
     }
   });
 
-const permissionRequestSchema = z
+export const permissionOptionSchema = z
   .object({
-    sessionId: sessionIdSchema,
-    toolCall: z.object({ toolCallId: z.string().min(1).max(512) }).passthrough(),
-    options: z.array(z.object({ optionId: z.string().min(1).max(512) }).passthrough()).max(100),
+    optionId: z.string().min(1).max(512),
+    kind: z.string().max(500).optional(),
+    name: z.string().max(500).optional(),
   })
   .passthrough();
 
+const permissionRequestSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    toolCall: z
+      .object({
+        toolCallId: z.string().min(1).max(512),
+        title: z.string().max(500).optional(),
+        kind: z.string().max(500).optional(),
+        rawInput: z.unknown().optional(),
+        _meta: z.record(z.unknown()).optional(),
+      })
+      .passthrough(),
+    options: z.array(permissionOptionSchema).max(100),
+  })
+  .passthrough();
+
+export type AcpPermissionOption = z.infer<typeof permissionOptionSchema>;
+
+export function mapPermissionOptions(
+  options: readonly AcpPermissionOption[],
+): Partial<Record<SessionPermissionDecision, string>> {
+  const mapped: Partial<Record<SessionPermissionDecision, string>> = {};
+  const allowOnce = options.filter((option) => option.kind === 'allow_once');
+  if (allowOnce.length === 1 && allowOnce[0]) {
+    mapped.allow_once = allowOnce[0].optionId;
+  }
+
+  const sessionAllows = options.filter(
+    (option) =>
+      option.kind === 'allow_always' &&
+      (option.optionId === 'allow_session' ||
+        (option.name !== undefined && /\bthis session\b/i.test(option.name))),
+  );
+  const sessionAllow = sessionAllows[0];
+  if (sessionAllows.length === 1 && sessionAllow !== undefined) {
+    mapped.allow_session = sessionAllow.optionId;
+  }
+
+  const rejectOnce = options.filter((option) => option.kind === 'reject_once');
+  if (rejectOnce.length === 1 && rejectOnce[0]) {
+    mapped.reject_once = rejectOnce[0].optionId;
+  }
+  return mapped;
+}
+
+function stripControlCharacters(value: string, replacement = ''): string {
+  return [...value]
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint < 32 || (codePoint >= 127 && codePoint <= 159)
+        ? replacement
+        : character;
+    })
+    .join('');
+}
+
+function cleanPermissionTitle(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const cleaned = [...stripControlCharacters(value, ' ').replace(/\s+/g, ' ').trim()]
+    .slice(0, 200)
+    .join('');
+  return cleaned || undefined;
+}
+
+function cleanPermissionCommand(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const cleaned = [...stripControlCharacters(value).trim()]
+    .slice(0, 2_000)
+    .join('');
+  return cleaned || undefined;
+}
+
 export type AcpActivityKind =
   'thinking' | 'reading' | 'editing' | 'executing' | 'searching' | 'fetching' | 'responding';
+
+const PERMISSION_TOOL_KINDS: readonly ActivityToolKind[] = [
+  'read',
+  'edit',
+  'delete',
+  'move',
+  'search',
+  'execute',
+  'think',
+  'fetch',
+  'other',
+];
+
+function permissionToolKind(value: string | undefined): ActivityToolKind | undefined {
+  return value && PERMISSION_TOOL_KINDS.includes(value as ActivityToolKind)
+    ? (value as ActivityToolKind)
+    : undefined;
+}
 
 export interface AcpSessionActivity {
   kind: AcpActivityKind;
   label: string;
   active: boolean;
   updatedAt: number;
+  awaiting?: 'answer' | 'approval';
+  terminalQuestion?: AcpTerminalQuestion;
 }
 
 interface ActiveAcpSessionActivity extends AcpSessionActivity {
@@ -452,6 +558,7 @@ export interface AcpClientOptions {
   executablePath: string;
   requestTimeoutMs?: number;
   promptTimeoutMs?: number;
+  permissionTimeoutMs?: number;
 }
 
 export interface AcpSessionMetadata {
@@ -461,7 +568,21 @@ export interface AcpSessionMetadata {
   title?: string;
   updatedAt?: string;
   modelId?: string;
-  activity?: { active: boolean; kind?: AcpActivityKind; updatedAt: number };
+  activity?: {
+    active: boolean;
+    kind?: AcpActivityKind;
+    updatedAt: number;
+    awaiting?: 'answer' | 'approval';
+  };
+}
+
+export interface AcpTerminalQuestion {
+  questions: Array<{
+    question: string;
+    header?: string;
+    options: string[];
+    multiSelect: boolean;
+  }>;
 }
 
 export interface AcpSessionPage {
@@ -493,6 +614,7 @@ export interface AcpElicitationField {
   maximum?: number;
   minLength?: number;
   maxLength?: number;
+  allowOther?: true;
   minItems?: number;
   maxItems?: number;
   defaultValue?: string | number | boolean | string[];
@@ -506,6 +628,17 @@ export interface AcpPendingElicitation {
   description?: string;
   fields: AcpElicitationField[];
   createdAt: number;
+}
+
+export interface AcpPendingPermission {
+  id: string;
+  title: string;
+  toolKind?: ActivityToolKind;
+  command?: string;
+  paths?: string[];
+  decisions: SessionPermissionDecision[];
+  createdAt: number;
+  expiresAt: number;
 }
 
 export type AcpElicitationContentValue = string | number | boolean | string[];
@@ -645,7 +778,19 @@ interface PendingRequest {
 interface PendingElicitationRecord {
   rpcId: string | number;
   public: AcpPendingElicitation;
+  toolCallId?: string;
 }
+
+interface PendingPermissionRecord {
+  rpcId: string | number;
+  toolCallId: string;
+  optionIds: Partial<Record<SessionPermissionDecision, string>>;
+  timer: ReturnType<typeof setTimeout>;
+  public: AcpPendingPermission;
+}
+
+const MAX_TIMED_OUT_SESSIONS = 100;
+const MAX_TIMED_OUT_TOOL_CALLS_PER_SESSION = 50;
 
 function enumOptions(
   property: z.infer<typeof elicitationPropertySchema>,
@@ -669,6 +814,7 @@ function publicField(
   key: string,
   property: z.infer<typeof elicitationPropertySchema>,
   required: boolean,
+  allowOther: boolean,
 ): AcpElicitationField {
   const base = {
     key,
@@ -682,6 +828,7 @@ function publicField(
       ...base,
       type: options ? 'single_select' : 'text',
       ...(options ? { options } : {}),
+      ...(options && allowOther ? { allowOther: true as const } : {}),
       ...(property.minLength !== null && property.minLength !== undefined
         ? { minLength: property.minLength }
         : {}),
@@ -749,16 +896,26 @@ function validateElicitationContent(
     }
     if (field.type === 'text' || field.type === 'single_select') {
       const parsed = z.string().max(MAX_ELICITATION_TEXT_LENGTH).parse(value);
-      if (field.minLength !== undefined && [...parsed].length < field.minLength) {
-        throw new Error('Elicitation response is shorter than allowed');
+      const isOption = field.options?.some((option) => option.value === parsed) ?? false;
+      let accepted = parsed;
+      if (field.type === 'single_select' && field.allowOther && field.options && !isOption) {
+        accepted = parsed.trim();
+        if (!accepted) throw new Error('Elicitation response must not be empty');
+        if ([...accepted].length > (field.maxLength ?? 2_000)) {
+          throw new Error('Elicitation response is longer than allowed');
+        }
+      } else {
+        if (field.minLength !== undefined && [...parsed].length < field.minLength) {
+          throw new Error('Elicitation response is shorter than allowed');
+        }
+        if (field.maxLength !== undefined && [...parsed].length > field.maxLength) {
+          throw new Error('Elicitation response is longer than allowed');
+        }
+        if (field.options && !isOption) {
+          throw new Error('Elicitation response selected an unavailable option');
+        }
       }
-      if (field.maxLength !== undefined && [...parsed].length > field.maxLength) {
-        throw new Error('Elicitation response is longer than allowed');
-      }
-      if (field.options && !field.options.some((option) => option.value === parsed)) {
-        throw new Error('Elicitation response selected an unavailable option');
-      }
-      validated[field.key] = parsed;
+      validated[field.key] = accepted;
       continue;
     }
     if (field.type === 'multi_select') {
@@ -1029,9 +1186,13 @@ export class AcpSessionClient {
   private readonly loadedSessions = new Set<string>();
   private activeLoad: ReplayCollector | null = null;
   private activePromptSessionId: string | null = null;
+  private latestQuestionToolCallId: string | null = null;
+  private timedOutToolCallId: string | null = null;
   private activeTurn: ActiveTurn | null = null;
   private activeActivity: ActiveAcpSessionActivity | null = null;
   private readonly pendingElicitations = new Map<string, PendingElicitationRecord>();
+  private readonly pendingPermissions = new Map<string, PendingPermissionRecord>();
+  private readonly timedOutToolCalls = new Map<string, Set<string>>();
   private creatingContinuation = false;
   private modelCatalog: AcpModelCatalog | null = null;
   private readonly sessionModelSelectors = new Map<string, AcpModelSelector>();
@@ -1051,9 +1212,13 @@ export class AcpSessionClient {
     this.loadedSessions.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
+    this.timedOutToolCalls.clear();
+    this.clearPendingPermissions(false);
     this.creatingContinuation = false;
     this.modelCatalog = null;
     this.sessionModelSelectors.clear();
@@ -1155,6 +1320,10 @@ export class AcpSessionClient {
     return Boolean(this.child);
   }
 
+  isSessionPermissionSupported(): boolean {
+    return Boolean(this.child);
+  }
+
   async getSessionActivity(sessionIdInput: unknown): Promise<AcpSessionActivity | null> {
     const sessionId = sessionIdSchema.parse(sessionIdInput);
     if (this.activeActivity?.sessionId !== sessionId) return null;
@@ -1191,6 +1360,23 @@ export class AcpSessionClient {
       : null;
   }
 
+  getPendingPermission(sessionIdInput: unknown): AcpPendingPermission | null {
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    const pending = this.pendingPermissions.get(sessionId)?.public;
+    return pending
+      ? {
+          ...pending,
+          decisions: [...pending.decisions],
+          ...(pending.paths ? { paths: [...pending.paths] } : {}),
+        }
+      : null;
+  }
+
+  getTimedOutToolCallIds(sessionIdInput: unknown): ReadonlySet<string> {
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    return new Set(this.timedOutToolCalls.get(sessionId) ?? []);
+  }
+
   respondToElicitation(
     sessionIdInput: unknown,
     interactionIdInput: unknown,
@@ -1222,6 +1408,41 @@ export class AcpSessionClient {
         : { action: response.action };
     child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: pending.rpcId, result })}\n`);
     this.pendingElicitations.delete(sessionId);
+    if (pending.toolCallId) this.activeTurn?.activity.resumeTool(pending.toolCallId);
+    if (this.activeActivity?.sessionId === sessionId) {
+      this.activeActivity = {
+        sessionId,
+        kind: 'responding',
+        label: 'Working on your task',
+        active: true,
+        updatedAt: Date.now(),
+      };
+    }
+  }
+
+  respondToPermission(
+    sessionIdInput: unknown,
+    permissionIdInput: unknown,
+    decisionInput: unknown,
+  ): void {
+    const child = this.child;
+    if (!child) throw new Error('ACP client is not started');
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    const permissionId = permissionIdSchema.parse(permissionIdInput);
+    const decision = sessionPermissionDecisionSchema.parse(decisionInput);
+    const pending = this.pendingPermissions.get(sessionId);
+    if (!pending || pending.public.id !== permissionId) {
+      throw new Error('ACP permission is unavailable');
+    }
+    const optionId = pending.optionIds[decision];
+    if (!optionId) throw new Error('ACP permission decision is unavailable');
+
+    clearTimeout(pending.timer);
+    this.pendingPermissions.delete(sessionId);
+    this.sendAgentResult(child, pending.rpcId, {
+      outcome: { outcome: 'selected', optionId },
+    });
+    if (decision !== 'reject_once') this.activeTurn?.activity.resumeTool(pending.toolCallId);
     if (this.activeActivity?.sessionId === sessionId) {
       this.activeActivity = {
         sessionId,
@@ -1492,8 +1713,14 @@ export class AcpSessionClient {
     const listedSessions = [...this.listedSessions.entries()];
     const modelCatalog = this.modelCatalog ? cloneModelCatalog(this.modelCatalog) : null;
     const finishedTurn = this.activeTurn?.sessionId === sessionId ? this.activeTurn : null;
+    const timedOutToolCalls = new Map(
+      [...this.timedOutToolCalls].map(([id, toolCallIds]) => [id, new Set(toolCallIds)]),
+    );
     await this.stop();
     await this.start();
+    for (const [id, toolCallIds] of timedOutToolCalls) {
+      this.timedOutToolCalls.set(id, toolCallIds);
+    }
     for (const [listedSessionId, metadata] of listedSessions) {
       this.listedSessions.set(listedSessionId, { ...metadata });
     }
@@ -1533,6 +1760,8 @@ export class AcpSessionClient {
       throw new AcpBusyError();
     }
     this.activePromptSessionId = sessionId;
+    this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     this.activeTurn = {
       sessionId,
       startedAt: Date.now(),
@@ -1561,8 +1790,11 @@ export class AcpSessionClient {
 
   private async finishPrompt(sessionId: string): Promise<void> {
     if (this.activePromptSessionId !== sessionId) return;
-    this.pendingElicitations.delete(sessionId);
+    this.clearPendingElicitation(sessionId, true);
+    this.clearPendingPermission(sessionId, true);
     this.activePromptSessionId = null;
+    this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     // Keep the turn snapshot readable until the next prompt or a stop() so the
     // phone can still render the completed turn right after end_turn.
     this.activeTurn?.activity.finishTurn();
@@ -1580,6 +1812,7 @@ export class AcpSessionClient {
 
   async stop(): Promise<void> {
     const child = this.child;
+    this.clearPendingPermissions(true);
     this.child = null;
     this.canListSessions = false;
     this.canLoadSessions = false;
@@ -1590,9 +1823,12 @@ export class AcpSessionClient {
     this.sessionModelSelectors.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
+    this.timedOutToolCalls.clear();
     this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
@@ -1702,7 +1938,66 @@ export class AcpSessionClient {
         this.sendAgentError(child, id, -32602, 'Invalid permission request');
         return;
       }
-      this.sendAgentResult(child, id, { outcome: { outcome: 'cancelled' } });
+      const request = parsed.data;
+      const optionIds = mapPermissionOptions(request.options);
+      if (
+        Object.keys(optionIds).length === 0 ||
+        request.sessionId !== this.activePromptSessionId ||
+        this.pendingPermissions.has(request.sessionId)
+      ) {
+        this.sendAgentResult(child, id, { outcome: { outcome: 'cancelled' } });
+        return;
+      }
+      const activity = this.activeTurn?.activity.entryForToolCall(request.toolCall.toolCallId);
+      const title =
+        cleanPermissionTitle(request.toolCall.title) ??
+        cleanPermissionTitle(activity?.title) ??
+        'Run a command';
+      const metadata = request.toolCall._meta;
+      const rawInput =
+        request.toolCall.rawInput &&
+        typeof request.toolCall.rawInput === 'object' &&
+        !Array.isArray(request.toolCall.rawInput)
+          ? (request.toolCall.rawInput as Record<string, unknown>)
+          : undefined;
+      const command =
+        cleanPermissionCommand(metadata?.['cognition.ai/editableCommand']) ??
+        cleanPermissionCommand(rawInput?.command);
+      const toolKind = activity?.toolKind ?? permissionToolKind(request.toolCall.kind);
+      const createdAt = Date.now();
+      const publicPermission: AcpPendingPermission = {
+        id: `permission_${randomBytes(32).toString('base64url')}`,
+        title,
+        ...(toolKind ? { toolKind } : {}),
+        ...(command ? { command } : {}),
+        ...(activity?.paths ? { paths: [...activity.paths] } : {}),
+        decisions: (
+          ['allow_once', 'allow_session', 'reject_once'] as const
+        ).filter((decision) => optionIds[decision] !== undefined),
+        createdAt,
+        expiresAt: createdAt + this.options.permissionTimeoutMs,
+      };
+      const timer = setTimeout(
+        () => this.timeOutPermission(request.sessionId, publicPermission.id),
+        this.options.permissionTimeoutMs,
+      );
+      timer.unref();
+      this.pendingPermissions.set(request.sessionId, {
+        rpcId: id,
+        toolCallId: request.toolCall.toolCallId,
+        optionIds,
+        timer,
+        public: publicPermission,
+      });
+      this.activeTurn?.activity.markAwaitingInput(request.toolCall.toolCallId);
+      this.activeActivity = {
+        sessionId: request.sessionId,
+        toolCallId: request.toolCall.toolCallId,
+        kind: 'thinking',
+        label: 'Waiting for your approval',
+        active: true,
+        updatedAt: createdAt,
+      };
       return;
     }
     if (method !== 'elicitation/create') {
@@ -1740,11 +2035,17 @@ export class AcpSessionClient {
         ? { description: parsed.data.requestedSchema.description }
         : {}),
       fields: Object.entries(parsed.data.requestedSchema.properties).map(([key, property]) =>
-        publicField(key, property, required.has(key)),
+        publicField(key, property, required.has(key), parsed.data._meta?.['cognition.ai/allowOther'] === true),
       ),
       createdAt: Date.now(),
     };
-    this.pendingElicitations.set(parsed.data.sessionId, { rpcId: id, public: pending });
+    const toolCallId = this.latestQuestionToolCallId ?? undefined;
+    this.pendingElicitations.set(parsed.data.sessionId, {
+      rpcId: id,
+      public: pending,
+      ...(toolCallId ? { toolCallId } : {}),
+    });
+    if (toolCallId) this.activeTurn?.activity.markAwaitingInput(toolCallId);
     this.activeActivity = {
       sessionId: parsed.data.sessionId,
       kind: 'thinking',
@@ -1926,6 +2227,16 @@ export class AcpSessionClient {
       return;
     }
     if (updateType === 'tool_call') {
+      if (
+        update._meta &&
+        typeof update._meta === 'object' &&
+        !Array.isArray(update._meta) &&
+        (update._meta as Record<string, unknown>)['cognition.ai/inferenceToolName'] ===
+          'ask_user_question' &&
+        typeof update.toolCallId === 'string'
+      ) {
+        this.latestQuestionToolCallId = update.toolCallId;
+      }
       turn.activity.beginTool(0, update, cwd);
       return;
     }
@@ -1938,6 +2249,29 @@ export class AcpSessionClient {
   private updatePromptActivity(sessionId: string, update: Record<string, unknown>): void {
     const updateType = update.sessionUpdate;
     this.collectPromptTurn(sessionId, update);
+    const pendingPermission = this.pendingPermissions.get(sessionId);
+    const pendingElicitation = this.pendingElicitations.get(sessionId);
+    const waitingToolCallId = pendingPermission?.toolCallId ?? pendingElicitation?.toolCallId;
+    if (waitingToolCallId && update.toolCallId === waitingToolCallId) {
+      this.activeTurn?.activity.markAwaitingInput(waitingToolCallId);
+      this.activeActivity = {
+        sessionId,
+        toolCallId: waitingToolCallId,
+        kind: 'thinking',
+        label: pendingPermission ? 'Waiting for your approval' : 'Waiting for your answer',
+        active: true,
+        updatedAt: Date.now(),
+      };
+      return;
+    }
+    if (pendingPermission || pendingElicitation) return;
+    if (
+      updateType === 'tool_call_update' &&
+      this.timedOutToolCallId !== null &&
+      update.toolCallId === this.timedOutToolCallId
+    ) {
+      return;
+    }
     if (updateType === 'tool_call' || updateType === 'tool_call_update') {
       const parsed = toolActivityUpdateSchema.safeParse(update);
       if (!parsed.success) return;
@@ -2046,6 +2380,68 @@ export class AcpSessionClient {
     this.pending.clear();
   }
 
+  private clearPendingElicitation(sessionId: string, cancel: boolean): void {
+    const pending = this.pendingElicitations.get(sessionId);
+    if (!pending) return;
+    if (cancel && this.child) {
+      this.sendAgentResult(this.child, pending.rpcId, { action: 'decline' });
+    }
+    this.pendingElicitations.delete(sessionId);
+  }
+
+  private clearPendingPermission(sessionId: string, cancel: boolean): void {
+    const pending = this.pendingPermissions.get(sessionId);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    if (cancel && this.child) {
+      this.sendAgentResult(this.child, pending.rpcId, { outcome: { outcome: 'cancelled' } });
+    }
+    this.pendingPermissions.delete(sessionId);
+  }
+
+  private clearPendingPermissions(cancel: boolean): void {
+    for (const sessionId of this.pendingPermissions.keys()) {
+      this.clearPendingPermission(sessionId, cancel);
+    }
+  }
+
+  private timeOutPermission(sessionId: string, permissionId: string): void {
+    const pending = this.pendingPermissions.get(sessionId);
+    if (!pending || pending.public.id !== permissionId) return;
+    this.rememberTimedOutToolCall(sessionId, pending.toolCallId);
+    this.timedOutToolCallId = pending.toolCallId;
+    this.clearPendingPermission(sessionId, true);
+    this.activeTurn?.activity.timeOutTool(pending.toolCallId);
+    if (this.activePromptSessionId === sessionId) {
+      this.activeActivity = {
+        sessionId,
+        toolCallId: pending.toolCallId,
+        kind: 'thinking',
+        label: 'Checking the next step',
+        active: true,
+        updatedAt: Date.now(),
+      };
+    }
+  }
+
+  private rememberTimedOutToolCall(sessionId: string, toolCallId: string): void {
+    let toolCallIds = this.timedOutToolCalls.get(sessionId);
+    if (!toolCallIds) {
+      if (this.timedOutToolCalls.size >= MAX_TIMED_OUT_SESSIONS) {
+        const oldestSessionId = this.timedOutToolCalls.keys().next().value;
+        if (oldestSessionId !== undefined) this.timedOutToolCalls.delete(oldestSessionId);
+      }
+      toolCallIds = new Set();
+      this.timedOutToolCalls.set(sessionId, toolCallIds);
+    }
+
+    toolCallIds.add(toolCallId);
+    if (toolCallIds.size > MAX_TIMED_OUT_TOOL_CALLS_PER_SESSION) {
+      const oldestToolCallId = toolCallIds.values().next().value;
+      if (oldestToolCallId !== undefined) toolCallIds.delete(oldestToolCallId);
+    }
+  }
+
   private abort(child: ChildProcessWithoutNullStreams, error: Error): void {
     if (child !== this.child) return;
     this.child = null;
@@ -2058,9 +2454,13 @@ export class AcpSessionClient {
     if (this.activeLoad) this.activeLoad.failed = true;
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
+    this.timedOutToolCalls.clear();
+    this.clearPendingPermissions(false);
     this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');
@@ -2087,9 +2487,13 @@ export class AcpSessionClient {
     if (this.activeLoad) this.activeLoad.failed = true;
     this.activeLoad = null;
     this.activePromptSessionId = null;
+    this.latestQuestionToolCallId = null;
+    this.timedOutToolCallId = null;
     this.activeTurn = null;
     this.activeActivity = null;
     this.pendingElicitations.clear();
+    this.timedOutToolCalls.clear();
+    this.clearPendingPermissions(false);
     this.creatingContinuation = false;
     this.buffer = '';
     this.decoder = new StringDecoder('utf8');

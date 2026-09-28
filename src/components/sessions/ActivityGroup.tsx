@@ -69,8 +69,10 @@ export function summarizeActivity(entries: ComputerActivityEntry[]): string {
 }
 
 function groupStatus(entries: ComputerActivityEntry[]): ComputerActivityStatus | null {
+  if (entries.some((entry) => entry.status === 'awaiting_input')) return 'awaiting_input';
   if (entries.some((entry) => entry.status === 'running')) return 'running';
   if (entries.some((entry) => entry.status === 'failed')) return 'failed';
+  if (entries.some((entry) => entry.status === 'timed_out')) return 'timed_out';
   if (entries.some((entry) => entry.status === 'interrupted')) return 'interrupted';
   if (entries.some((entry) => entry.status === 'unknown')) return 'unknown';
   return null;
@@ -257,6 +259,8 @@ function ActivityStep({
                   className={`ml-1 text-text11 ${
                     entry.status === 'failed'
                       ? 'text-failed'
+                      : entry.status === 'awaiting_input'
+                        ? 'text-brand-text'
                       : entry.status === 'running'
                         ? 'text-running'
                         : 'text-blocked'
@@ -338,9 +342,11 @@ export function ActivityGroup({
   const status = groupStatus(entries);
   const statusLabel = status ? activityStatusLabel(status) : null;
   const dotColor =
-    status === 'failed'
+    status === 'awaiting_input'
+      ? tokens.brand.hex
+      : status === 'failed'
       ? tokens.failed.hex
-      : status === 'interrupted' || status === 'unknown'
+      : status === 'timed_out' || status === 'interrupted' || status === 'unknown'
         ? tokens.blocked.hex
         : status === 'running'
           ? tokens.running.hex
@@ -367,6 +373,7 @@ export function ActivityGroup({
           <View
             className="mr-1.5 h-1.5 w-1.5 rounded-dot"
             style={{ backgroundColor: dotColor }}
+            testID="activity-group-status-dot"
           />
         ) : (
           <View className="w-3" />
@@ -379,6 +386,8 @@ export function ActivityGroup({
             className={`ml-2 text-text11 ${
               status === 'failed'
                 ? 'text-failed'
+                : status === 'awaiting_input'
+                  ? 'text-brand-text'
                 : status === 'running'
                   ? 'text-running'
                   : 'text-blocked'

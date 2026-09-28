@@ -1,0 +1,24 @@
+[
+  { "optionId": "allow_once", "kind": "allow_once", "name": "Allow" },
+  {
+    "optionId": "allow_session",
+    "kind": "allow_always",
+    "name": "Yes, allow `git push` commands (this session)"
+  },
+  {
+    "optionId": "allow_always",
+    "kind": "allow_always",
+    "name": "Yes, always allow `git push` commands in `<PROJECT>`"
+  },
+  {
+    "optionId": "allow_always_global",
+    "kind": "allow_always",
+    "name": "Yes, always allow `git push` commands in all projects"
+  },
+  {
+    "optionId": "switch_bypass",
+    "kind": "allow_always",
+    "name": "Yes, switch to bypass mode"
+  },
+  { "optionId": "reject_once", "kind": "reject_once", "name": "Reject" }
+]

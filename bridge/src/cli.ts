@@ -4,6 +4,7 @@ import { createInterface } from 'node:readline/promises';
 
 import { z } from 'zod';
 
+import { discoverMacOSDevinSessionDb } from './connector-platform';
 import {
   discoverPrivateLanAddresses,
   privateTransportLabel,
@@ -95,6 +96,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
   const host = validateAdvertisedLanHost(argumentsResult.options.host, interfaces);
   if (process.platform !== 'darwin') throw new Error('Desktop Bridge requires macOS');
+  const devinSessionDbPath = await discoverMacOSDevinSessionDb(process.env);
 
   const qrRenderer = new TerminalQrRenderer();
   const runner = new DesktopBridgeRunner(
@@ -102,6 +104,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       advertisedHost: host,
       port: argumentsResult.options.port,
       devinCliPath: argumentsResult.options.devinCliPath,
+      ...(devinSessionDbPath ? { devinSessionDbPath } : {}),
     },
     createProductionRunnerDependencies(qrRenderer),
   );

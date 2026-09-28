@@ -15,7 +15,14 @@ export type ActivityToolKind =
   | 'think'
   | 'fetch'
   | 'other';
-export type ActivityStatus = 'running' | 'completed' | 'failed' | 'interrupted' | 'unknown';
+export type ActivityStatus =
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'interrupted'
+  | 'unknown'
+  | 'awaiting_input'
+  | 'timed_out';
 export type ActivityDetail =
   | { type: 'text'; text: string }
   | { type: 'diff'; path: string; oldText?: string; newText?: string };
@@ -91,7 +98,15 @@ export const activityEntrySchema = z
     toolKind: z
       .enum(['read', 'edit', 'delete', 'move', 'search', 'execute', 'think', 'fetch', 'other'])
       .optional(),
-    status: z.enum(['running', 'completed', 'failed', 'interrupted', 'unknown']),
+    status: z.enum([
+      'running',
+      'completed',
+      'failed',
+      'interrupted',
+      'unknown',
+      'awaiting_input',
+      'timed_out',
+    ]),
     title: z.string().min(1).max(ACTIVITY_LIMITS.title),
     paths: z.array(activityPathSchema).max(ACTIVITY_LIMITS.paths).optional(),
     detail: activityDetailSchema.optional(),
@@ -107,6 +122,12 @@ export function activityStatusFromAcp(status: string | undefined): ActivityStatu
   if (normalized === 'completed') return 'completed';
   if (normalized === 'failed') return 'failed';
   return 'unknown';
+}
+
+export function legacyActivityStatus(status: ActivityStatus): ActivityStatus {
+  if (status === 'awaiting_input') return 'running';
+  if (status === 'timed_out') return 'failed';
+  return status;
 }
 
 export function activityKindFromToolName(name: string): ActivityToolKind {
@@ -304,6 +325,23 @@ function toolEntryId(toolCallId: string): string {
   return `tool_${createHash('sha256').update(toolCallId, 'utf8').digest('hex').slice(0, 32)}`;
 }
 
+export function markTimedOutEntries(
+  entries: ActivityEntry[],
+  toolCallIds: ReadonlySet<string>,
+): ActivityEntry[] {
+  if (entries.length === 0 || toolCallIds.size === 0) return entries;
+  const timedOutEntryIds = new Set([...toolCallIds].map(toolEntryId));
+  return entries.map((entry) => {
+    if (
+      timedOutEntryIds.has(entry.id) &&
+      (entry.status === 'failed' || entry.status === 'interrupted' || entry.status === 'running')
+    ) {
+      return { ...entry, status: 'timed_out' };
+    }
+    return entry;
+  });
+}
+
 function inferenceToolName(meta: Record<string, unknown> | undefined): string | undefined {
   const value = meta?.['cognition.ai/inferenceToolName'];
   return typeof value === 'string' && value.length <= 80 ? value : undefined;
@@ -365,11 +403,61 @@ export class ActivityLog {
     }
   }
 
+  markAwaitingInput(toolCallId: string): void {
+    try {
+      const callId = z.string().min(1).max(512).parse(toolCallId);
+      const entry = this.toolsByCallId.get(callId);
+      if (entry?.status === 'running') {
+        entry.status = 'awaiting_input';
+      }
+    } catch {
+      this.overflowed = true;
+    }
+  }
+
+  resumeTool(toolCallId: string): void {
+    try {
+      const callId = z.string().min(1).max(512).parse(toolCallId);
+      const entry = this.toolsByCallId.get(callId);
+      if (entry?.status === 'awaiting_input') {
+        entry.status = 'running';
+        entry.endedAt = undefined;
+      }
+    } catch {
+      this.overflowed = true;
+    }
+  }
+
+  timeOutTool(toolCallId: string, at?: number): void {
+    try {
+      const callId = z.string().min(1).max(512).parse(toolCallId);
+      const entry = this.toolsByCallId.get(callId);
+      if (entry && (entry.status === 'running' || entry.status === 'awaiting_input')) {
+        entry.status = 'timed_out';
+        const ended = this.effectiveAt(at);
+        if (ended !== undefined) entry.endedAt = ended;
+      }
+    } catch {
+      this.overflowed = true;
+    }
+  }
+
+  entryForToolCall(toolCallId: string): ActivityEntry | undefined {
+    const entry = this.toolsByCallId.get(toolCallId);
+    return entry
+      ? {
+          ...entry,
+          ...(entry.paths ? { paths: [...entry.paths] } : {}),
+          ...(entry.detail ? { detail: { ...entry.detail } } : {}),
+        }
+      : undefined;
+  }
+
   interruptTool(toolCallId: string, at?: number): void {
     try {
       const callId = z.string().min(1).max(512).parse(toolCallId);
       const entry = this.toolsByCallId.get(callId);
-      if (entry && entry.status === 'running') {
+      if (entry && (entry.status === 'running' || entry.status === 'awaiting_input')) {
         entry.status = 'interrupted';
         const ended = this.effectiveAt(at);
         if (ended !== undefined) entry.endedAt = ended;
@@ -395,7 +483,10 @@ export class ActivityLog {
       this.openThought = null;
     }
     for (const entry of this.entries) {
-      if (entry.kind === 'tool' && entry.status === 'running') {
+      if (
+        entry.kind === 'tool' &&
+        (entry.status === 'running' || entry.status === 'awaiting_input')
+      ) {
         entry.status = 'interrupted';
         if (now !== undefined) entry.endedAt = now;
       }
@@ -578,6 +669,7 @@ export class ActivityLog {
     const callId = z.string().min(1).max(512).parse(toolCallId);
     const entry = this.toolsByCallId.get(callId);
     if (!entry) return;
+    if (entry.status === 'timed_out') return;
     const parsed = toolUpdateInputSchema.parse(input);
     const status = activityStatusFromAcp(parsed.status);
     if (status !== 'unknown') entry.status = status;

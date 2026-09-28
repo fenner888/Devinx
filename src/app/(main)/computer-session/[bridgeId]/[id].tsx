@@ -10,6 +10,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
@@ -30,7 +31,12 @@ import {
   useRespondComputerSessionElicitation,
 } from '@api/bridge/queries';
 import type { ComputerSessionBoard } from '@api/bridge/queries';
-import { ComputerBridgeError, type ComputerLoadedSession } from '@auth/computerBridge';
+import {
+  ComputerBridgeError,
+  type ComputerElicitationAnswer,
+  type ComputerElicitationInteraction,
+  type ComputerLoadedSession,
+} from '@auth/computerBridge';
 import { useConnections } from '@auth/ConnectionContext';
 import { computerTransportLabel } from '@auth/pairedComputers';
 import { ActivityGroup, groupActivity } from '@components/sessions/ActivityGroup';
@@ -38,6 +44,12 @@ import { DevinMarkdown } from '@components/DevinMarkdown';
 import { DevinCompanion } from '@components/pets';
 import { ComputerModelPickerSheets } from '@components/sessions/ComputerModelPickerSheets';
 import { ComputerElicitationCard } from '@components/sessions/ComputerElicitationCard';
+import {
+  ComputerInteractionAnsweredRow,
+  ComputerInteractionDock,
+} from '@components/sessions/ComputerInteractionDock';
+import { ComputerPermissionDockItem } from '@components/sessions/ComputerPermissionDockItem';
+import { ComputerTerminalQuestionCard } from '@components/sessions/ComputerTerminalQuestionCard';
 import { ModelFamilyMark } from '@components/sessions/ModelFamilyMark';
 import { KeyboardDismissButton } from '@components/KeyboardDismissButton';
 import { VoiceComposerStatus, VoiceMicButton, useVoiceComposer } from '@components/VoiceInput';
@@ -155,6 +167,25 @@ function HistoryMessage({ message }: { message: ComputerLoadedSession['messages'
   );
 }
 
+function elicitationSummary(
+  response: ComputerElicitationAnswer,
+  interaction: ComputerElicitationInteraction | null | undefined,
+): string {
+  if (response.action !== 'accept' || !interaction) return 'You skipped this question';
+  const values = interaction.fields.flatMap((field) => {
+    const value = response.content[field.key];
+    if (value === undefined) return [];
+    if (Array.isArray(value)) {
+      return value.map(
+        (item) => field.options?.find((option) => option.value === item)?.label ?? item,
+      );
+    }
+    if (typeof value === 'boolean') return [value ? 'Yes' : 'No'];
+    return [field.options?.find((option) => option.value === String(value))?.label ?? String(value)];
+  });
+  return `You answered · ${values.join(', ') || 'Answered'}`.slice(0, 200);
+}
+
 export default function ComputerSessionDetailScreen() {
   const parameters = useLocalSearchParams<{
     bridgeId?: string | string[];
@@ -167,10 +198,13 @@ export default function ComputerSessionDetailScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
   const { computers } = useConnections();
   const [companionActive, setCompanionActive] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [composerHeight, setComposerHeight] = useState(0);
+  const [interactionDockHeight, setInteractionDockHeight] = useState(0);
+  const [answeredSummary, setAnsweredSummary] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [steeringActive, setSteeringActive] = useState(continuationPending);
@@ -220,14 +254,27 @@ export default function ComputerSessionDetailScreen() {
       : null;
   const prompt = usePromptComputerSession(bridgeId, sessionId);
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
+  const awaiting =
+    sessionActivity.data?.awaiting ??
+    (sessionActivity.data?.label === 'Waiting for your answer' ? 'answer' : undefined);
+  const awaitingInteraction = awaiting === 'answer' || awaiting === 'approval';
   const mayAnswerQuestions =
     mayReadContent &&
     canPrompt &&
-    Boolean(bridgeFeatures.data?.sessionElicitation) &&
-    Boolean(sessionActivity.data?.active) &&
-    sessionActivity.data?.label === 'Waiting for your answer';
+    ((Boolean(bridgeFeatures.data?.sessionElicitation) &&
+      Boolean(sessionActivity.data?.active) &&
+      sessionActivity.data?.label === 'Waiting for your answer') ||
+      (bridgeFeatures.data?.sessionElicitation === true && awaiting === 'answer'));
   const elicitation = useComputerSessionElicitation(bridgeId, sessionId, mayAnswerQuestions);
   const activeElicitation = mayAnswerQuestions ? elicitation.data?.interaction : null;
+  const mayApprove =
+    mayReadContent &&
+    canPrompt &&
+    bridgeFeatures.data?.permissionPrompts === true &&
+    awaiting === 'approval';
+  const terminalQuestions =
+    awaiting === 'answer' ? sessionActivity.data?.terminalQuestion?.questions : undefined;
+  const terminalQuestionPresent = Boolean(terminalQuestions?.length);
   const connectorQuestionUpdateRequired =
     mayReadContent &&
     canPrompt &&
@@ -236,6 +283,18 @@ export default function ComputerSessionDetailScreen() {
   const answerElicitation = useRespondComputerSessionElicitation(bridgeId, sessionId);
   const sessionBusy = Boolean(sessionActivity.data?.active);
   const composerOverlayHeight = canPrompt && mayReadContent ? Math.max(composerHeight, 160) : 0;
+  const interactionDockVisible = Boolean(
+    activeElicitation || mayApprove || terminalQuestionPresent || answeredSummary,
+  );
+  const interactionKey = activeElicitation
+    ? `elicitation:${activeElicitation.id}`
+    : mayApprove
+      ? 'permission:pending'
+      : terminalQuestionPresent
+        ? `terminal:${JSON.stringify(terminalQuestions)}`
+        : null;
+  const previousInteractionKey = useRef<string | null>(null);
+  const terminalHint = `Answer in Terminal on ${computer?.computerName ?? 'your Mac'}`;
   const localOptions = useComputerCreateOptions(bridgeId, canPrompt && Boolean(computer));
   const localModels = useMemo(() => localOptions.data?.models ?? [], [localOptions.data?.models]);
   const modelFamilies = useMemo(() => groupComputerModels(localModels), [localModels]);
@@ -251,7 +310,8 @@ export default function ComputerSessionDetailScreen() {
   const voice = useVoiceComposer({
     value: draft,
     onChangeText: setDraft,
-    disabled: !canPrompt || prompt.isPending || steeringActive || sessionBusy,
+    disabled:
+      !canPrompt || prompt.isPending || steeringActive || sessionBusy || terminalQuestionPresent,
     hints: {
       repositories: query.data?.session.workspaceName ? [query.data.session.workspaceName] : [],
     },
@@ -268,6 +328,13 @@ export default function ComputerSessionDetailScreen() {
       setSelectedModelId(currentModelId);
     }
   }, [localModels, query.data?.session.model?.id, selectedModelId]);
+
+  useEffect(() => {
+    if (interactionKey && interactionKey !== previousInteractionKey.current) {
+      setAnsweredSummary(null);
+    }
+    previousInteractionKey.current = interactionKey;
+  }, [interactionKey]);
 
   useEffect(() => {
     if (!continuationPending || !mayReadContent || continuationRefreshStarted.current) return;
@@ -321,6 +388,7 @@ export default function ComputerSessionDetailScreen() {
     const text = draft.trim();
     if (!text || !canPrompt || prompt.isPending || steeringActive || sessionBusy) return;
     Keyboard.dismiss();
+    setAnsweredSummary(null);
     setSteeringActive(true);
     // The Connector keeps the previous turn until the next prompt starts;
     // the skew slack keeps a just-started turn visible under clock drift.
@@ -393,10 +461,11 @@ export default function ComputerSessionDetailScreen() {
     );
   }
 
-  function answerQuestion(response: Parameters<typeof answerElicitation.mutate>[0]) {
+  function answerQuestion(response: ComputerElicitationAnswer) {
     const baselineReply = devinReplySignature(query.data);
     answerElicitation.mutate(response, {
       onSuccess: () => {
+        setAnsweredSummary(elicitationSummary(response, activeElicitation));
         setSteeringActive(true);
         promptStartedAt.current = Date.now() - 5_000;
         const generation = refreshGeneration.current + 1;
@@ -473,7 +542,7 @@ export default function ComputerSessionDetailScreen() {
             <Text className="ml-1.5 text-brand-text text-text12" numberOfLines={1}>
               {computer?.computerName ?? 'Paired local device'}
             </Text>
-            {activityIndicatorKind && (
+            {(activityIndicatorKind || awaitingInteraction) && (
               <>
                 <Text className="mx-1.5 text-text-low text-text12">·</Text>
                 <View
@@ -482,10 +551,21 @@ export default function ComputerSessionDetailScreen() {
                 >
                   <View
                     className="mr-1 h-1.5 w-1.5 rounded-dot"
-                    style={{ backgroundColor: tokens.running.hex }}
+                    style={{
+                      backgroundColor:
+                        awaitingInteraction ? tokens.brand.hex : tokens.running.hex,
+                    }}
                   />
-                  <Text className="text-text-low text-text12">
-                    {activityShortLabel(activityIndicatorKind)}
+                  <Text
+                    className={
+                      awaitingInteraction
+                        ? 'text-brand-text text-text12'
+                        : 'text-text-low text-text12'
+                    }
+                  >
+                    {awaitingInteraction
+                      ? 'Waiting for your answer'
+                      : activityShortLabel(activityIndicatorKind ?? 'thinking')}
                   </Text>
                 </View>
               </>
@@ -560,7 +640,10 @@ export default function ComputerSessionDetailScreen() {
                 ref={historyRef}
                 className="flex-1"
                 contentContainerClassName="px-5 pt-5"
-                contentContainerStyle={{ paddingBottom: composerOverlayHeight + 128 }}
+                contentContainerStyle={{
+                  paddingBottom:
+                    composerOverlayHeight + (interactionDockVisible ? interactionDockHeight : 0) + 128,
+                }}
                 testID="computer-session-history"
                 keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                 keyboardShouldPersistTaps="handled"
@@ -664,21 +747,9 @@ export default function ComputerSessionDetailScreen() {
                     </Text>
                   </View>
                 )}
-                {activeElicitation && (
-                  <ComputerElicitationCard
-                    interaction={activeElicitation}
-                    pending={answerElicitation.isPending}
-                    error={
-                      answerElicitation.error
-                        ? 'Your answer could not be sent securely. Try again.'
-                        : undefined
-                    }
-                    onRespond={answerQuestion}
-                  />
-                )}
               </ScrollView>
             )}
-            {query.data && (
+            {query.data && !interactionDockVisible && (
               <View
                 pointerEvents="none"
                 className="absolute inset-x-0 px-4 pb-1"
@@ -695,6 +766,47 @@ export default function ComputerSessionDetailScreen() {
                   accessibilityLabel={`Devin companion, ${companionActivity.message ?? companionActivity.state}`}
                 />
               </View>
+            )}
+            {interactionDockVisible && (
+              <ComputerInteractionDock
+                bottom={composerOverlayHeight}
+                maxHeight={window.height * 0.55}
+                onHeightChange={(height) =>
+                  setInteractionDockHeight((current) =>
+                    Math.abs(current - height) < 1 ? current : height,
+                  )
+                }
+              >
+                {answeredSummary ? (
+                  <ComputerInteractionAnsweredRow sentence={answeredSummary} />
+                ) : activeElicitation ? (
+                  <ComputerElicitationCard
+                    interaction={activeElicitation}
+                    pending={answerElicitation.isPending}
+                    error={
+                      answerElicitation.error
+                        ? 'Your answer could not be sent securely. Try again.'
+                        : undefined
+                    }
+                    onRespond={answerQuestion}
+                  />
+                ) : mayApprove ? (
+                  <ComputerPermissionDockItem
+                    bridgeId={bridgeId}
+                    sessionId={sessionId}
+                    onAnswered={setAnsweredSummary}
+                  />
+                ) : (
+                  terminalQuestions?.map((question, index) => (
+                    <View className="mb-2" key={`${index}-${question.question}`}>
+                      <ComputerTerminalQuestionCard
+                        question={question}
+                        computerName={computer?.computerName ?? 'your Mac'}
+                      />
+                    </View>
+                  ))
+                )}
+              </ComputerInteractionDock>
             )}
           </View>
           {canPrompt && mayReadContent && query.data && (
@@ -719,11 +831,17 @@ export default function ComputerSessionDetailScreen() {
                   className="min-h-[44px] max-h-24 px-1 text-text-hi text-text14"
                   value={draft}
                   onChangeText={(value) => setDraft(value.slice(0, 100_000))}
-                  placeholder="Send a message to this Devin session…"
+                  placeholder={
+                    terminalQuestionPresent
+                      ? terminalHint
+                      : 'Send a message to this Devin session…'
+                  }
                   placeholderTextColor={tokens.textLow.hex}
                   multiline
                   textAlignVertical="top"
-                  editable={!prompt.isPending && !steeringActive && !sessionBusy}
+                  editable={
+                    !prompt.isPending && !steeringActive && !sessionBusy && !terminalQuestionPresent
+                  }
                   accessibilityLabel="Local session message"
                   onSelectionChange={voice.onSelectionChange}
                   onFocus={() => setKeyboardVisible(true)}
@@ -773,7 +891,13 @@ export default function ComputerSessionDetailScreen() {
                     <KeyboardDismissButton visible={keyboardVisible} />
                     <VoiceMicButton
                       voice={voice}
-                      disabled={!canPrompt || prompt.isPending || steeringActive || sessionBusy}
+                      disabled={
+                        !canPrompt ||
+                        prompt.isPending ||
+                        steeringActive ||
+                        sessionBusy ||
+                        terminalQuestionPresent
+                      }
                     />
                     <Pressable
                       className={`h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive && !sessionBusy ? 'bg-brand' : 'bg-tint-secondary'}`}

@@ -8,15 +8,18 @@ import {
   getComputerBridgeHealth,
   getComputerSessionActivity,
   getComputerSessionElicitation,
+  getComputerSessionPermission,
   getComputerCreateOptions,
   createComputerSession,
   promptComputerSession,
   respondToComputerSessionElicitation,
+  respondToComputerSessionPermission,
   openComputerBridges,
   type ComputerLoadedSession,
   type ComputerBridgeConnection,
   type ComputerSessionSummary,
   type ComputerElicitationAnswer,
+  type ComputerPermissionAnswer,
 } from '@auth/computerBridge';
 import type { PairedComputerSummary } from '@auth/pairedComputers';
 import { connectionModeUsesComputer } from '@lib/connections';
@@ -323,6 +326,37 @@ export function useRespondComputerSessionElicitation(bridgeId: string, sessionId
           queryKey: ['computerSessionActivity', bridgeId, sessionId],
         }),
         queryClient.invalidateQueries({ queryKey: ['computerSession', bridgeId, sessionId] }),
+      ]);
+    },
+  });
+}
+
+export function useComputerSessionPermission(bridgeId: string, sessionId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['computerSessionPermission', bridgeId, sessionId],
+    queryFn: () => getComputerSessionPermission(bridgeId, sessionId),
+    enabled,
+    staleTime: 500,
+    gcTime: 60_000,
+    refetchInterval: () => (AppState.currentState === 'active' ? 1_500 : false),
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+}
+
+export function useRespondComputerSessionPermission(bridgeId: string, sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ComputerPermissionAnswer) =>
+      respondToComputerSessionPermission(bridgeId, { ...input, sessionId }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['computerSessionPermission', bridgeId, sessionId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['computerSessionActivity', bridgeId, sessionId],
+        }),
       ]);
     },
   });

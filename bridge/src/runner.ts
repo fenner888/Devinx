@@ -7,13 +7,17 @@ import {
   AcpSessionClient,
   defaultActivityLabel,
   isAcpSessionInUseError,
+  type AcpLoadedSession,
   type AcpElicitationResponse,
   type AcpHistoryMessage,
   type AcpModelCatalog,
   type AcpPendingElicitation,
+  type AcpPendingPermission,
   type AcpSessionActivity,
   type AcpSessionTurn,
+  type AcpTerminalQuestion,
 } from './acp';
+import { markTimedOutEntries } from './activity';
 import {
   DevinSessionStore,
   type DevinCreateOptions,
@@ -120,7 +124,12 @@ export interface SessionHistoryLifecycle {
   listCreateOptions?(forceRefresh?: boolean): Promise<DevinCreateOptions>;
   getSessionLiveness?(
     sessionId: string,
-  ): Promise<{ active: boolean; kind?: AcpSessionActivity['kind']; updatedAt: number } | null>;
+  ): Promise<{
+    active: boolean;
+    kind?: AcpSessionActivity['kind'];
+    updatedAt: number;
+    pendingQuestion?: AcpTerminalQuestion;
+  } | null>;
 }
 
 export interface DesktopBridgeRunnerDependencies {
@@ -153,6 +162,11 @@ const unavailableSessions: SessionDiscoveryAdapter = {
   respondToElicitation: () => {
     throw new Error('Session questions are not enabled');
   },
+  isSessionPermissionSupported: () => false,
+  getPendingPermission: () => null,
+  respondToPermission: () => {
+    throw new Error('Session permissions are not enabled');
+  },
   isSessionPromptSupported: () => false,
   promptSession: () => Promise.reject(new Error('Session prompting is not enabled')),
   isSessionCreateSupported: () => false,
@@ -164,6 +178,12 @@ const MAXIMUM_REHYDRATION_PAGES = 100;
 const MAXIMUM_CREATE_WORKSPACES = 100;
 // Reserve one KiB for the omission marker and framing before ACP's 160 KiB limit.
 const MAXIMUM_CONTINUATION_CONTEXT_BYTES = 149 * 1024;
+
+function awaitingFromLabel(label: string | undefined): 'answer' | 'approval' | undefined {
+  if (label === 'Waiting for your answer') return 'answer';
+  if (label === 'Waiting for your approval') return 'approval';
+  return undefined;
+}
 
 function continuationContext(messages: AcpHistoryMessage[], truncated: boolean): string {
   const blocks: string[] = [];
@@ -189,6 +209,21 @@ function continuationContext(messages: AcpHistoryMessage[], truncated: boolean):
   }
   const omission = omitted ? '\n\nThe oldest transcript content was omitted.' : '';
   return `${base}${omission}\n\n${blocks.join('\n\n')}`;
+}
+
+function markLoadedSessionTimeouts(
+  loaded: AcpLoadedSession,
+  toolCallIds: ReadonlySet<string>,
+): AcpLoadedSession {
+  if (!loaded.activity || toolCallIds.size === 0) return loaded;
+  const marked = { ...loaded };
+  Object.defineProperty(marked, 'activity', {
+    value: markTimedOutEntries(loaded.activity, toolCallIds),
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+  return marked;
 }
 
 export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapter {
@@ -225,10 +260,23 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
       try {
         const live = await this.current.getSessionActivity?.(session.sessionId);
         if (live?.active) {
-          session.activity = { active: true, kind: live.kind, updatedAt: live.updatedAt };
+          const awaiting = live.awaiting ?? awaitingFromLabel(live.label);
+          session.activity = {
+            active: true,
+            kind: live.kind,
+            updatedAt: live.updatedAt,
+            ...(awaiting ? { awaiting } : {}),
+          };
         } else if (this.history?.getSessionLiveness) {
           const liveness = await this.history.getSessionLiveness(session.sessionId);
-          if (liveness) session.activity = liveness;
+          if (liveness) {
+            session.activity = {
+              active: liveness.active,
+              kind: liveness.kind,
+              updatedAt: liveness.updatedAt,
+              ...(liveness.pendingQuestion ? { awaiting: 'answer' } : {}),
+            };
+          }
         }
       } catch {
         // Liveness is best-effort; never fail session discovery for it.
@@ -250,7 +298,10 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   async getSessionActivity(input: string): Promise<AcpSessionActivity | null> {
     await this.ensureSessionListed(input);
     const live = (await this.current.getSessionActivity?.(input)) ?? null;
-    if (live?.active) return live;
+    if (live?.active) {
+      const awaiting = live.awaiting ?? awaitingFromLabel(live.label);
+      return { ...live, ...(awaiting ? { awaiting } : {}) };
+    }
     if (this.history?.getSessionLiveness) {
       try {
         const liveness = await this.history.getSessionLiveness(input);
@@ -258,9 +309,14 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
           const kind = liveness.kind ?? 'thinking';
           return {
             kind,
-            label: defaultActivityLabel(kind),
+            label: liveness.pendingQuestion
+              ? 'Waiting for your answer in Terminal'
+              : defaultActivityLabel(kind),
             active: true,
             updatedAt: liveness.updatedAt,
+            ...(liveness.pendingQuestion
+              ? { awaiting: 'answer' as const, terminalQuestion: liveness.pendingQuestion }
+              : {}),
           };
         }
       } catch {
@@ -271,7 +327,11 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
   }
 
   async getSessionTurn(input: string): Promise<AcpSessionTurn | null> {
-    return this.current.getSessionTurn?.(input) ?? null;
+    const turn = (await this.current.getSessionTurn?.(input)) ?? null;
+    if (!turn) return null;
+    const toolCallIds = this.current.getTimedOutToolCallIds?.(input);
+    if (!toolCallIds?.size) return turn;
+    return { ...turn, activity: markTimedOutEntries(turn.activity, toolCallIds) };
   }
 
   isSessionElicitationSupported(): boolean {
@@ -298,11 +358,37 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     this.current.respondToElicitation(sessionId, interactionId, response);
   }
 
+  isSessionPermissionSupported(): boolean {
+    return Boolean(
+      this.current.isSessionPermissionSupported?.() &&
+      this.current.getPendingPermission &&
+      this.current.respondToPermission,
+    );
+  }
+
+  getPendingPermission(sessionId: string): AcpPendingPermission | null {
+    if (!this.isSessionPermissionSupported() || !this.current.getPendingPermission) return null;
+    return this.current.getPendingPermission(sessionId);
+  }
+
+  respondToPermission(
+    sessionId: string,
+    permissionId: string,
+    decision: AcpPendingPermission['decisions'][number],
+  ): void {
+    if (!this.isSessionPermissionSupported() || !this.current.respondToPermission) {
+      throw new Error('Session permissions are not enabled');
+    }
+    this.current.respondToPermission(sessionId, permissionId, decision);
+  }
+
   async loadSession(input: string): ReturnType<SessionDiscoveryAdapter['loadSession']> {
     await this.ensureSessionListed(input);
     if (this.history?.isSessionLoadSupported()) {
       try {
-        return await this.history.loadSession(input);
+        const loaded = await this.history.loadSession(input);
+        const toolCallIds = this.current.getTimedOutToolCallIds?.(input);
+        return toolCallIds?.size ? markLoadedSessionTimeouts(loaded, toolCallIds) : loaded;
       } catch {
         // Fall back to negotiated ACP loading when the reviewed store cannot
         // provide this specific session without exposing its private error.
@@ -312,7 +398,8 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     this.acpLoadedSessionIds.add(input);
     await this.current.releaseSessionOwnership?.(input);
     this.acpLoadedSessionIds.delete(input);
-    return loaded;
+    const toolCallIds = this.current.getTimedOutToolCallIds?.(input);
+    return toolCallIds?.size ? markLoadedSessionTimeouts(loaded, toolCallIds) : loaded;
   }
 
   isSessionPromptSupported(): boolean {

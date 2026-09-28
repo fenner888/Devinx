@@ -2,12 +2,18 @@ import { basename, win32 } from 'node:path';
 
 import { z } from 'zod';
 
-import { activityEntrySchema, type ActivityEntry } from './activity';
+import {
+  activityEntrySchema,
+  legacyActivityStatus,
+  type ActivityEntry,
+} from './activity';
 import {
   AcpBusyError,
+  defaultActivityLabel,
   type AcpLoadedSession,
   type AcpModelCatalog,
   type AcpPendingElicitation,
+  type AcpPendingPermission,
   type AcpSessionActivity,
   type AcpSessionPage,
   type AcpSessionTurn,
@@ -22,8 +28,10 @@ import {
 } from './security';
 import {
   BRIDGE_PROTOCOL_VERSION,
+  bridgeFeaturesBodySchema,
   opaqueIdSchema,
   modelIdSchema,
+  permissionIdSchema,
   sessionCreateBodySchema,
   sessionCreateOptionsBodySchema,
   sessionActivityBodySchema,
@@ -32,6 +40,10 @@ import {
   sessionListBodySchema,
   sessionLoadBodySchema,
   sessionPromptBodySchema,
+  sessionPermissionBodySchema,
+  sessionPermissionDecisionSchema,
+  sessionPermissionResponseBodySchema,
+  type SessionPermissionDecision,
 } from './schemas';
 import { CONNECTOR_VERSION } from './version';
 import type { SessionHandleRegistry } from './session-handles';
@@ -92,6 +104,7 @@ const localSessionSchema = z
         active: z.boolean(),
         kind: localSessionActivityKindSchema.optional(),
         updatedAt: z.number().int().nonnegative(),
+        awaiting: z.enum(['answer', 'approval']).optional(),
       })
       .strict()
       .optional(),
@@ -116,6 +129,7 @@ const featuresResponseSchema = z
   .object({
     sessionElicitation: z.boolean(),
     activityTimeline: z.boolean(),
+    permissionPrompts: z.boolean().optional(),
   })
   .strict();
 
@@ -167,6 +181,25 @@ const localSessionActivitySchema = z
     kind: localSessionActivityKindSchema,
     label: z.string().min(1).max(160),
     updatedAt: z.number().int().nonnegative(),
+    awaiting: z.enum(['answer', 'approval']).optional(),
+    terminalQuestion: z
+      .object({
+        questions: z
+          .array(
+            z
+              .object({
+                question: z.string().min(1).max(500),
+                header: z.string().max(120).optional(),
+                options: z.array(z.string().max(200)).max(20),
+                multiSelect: z.boolean(),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(4),
+      })
+      .strict()
+      .optional(),
     turn: z
       .object({
         startedAt: z.number().int().nonnegative(),
@@ -177,6 +210,43 @@ const localSessionActivitySchema = z
       .optional(),
   })
   .strict();
+
+const localSessionPermissionSchema = z
+  .object({
+    permission: z
+      .object({
+        id: permissionIdSchema,
+        title: z.string().min(1).max(200),
+        toolKind: z
+          .enum(['read', 'edit', 'delete', 'move', 'search', 'execute', 'think', 'fetch', 'other'])
+          .optional(),
+        command: z.string().min(1).max(2_000).optional(),
+        paths: z.array(z.string().min(1).max(4_096)).max(100).optional(),
+        decisions: z.array(sessionPermissionDecisionSchema).min(1).max(3),
+        createdAt: z.number().int().nonnegative(),
+        expiresAt: z.number().int().positive(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+function interactionAwaiting(label: string): 'answer' | 'approval' | undefined {
+  if (label === 'Waiting for your answer' || label === 'Waiting for your answer in Terminal') {
+    return 'answer';
+  }
+  if (label === 'Waiting for your approval') return 'approval';
+  return undefined;
+}
+
+function activityForClient(entries: ActivityEntry[], interaction: boolean): ActivityEntry[] {
+  return interaction
+    ? entries
+    : entries.map((entry) => ({
+        ...entry,
+        status: legacyActivityStatus(entry.status),
+      }));
+}
 
 const elicitationValueSchema = z.union([
   z.string().max(10_000),
@@ -226,6 +296,7 @@ const localSessionElicitationSchema = z
                 maxLength: z.number().int().min(0).max(10_000).optional(),
                 minItems: z.number().int().min(0).max(100).optional(),
                 maxItems: z.number().int().min(0).max(100).optional(),
+                allowOther: z.literal(true).optional(),
                 defaultValue: elicitationValueSchema.optional(),
               })
               .strict(),
@@ -246,6 +317,7 @@ export interface SessionDiscoveryAdapter {
   listSessions(input?: unknown): Promise<AcpSessionPage>;
   isSessionLoadSupported(): boolean;
   loadSession(sessionId: string): Promise<AcpLoadedSession>;
+  getTimedOutToolCallIds?(sessionId: string): ReadonlySet<string>;
   isSessionActivitySupported?(): boolean;
   getSessionActivity?(sessionId: string): Promise<AcpSessionActivity | null>;
   getSessionTurn?(sessionId: string): AcpSessionTurn | null | Promise<AcpSessionTurn | null>;
@@ -256,6 +328,13 @@ export interface SessionDiscoveryAdapter {
     interactionId: string,
     response:
       { action: 'accept'; content: Record<string, unknown> } | { action: 'decline' | 'cancel' },
+  ): void;
+  isSessionPermissionSupported?(): boolean;
+  getPendingPermission?(sessionId: string): AcpPendingPermission | null;
+  respondToPermission?(
+    sessionId: string,
+    permissionId: string,
+    decision: SessionPermissionDecision,
   ): void;
   isSessionPromptSupported(): boolean;
   promptSession(
@@ -563,7 +642,8 @@ export class BridgeService {
         : authorization.request.method === 'session.load'
           ? this.rates.sessionLoadLimit
           : authorization.request.method === 'session.activity' ||
-              authorization.request.method === 'session.elicitation'
+              authorization.request.method === 'session.elicitation' ||
+              authorization.request.method === 'session.permission'
             ? this.rates.sessionActivityLimit
             : authorization.request.method === 'bridge.health' ||
                 authorization.request.method === 'bridge.platform' ||
@@ -601,6 +681,7 @@ export class BridgeService {
       };
     }
     if (authorization.request.method === 'bridge.features') {
+      const body = bridgeFeaturesBodySchema.parse(authorization.request.body);
       return {
         status: 200,
         body: featuresResponseSchema.parse({
@@ -610,6 +691,15 @@ export class BridgeService {
             this.dependencies.sessions.respondToElicitation,
           ),
           activityTimeline: this.dependencies.sessions.isSessionLoadSupported(),
+          ...(body.interaction === true
+            ? {
+                permissionPrompts: Boolean(
+                  this.dependencies.sessions.isSessionPermissionSupported?.() &&
+                  this.dependencies.sessions.getPendingPermission &&
+                  this.dependencies.sessions.respondToPermission,
+                ),
+              }
+            : {}),
         }),
       };
     }
@@ -652,6 +742,12 @@ export class BridgeService {
     if (authorization.request.method === 'session.elicitation.respond') {
       return this.respondToSessionElicitation(authorization, context.now);
     }
+    if (authorization.request.method === 'session.permission') {
+      return this.sessionPermission(authorization, context.now);
+    }
+    if (authorization.request.method === 'session.permission.respond') {
+      return this.respondToSessionPermission(authorization, context.now);
+    }
     if (authorization.request.method === 'session.prompt') {
       return this.promptSession(authorization, context.now);
     }
@@ -680,7 +776,10 @@ export class BridgeService {
     this.listing = true;
     try {
       const body = sessionListBodySchema.parse(authorization.request.body);
-      const page = await this.dependencies.sessions.listSessions(body);
+      const interaction = body.interaction === true;
+      const page = await this.dependencies.sessions.listSessions(
+        body.cursor === undefined ? {} : { cursor: body.cursor },
+      );
       const mayReadTitles =
         authorization.request.device.permissions.includes('session:content:read');
       const response = localSessionPageSchema.parse({
@@ -702,6 +801,9 @@ export class BridgeService {
                 active: session.activity.active,
                 kind: session.activity.kind,
                 updatedAt: session.activity.updatedAt,
+                ...(interaction && session.activity.awaiting
+                  ? { awaiting: session.activity.awaiting }
+                  : {}),
               }
             : undefined,
         })),
@@ -723,6 +825,7 @@ export class BridgeService {
       return { status: 503, body: { error: 'temporarily_unavailable' } };
     }
     const body = sessionLoadBodySchema.parse(authorization.request.body);
+    const interaction = body.interaction === true;
     const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
     if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
     if (this.loading) return { status: 429, body: { error: 'busy' } };
@@ -747,7 +850,10 @@ export class BridgeService {
               }
               return kept;
             }),
-          )
+        )
+        : undefined;
+      const responseActivity = remappedActivity
+        ? boundActivityDetail(activityForClient(remappedActivity, interaction))
         : undefined;
       const response = localLoadedSessionSchema.parse({
         session: {
@@ -765,7 +871,7 @@ export class BridgeService {
             source: message.source,
             text: message.text,
           })),
-        activity: remappedActivity,
+        activity: responseActivity,
         truncated: loaded.truncated,
       });
       return { status: 200, body: fitLoadedSessionResponse(response) };
@@ -787,6 +893,7 @@ export class BridgeService {
       return { status: 503, body: { error: 'temporarily_unavailable' } };
     }
     const body = sessionActivityBodySchema.parse(authorization.request.body);
+    const interaction = body.interaction === true;
     const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
     if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
     try {
@@ -794,22 +901,37 @@ export class BridgeService {
       const turn = this.dependencies.sessions.getSessionTurn
         ? await this.dependencies.sessions.getSessionTurn(rawSessionId)
         : null;
+      const activityLabel = activity?.label ?? 'Waiting for the next step';
+      const label = cleanDisplayText(
+        !interaction && activityLabel === 'Waiting for your answer in Terminal'
+          ? defaultActivityLabel(activity?.kind ?? 'thinking')
+          : activityLabel,
+        160,
+        'Working',
+      );
+      const awaiting = activity?.awaiting ?? interactionAwaiting(label);
       return {
         status: 200,
-        body: fitActivityResponse(localSessionActivitySchema.parse({
-          active: activity?.active ?? false,
-          kind: activity?.kind ?? 'thinking',
-          label: cleanDisplayText(activity?.label ?? 'Waiting for the next step', 160, 'Working'),
-          updatedAt: activity?.updatedAt ?? now,
-          turn: turn
-            ? {
-                startedAt: turn.startedAt,
-                reply: turn.reply,
-                activity: boundActivityDetail(turn.activity),
-              }
-            : undefined,
-        }),
-      )};
+        body: fitActivityResponse(
+          localSessionActivitySchema.parse({
+            active: activity?.active ?? false,
+            kind: activity?.kind ?? 'thinking',
+            label,
+            updatedAt: activity?.updatedAt ?? now,
+            ...(interaction && awaiting ? { awaiting } : {}),
+            ...(interaction && activity?.terminalQuestion
+              ? { terminalQuestion: activity.terminalQuestion }
+              : {}),
+            turn: turn
+              ? {
+                  startedAt: turn.startedAt,
+                  reply: turn.reply,
+                  activity: boundActivityDetail(activityForClient(turn.activity, interaction)),
+                }
+              : undefined,
+          }),
+        ),
+      };
     } catch (error) {
       if (error instanceof AcpBusyError) {
         return { status: 409, body: { error: 'conflict' } };
@@ -892,6 +1014,74 @@ export class BridgeService {
         body.action === 'accept'
           ? { action: 'accept', content: body.content }
           : { action: body.action },
+      );
+      return { status: 200, body: { accepted: true } };
+    } catch {
+      return { status: 404, body: { error: 'not_found' } };
+    }
+  }
+
+  private async sessionPermission(
+    authorization: RequestAuthorization,
+    now: number,
+  ): Promise<BridgeServiceResponse> {
+    if (
+      !this.dependencies.sessions.isSessionPermissionSupported?.() ||
+      !this.dependencies.sessions.getPendingPermission ||
+      !this.dependencies.sessions.respondToPermission
+    ) {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+    const body = sessionPermissionBodySchema.parse(authorization.request.body);
+    const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
+    if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
+    try {
+      const permission = this.dependencies.sessions.getPendingPermission(rawSessionId);
+      return {
+        status: 200,
+        body: localSessionPermissionSchema.parse({
+          permission: permission
+            ? {
+                id: permission.id,
+                title: cleanDisplayText(permission.title, 200, 'Run a command'),
+                toolKind: permission.toolKind,
+                command: permission.command,
+                paths: permission.paths?.map((path) => cleanDisplayText(path, 4_096, 'Workspace')),
+                decisions: [...permission.decisions],
+                createdAt: permission.createdAt,
+                expiresAt: permission.expiresAt,
+              }
+            : null,
+        }),
+      };
+    } catch {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+  }
+
+  private async respondToSessionPermission(
+    authorization: RequestAuthorization,
+    now: number,
+  ): Promise<BridgeServiceResponse> {
+    if (
+      !this.dependencies.sessions.isSessionPermissionSupported?.() ||
+      !this.dependencies.sessions.getPendingPermission ||
+      !this.dependencies.sessions.respondToPermission
+    ) {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+    const body = sessionPermissionResponseBodySchema.parse(authorization.request.body);
+    const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
+    if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
+    const pending = this.dependencies.sessions.getPendingPermission(rawSessionId);
+    if (!pending || pending.id !== body.permissionId) {
+      return { status: 404, body: { error: 'not_found' } };
+    }
+    try {
+      this.dependencies.sessions.respondToPermission(
+        rawSessionId,
+        body.permissionId,
+        body.decision,
       );
       return { status: 200, body: { accepted: true } };
     } catch {
