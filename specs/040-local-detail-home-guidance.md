@@ -13,11 +13,11 @@ sessions while preserving legacy Connector and Cloud behavior.
   and start sessions. The phone prefers Connector-reported grants, falls back
   to the paired device's stored permissions, and otherwise treats grants as
   unknown.
-- The phone requests `session.load` timestamps only when the Connector
-  advertises `messageTimestamps: true` and interaction support is enabled.
-  Retrying without interaction drops both opt-in flags. A returned `createdAt`
-  is a bounded integer in milliseconds and is included only when a source
-  timestamp exists.
+- The phone requests `session.load` timestamps when the Connector advertises
+  `messageTimestamps: true`, independent of whether interaction support has
+  been negotiated. Retrying without interaction drops the interaction flag but
+  retains the timestamp opt-in. A returned `createdAt` is a bounded integer in
+  milliseconds and is included only when a source timestamp exists.
 - Local timestamps prefer SQLite `metadata.created_at` ISO values and fall
   back to `message_nodes.created_at` Unix seconds converted to milliseconds.
   ACP replay uses `_meta["cognition.ai/timestamp"]` when present. Missing

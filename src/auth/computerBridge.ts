@@ -1111,12 +1111,8 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
       requestWithInteractionFallback(credential, (includeInteraction) =>
         requestSessionLoad(credential, {
           sessionId,
-          ...(includeInteraction
-            ? {
-                interaction: true as const,
-                ...(options.timestamps ? { timestamps: true as const } : {}),
-              }
-            : {}),
+          ...(includeInteraction ? { interaction: true as const } : {}),
+          ...(options.timestamps ? { timestamps: true as const } : {}),
         }),
       ),
     getSessionActivity: (sessionId) =>

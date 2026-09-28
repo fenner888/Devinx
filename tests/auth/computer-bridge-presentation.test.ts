@@ -204,7 +204,28 @@ describe('Computer Bridge presentation compatibility', () => {
     });
   });
 
-  it('drops interaction and timestamp flags together after an invalid session-load request', async () => {
+  it('requests timestamps before interaction support has been negotiated', async () => {
+    const bridgeId = 'bridge_presentation_timestamps_unnegotiated';
+    mockLoadPairedComputers.mockResolvedValue([credential(bridgeId)]);
+    mockPostBridgeJson.mockImplementation(
+      async (_endpoint: string, _path: string, envelope: unknown) => {
+        const request = envelope as { method: string };
+        if (request.method === 'session.load') {
+          return { status: 200, body: loadedSession(1_790_610_060_123) };
+        }
+        throw new Error(`Unexpected method ${request.method}`);
+      },
+    );
+
+    await loadComputerSession(bridgeId, SESSION_ID, { timestamps: true });
+
+    expect(requests('session.load').map((request) => request.body)).toEqual([
+      { sessionId: SESSION_ID, timestamps: true },
+    ]);
+    expect(requests('bridge.features')).toHaveLength(0);
+  });
+
+  it('drops interaction but retains requested timestamps after an invalid session-load request', async () => {
     const bridgeId = 'bridge_presentation_load_fallback';
     mockLoadPairedComputers.mockResolvedValue([credential(bridgeId)]);
     let loadAttempts = 0;
@@ -234,7 +255,7 @@ describe('Computer Bridge presentation compatibility', () => {
 
     expect(requests('session.load').map((request) => request.body)).toEqual([
       { sessionId: SESSION_ID, interaction: true, timestamps: true },
-      { sessionId: SESSION_ID },
+      { sessionId: SESSION_ID, timestamps: true },
     ]);
   });
 
