@@ -327,6 +327,8 @@ export const statusLabels = {
   completed: 'Completed',
   failed: 'Failed',
   interrupted: 'Interrupted',
+  awaiting_input: 'Waiting for your answer',
+  timed_out: 'Timed out',
   unknown: 'Unknown',
 } as const;
 

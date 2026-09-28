@@ -36,8 +36,13 @@ export function ComputerSessionRow({
       ? 'Session title hidden'
       : 'Local session';
   const modelText = session.model?.name;
+  const activityLabel = session.activity?.awaiting
+    ? 'Waiting for your answer'
+    : session.activity?.active
+      ? activityShortLabel(session.activity.kind ?? 'thinking')
+      : undefined;
 
-  const accessibilityLabel = `${primaryText}, on ${session.computerName}, ${detailText}${modelText ? `, ${modelText}` : ''}${session.activity?.active ? `, ${activityShortLabel(session.activity.kind ?? 'thinking')}` : ''}${time ? `, ${time}` : ''}${onPress ? ', open history' : ''}`;
+  const accessibilityLabel = `${primaryText}, on ${session.computerName}, ${detailText}${modelText ? `, ${modelText}` : ''}${activityLabel ? `, ${activityLabel}` : ''}${time ? `, ${time}` : ''}${onPress ? ', open history' : ''}`;
   const content = (
     <>
       <View className="w-8 h-8 rounded-card bg-tint-blue items-center justify-center mr-3">
@@ -59,14 +64,18 @@ export function ComputerSessionRow({
           <Text className="text-text-low text-text12 flex-1" numberOfLines={1}>
             {detailText}{modelText ? ` · ${modelText}` : ''}
           </Text>
-          {session.activity?.active && (
+          {activityLabel && (
             <View className="ml-2 flex-row items-center" testID="computer-session-row-activity">
               <View
                 className="mr-1 h-1.5 w-1.5 rounded-dot"
-                style={{ backgroundColor: tokens.running.hex }}
+                style={{
+                  backgroundColor: session.activity?.awaiting
+                    ? tokens.brand.hex
+                    : tokens.running.hex,
+                }}
               />
               <Text className="text-brand-text text-text12">
-                {activityShortLabel(session.activity.kind ?? 'thinking')}
+                {activityLabel}
               </Text>
             </View>
           )}

@@ -45,6 +45,8 @@ export const DEVIN_STATE_BY_STATUS_KEY: Record<StatusLabelKey, DevinPetState> = 
   completed: 'success',
   failed: 'error',
   interrupted: 'blocked',
+  awaiting_input: 'blocked',
+  timed_out: 'blocked',
   unknown: 'waiting',
 };
 

@@ -31,10 +31,15 @@ function initialAnswers(interaction: ComputerElicitationInteraction): Record<str
 function answerContent(
   interaction: ComputerElicitationInteraction,
   answers: Record<string, DraftValue>,
+  otherAnswers: Record<string, string>,
 ): Record<string, string | number | boolean | string[]> | null {
   const content: Record<string, string | number | boolean | string[]> = {};
   for (const field of interaction.fields) {
-    const answer = answers[field.key];
+    const otherAnswer = otherAnswers[field.key]?.trim();
+    const answer =
+      field.type === 'single_select' && field.allowOther === true && otherAnswer
+        ? otherAnswers[field.key]
+        : answers[field.key];
     if (field.type === 'boolean') {
       if (typeof answer !== 'boolean') {
         if (field.required) return null;
@@ -83,9 +88,16 @@ export function ComputerElicitationCard({
   const [answers, setAnswers] = useState<Record<string, DraftValue>>(() =>
     initialAnswers(interaction),
   );
-  const content = useMemo(() => answerContent(interaction, answers), [answers, interaction]);
+  const [otherAnswers, setOtherAnswers] = useState<Record<string, string>>({});
+  const content = useMemo(
+    () => answerContent(interaction, answers, otherAnswers),
+    [answers, interaction, otherAnswers],
+  );
 
-  useEffect(() => setAnswers(initialAnswers(interaction)), [interaction]);
+  useEffect(() => {
+    setAnswers(initialAnswers(interaction));
+    setOtherAnswers({});
+  }, [interaction]);
 
   return (
     <View className="mb-5 rounded-card border border-brand bg-surface1 px-4 py-4">
@@ -113,45 +125,63 @@ export function ComputerElicitationCard({
               <Text className="mt-1 text-text-low text-text12">{field.description}</Text>
             )}
             {field.type === 'single_select' || field.type === 'boolean' ? (
-              <View className="mt-2 flex-row flex-wrap gap-2">
-                {(field.type === 'boolean'
-                  ? [
-                      { value: 'true', label: 'Yes' },
-                      { value: 'false', label: 'No' },
-                    ]
-                  : options
-                ).map((option) => {
-                  const selected =
-                    field.type === 'boolean'
-                      ? value === (option.value === 'true')
-                      : value === option.value;
-                  return (
-                    <Pressable
-                      key={option.value}
-                      className={`min-h-11 justify-center rounded-full border px-4 ${selected ? 'border-brand bg-tint-primary' : 'border-border bg-surface2'}`}
-                      onPress={() =>
-                        setAnswers((current) => ({
-                          ...current,
-                          [field.key]:
-                            field.type === 'boolean' ? option.value === 'true' : option.value,
-                        }))
-                      }
-                      disabled={pending}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: selected, disabled: pending }}
-                      accessibilityLabel={`${field.title}: ${option.label}`}
-                    >
-                      <Text
-                        className={
-                          selected ? 'text-brand-text text-text13' : 'text-text-mid text-text13'
-                        }
+              <>
+                <View className="mt-2 flex-row flex-wrap gap-2">
+                  {(field.type === 'boolean'
+                    ? [
+                        { value: 'true', label: 'Yes' },
+                        { value: 'false', label: 'No' },
+                      ]
+                    : options
+                  ).map((option) => {
+                    const selected =
+                      field.type === 'boolean'
+                        ? value === (option.value === 'true')
+                        : value === option.value;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        className={`min-h-11 justify-center rounded-full border px-4 ${selected ? 'border-brand bg-tint-primary' : 'border-border bg-surface2'}`}
+                        onPress={() => {
+                          setOtherAnswers((current) => ({ ...current, [field.key]: '' }));
+                          setAnswers((current) => ({
+                            ...current,
+                            [field.key]:
+                              field.type === 'boolean' ? option.value === 'true' : option.value,
+                          }));
+                        }}
+                        disabled={pending}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: selected, disabled: pending }}
+                        accessibilityLabel={`${field.title}: ${option.label}`}
                       >
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+                        <Text
+                          className={
+                            selected ? 'text-brand-text text-text13' : 'text-text-mid text-text13'
+                          }
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {field.type === 'single_select' && field.allowOther === true && (
+                  <TextInput
+                    className="mt-2 min-h-12 rounded-card border border-border bg-surface2 px-3 py-3 text-text-hi text-text14"
+                    value={otherAnswers[field.key] ?? ''}
+                    onChangeText={(text) => {
+                      setOtherAnswers((current) => ({ ...current, [field.key]: text }));
+                      setAnswers((current) => ({ ...current, [field.key]: '' }));
+                    }}
+                    editable={!pending}
+                    maxLength={field.maxLength ?? 2_000}
+                    placeholder="Other…"
+                    placeholderTextColor={tokens.textLow.hex}
+                    accessibilityLabel={`Other answer: ${field.title}`}
+                  />
+                )}
+              </>
             ) : field.type === 'multi_select' ? (
               <View className="mt-2 flex-row flex-wrap gap-2">
                 {options.map((option) => {
