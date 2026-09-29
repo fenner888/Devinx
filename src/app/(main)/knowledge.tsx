@@ -25,10 +25,7 @@ import {
   useUpdateKnowledgeNote,
   useDeleteKnowledgeNote,
 } from '@api/devin/queries';
-import { useConnections } from '@auth/ConnectionContext';
-import { CloudRequiredScreen } from '@components/CloudRequired';
 import { EmptyState, ErrorState } from '@components/Skeletons';
-import { connectionModeUsesCloud } from '@lib/connections';
 import { hapticSuccess, hapticError, hapticWarning, hapticLight } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
 import { userFacingError } from '@lib/user-facing-error';
@@ -44,7 +41,7 @@ interface EditorState {
   pinnedRepo: string;
 }
 
-function KnowledgeContent() {
+export default function KnowledgeScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -436,17 +433,4 @@ function KnowledgeContent() {
       </Modal>
     </SafeAreaView>
   );
-}
-
-export default function KnowledgeScreen() {
-  const { mode } = useConnections();
-  if (!connectionModeUsesCloud(mode)) {
-    return (
-      <CloudRequiredScreen
-        title="Knowledge"
-        message="Knowledge is stored in Devin Cloud. Connect your Devin account to see it here."
-      />
-    );
-  }
-  return <KnowledgeContent />;
 }

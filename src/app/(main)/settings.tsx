@@ -12,7 +12,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@auth/AuthContext';
 import { useConnections } from '@auth/ConnectionContext';
 import { computerTransportLabel } from '@auth/pairedComputers';
-import { CloudTag } from '@components/CloudRequired';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSelf } from '@api/devin/queries';
 import { purgeCache } from '@cache/index';
@@ -385,13 +384,11 @@ export default function SettingsScreen() {
               onPress={() => router.push(route)}
               accessibilityRole="button"
               accessibilityLabel={label}
-              accessibilityHint={!hasCloudConnection ? 'Requires Devin Cloud' : undefined}
             >
               <View className={`w-8 h-8 rounded-button items-center justify-center mr-3 ${tint}`}>
                 <Ionicons name={icon} size={15} color={color} />
               </View>
               <Text className="text-text-hi text-text14 flex-1">{label}</Text>
-              {!hasCloudConnection && <CloudTag />}
               <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
             </Pressable>
           ))}
@@ -445,13 +442,11 @@ export default function SettingsScreen() {
               onPress={() => router.push(route)}
               accessibilityRole="button"
               accessibilityLabel={label}
-              accessibilityHint={!hasCloudConnection ? 'Requires Devin Cloud' : undefined}
             >
               <View className={`w-8 h-8 rounded-button items-center justify-center mr-3 ${tint}`}>
                 <Ionicons name={icon} size={15} color={color} />
               </View>
               <Text className="text-text-hi text-text14 flex-1">{label}</Text>
-              {!hasCloudConnection && <CloudTag />}
               <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
             </Pressable>
           ))}

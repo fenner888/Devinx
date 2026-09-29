@@ -16,10 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useOrgMetrics } from '@api/devin/queries';
-import { useConnections } from '@auth/ConnectionContext';
-import { CloudRequiredScreen } from '@components/CloudRequired';
 import { ApiError } from '@api/devin/client';
-import { connectionModeUsesCloud } from '@lib/connections';
 import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 
@@ -91,7 +88,7 @@ function Distribution({ data, colorFor }: { data: Record<string, number>; colorF
   );
 }
 
-function AnalyticsContent() {
+export default function AnalyticsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -255,17 +252,4 @@ function AnalyticsContent() {
       )}
     </SafeAreaView>
   );
-}
-
-export default function AnalyticsScreen() {
-  const { mode } = useConnections();
-  if (!connectionModeUsesCloud(mode)) {
-    return (
-      <CloudRequiredScreen
-        title="Analytics"
-        message="Analytics come from Devin Cloud. Connect your Devin account to see them here."
-      />
-    );
-  }
-  return <AnalyticsContent />;
 }
