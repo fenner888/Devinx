@@ -31,7 +31,12 @@ import {
   privateTransportKind,
   type PrivateTransportKind,
 } from './network';
-import { PairingManager, type PairingApprovalOptions, type PendingPairingReview } from './pairing';
+import {
+  defaultComputerName,
+  PairingManager,
+  type PairingApprovalOptions,
+  type PendingPairingReview,
+} from './pairing';
 import { FixedWindowRateLimiter } from './rate-limit';
 import { InMemoryReplayGuard } from './replay';
 import { BridgeService, type SessionDiscoveryAdapter } from './service';
@@ -660,7 +665,9 @@ export class DesktopBridgeRunner {
         }
       }
 
-      const pairing = new PairingManager(runtime.identity, runtime.devices);
+      const pairing = new PairingManager(runtime.identity, runtime.devices, {
+        computerName: defaultComputerName(),
+      });
       this.pairing = pairing;
       const service = new BridgeService({
         bridgeId: runtime.bridgeId,

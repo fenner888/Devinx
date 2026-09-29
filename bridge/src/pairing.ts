@@ -8,6 +8,7 @@ import {
   verify,
   type KeyObject,
 } from 'node:crypto';
+import * as os from 'node:os';
 
 import { z } from 'zod';
 
@@ -101,6 +102,7 @@ export const pairingOfferSchema = z
     pairingId: opaqueIdSchema,
     pairingSecret: pairingSecretSchema,
     expiresAt: z.number().int().positive(),
+    computerName: deviceNameSchema.optional(),
   })
   .strict();
 
@@ -171,6 +173,7 @@ const pairingOptionsSchema = z
       .min(10_000)
       .max(600_000)
       .default(DEFAULT_RECEIPT_LIFETIME_MS),
+    computerName: deviceNameSchema.optional(),
   })
   .strict();
 
@@ -210,6 +213,7 @@ export interface PairingManagerOptions {
   maximumOffers?: number;
   maximumPending?: number;
   receiptLifetimeMs?: number;
+  computerName?: string;
 }
 
 export interface PairingApprovalOptions {
@@ -228,6 +232,27 @@ export type PairingPollRequest = z.infer<typeof pairingPollRequestSchema>;
 export type PairingReceipt = z.infer<typeof pairingReceiptSchema>;
 export type SignedPairingReceipt = z.infer<typeof signedPairingReceiptSchema>;
 export type DevicePermissionUpdate = z.infer<typeof devicePermissionUpdateSchema>;
+
+export function defaultComputerName(hostname = os.hostname()): string | undefined {
+  try {
+    const withoutControls = [...hostname]
+      .filter((character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return codePoint >= 32 && codePoint !== 127;
+      })
+      .join('');
+    const sanitized = withoutControls
+      .trim()
+      .replace(/\.(?:local|lan)$/i, '')
+      .trim()
+      .slice(0, 80)
+      .trim();
+    const result = deviceNameSchema.safeParse(sanitized);
+    return result.success ? result.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 interface OfferState {
   offer: PairingOffer;
@@ -448,6 +473,9 @@ export class PairingManager {
       pairingId: randomBytes(18).toString('base64url'),
       pairingSecret: randomBytes(32).toString('base64url'),
       expiresAt: now + this.options.offerLifetimeMs,
+      ...(this.options.computerName === undefined
+        ? {}
+        : { computerName: this.options.computerName }),
     });
     this.offers.set(offer.pairingId, { offer: { ...offer }, failedProofAttempts: 0 });
     return { ...offer };
