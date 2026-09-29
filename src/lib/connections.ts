@@ -44,10 +44,6 @@ export function connectionModeUsesComputer(mode: ConnectionMode): boolean {
   return mode === 'computer' || mode === 'both';
 }
 
-export function canAddCloudToLocal(mode: ConnectionMode, computerCount: number): boolean {
-  return mode === 'computer' && computerCount > 0;
-}
-
 export function connectionModeAfterComputerRefresh(
   mode: ConnectionMode,
   hasCloudConnection: boolean,

@@ -3,25 +3,17 @@ import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useConnections } from '@auth/ConnectionContext';
-import { canAddCloudToLocal } from '@lib/connections';
 import { useAppPreferences } from '@store/preferences';
 import { useTheme } from '@theme/index';
 
 export function useConnectDevinCloud(): () => void {
   const router = useRouter();
-  const connectionMode = useAppPreferences((state) => state.connectionMode);
   const setConnectionMode = useAppPreferences((state) => state.setConnectionMode);
-  const { computers = [] } = useConnections();
 
   return useCallback(() => {
-    if (canAddCloudToLocal(connectionMode, computers.length)) {
-      router.push('/(main)/credentials');
-      return;
-    }
     setConnectionMode('cloud');
     router.replace('/(onboarding)/credentials');
-  }, [computers.length, connectionMode, router, setConnectionMode]);
+  }, [router, setConnectionMode]);
 }
 
 export function CloudTag() {

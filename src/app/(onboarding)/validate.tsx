@@ -3,7 +3,7 @@
  * Live check: authenticated GET sessions call. Success → store in Keychain →
  * land on Board. Failure → specific error (401/403/network).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,9 +19,6 @@ export default function ValidateScreen() {
   const { connect } = useAuth();
   const { tokens } = useTheme();
   const connectionMode = useAppPreferences((state) => state.connectionMode);
-  const setConnectionMode = useAppPreferences((state) => state.setConnectionMode);
-  const initialModeRef = useRef(connectionMode);
-  const isAddingToLocal = initialModeRef.current === 'computer';
 
   const [status, setStatus] = useState<'validating' | 'success' | 'error'>('validating');
   const [result, setResult] = useState<ValidationResult | null>(null);
@@ -30,7 +27,7 @@ export default function ValidateScreen() {
     const creds = takePendingCredentials();
     if (!creds) {
       // Nothing pending (e.g. web reload) — go back to credentials.
-      router.replace(isAddingToLocal ? '/(main)/credentials' : '/(onboarding)/credentials');
+      router.replace('/(onboarding)/credentials');
       return;
     }
     let cancelled = false;
@@ -41,24 +38,21 @@ export default function ValidateScreen() {
       setResult(r);
       setStatus(r.ok ? 'success' : 'error');
       if (r.ok) {
-        timer = setTimeout(() => {
-          if (isAddingToLocal) {
-            setConnectionMode('both');
-            router.replace('/(main)');
-            return;
-          }
-          // Combined mode continues to computer pairing; Cloud-only lands in main.
-          router.replace(
-            initialModeRef.current === 'both' ? '/(onboarding)/computer' : '/(main)',
-          );
-        }, 600);
+        // Combined mode continues to computer pairing; Cloud-only lands in main.
+        timer = setTimeout(
+          () =>
+            router.replace(
+              connectionMode === 'both' ? '/(onboarding)/computer' : '/(main)',
+            ),
+          600,
+        );
       }
     })();
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [connect, isAddingToLocal, router, setConnectionMode]);
+  }, [connect, connectionMode, router]);
 
   return (
     <SafeAreaView
@@ -117,11 +111,7 @@ export default function ValidateScreen() {
             accessibilityRole="button"
             accessibilityLabel="Return to Devin Cloud credentials"
             className="bg-brand rounded-button px-buttonPrimaryX py-buttonPrimaryY w-full min-h-14 items-center justify-center"
-            onPress={() =>
-              router.replace(
-                isAddingToLocal ? '/(main)/credentials' : '/(onboarding)/credentials',
-              )
-            }
+            onPress={() => router.replace('/(onboarding)/credentials')}
           >
             <Text className="text-text-always-white text-text16 font-semibold">Try again</Text>
           </Pressable>

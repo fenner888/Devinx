@@ -28,7 +28,6 @@ export default function CredentialsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
   const connectionMode = useAppPreferences((state) => state.connectionMode);
-  const isAddingToLocal = connectionMode === 'computer';
   const isCombinedSetup = connectionMode === 'both';
 
   const [apiKey, setApiKey] = useState('');
@@ -57,7 +56,7 @@ export default function CredentialsScreen() {
       orgId: trimmedOrgId,
       attributionUserId: attributionUserId || undefined,
     });
-    router.push(isAddingToLocal ? '/(main)/validate' : '/(onboarding)/validate');
+    router.push('/(onboarding)/validate');
   }
 
   return (
@@ -86,9 +85,7 @@ export default function CredentialsScreen() {
             Connect Devin Cloud
           </Text>
           <Text className="text-text-mid text-text14 leading-5 mt-3 mb-7">
-            {isAddingToLocal
-              ? 'Your paired devices stay connected. DevinX stores the scoped credential in the iOS Keychain and never places it in logs or ordinary app storage.'
-              : isCombinedSetup
+            {isCombinedSetup
               ? 'First connect your Devin Cloud account. Next, you’ll pair a local device. Your scoped credential stays in the iOS Keychain.'
               : 'Use a scoped credential for your Devin organization. DevinX stores it in the iOS Keychain and never places it in logs or ordinary app storage.'}
           </Text>
