@@ -3,6 +3,7 @@ import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto';
 import {
   PairingManager,
   createPairingProof,
+  defaultComputerName,
   revokeDeviceRecord,
   updateDevicePermissions,
   verifyPairingReceipt,
@@ -95,6 +96,45 @@ describe('Desktop Bridge pairing core', () => {
       expiresAt: NOW + 120_000,
     });
     expect(Buffer.from(offer.pairingSecret, 'base64url')).toHaveLength(32);
+    expect(offer.computerName).toBeUndefined();
+  });
+
+  it('includes a configured computer name in the pairing offer', () => {
+    const configured = new PairingManager(
+      {
+        bridgeId: BRIDGE_ID,
+        privateKey: bridgeKeys.privateKey,
+        publicKeySpki: bridgePublicKeySpki,
+      },
+      registry,
+      { computerName: 'Marks-Mac-mini' },
+    );
+
+    expect(configured.createOffer(TRANSPORT, NOW).computerName).toBe('Marks-Mac-mini');
+  });
+
+  it.each([
+    ['Marks-Mac-mini.local', 'Marks-Mac-mini'],
+    ['', undefined],
+    ['a'.repeat(100), 'a'.repeat(80)],
+    ['Mac\u0000\u001bName\u007f', 'MacName'],
+  ])('normalizes the default computer name %s', (hostname, expected) => {
+    expect(defaultComputerName(hostname)).toBe(expected);
+  });
+
+  it('rejects an overlong configured computer name', () => {
+    expect(
+      () =>
+        new PairingManager(
+          {
+            bridgeId: BRIDGE_ID,
+            privateKey: bridgeKeys.privateKey,
+            publicKeySpki: bridgePublicKeySpki,
+          },
+          registry,
+          { computerName: 'a'.repeat(200) },
+        ),
+    ).toThrow();
   });
 
   it('requires desktop approval and grants only read-only defaults', async () => {
