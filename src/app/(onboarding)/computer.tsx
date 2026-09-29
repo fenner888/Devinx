@@ -78,9 +78,7 @@ const styles = StyleSheet.create({
   scanner: { width: '100%', height: '100%' },
 });
 
-function grantsFromPermissions(
-  permissions: PairedComputerSummary['permissions'],
-): ComputerGrants {
+function grantsFromPermissions(permissions: PairedComputerSummary['permissions']): ComputerGrants {
   return {
     viewSessions: permissions.includes('session:content:read'),
     sendPrompts: permissions.includes('session:prompt:send'),
@@ -523,16 +521,12 @@ export default function ComputerConnectionScreen() {
                       className={`px-4 py-3 ${index < computers.length - 1 ? 'border-b border-border-subtle' : ''}`}
                     >
                       <Pressable
-                        className="flex-row items-center"
+                        className="flex-row items-start"
                         onPress={() => setSelectedComputer(computer)}
                         accessibilityRole="button"
                         accessibilityLabel={`Permissions for ${computer.computerName}`}
                       >
-                        <Ionicons
-                          name="desktop-outline"
-                          size={18}
-                          color={tokens.brandText.hex}
-                        />
+                        <Ionicons name="desktop-outline" size={18} color={tokens.brandText.hex} />
                         <View className="ml-3 flex-1">
                           <Text className="text-text-hi text-text14">{computer.computerName}</Text>
                           <Text className="mt-0.5 text-text-low text-text12">Tailscale</Text>
@@ -574,17 +568,13 @@ export default function ComputerConnectionScreen() {
                             ))}
                           </View>
                         </View>
-                        <Ionicons
-                          name="chevron-forward"
-                          size={16}
-                          color={tokens.textLow.hex}
-                        />
+                        <View className="self-center ml-2">
+                          <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+                        </View>
                       </Pressable>
                       <Pressable
                         className="self-end px-2 py-1 mt-1"
-                        onPress={() =>
-                          confirmDisconnect(computer.bridgeId, computer.computerName)
-                        }
+                        onPress={() => confirmDisconnect(computer.bridgeId, computer.computerName)}
                         disabled={removingBridgeId !== null}
                         accessibilityRole="button"
                         accessibilityLabel={`Disconnect ${computer.computerName}`}
@@ -758,9 +748,7 @@ export default function ComputerConnectionScreen() {
                       className={`flex-row items-start py-3 ${index < STEPS.length - 1 ? 'border-b border-border-subtle' : ''}`}
                     >
                       <View className="w-6 h-6 rounded-full bg-tint-blue items-center justify-center mr-3 mt-0.5">
-                        <Text className="text-brand-text text-text12 font-medium">
-                          {index + 1}
-                        </Text>
+                        <Text className="text-brand-text text-text12 font-medium">{index + 1}</Text>
                       </View>
                       <Text className="text-text-mid text-text14 leading-5 flex-1">{step}</Text>
                     </View>
