@@ -492,7 +492,7 @@ export default function ComputerConnectionScreen() {
               )}
 
               <Pressable
-                className={`rounded-button px-buttonPrimaryX py-buttonPrimaryY ${canScan ? 'bg-brand' : 'bg-tint-secondary'}`}
+                className={`rounded-button px-buttonPrimaryX py-buttonPrimaryY mb-6 ${canScan ? 'bg-brand' : 'bg-tint-secondary'}`}
                 disabled={!canScan}
                 onPress={startScanning}
                 accessibilityRole="button"
@@ -520,10 +520,10 @@ export default function ComputerConnectionScreen() {
                   return (
                     <View
                       key={computer.bridgeId}
-                      className={`flex-row items-start px-4 py-3 ${index < computers.length - 1 ? 'border-b border-border-subtle' : ''}`}
+                      className={`px-4 py-3 ${index < computers.length - 1 ? 'border-b border-border-subtle' : ''}`}
                     >
                       <Pressable
-                        className="flex-1 flex-row items-start"
+                        className="flex-row items-center"
                         onPress={() => setSelectedComputer(computer)}
                         accessibilityRole="button"
                         accessibilityLabel={`Permissions for ${computer.computerName}`}
@@ -581,7 +581,7 @@ export default function ComputerConnectionScreen() {
                         />
                       </Pressable>
                       <Pressable
-                        className="px-2 py-2 mt-1"
+                        className="self-end px-2 py-1 mt-1"
                         onPress={() =>
                           confirmDisconnect(computer.bridgeId, computer.computerName)
                         }
