@@ -11,7 +11,21 @@ let mockInteraction: Record<string, unknown> | null;
 
 jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),
-  useQueryClient: () => ({ getQueryData: () => undefined }),
+  useQueryClient: () => ({
+    getQueryData: () => undefined,
+    invalidateQueries: jest.fn(async () => undefined),
+  }),
+}));
+jest.mock('../../src/api/bridge/presentation', () => ({
+  computerBridgePresentationQueryKey: ['computerBridgePresentation'],
+  useComputerPresentation: () => ({
+    data: { messageTimestamps: true, grants: { viewSessions: true, sendPrompts: true, startSessions: true } },
+    settled: true,
+  }),
+  useComputerGrants: () => ({
+    grants: { viewSessions: true, sendPrompts: true, startSessions: true },
+    source: 'connector',
+  }),
 }));
 
 jest.mock('expo-router', () => ({
@@ -32,6 +46,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../src/api/bridge/queries', () => ({
+  computerSessionAccessQueryKey: ['computerSessionAccess'],
   computerSessionsQueryKey: () => ['computerSessions', 'bridge_1234567890'],
   useComputerBridgeFeatures: () => ({
     data: { activityTimeline: true, sessionElicitation: true, permissionPrompts: true },

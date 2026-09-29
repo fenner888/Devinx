@@ -38,6 +38,7 @@ import {
   ComputerPermissionsSheet,
   type ComputerGrants,
 } from '@components/connections/ComputerPermissionsSheet';
+import { useComputerGrants } from '@api/bridge/presentation';
 import {
   CONNECTOR_RELEASE_PAGE,
   CONNECTOR_SETUP_PROMPT,
@@ -84,6 +85,37 @@ function grantsFromPermissions(permissions: PairedComputerSummary['permissions']
     sendPrompts: permissions.includes('session:prompt:send'),
     startSessions: permissions.includes('session:create'),
   };
+}
+
+function ComputerPermissionChips({ computer }: { computer: PairedComputerSummary }) {
+  const { tokens } = useTheme();
+  const liveGrantInfo = useComputerGrants(computer.bridgeId, true);
+  const grants = liveGrantInfo?.grants ?? grantsFromPermissions(computer.permissions);
+  return (
+    <View className="flex-row flex-wrap mt-2">
+      {[
+        { id: 'viewSessions', label: 'View sessions', allowed: grants.viewSessions },
+        { id: 'sendPrompts', label: 'Send prompts', allowed: grants.sendPrompts },
+        { id: 'startSessions', label: 'Start sessions', allowed: grants.startSessions },
+      ].map(({ id, label, allowed }) => (
+        <View
+          key={id}
+          className={`flex-row items-center rounded-chip px-2 py-1 mr-1.5 mb-1 ${allowed ? 'bg-tint-green' : 'bg-tint-secondary'}`}
+          accessible
+          accessibilityLabel={`${label} ${allowed ? 'allowed' : 'not allowed'}`}
+        >
+          <Ionicons
+            name={allowed ? 'checkmark' : 'close'}
+            size={12}
+            color={allowed ? tokens.finished.hex : tokens.textLow.hex}
+          />
+          <Text className={`ml-1 text-text11 ${allowed ? 'text-finished' : 'text-text-low'}`}>
+            {label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 type ScreenPhase = 'intro' | 'requesting_permission' | 'scanning' | 'pairing' | 'success';
@@ -154,6 +186,10 @@ export default function ComputerConnectionScreen() {
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const expanded = howItWorksOpen ?? computers.length === 0;
+  const selectedComputerGrantInfo = useComputerGrants(
+    selectedComputer?.bridgeId ?? '',
+    selectedComputer !== null,
+  );
 
   useEffect(() => {
     mountedRef.current = true;
@@ -514,7 +550,6 @@ export default function ComputerConnectionScreen() {
               <Text className="text-text-mid text-text13 mb-2">Paired local devices</Text>
               <View className="rounded-card border border-border-subtle bg-surface1">
                 {computers.map((computer, index) => {
-                  const grants = grantsFromPermissions(computer.permissions);
                   return (
                     <View
                       key={computer.bridgeId}
@@ -530,43 +565,7 @@ export default function ComputerConnectionScreen() {
                         <View className="ml-3 flex-1">
                           <Text className="text-text-hi text-text14">{computer.computerName}</Text>
                           <Text className="mt-0.5 text-text-low text-text12">Tailscale</Text>
-                          <View className="flex-row flex-wrap mt-2">
-                            {[
-                              {
-                                id: 'viewSessions',
-                                label: 'View sessions',
-                                allowed: grants.viewSessions,
-                              },
-                              {
-                                id: 'sendPrompts',
-                                label: 'Send prompts',
-                                allowed: grants.sendPrompts,
-                              },
-                              {
-                                id: 'startSessions',
-                                label: 'Start sessions',
-                                allowed: grants.startSessions,
-                              },
-                            ].map(({ id, label, allowed }) => (
-                              <View
-                                key={id}
-                                className={`flex-row items-center rounded-chip px-2 py-1 mr-1.5 mb-1 ${allowed ? 'bg-tint-green' : 'bg-tint-secondary'}`}
-                                accessible
-                                accessibilityLabel={`${label} ${allowed ? 'allowed' : 'not allowed'}`}
-                              >
-                                <Ionicons
-                                  name={allowed ? 'checkmark' : 'close'}
-                                  size={12}
-                                  color={allowed ? tokens.finished.hex : tokens.textLow.hex}
-                                />
-                                <Text
-                                  className={`ml-1 text-text11 ${allowed ? 'text-finished' : 'text-text-low'}`}
-                                >
-                                  {label}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
+                          <ComputerPermissionChips computer={computer} />
                         </View>
                         <View className="self-center ml-2">
                           <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
@@ -777,8 +776,11 @@ export default function ComputerConnectionScreen() {
           visible={selectedComputer !== null}
           onClose={() => setSelectedComputer(null)}
           computerName={selectedComputer.computerName}
-          grants={grantsFromPermissions(selectedComputer.permissions)}
-          source="pairing"
+          grants={
+            selectedComputerGrantInfo?.grants ??
+            grantsFromPermissions(selectedComputer.permissions)
+          }
+          source={selectedComputerGrantInfo?.source ?? 'pairing'}
         />
       )}
     </SafeAreaView>

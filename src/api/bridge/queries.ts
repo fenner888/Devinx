@@ -27,6 +27,7 @@ import { connectionModeUsesComputer } from '@lib/connections';
 const MAXIMUM_PAGES_PER_COMPUTER = 5;
 export const COMPUTER_SESSIONS_REFRESH_INTERVAL_MS = 30_000;
 const MAXIMUM_SESSIONS_PER_COMPUTER = 5_000;
+export const computerSessionAccessQueryKey = ['computerSessionAccess'] as const;
 
 export interface ComputerSessionListItem extends ComputerSessionSummary {
   bridgeId: string;
@@ -370,10 +371,13 @@ export function useRespondComputerSessionPermission(bridgeId: string, sessionId:
 
 export function useComputerSessionAccess(bridgeId: string, enabled = true) {
   return useQuery({
-    queryKey: ['computerSessionAccess', bridgeId],
+    queryKey: [...computerSessionAccessQueryKey, bridgeId],
     queryFn: () => getComputerBridgeHealth(bridgeId),
     enabled,
     staleTime: 5_000,
+    refetchInterval: () =>
+      AppState.currentState === 'active' ? COMPUTER_SESSIONS_REFRESH_INTERVAL_MS : false,
+    refetchOnWindowFocus: true,
     retry: false,
   });
 }

@@ -21,6 +21,10 @@ jest.mock('@store/preferences', () => ({
   useAppPreferences: (selector: (state: unknown) => unknown) =>
     selector({ pinnedSessionIds: [], togglePin: jest.fn() }),
 }));
+jest.mock('@tanstack/react-query', () => ({
+  ...jest.requireActual('@tanstack/react-query'),
+  useQueryClient: () => ({ invalidateQueries: jest.fn(async () => undefined) }),
+}));
 jest.mock('@api/devin/queries', () => ({
   useSessions: () => ({
     data: [

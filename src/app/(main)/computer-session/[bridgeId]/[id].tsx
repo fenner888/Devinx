@@ -26,12 +26,17 @@ import {
   useComputerSessionElicitation,
   useComputerCreateOptions,
   useComputerSessionDetail,
+  computerSessionAccessQueryKey,
   computerSessionsQueryKey,
   usePromptComputerSession,
   useRespondComputerSessionElicitation,
 } from '@api/bridge/queries';
 import type { ComputerSessionBoard } from '@api/bridge/queries';
-import { useComputerGrants, useComputerPresentation } from '@api/bridge/presentation';
+import {
+  computerBridgePresentationQueryKey,
+  useComputerGrants,
+  useComputerPresentation,
+} from '@api/bridge/presentation';
 import {
   ComputerBridgeError,
   type ComputerElicitationAnswer,
@@ -303,6 +308,13 @@ export default function ComputerSessionDetailScreen() {
   );
   const listItem = (currentBoard?.sessions ?? [])
     .find((session) => session.bridgeId === bridgeId && session.id === sessionId);
+  const refreshLocalSession = useCallback(() => {
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: computerBridgePresentationQueryKey }),
+      queryClient.invalidateQueries({ queryKey: computerSessionAccessQueryKey }),
+      query.refetch(),
+    ]).catch(() => {});
+  }, [query, queryClient]);
   const workspaceSubtitle =
     listItem?.title !== undefined
       ? (query.data?.session.workspaceName ?? listItem.workspaceName)
@@ -711,7 +723,7 @@ export default function ComputerSessionDetailScreen() {
                 </Text>
                 <Pressable
                   className="mt-5 rounded-card bg-brand px-5 py-3"
-                  onPress={() => query.refetch()}
+                  onPress={refreshLocalSession}
                   accessibilityRole="button"
                   accessibilityLabel="Try loading local session again"
                 >
@@ -738,7 +750,7 @@ export default function ComputerSessionDetailScreen() {
                 refreshControl={
                   <RefreshControl
                     refreshing={query.isRefetching}
-                    onRefresh={() => query.refetch()}
+                    onRefresh={refreshLocalSession}
                     tintColor={tokens.brand.hex}
                   />
                 }

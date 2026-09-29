@@ -45,6 +45,20 @@ jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),
   useQueryClient: () => mockQueryClient,
 }));
+jest.mock('../../src/api/bridge/presentation', () => ({
+  computerBridgePresentationQueryKey: ['computerBridgePresentation'],
+  useComputerPresentation: () => ({
+    data: {
+      messageTimestamps: true,
+      grants: { viewSessions: true, sendPrompts: true, startSessions: true },
+    },
+    settled: true,
+  }),
+  useComputerGrants: () => ({
+    grants: { viewSessions: true, sendPrompts: true, startSessions: true },
+    source: 'connector',
+  }),
+}));
 
 jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) =>
@@ -66,6 +80,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../src/api/bridge/queries', () => ({
+  computerSessionAccessQueryKey: ['computerSessionAccess'],
   computerSessionsQueryKey: (computers: Array<{ bridgeId: string }>) => [
     'computerSessions',
     ...computers.map((computer) => computer.bridgeId).sort(),

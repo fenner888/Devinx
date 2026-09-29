@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { AppState } from 'react-native';
 
 import { useConnections } from '@auth/ConnectionContext';
 import {
@@ -6,94 +7,24 @@ import {
   type ComputerBridgePresentation,
 } from '@auth/computerBridge';
 
-const PRESENTATION_CACHE_TTL_MS = 60_000;
-
-interface CachedPresentation {
-  value: ComputerBridgePresentation | null;
-  fetchedAt: number;
-}
-
-interface PresentationState {
-  bridgeId: string;
-  enabled: boolean;
-  data: ComputerBridgePresentation | null | undefined;
-  settled: boolean;
-}
-
-const presentationCache = new Map<string, CachedPresentation>();
-const presentationRequests = new Map<string, Promise<ComputerBridgePresentation | null>>();
-
-function getCachedPresentation(bridgeId: string): CachedPresentation | undefined {
-  const cached = presentationCache.get(bridgeId);
-  if (!cached) return undefined;
-  if (Date.now() - cached.fetchedAt >= PRESENTATION_CACHE_TTL_MS) {
-    presentationCache.delete(bridgeId);
-    return undefined;
-  }
-  return cached;
-}
-
-function requestPresentation(bridgeId: string): Promise<ComputerBridgePresentation | null> {
-  const existing = presentationRequests.get(bridgeId);
-  if (existing) return existing;
-
-  const request = getComputerBridgePresentation(bridgeId)
-    .catch(() => null)
-    .then((value) => {
-      presentationCache.set(bridgeId, { value, fetchedAt: Date.now() });
-      return value;
-    });
-  presentationRequests.set(bridgeId, request);
-  request.then(() => {
-    if (presentationRequests.get(bridgeId) === request) {
-      presentationRequests.delete(bridgeId);
-    }
-  });
-  return request;
-}
+export const computerBridgePresentationQueryKey = ['computerBridgePresentation'] as const;
 
 export function useComputerPresentation(
   bridgeId: string,
   enabled: boolean,
 ): { data: ComputerBridgePresentation | null | undefined; settled: boolean } {
-  const [state, setState] = useState<PresentationState>({
-    bridgeId: '',
-    enabled: false,
-    data: undefined,
-    settled: false,
+  const query = useQuery<ComputerBridgePresentation | null>({
+    queryKey: [...computerBridgePresentationQueryKey, bridgeId],
+    queryFn: () => getComputerBridgePresentation(bridgeId).catch(() => null),
+    enabled: enabled && bridgeId.length > 0,
+    staleTime: 15_000,
+    gcTime: 5 * 60_000,
+    refetchInterval: () =>
+      AppState.currentState === 'active' ? 30_000 : false,
+    refetchOnWindowFocus: true,
+    retry: false,
   });
-  const active = enabled && bridgeId.length > 0;
-  const cached = active ? getCachedPresentation(bridgeId) : undefined;
-  const current =
-    active && state.bridgeId === bridgeId && state.enabled
-      ? state
-      : active && cached
-        ? { bridgeId, enabled: true, data: cached.value, settled: true }
-        : { bridgeId, enabled: active, data: undefined, settled: false };
-
-  useEffect(() => {
-    if (!active) {
-      setState({ bridgeId, enabled: false, data: undefined, settled: false });
-      return;
-    }
-
-    const fresh = getCachedPresentation(bridgeId);
-    if (fresh) {
-      setState({ bridgeId, enabled: true, data: fresh.value, settled: true });
-      return;
-    }
-
-    let mounted = true;
-    setState({ bridgeId, enabled: true, data: undefined, settled: false });
-    requestPresentation(bridgeId).then((data) => {
-      if (mounted) setState({ bridgeId, enabled: true, data, settled: true });
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [active, bridgeId]);
-
-  return { data: current.data, settled: current.settled };
+  return { data: query.data, settled: query.isFetched };
 }
 
 export function useComputerGrants(bridgeId: string, enabled: boolean) {

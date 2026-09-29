@@ -70,6 +70,9 @@ jest.mock('../../src/auth/deviceSigning', () => ({
   isQrScannerAvailable: () => true,
   requestQrScannerPermission: () => mockRequestPermission(),
 }));
+jest.mock('../../src/api/bridge/presentation', () => ({
+  useComputerGrants: () => undefined,
+}));
 
 jest.mock('../../src/components/connections/DevinXQrScanner', () => {
   return {
