@@ -4,7 +4,10 @@ import { Text } from 'react-native';
 
 const mockReact = React;
 const mockText = Text;
-const mockQueryClient = { getQueryData: jest.fn(() => undefined) };
+const mockQueryClient = {
+  getQueryData: jest.fn(() => undefined),
+  invalidateQueries: jest.fn(async () => undefined),
+};
 let mockMessages: Array<{
   sequence: number;
   source: 'user' | 'devin';
@@ -15,6 +18,20 @@ const mockRefetch = jest.fn(async () => {});
 
 jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => mockQueryClient,
+}));
+jest.mock('../../src/api/bridge/presentation', () => ({
+  computerBridgePresentationQueryKey: ['computerBridgePresentation'],
+  useComputerPresentation: () => ({
+    data: {
+      messageTimestamps: true,
+      grants: { viewSessions: true, sendPrompts: false, startSessions: false },
+    },
+    settled: true,
+  }),
+  useComputerGrants: () => ({
+    grants: { viewSessions: true, sendPrompts: false, startSessions: false },
+    source: 'pairing',
+  }),
 }));
 jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) =>
@@ -31,6 +48,7 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 jest.mock('../../src/api/bridge/queries', () => ({
+  computerSessionAccessQueryKey: ['computerSessionAccess'],
   computerSessionsQueryKey: () => ['computerSessions', 'bridge_1234567890'],
   useComputerBridgeFeatures: () => ({
     data: {

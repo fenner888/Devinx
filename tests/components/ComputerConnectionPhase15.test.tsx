@@ -85,6 +85,9 @@ jest.mock('@auth/deviceSigning', () => ({
   isQrScannerAvailable: () => true,
   requestQrScannerPermission: () => mockRequestPermission(),
 }));
+jest.mock('@api/bridge/presentation', () => ({
+  useComputerGrants: () => undefined,
+}));
 jest.mock('@components/connections/DevinXQrScanner', () => ({
   DevinXQrScanner: ({ onCode }: { onCode: (payload: string) => void }) =>
     mockReact.createElement(

@@ -96,6 +96,9 @@ jest.mock('@api/bridge/queries', () => ({
     mutate: mockCreateComputerSession,
   }),
 }));
+jest.mock('@api/bridge/presentation', () => ({
+  useComputerGrants: () => undefined,
+}));
 
 jest.mock('@auth/ConnectionContext', () => ({
   useConnections: () => mockConnection,

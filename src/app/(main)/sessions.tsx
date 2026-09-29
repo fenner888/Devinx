@@ -17,9 +17,15 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@theme/index';
 import { useSessions, useArchiveSession, useTerminateSession } from '@api/devin/queries';
-import { useComputerSessions, type ComputerSessionListItem } from '@api/bridge/queries';
+import {
+  computerSessionAccessQueryKey,
+  useComputerSessions,
+  type ComputerSessionListItem,
+} from '@api/bridge/queries';
+import { computerBridgePresentationQueryKey } from '@api/bridge/presentation';
 import { BoardSkeleton, EmptyState, ErrorState } from '@components/Skeletons';
 import {
   ComputerDiscoveryNotices,
@@ -65,6 +71,7 @@ export default function SessionsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const cloudQuery = useSessions('board');
   const computerQuery = useComputerSessions();
   const { mode } = useConnections();
@@ -138,9 +145,15 @@ export default function SessionsScreen() {
   const refreshAll = useCallback(() => {
     const refreshes: Promise<unknown>[] = [];
     if (usesCloud) refreshes.push(cloudQuery.refetch());
-    if (usesComputer) refreshes.push(computerQuery.refetch());
+    if (usesComputer) {
+      refreshes.push(computerQuery.refetch());
+      refreshes.push(
+        queryClient.invalidateQueries({ queryKey: computerBridgePresentationQueryKey }),
+      );
+      refreshes.push(queryClient.invalidateQueries({ queryKey: computerSessionAccessQueryKey }));
+    }
     Promise.all(refreshes).catch(() => {});
-  }, [cloudQuery, computerQuery, usesCloud, usesComputer]);
+  }, [cloudQuery, computerQuery, queryClient, usesCloud, usesComputer]);
 
   const toggleTag = useCallback((tag: string) => {
     setSelectedTags((prev) =>
