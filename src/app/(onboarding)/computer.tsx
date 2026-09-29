@@ -771,25 +771,16 @@ export default function ComputerConnectionScreen() {
           </View>
 
           {mode === 'computer' && phase === 'intro' && (
-            <>
-              <Pressable
-                className="border border-border rounded-button px-buttonPrimaryX py-buttonPrimaryY mt-5"
-                onPress={useCloudInstead}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  computers.length > 0 ? 'Also connect Devin Cloud' : 'Connect Devin Cloud instead'
-                }
-              >
-                <Text className="text-text-hi text-text14 font-medium text-center">
-                  {computers.length > 0 ? 'Also connect Devin Cloud' : 'Connect Devin Cloud instead'}
-                </Text>
-              </Pressable>
-              {computers.length > 0 && (
-                <Text className="text-text-low text-text12 text-center mt-2">
-                  Your paired devices stay connected.
-                </Text>
-              )}
-            </>
+            <Pressable
+              className="border border-border rounded-button px-buttonPrimaryX py-buttonPrimaryY mt-3"
+              onPress={useCloudInstead}
+              accessibilityRole="button"
+              accessibilityLabel="Connect Devin Cloud instead"
+            >
+              <Text className="text-text-hi text-text14 font-medium text-center">
+                Connect Devin Cloud instead
+              </Text>
+            </Pressable>
           )}
         </ScrollView>
       </KeyboardAvoidingView>

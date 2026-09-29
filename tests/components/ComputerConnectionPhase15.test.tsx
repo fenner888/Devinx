@@ -148,6 +148,7 @@ describe('Phase 15 local-device pairing screen', () => {
     expect(screen.getByLabelText('Send prompts not allowed')).toBeTruthy();
     expect(screen.getByLabelText('Start sessions not allowed')).toBeTruthy();
     expect(screen.getByLabelText('Disconnect Studio Mac')).toBeTruthy();
+    expect(screen.getByLabelText('Connect Devin Cloud instead')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Permissions for Studio Mac'));
 
