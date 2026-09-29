@@ -56,6 +56,7 @@ import {
 } from './endpoints';
 import { queryKeys } from './queryKeys';
 import {
+  IDLE_SESSION_LIST_INTERVAL_MS,
   messagePollingInterval,
   pollingPolicy,
   scalePolling,
@@ -146,7 +147,9 @@ export function useSessions(screen: ScreenContext = 'board') {
           mode,
         );
       }
-      return appState === 'active' ? scalePolling(60_000, mode) : false;
+      return appState === 'active'
+        ? scalePolling(IDLE_SESSION_LIST_INTERVAL_MS, mode)
+        : false;
     },
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,

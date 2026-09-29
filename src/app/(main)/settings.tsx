@@ -20,13 +20,21 @@ import { branding } from '@lib/branding';
 import { connectionModeOptions } from '@lib/connections';
 import { confirmAction } from '@lib/confirm';
 import { purgeUserScopedStorage } from '@lib/localUserData';
+import { formatPollingInterval, pollingModeIntervals } from '@lib/polling';
 import { normalizeDefaultTags, useAppPreferences, type PollingMode } from '@store/preferences';
+import { COMPUTER_SESSIONS_REFRESH_INTERVAL_MS } from '@api/bridge/queries';
 import {
   setThemePreference,
   useThemePreference,
   useTheme,
   type ThemePreference,
 } from '@theme/index';
+
+const POLLING_OPTIONS: { key: PollingMode; label: string }[] = [
+  { key: 'battery_saver', label: 'Battery saver' },
+  { key: 'balanced', label: 'Balanced' },
+  { key: 'fast', label: 'Fast' },
+];
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -44,6 +52,7 @@ export default function SettingsScreen() {
   const { tokens } = useTheme();
   const currentPref = useThemePreference();
   const pollingMode = useAppPreferences((s) => s.pollingMode);
+  const pollingIntervals = pollingModeIntervals(pollingMode);
   const setPollingMode = useAppPreferences((s) => s.setPollingMode);
   const hapticsEnabled = useAppPreferences((s) => s.hapticsEnabled);
   const setHaptics = useAppPreferences((s) => s.setHaptics);
@@ -217,28 +226,33 @@ export default function SettingsScreen() {
           <View className="px-4 py-3 border-b border-border-subtle">
             <Text className="text-text-hi text-text14 mb-2">Polling</Text>
             <View className="flex-row bg-tint-secondary rounded-button p-1">
-              {(
-                [
-                  { key: 'battery_saver', label: 'Battery saver' },
-                  { key: 'balanced', label: 'Balanced' },
-                  { key: 'fast', label: 'Fast' },
-                ] as { key: PollingMode; label: string }[]
-              ).map(({ key, label }) => (
+              {POLLING_OPTIONS.map(({ key, label }) => (
                 <Pressable
                   key={key}
                   className={`flex-1 rounded-button py-2 ${pollingMode === key ? 'bg-surface2' : ''}`}
                   onPress={() => setPollingMode(key)}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityState={{ selected: pollingMode === key }}
                 >
                   <Text
                     className={`text-center text-text13 ${pollingMode === key ? 'text-text-hi font-medium' : 'text-text-mid'}`}
                   >
                     {label}
                   </Text>
+                  <Text
+                    className={`text-center text-text11 mt-0.5 ${pollingMode === key ? 'text-text-hi' : 'text-text-mid'}`}
+                  >
+                    every {formatPollingInterval(pollingModeIntervals(key).sessionList)}
+                  </Text>
                 </Pressable>
               ))}
             </View>
             <Text className="text-text-low text-text12 mt-2">
-              How often the app refreshes sessions while open.
+              {`${POLLING_OPTIONS.find(({ key }) => key === pollingMode)?.label ?? 'Balanced'} · Devin Cloud session list every ${formatPollingInterval(pollingIntervals.sessionList)} while a session is running (${formatPollingInterval(pollingIntervals.idleSessionList)} when idle). Open sessions check for new messages every ${formatPollingInterval(pollingIntervals.messages)}.`}
+            </Text>
+            <Text className="text-text-low text-text11 mt-1">
+              {`Applies to Devin Cloud only. Local sessions refresh every ${formatPollingInterval(COMPUTER_SESSIONS_REFRESH_INTERVAL_MS)} while the app is open, whatever you choose here.`}
             </Text>
           </View>
           <View className="px-4 py-3 border-b border-border-subtle">

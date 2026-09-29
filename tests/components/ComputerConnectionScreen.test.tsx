@@ -123,7 +123,7 @@ describe('Computer connection onboarding', () => {
     const screen = render(<ComputerConnectionScreen />);
 
     expect(screen.getByText('Connect locally')).toBeTruthy();
-    expect(screen.getByText('Name this local device')).toBeTruthy();
+    expect(screen.getByText('Name this computer')).toBeTruthy();
     expect(screen.getByText('Open Tailscale setup guide')).toBeTruthy();
     expect(screen.getByText('Set up DevinX Connector')).toBeTruthy();
     expect(screen.getByText('Send assisted setup prompt')).toBeTruthy();
@@ -242,7 +242,7 @@ describe('Computer connection onboarding', () => {
     await waitFor(() => expect(mockPairComputer).toHaveBeenCalledTimes(1));
     expect(mockPairComputer).toHaveBeenCalledWith(
       '{"pairing":"offer"}',
-      expect.objectContaining({ computerName: 'My local device', signal: expect.any(Object) }),
+      expect.objectContaining({ computerName: 'My Mac', signal: expect.any(Object) }),
     );
     await waitFor(() => expect(mockRefreshComputers).toHaveBeenCalledTimes(1));
     expect(mockReplace).toHaveBeenCalledWith('/(main)');

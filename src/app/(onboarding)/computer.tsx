@@ -27,12 +27,17 @@ import {
   removeComputerFromThisIPhone,
 } from '@auth/computerBridge';
 import { pairComputerFromQrPayload, type ComputerPairingStatus } from '@auth/computerPairing';
+import type { PairedComputerSummary } from '@auth/pairedComputers';
 import {
   getQrScannerPermissionStatus,
   isQrScannerAvailable,
   requestQrScannerPermission,
 } from '@auth/deviceSigning';
 import { DevinXQrScanner } from '@components/connections/DevinXQrScanner';
+import {
+  ComputerPermissionsSheet,
+  type ComputerGrants,
+} from '@components/connections/ComputerPermissionsSheet';
 import {
   CONNECTOR_RELEASE_PAGE,
   CONNECTOR_SETUP_PROMPT,
@@ -55,6 +60,7 @@ const STEPS = [
 ];
 
 const TAILSCALE_IOS_GUIDE = 'https://tailscale.com/docs/install/ios';
+const DEFAULT_COMPUTER_NAME = 'My Mac';
 
 const STATUS_COPY: Record<ComputerPairingStatus, string> = {
   validating: 'Checking the pairing code…',
@@ -71,6 +77,14 @@ const STATUS_COPY: Record<ComputerPairingStatus, string> = {
 const styles = StyleSheet.create({
   scanner: { width: '100%', height: '100%' },
 });
+
+function grantsFromPermissions(permissions: PairedComputerSummary['permissions']): ComputerGrants {
+  return {
+    viewSessions: permissions.includes('session:content:read'),
+    sendPrompts: permissions.includes('session:prompt:send'),
+    startSessions: permissions.includes('session:create'),
+  };
+}
 
 type ScreenPhase = 'intro' | 'requesting_permission' | 'scanning' | 'pairing' | 'success';
 
@@ -127,26 +141,25 @@ export default function ComputerConnectionScreen() {
   const mode = useAppPreferences((state) => state.connectionMode);
   const setConnectionMode = useAppPreferences((state) => state.setConnectionMode);
   const isCombinedSetup = mode === 'both';
-  const [computerName, setComputerName] = useState('My local device');
+  const [computerName, setComputerName] = useState(DEFAULT_COMPUTER_NAME);
+  const [nameEdited, setNameEdited] = useState(false);
   const [phase, setPhase] = useState<ScreenPhase>('intro');
   const [pairingStatus, setPairingStatus] = useState<ComputerPairingStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [howItWorksOpen, setHowItWorksOpen] = useState<boolean | null>(null);
+  const [selectedComputer, setSelectedComputer] = useState<PairedComputerSummary | null>(null);
   const [removingBridgeId, setRemovingBridgeId] = useState<string | null>(null);
   const [updateRequiredBridgeIds, setUpdateRequiredBridgeIds] = useState<Set<string>>(new Set());
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
-  const scrollRef = useRef<ScrollView>(null);
+  const expanded = howItWorksOpen ?? computers.length === 0;
 
   useEffect(() => {
     mountedRef.current = true;
-    const keyboardSubscription = Keyboard.addListener('keyboardDidShow', () => {
-      scrollRef.current?.scrollToEnd({ animated: true });
-    });
     return () => {
       mountedRef.current = false;
       abortRef.current?.abort();
-      keyboardSubscription.remove();
     };
   }, []);
 
@@ -290,6 +303,7 @@ export default function ComputerConnectionScreen() {
     try {
       await pairComputerFromQrPayload(payload, {
         computerName: computerName.trim(),
+        useConnectorComputerName: !nameEdited,
         signal: controller.signal,
         onStatus: (status) => {
           latestStatus = status;
@@ -379,7 +393,6 @@ export default function ComputerConnectionScreen() {
         testID="computer-connection-keyboard-viewport"
       >
         <ScrollView
-          ref={scrollRef}
           contentContainerClassName="px-6 py-8 flex-grow"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           keyboardShouldPersistTaps="handled"
@@ -410,6 +423,220 @@ export default function ComputerConnectionScreen() {
               ? 'Devin Cloud is connected. Tailscale provides the private route to your local device; Connector provides authorized local session access.'
               : 'Tailscale provides the private route to your local device. Connector provides authorized local session access; your Devin credentials stay there.'}
           </Text>
+
+          {phase === 'pairing' || phase === 'success' ? (
+            <View className="bg-surface1 border border-border-subtle rounded-card px-5 py-6 items-center mb-5">
+              {phase === 'pairing' ? (
+                <ActivityIndicator size="large" color={tokens.brand.hex} />
+              ) : (
+                <Ionicons name="checkmark-circle" size={34} color={tokens.finished.hex} />
+              )}
+              <Text className="text-text-hi text-text14 font-medium mt-4 text-center">
+                {pairingStatus ? STATUS_COPY[pairingStatus] : 'Connecting…'}
+              </Text>
+              {pairingStatus === 'waiting_for_approval' && (
+                <Text className="text-text-low text-text12 leading-4 text-center mt-2">
+                  Choose metadata-only or read-only session content in Connector. The request
+                  expires automatically if it is not approved.
+                </Text>
+              )}
+              {phase === 'pairing' && (
+                <Pressable
+                  className="mt-4 px-4 py-2"
+                  onPress={() => resetForRetry('Pairing was cancelled.')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel local-device pairing"
+                >
+                  <Text className="text-link text-text13">Cancel</Text>
+                </Pressable>
+              )}
+            </View>
+          ) : (
+            <>
+              <View className="mb-4">
+                <Text className="text-text-mid text-text13 mb-2">Name this computer</Text>
+                <TextInput
+                  className="bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
+                  value={computerName}
+                  onChangeText={(value) => {
+                    setNameEdited(true);
+                    setComputerName(value);
+                  }}
+                  onSubmitEditing={Keyboard.dismiss}
+                  placeholder={DEFAULT_COMPUTER_NAME}
+                  placeholderTextColor={tokens.textLow.hex}
+                  maxLength={80}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  accessibilityLabel="Paired local-device name"
+                />
+              </View>
+
+              {error && (
+                <View className="mb-4 bg-tint-red rounded-card px-4 py-3">
+                  <Text className="text-failed text-text13 leading-5">{error}</Text>
+                  {showSettings && (
+                    <Pressable
+                      className="mt-2 self-start"
+                      onPress={() => Linking.openSettings().catch(() => {})}
+                      accessibilityRole="button"
+                      accessibilityLabel="Open iPhone settings"
+                    >
+                      <Text className="text-link text-text13 font-medium">Open Settings</Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
+
+              <Pressable
+                className={`rounded-button px-buttonPrimaryX py-buttonPrimaryY mb-6 ${canScan ? 'bg-brand' : 'bg-tint-secondary'}`}
+                disabled={!canScan}
+                onPress={startScanning}
+                accessibilityRole="button"
+                accessibilityLabel="Scan DevinX Connector pairing code"
+              >
+                {phase === 'requesting_permission' ? (
+                  <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+                ) : (
+                  <Text
+                    className={`text-center text-text14 font-medium ${canScan ? 'text-text-always-white' : 'text-text-low'}`}
+                  >
+                    Scan pairing code
+                  </Text>
+                )}
+              </Pressable>
+            </>
+          )}
+
+          {computers.length > 0 && (
+            <View className="mb-6">
+              <Text className="text-text-mid text-text13 mb-2">Paired local devices</Text>
+              <View className="rounded-card border border-border-subtle bg-surface1">
+                {computers.map((computer, index) => {
+                  const grants = grantsFromPermissions(computer.permissions);
+                  return (
+                    <View
+                      key={computer.bridgeId}
+                      className={`px-4 py-3 ${index < computers.length - 1 ? 'border-b border-border-subtle' : ''}`}
+                    >
+                      <Pressable
+                        className="flex-row items-start"
+                        onPress={() => setSelectedComputer(computer)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Permissions for ${computer.computerName}`}
+                      >
+                        <Ionicons name="desktop-outline" size={18} color={tokens.brandText.hex} />
+                        <View className="ml-3 flex-1">
+                          <Text className="text-text-hi text-text14">{computer.computerName}</Text>
+                          <Text className="mt-0.5 text-text-low text-text12">Tailscale</Text>
+                          <View className="flex-row flex-wrap mt-2">
+                            {[
+                              {
+                                id: 'viewSessions',
+                                label: 'View sessions',
+                                allowed: grants.viewSessions,
+                              },
+                              {
+                                id: 'sendPrompts',
+                                label: 'Send prompts',
+                                allowed: grants.sendPrompts,
+                              },
+                              {
+                                id: 'startSessions',
+                                label: 'Start sessions',
+                                allowed: grants.startSessions,
+                              },
+                            ].map(({ id, label, allowed }) => (
+                              <View
+                                key={id}
+                                className={`flex-row items-center rounded-chip px-2 py-1 mr-1.5 mb-1 ${allowed ? 'bg-tint-green' : 'bg-tint-secondary'}`}
+                                accessible
+                                accessibilityLabel={`${label} ${allowed ? 'allowed' : 'not allowed'}`}
+                              >
+                                <Ionicons
+                                  name={allowed ? 'checkmark' : 'close'}
+                                  size={12}
+                                  color={allowed ? tokens.finished.hex : tokens.textLow.hex}
+                                />
+                                <Text
+                                  className={`ml-1 text-text11 ${allowed ? 'text-finished' : 'text-text-low'}`}
+                                >
+                                  {label}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                        <View className="self-center ml-2">
+                          <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
+                        </View>
+                      </Pressable>
+                      <Pressable
+                        className="self-end px-2 py-1 mt-1"
+                        onPress={() => confirmDisconnect(computer.bridgeId, computer.computerName)}
+                        disabled={removingBridgeId !== null}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Disconnect ${computer.computerName}`}
+                      >
+                        {removingBridgeId === computer.bridgeId ? (
+                          <ActivityIndicator size="small" color={tokens.failed.hex} />
+                        ) : (
+                          <Text className="text-failed text-text12 font-medium">Disconnect</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+              <View className="bg-tint-blue border border-border-subtle rounded-card px-4 py-3 mt-3">
+                <View className="flex-row items-start">
+                  <Ionicons name="arrow-up-circle-outline" size={18} color={tokens.brandText.hex} />
+                  <View className="ml-2 flex-1">
+                    <Text className="text-text-hi text-text13 font-semibold">
+                      {updateRequiredBridgeIds.size > 0
+                        ? 'Connector update required'
+                        : 'Updating DevinX Connector'}
+                    </Text>
+                    {updateRequiredBridgeIds.size > 0 && (
+                      <Text className="text-text-mid text-text12 leading-4 mt-1">
+                        Install DevinX Connector {MINIMUM_SUPPORTED_CONNECTOR_VERSION} or later to
+                        keep local sessions compatible.
+                      </Text>
+                    )}
+                    <Text className="text-text-mid text-text12 leading-4 mt-2">
+                      {CONNECTOR_UPDATE_NOTICE}
+                    </Text>
+                    <Text className="text-text-mid text-text12 leading-4 mt-2">
+                      {MAC_CONNECTOR_UPDATE_STEPS}
+                    </Text>
+                    <Text className="text-text-mid text-text12 leading-4 mt-2">
+                      {WINDOWS_CONNECTOR_UPDATE_STEPS}
+                    </Text>
+                    <View className="flex-row mt-2">
+                      <Pressable
+                        className="mr-4"
+                        onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
+                        accessibilityRole="link"
+                        accessibilityLabel="Open official DevinX Connector update for Mac"
+                      >
+                        <Text className="text-link text-text12 font-medium">Mac update</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() =>
+                          Linking.openURL(WINDOWS_CONNECTOR_STORE_PAGE).catch(() => {})
+                        }
+                        accessibilityRole="link"
+                        accessibilityLabel="Open DevinX Connector update in Microsoft Store"
+                      >
+                        <Text className="text-link text-text12 font-medium">Windows update</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
 
           {computers.length === 0 && (
             <View className="bg-surface1 border border-border-subtle rounded-card px-4 py-4 mb-5">
@@ -466,207 +693,70 @@ export default function ComputerConnectionScreen() {
               </View>
 
               <Text className="text-text-low text-text11 leading-4 text-center mt-3">
-                Already installed? Continue below to name this device and scan its pairing code.
+                Already installed? Name this computer and scan its pairing code above.
               </Text>
             </View>
           )}
 
-          {computers.length > 0 && (
-            <View className="mb-6">
-              <Text className="text-text-mid text-text13 mb-2">Paired local devices</Text>
-              <View className="rounded-card border border-border-subtle bg-surface1">
-                {computers.map((computer, index) => (
-                  <View
-                    key={computer.bridgeId}
-                    className={`flex-row items-center px-4 py-3 ${index < computers.length - 1 ? 'border-b border-border-subtle' : ''}`}
-                  >
-                    <Ionicons name="desktop-outline" size={18} color={tokens.brandText.hex} />
-                    <View className="ml-3 flex-1">
-                      <Text className="text-text-hi text-text14">{computer.computerName}</Text>
-                      <Text className="mt-0.5 text-text-low text-text12">Tailscale</Text>
-                    </View>
-                    <Pressable
-                      className="px-2 py-2"
-                      onPress={() => confirmDisconnect(computer.bridgeId, computer.computerName)}
-                      disabled={removingBridgeId !== null}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Disconnect ${computer.computerName}`}
-                    >
-                      {removingBridgeId === computer.bridgeId ? (
-                        <ActivityIndicator size="small" color={tokens.failed.hex} />
-                      ) : (
-                        <Text className="text-failed text-text12 font-medium">Disconnect</Text>
-                      )}
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-              <View className="bg-tint-blue border border-border-subtle rounded-card px-4 py-3 mt-3">
-                <View className="flex-row items-start">
-                  <Ionicons name="arrow-up-circle-outline" size={18} color={tokens.brandText.hex} />
-                  <View className="ml-2 flex-1">
-                    <Text className="text-text-hi text-text13 font-semibold">
-                      {updateRequiredBridgeIds.size > 0
-                        ? 'Connector update required'
-                        : 'Updating DevinX Connector'}
-                    </Text>
-                    {updateRequiredBridgeIds.size > 0 && (
-                      <Text className="text-text-mid text-text12 leading-4 mt-1">
-                        Install DevinX Connector {MINIMUM_SUPPORTED_CONNECTOR_VERSION} or later to
-                        keep local sessions compatible.
-                      </Text>
-                    )}
-                    <Text className="text-text-mid text-text12 leading-4 mt-2">
-                      {CONNECTOR_UPDATE_NOTICE}
-                    </Text>
-                    <Text className="text-text-mid text-text12 leading-4 mt-2">
-                      {MAC_CONNECTOR_UPDATE_STEPS}
-                    </Text>
-                    <Text className="text-text-mid text-text12 leading-4 mt-2">
-                      {WINDOWS_CONNECTOR_UPDATE_STEPS}
-                    </Text>
-                    <View className="flex-row mt-2">
-                      <Pressable
-                        className="mr-4"
-                        onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
-                        accessibilityRole="link"
-                        accessibilityLabel="Open official DevinX Connector update for Mac"
-                      >
-                        <Text className="text-link text-text12 font-medium">Mac update</Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() =>
-                          Linking.openURL(WINDOWS_CONNECTOR_STORE_PAGE).catch(() => {})
-                        }
-                        accessibilityRole="link"
-                        accessibilityLabel="Open DevinX Connector update in Microsoft Store"
-                      >
-                        <Text className="text-link text-text12 font-medium">Windows update</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-          )}
-
-          <Text className="text-text-mid text-text13 mb-2">Private connection</Text>
-          <View className="bg-tint-blue rounded-card px-4 py-3 mb-4">
-            <View className="flex-row items-start">
-              <Ionicons name="shield-checkmark-outline" size={16} color={tokens.brandText.hex} />
-              <Text className="text-brand-text text-text12 leading-4 ml-2 flex-1">
-                Tailscale supplies the private network. Connector supplies the local Devin service,
-                and DevinX verifies the local device and this iPhone for every request.
-              </Text>
-            </View>
+          <View className="mb-5">
             <Pressable
-              className="mt-2 self-start"
-              onPress={() => Linking.openURL(TAILSCALE_IOS_GUIDE).catch(() => {})}
-              accessibilityRole="link"
-              accessibilityLabel="Open Tailscale setup guide"
+              className="flex-row items-center justify-between py-3"
+              onPress={() => setHowItWorksOpen(!expanded)}
+              accessibilityRole="button"
+              accessibilityLabel="How it works"
+              accessibilityState={{ expanded }}
             >
-              <Text className="text-brand-text text-text12 font-medium">
-                Open Tailscale setup guide
-              </Text>
+              <Text className="text-text-mid text-text13">How it works</Text>
+              <Ionicons
+                name={expanded ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color={tokens.textLow.hex}
+              />
             </Pressable>
-          </View>
-
-          <View className="bg-surface1 border border-border-subtle rounded-card px-4 py-2 mb-5">
-            {STEPS.map((step, index) => (
-              <View
-                key={step}
-                className={`flex-row items-start py-3 ${index < STEPS.length - 1 ? 'border-b border-border-subtle' : ''}`}
-              >
-                <View className="w-6 h-6 rounded-full bg-tint-blue items-center justify-center mr-3 mt-0.5">
-                  <Text className="text-brand-text text-text12 font-medium">{index + 1}</Text>
-                </View>
-                <Text className="text-text-mid text-text14 leading-5 flex-1">{step}</Text>
-              </View>
-            ))}
-          </View>
-
-          {phase === 'pairing' || phase === 'success' ? (
-            <View className="bg-surface1 border border-border-subtle rounded-card px-5 py-6 items-center mb-5">
-              {phase === 'pairing' ? (
-                <ActivityIndicator size="large" color={tokens.brand.hex} />
-              ) : (
-                <Ionicons name="checkmark-circle" size={34} color={tokens.finished.hex} />
-              )}
-              <Text className="text-text-hi text-text14 font-medium mt-4 text-center">
-                {pairingStatus ? STATUS_COPY[pairingStatus] : 'Connecting…'}
-              </Text>
-              {pairingStatus === 'waiting_for_approval' && (
-                <Text className="text-text-low text-text12 leading-4 text-center mt-2">
-                  Choose metadata-only or read-only session content in Connector. The request
-                  expires automatically if it is not approved.
-                </Text>
-              )}
-              {phase === 'pairing' && (
-                <Pressable
-                  className="mt-4 px-4 py-2"
-                  onPress={() => resetForRetry('Pairing was cancelled.')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel local-device pairing"
-                >
-                  <Text className="text-link text-text13">Cancel</Text>
-                </Pressable>
-              )}
-            </View>
-          ) : (
-            <>
-              <View className="mb-4">
-                <Text className="text-text-mid text-text13 mb-2">Name this local device</Text>
-                <TextInput
-                  className="bg-surface2 border border-border rounded-input px-4 py-3 text-text14 text-text-hi"
-                  value={computerName}
-                  onChangeText={setComputerName}
-                  onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
-                  onSubmitEditing={Keyboard.dismiss}
-                  placeholder="My local device"
-                  placeholderTextColor={tokens.textLow.hex}
-                  maxLength={80}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  returnKeyType="done"
-                  accessibilityLabel="Paired local-device name"
-                />
-              </View>
-
-              {error && (
-                <View className="mb-4 bg-tint-red rounded-card px-4 py-3">
-                  <Text className="text-failed text-text13 leading-5">{error}</Text>
-                  {showSettings && (
-                    <Pressable
-                      className="mt-2 self-start"
-                      onPress={() => Linking.openSettings().catch(() => {})}
-                      accessibilityRole="button"
-                      accessibilityLabel="Open iPhone settings"
-                    >
-                      <Text className="text-link text-text13 font-medium">Open Settings</Text>
-                    </Pressable>
-                  )}
-                </View>
-              )}
-
-              <Pressable
-                className={`rounded-button px-buttonPrimaryX py-buttonPrimaryY ${canScan ? 'bg-brand' : 'bg-tint-secondary'}`}
-                disabled={!canScan}
-                onPress={startScanning}
-                accessibilityRole="button"
-                accessibilityLabel="Scan DevinX Connector pairing code"
-              >
-                {phase === 'requesting_permission' ? (
-                  <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
-                ) : (
-                  <Text
-                    className={`text-center text-text14 font-medium ${canScan ? 'text-text-always-white' : 'text-text-low'}`}
+            {expanded && (
+              <>
+                <Text className="text-text-mid text-text13 mb-2">Private connection</Text>
+                <View className="bg-tint-blue rounded-card px-4 py-3 mb-4">
+                  <View className="flex-row items-start">
+                    <Ionicons
+                      name="shield-checkmark-outline"
+                      size={16}
+                      color={tokens.brandText.hex}
+                    />
+                    <Text className="text-brand-text text-text12 leading-4 ml-2 flex-1">
+                      Tailscale supplies the private network. Connector supplies the local Devin
+                      service, and DevinX verifies the local device and this iPhone for every
+                      request.
+                    </Text>
+                  </View>
+                  <Pressable
+                    className="mt-2 self-start"
+                    onPress={() => Linking.openURL(TAILSCALE_IOS_GUIDE).catch(() => {})}
+                    accessibilityRole="link"
+                    accessibilityLabel="Open Tailscale setup guide"
                   >
-                    Scan pairing code
-                  </Text>
-                )}
-              </Pressable>
-            </>
-          )}
+                    <Text className="text-brand-text text-text12 font-medium">
+                      Open Tailscale setup guide
+                    </Text>
+                  </Pressable>
+                </View>
+
+                <View className="bg-surface1 border border-border-subtle rounded-card px-4 py-2 mb-5">
+                  {STEPS.map((step, index) => (
+                    <View
+                      key={step}
+                      className={`flex-row items-start py-3 ${index < STEPS.length - 1 ? 'border-b border-border-subtle' : ''}`}
+                    >
+                      <View className="w-6 h-6 rounded-full bg-tint-blue items-center justify-center mr-3 mt-0.5">
+                        <Text className="text-brand-text text-text12 font-medium">{index + 1}</Text>
+                      </View>
+                      <Text className="text-text-mid text-text14 leading-5 flex-1">{step}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
 
           {mode === 'computer' && phase === 'intro' && (
             <Pressable
@@ -682,6 +772,15 @@ export default function ComputerConnectionScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      {selectedComputer && (
+        <ComputerPermissionsSheet
+          visible={selectedComputer !== null}
+          onClose={() => setSelectedComputer(null)}
+          computerName={selectedComputer.computerName}
+          grants={grantsFromPermissions(selectedComputer.permissions)}
+          source="pairing"
+        />
+      )}
     </SafeAreaView>
   );
 }
