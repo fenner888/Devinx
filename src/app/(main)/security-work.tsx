@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSessions } from '@api/devin/queries';
 import type { SessionResponse } from '@api/devin/types';
 import { useConnections } from '@auth/ConnectionContext';
+import { CloudRequiredScreen } from '@components/CloudRequired';
 import { BoardSkeleton, EmptyState, ErrorState } from '@components/Skeletons';
 import { connectionModeUsesCloud } from '@lib/connections';
 import { hapticLight } from '@lib/haptics';
@@ -14,17 +15,15 @@ import { groupSecurityWork } from '@lib/security-work';
 import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 
-export default function SecurityWorkScreen() {
+function SecurityWorkContent() {
   const router = useRouter();
   const { tokens } = useTheme();
-  const { mode } = useConnections();
-  const cloudEnabled = connectionModeUsesCloud(mode);
   const sessions = useSessions('board');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const groups = useMemo(
-    () => groupSecurityWork(cloudEnabled ? (sessions.data ?? []) : []),
-    [cloudEnabled, sessions.data],
+    () => groupSecurityWork(sessions.data ?? []),
+    [sessions.data],
   );
 
   function openSession(session: SessionResponse) {
@@ -67,15 +66,7 @@ export default function SecurityWorkScreen() {
         </Text>
       </View>
 
-      {!cloudEnabled ? (
-        <View className="flex-1 px-5">
-          <EmptyState
-            icon="shield"
-            title="Connect Devin Cloud"
-            message="Security Work uses Code Scan sessions returned by Devin Cloud."
-          />
-        </View>
-      ) : sessions.isLoading ? (
+      {sessions.isLoading ? (
         <BoardSkeleton />
       ) : sessions.error && groups.length === 0 ? (
         <ErrorState
@@ -205,4 +196,17 @@ export default function SecurityWorkScreen() {
       )}
     </SafeAreaView>
   );
+}
+
+export default function SecurityWorkScreen() {
+  const { mode } = useConnections();
+  if (!connectionModeUsesCloud(mode)) {
+    return (
+      <CloudRequiredScreen
+        title="Security Work"
+        message="Code Scans run in Devin Cloud. Connect your Devin account to see them here."
+      />
+    );
+  }
+  return <SecurityWorkContent />;
 }

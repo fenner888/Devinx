@@ -12,11 +12,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRepositories } from '@api/devin/queries';
+import { useConnections } from '@auth/ConnectionContext';
+import { CloudRequiredScreen } from '@components/CloudRequired';
 import { repositoryIndexPresentation } from '@lib/repository-indexing';
+import { connectionModeUsesCloud } from '@lib/connections';
 import { EmptyState, ErrorState } from '@components/Skeletons';
 import { useTheme } from '@theme/index';
 
-export default function RepositoriesScreen() {
+function RepositoriesContent() {
   const router = useRouter();
   const { tokens } = useTheme();
   const repositories = useRepositories();
@@ -190,4 +193,17 @@ export default function RepositoriesScreen() {
       )}
     </SafeAreaView>
   );
+}
+
+export default function RepositoriesScreen() {
+  const { mode } = useConnections();
+  if (!connectionModeUsesCloud(mode)) {
+    return (
+      <CloudRequiredScreen
+        title="Repositories & Wiki"
+        message="Repositories and wikis are indexed in Devin Cloud. Connect your Devin account to see them here."
+      />
+    );
+  }
+  return <RepositoriesContent />;
 }
