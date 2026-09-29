@@ -154,7 +154,7 @@ describe('Local Home grant priority', () => {
     mockCloudSessions = [];
   });
 
-  it('puts Recent and read-only guidance before the companion without a composer', () => {
+  it('puts the companion before Recent and read-only guidance without a composer', () => {
     mockConnection = {
       mode: 'computer',
       hasCloudConnection: false,
@@ -185,14 +185,11 @@ describe('Local Home grant priority', () => {
     expect(screen.queryByLabelText('Session prompt')).toBeNull();
     expect(screen.queryByLabelText('Start session')).toBeNull();
     const tree = JSON.stringify(screen.toJSON());
-    expect(tree.indexOf('"testID":"home-connection-status"')).toBeLessThan(
+    expect(tree.indexOf('"testID":"home-companion-stage"')).toBeLessThan(
       tree.indexOf('"testID":"home-recent"'),
     );
     expect(tree.indexOf('"testID":"home-recent"')).toBeLessThan(
       tree.indexOf('"testID":"home-read-only-card"'),
-    );
-    expect(tree.indexOf('"testID":"home-read-only-card"')).toBeLessThan(
-      tree.indexOf('"testID":"home-companion-stage"'),
     );
 
     fireEvent.press(screen.getByTestId('home-read-only-card'));
@@ -239,7 +236,7 @@ describe('Local Home grant priority', () => {
     expect(mockUseComputerCreateOptions).toHaveBeenLastCalledWith(bridgeId, true);
   });
 
-  it('shows at most three Recent rows before a reduced companion and the composer', () => {
+  it('shows Recent rows after the full companion and composer', () => {
     mockConnection = {
       mode: 'computer',
       hasCloudConnection: false,
@@ -270,18 +267,16 @@ describe('Local Home grant priority', () => {
 
     expect(screen.getByText('Recent one')).toBeTruthy();
     expect(screen.getByText('Recent three')).toBeTruthy();
-    expect(screen.queryByText('Recent four')).toBeNull();
+    expect(screen.getByText('Recent four')).toBeTruthy();
     expect(screen.getByLabelText('Session prompt')).toBeTruthy();
     expect(screen.getByLabelText('Start session')).toBeTruthy();
     const tree = JSON.stringify(screen.toJSON());
-    expect(tree.indexOf('"testID":"home-recent"')).toBeLessThan(
-      tree.indexOf('"testID":"home-companion-stage"'),
-    );
     expect(tree.indexOf('"testID":"home-companion-stage"')).toBeLessThan(
       tree.indexOf('"testID":"home-composer-heading"'),
     );
-    const companion = mockCompanionProps.mock.calls.at(-1)?.[0] as { size?: number } | undefined;
-    expect(companion?.size).toBeLessThan(164);
+    expect(tree.indexOf('"testID":"home-composer-heading"')).toBeLessThan(
+      tree.indexOf('"testID":"home-recent"'),
+    );
   });
 
   it('keeps Cloud Home Recent after the composer without a read-only card', () => {

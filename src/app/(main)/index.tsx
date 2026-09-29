@@ -371,13 +371,10 @@ export default function HomeScreen() {
       repository.repo_path.normalize('NFKC').toLocaleLowerCase().includes(normalizedRepoQuery),
   );
   const companionSize = Math.round(Math.min(height < 700 ? 184 : 220, Math.max(164, width * 0.54)));
-  const localRecentCompanionSize = Math.round(Math.min(148, Math.max(132, width * 0.36)));
   const readOnlyLocalHome =
     connectionMode === 'computer' &&
     computerGrantInfo?.source === 'connector' &&
     computerGrantInfo.grants.startSessions === false;
-  const localRecentBeforeComposer =
-    connectionMode === 'computer' && !readOnlyLocalHome && recent.length > 0;
   const voice = useVoiceComposer({
     value: prompt,
     onChangeText: setPrompt,
@@ -651,6 +648,14 @@ export default function HomeScreen() {
 
           {readOnlyLocalHome ? (
             <>
+              <HomeCompanionStage companionSize={companionSize}>
+                <DevinCompanion
+                  state={companionState}
+                  size={companionSize}
+                  active={companionActive}
+                  accessibilityLabel={`Devin companion, ${companionState}`}
+                />
+              </HomeCompanionStage>
               <HomeRecent items={recent.slice(0, 5)} />
               <Pressable
                 className="mt-3 flex-row items-center rounded-card border border-border-subtle bg-surface1 px-4 py-3"
@@ -669,24 +674,13 @@ export default function HomeScreen() {
                   computers={usesComputer ? (computerSessions.data?.computers ?? []) : []}
                 />
               </View>
+            </>
+          ) : (
+            <>
               <HomeCompanionStage companionSize={companionSize}>
                 <DevinCompanion
                   state={companionState}
                   size={companionSize}
-                  active={companionActive}
-                  accessibilityLabel={`Devin companion, ${companionState}`}
-                />
-              </HomeCompanionStage>
-            </>
-          ) : (
-            <>
-              {localRecentBeforeComposer && <HomeRecent items={recent.slice(0, 3)} />}
-              <HomeCompanionStage
-                companionSize={localRecentBeforeComposer ? localRecentCompanionSize : companionSize}
-              >
-                <DevinCompanion
-                  state={companionState}
-                  size={localRecentBeforeComposer ? localRecentCompanionSize : companionSize}
                   active={companionActive}
                   accessibilityLabel={`Devin companion, ${companionState}`}
                 />
@@ -962,7 +956,7 @@ export default function HomeScreen() {
                   computers={usesComputer ? (computerSessions.data?.computers ?? []) : []}
                 />
               </View>
-              {!localRecentBeforeComposer && <HomeRecent items={recent} />}
+              <HomeRecent items={recent} />
             </>
           )}
         </ScrollView>
