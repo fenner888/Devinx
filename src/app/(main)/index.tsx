@@ -618,11 +618,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <NavMenu
-        visible={showMenu}
-        onClose={() => setShowMenu(false)}
-        showCloudTags={!hasCloudConnection}
-      />
+      <NavMenu visible={showMenu} onClose={() => setShowMenu(false)} />
 
       <OfflineBanner />
 

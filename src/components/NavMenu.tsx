@@ -7,7 +7,6 @@ import { View, Text, Pressable, Modal, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { CloudTag } from '@components/CloudRequired';
 import { useTheme } from '@theme/index';
 import { hapticLight } from '@lib/haptics';
 import WORDMARK_DARK from '../../assets/wordmark.png';
@@ -17,17 +16,14 @@ interface NavItem {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   route: Href;
-  cloudOnly?: true;
 }
 
 export function NavMenu({
   visible,
   onClose,
-  showCloudTags = false,
 }: {
   visible: boolean;
   onClose: () => void;
-  showCloudTags?: boolean;
 }) {
   const router = useRouter();
   const { name, tokens } = useTheme();
@@ -39,14 +35,9 @@ export function NavMenu({
   const primary: NavItem[] = [
     { icon: 'add', label: 'New session', route: '/(main)/compose' },
     { icon: 'chatbubbles-outline', label: 'Sessions', route: '/(main)/sessions' },
-    { icon: 'time-outline', label: 'Automations', route: '/(main)/automations', cloudOnly: true },
-    {
-      icon: 'shield-checkmark-outline',
-      label: 'Security Work',
-      route: '/(main)/security-work',
-      cloudOnly: true,
-    },
-    { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review', cloudOnly: true },
+    { icon: 'time-outline', label: 'Automations', route: '/(main)/automations' },
+    { icon: 'shield-checkmark-outline', label: 'Security Work', route: '/(main)/security-work' },
+    { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review' },
   ];
 
   function go(route: Href) {
@@ -81,18 +72,16 @@ export function NavMenu({
             </View>
 
             <View className="px-3">
-              {primary.map(({ icon, label, route, cloudOnly }) => (
+              {primary.map(({ icon, label, route }) => (
                 <Pressable
                   key={label}
                   className="flex-row items-center rounded-card px-3 py-3"
                   onPress={() => go(route)}
                   accessibilityRole="button"
                   accessibilityLabel={label}
-                  accessibilityHint={showCloudTags && cloudOnly ? 'Requires Devin Cloud' : undefined}
                 >
                   <Ionicons name={icon} size={19} color={tokens.textMid.hex} />
                   <Text className="text-text-hi text-text16 ml-3">{label}</Text>
-                  {showCloudTags && cloudOnly && <CloudTag />}
                 </Pressable>
               ))}
             </View>

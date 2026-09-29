@@ -18,10 +18,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { usePrReview, useTriggerPrReview } from '@api/devin/queries';
-import { useConnections } from '@auth/ConnectionContext';
-import { CloudRequiredScreen } from '@components/CloudRequired';
 import { ApiError } from '@api/devin/client';
-import { connectionModeUsesCloud } from '@lib/connections';
 import { hapticLight, hapticSuccess, hapticError } from '@lib/haptics';
 import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
@@ -37,7 +34,7 @@ const STATUS_STYLE: Record<PrReviewStatus, { label: string; text: string; bg: st
   cancelled: { label: 'Cancelled', text: 'text-text-mid', bg: 'bg-tint-secondary' },
 };
 
-function ReviewContent() {
+export default function ReviewScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -223,17 +220,4 @@ function ReviewContent() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
-
-export default function ReviewScreen() {
-  const { mode } = useConnections();
-  if (!connectionModeUsesCloud(mode)) {
-    return (
-      <CloudRequiredScreen
-        title="Review"
-        message="Pull request reviews run in Devin Cloud. Connect your Devin account to see them here."
-      />
-    );
-  }
-  return <ReviewContent />;
 }

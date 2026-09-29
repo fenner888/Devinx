@@ -25,12 +25,9 @@ import {
   useDeleteSchedule,
   usePlaybooks,
 } from '@api/devin/queries';
-import { useConnections } from '@auth/ConnectionContext';
-import { CloudRequiredScreen } from '@components/CloudRequired';
 import { ErrorState, EmptyState } from '@components/Skeletons';
 import { hapticLight, hapticSuccess, hapticError, hapticWarning } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
-import { connectionModeUsesCloud } from '@lib/connections';
 import { normalizeScheduleTags, validateScheduleTiming } from '@lib/schedule-validation';
 import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
@@ -48,7 +45,7 @@ const CRON_PRESETS: { label: string; cron: string }[] = [
   { label: 'Hourly', cron: '0 * * * *' },
 ];
 
-function AutomationsContent() {
+export default function AutomationsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -505,17 +502,4 @@ function AutomationsContent() {
       </Modal>
     </SafeAreaView>
   );
-}
-
-export default function AutomationsScreen() {
-  const { mode } = useConnections();
-  if (!connectionModeUsesCloud(mode)) {
-    return (
-      <CloudRequiredScreen
-        title="Automations"
-        message="Automations run in Devin Cloud. Connect your Devin account to see them here."
-      />
-    );
-  }
-  return <AutomationsContent />;
 }

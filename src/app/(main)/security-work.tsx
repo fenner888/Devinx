@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSessions } from '@api/devin/queries';
 import type { SessionResponse } from '@api/devin/types';
 import { useConnections } from '@auth/ConnectionContext';
-import { CloudRequiredScreen } from '@components/CloudRequired';
 import { BoardSkeleton, EmptyState, ErrorState } from '@components/Skeletons';
 import { connectionModeUsesCloud } from '@lib/connections';
 import { hapticLight } from '@lib/haptics';
@@ -15,15 +14,17 @@ import { groupSecurityWork } from '@lib/security-work';
 import { userFacingError } from '@lib/user-facing-error';
 import { useTheme } from '@theme/index';
 
-function SecurityWorkContent() {
+export default function SecurityWorkScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
+  const { mode } = useConnections();
+  const cloudEnabled = connectionModeUsesCloud(mode);
   const sessions = useSessions('board');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const groups = useMemo(
-    () => groupSecurityWork(sessions.data ?? []),
-    [sessions.data],
+    () => groupSecurityWork(cloudEnabled ? (sessions.data ?? []) : []),
+    [cloudEnabled, sessions.data],
   );
 
   function openSession(session: SessionResponse) {
@@ -66,7 +67,15 @@ function SecurityWorkContent() {
         </Text>
       </View>
 
-      {sessions.isLoading ? (
+      {!cloudEnabled ? (
+        <View className="flex-1 px-5">
+          <EmptyState
+            icon="shield"
+            title="Connect Devin Cloud"
+            message="Security Work uses Code Scan sessions returned by Devin Cloud."
+          />
+        </View>
+      ) : sessions.isLoading ? (
         <BoardSkeleton />
       ) : sessions.error && groups.length === 0 ? (
         <ErrorState
@@ -196,17 +205,4 @@ function SecurityWorkContent() {
       )}
     </SafeAreaView>
   );
-}
-
-export default function SecurityWorkScreen() {
-  const { mode } = useConnections();
-  if (!connectionModeUsesCloud(mode)) {
-    return (
-      <CloudRequiredScreen
-        title="Security Work"
-        message="Code Scans run in Devin Cloud. Connect your Devin account to see them here."
-      />
-    );
-  }
-  return <SecurityWorkContent />;
 }

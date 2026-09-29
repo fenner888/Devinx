@@ -20,10 +20,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSecrets, useCreateSecret, useDeleteSecret } from '@api/devin/queries';
-import { useConnections } from '@auth/ConnectionContext';
-import { CloudRequiredScreen } from '@components/CloudRequired';
 import { EmptyState, ErrorState } from '@components/Skeletons';
-import { connectionModeUsesCloud } from '@lib/connections';
 import { hapticSuccess, hapticError, hapticWarning } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
 import { userFacingError } from '@lib/user-facing-error';
@@ -36,7 +33,7 @@ const SECRET_TYPES: { key: SecretType; label: string }[] = [
   { key: 'totp', label: 'TOTP' },
 ];
 
-function SecretsContent() {
+export default function SecretsScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -292,17 +289,4 @@ function SecretsContent() {
       </Modal>
     </SafeAreaView>
   );
-}
-
-export default function SecretsScreen() {
-  const { mode } = useConnections();
-  if (!connectionModeUsesCloud(mode)) {
-    return (
-      <CloudRequiredScreen
-        title="Secrets"
-        message="Secrets are stored in Devin Cloud. Connect your Devin account to see them here."
-      />
-    );
-  }
-  return <SecretsContent />;
 }

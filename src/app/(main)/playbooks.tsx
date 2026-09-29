@@ -19,10 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlaybooks, useCreatePlaybook, useUpdatePlaybook, useDeletePlaybook } from '@api/devin/queries';
-import { useConnections } from '@auth/ConnectionContext';
-import { CloudRequiredScreen } from '@components/CloudRequired';
 import { EmptyState, ErrorState } from '@components/Skeletons';
-import { connectionModeUsesCloud } from '@lib/connections';
 import { hapticSuccess, hapticError, hapticWarning } from '@lib/haptics';
 import { confirmAction } from '@lib/confirm';
 import { normalizePlaybookMacro, validatePlaybookMacro } from '@lib/playbook-macro';
@@ -39,7 +36,7 @@ interface EditorState {
   structuredOutputSchema: string;
 }
 
-function PlaybooksContent() {
+export default function PlaybooksScreen() {
   const router = useRouter();
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -341,17 +338,4 @@ function PlaybooksContent() {
       </Modal>
     </SafeAreaView>
   );
-}
-
-export default function PlaybooksScreen() {
-  const { mode } = useConnections();
-  if (!connectionModeUsesCloud(mode)) {
-    return (
-      <CloudRequiredScreen
-        title="Playbooks"
-        message="Playbooks are stored in Devin Cloud. Connect your Devin account to see them here."
-      />
-    );
-  }
-  return <PlaybooksContent />;
 }
