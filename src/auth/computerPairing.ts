@@ -102,6 +102,7 @@ export const computerPairingOfferSchema = z
     pairingId: opaqueIdSchema,
     pairingSecret: base64UrlSchema.length(43),
     expiresAt: z.number().int().positive(),
+    computerName: deviceNameSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -185,6 +186,7 @@ export type ComputerPairingStatus =
 
 export interface PairComputerOptions {
   computerName: string;
+  useConnectorComputerName?: boolean;
   deviceName?: string;
   signal?: AbortSignal;
   onStatus?: (status: ComputerPairingStatus) => void;
@@ -399,7 +401,11 @@ async function performComputerPairing(
   notify(options, 'validating');
   const now = pairingRuntime.now();
   const offer = parseOffer(payload, now);
-  const computerName = deviceNameSchema.parse(options.computerName);
+  const computerName = deviceNameSchema.parse(
+    options.useConnectorComputerName && offer.computerName
+      ? offer.computerName
+      : options.computerName,
+  );
   const deviceName = deviceNameSchema.parse(options.deviceName ?? 'DevinX iPhone');
   notify(options, 'checking_bridge_identity');
   if ((await fingerprintPublicKeySpki(offer.bridgePublicKeySpki)) !== offer.bridgeKeyFingerprint) {

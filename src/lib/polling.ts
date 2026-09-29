@@ -7,6 +7,8 @@ export type ScreenContext = 'board' | 'session_detail' | 'background' | 'other';
 
 export type PollingMode = 'battery_saver' | 'balanced' | 'fast';
 
+export const IDLE_SESSION_LIST_INTERVAL_MS = 60_000;
+
 const MODE_FACTOR: Record<PollingMode, number> = {
   battery_saver: 2,
   balanced: 1,
@@ -65,6 +67,26 @@ export function messagePollingInterval({
     return false;
   }
   return scalePolling(2_500, mode);
+}
+
+export function pollingModeIntervals(mode: PollingMode): {
+  sessionList: number;
+  idleSessionList: number;
+  messages: number;
+} {
+  const sessionList = pollingPolicy('running', 'active', 'board', mode);
+  const idleSessionList = scalePolling(IDLE_SESSION_LIST_INTERVAL_MS, mode);
+  const messages = messagePollingInterval({ appState: 'active', mode });
+  if (sessionList === false || idleSessionList === false || messages === false) {
+    throw new Error(`Polling intervals are unavailable for ${mode}`);
+  }
+  return { sessionList, idleSessionList, messages };
+}
+
+export function formatPollingInterval(ms: number): string {
+  if (ms >= 60_000 && ms % 60_000 === 0) return `${ms / 60_000} min`;
+  const seconds = Math.round(ms / 100) / 10;
+  return `${Number.isInteger(seconds) ? seconds.toFixed(0) : seconds.toFixed(1)} s`;
 }
 
 /** 429 backoff with jitter (spec §8.4). Retry-After is capped at 60s. */
