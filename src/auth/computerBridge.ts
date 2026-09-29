@@ -48,6 +48,7 @@ type CachedBridgeFeatures = {
 };
 const bridgeFeaturesCache = new Map<string, CachedBridgeFeatures>();
 const bridgeInteractionSupport = new Map<string, boolean>();
+const bridgePresentationRejected = new Set<string>();
 const computerModelSchema = z
   .object({
     id: modelIdSchema,
@@ -80,7 +81,12 @@ const bridgeMethodSchema = z.enum([
 ]);
 const bridgeHealthBodySchema = z.object({}).strict();
 const interactionOptInSchema = z.literal(true).optional();
-const bridgeFeaturesBodySchema = z.object({ interaction: interactionOptInSchema }).strict();
+const bridgeFeaturesBodySchema = z
+  .object({
+    interaction: interactionOptInSchema,
+    presentation: z.literal(true).optional(),
+  })
+  .strict();
 const bridgePlatformBodySchema = z.object({}).strict();
 const bridgeVersionBodySchema = z.object({}).strict();
 const computerBridgeFeaturesSchema = z
@@ -88,7 +94,18 @@ const computerBridgeFeaturesSchema = z
     sessionElicitation: z.boolean(),
     activityTimeline: z.boolean().optional(),
     permissionPrompts: z.boolean().optional(),
+  })
+  .passthrough();
+const computerGrantsSchema = z
+  .object({
+    viewSessions: z.boolean(),
+    sendPrompts: z.boolean(),
+    startSessions: z.boolean(),
   });
+const computerBridgePresentationSchema = z.object({
+  messageTimestamps: z.boolean(),
+  grants: computerGrantsSchema.strict(),
+}).passthrough();
 const computerBridgePlatformSchema = z
   .object({ platform: z.enum(['macos', 'windows', 'linux']) })
   .strict();
@@ -101,7 +118,11 @@ const sessionListBodySchema = z
   .object({ cursor: cursorSchema.optional(), interaction: interactionOptInSchema })
   .strict();
 const sessionLoadBodySchema = z
-  .object({ sessionId: localSessionIdSchema, interaction: interactionOptInSchema })
+  .object({
+    sessionId: localSessionIdSchema,
+    interaction: interactionOptInSchema,
+    timestamps: z.literal(true).optional(),
+  })
   .strict();
 const sessionActivityBodySchema = z
   .object({ sessionId: localSessionIdSchema, interaction: interactionOptInSchema })
@@ -447,6 +468,7 @@ export const computerLoadedSessionSchema = z
             sequence: z.number().int().positive(),
             source: z.enum(['user', 'devin']),
             text: z.string().max(100_000),
+            createdAt: z.number().int().min(0).max(8_640_000_000_000_000).optional(),
           })
           .strict(),
       )
@@ -491,6 +513,15 @@ export const computerSessionPageSchema = z
 
 export type ComputerBridgeHealth = z.infer<typeof computerBridgeHealthSchema>;
 export type ComputerBridgeFeatures = z.infer<typeof computerBridgeFeaturesSchema>;
+export interface ComputerGrants {
+  viewSessions: boolean;
+  sendPrompts: boolean;
+  startSessions: boolean;
+}
+export interface ComputerBridgePresentation {
+  messageTimestamps: boolean;
+  grants: ComputerGrants;
+}
 export type ComputerBridgePlatform = z.infer<typeof computerBridgePlatformSchema>['platform'];
 export type ComputerBridgeVersionStatus =
   { kind: 'supported'; version: string } | { kind: 'legacy' };
@@ -897,7 +928,7 @@ async function requestSessionList(
 
 async function requestSessionLoad(
   credential: PairedComputerCredential,
-  input: { sessionId: string; interaction?: true },
+  input: { sessionId: string; interaction?: true; timestamps?: true },
 ): Promise<ComputerLoadedSession> {
   const body = sessionLoadBodySchema.parse(input);
   const response = await requestComputer(credential, 'session.load', body);
@@ -1041,7 +1072,10 @@ export interface ComputerBridgeConnection {
   getFeatures(): Promise<ComputerBridgeFeatures>;
   getVersion(): Promise<ComputerBridgeVersionStatus>;
   listSessions(input?: { cursor?: string }): Promise<ComputerSessionPage>;
-  loadSession(sessionId: string): Promise<ComputerLoadedSession>;
+  loadSession(
+    sessionId: string,
+    options?: { timestamps?: boolean },
+  ): Promise<ComputerLoadedSession>;
   getSessionActivity(sessionId: string): Promise<ComputerSessionActivity>;
   getSessionElicitation(sessionId: string): Promise<ComputerSessionElicitation>;
   respondToSessionElicitation(input: ComputerElicitationResponse): Promise<void>;
@@ -1073,11 +1107,12 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
           ...(includeInteraction ? { interaction: true as const } : {}),
         }),
       ),
-    loadSession: (sessionId) =>
+    loadSession: (sessionId, options = {}) =>
       requestWithInteractionFallback(credential, (includeInteraction) =>
         requestSessionLoad(credential, {
           sessionId,
           ...(includeInteraction ? { interaction: true as const } : {}),
+          ...(options.timestamps ? { timestamps: true as const } : {}),
         }),
       ),
     getSessionActivity: (sessionId) =>
@@ -1144,6 +1179,41 @@ export async function getComputerBridgeFeatures(bridgeId: string): Promise<Compu
   return (await openComputerBridge(bridgeId)).getFeatures();
 }
 
+export async function getComputerBridgePresentation(
+  bridgeId: string,
+): Promise<ComputerBridgePresentation | null> {
+  if (bridgePresentationRejected.has(bridgeId)) return null;
+  const computers = await validatedComputerRegistry();
+  const credential = computers.find((computer) => computer.bridgeId === bridgeId);
+  if (!credential || credential.transportSecurity !== 'tailscale_wireguard') {
+    throw new ComputerBridgeError(
+      'This local device is not paired through Tailscale.',
+      'not_paired',
+    );
+  }
+
+  try {
+    const response = await requestComputer(credential, 'bridge.features', { presentation: true });
+    const result = computerBridgePresentationSchema.safeParse(response.body);
+    if (!result.success) {
+      throw new ComputerBridgeError(
+        'The paired local device returned invalid presentation information.',
+        'invalid_response',
+      );
+    }
+    return result.data;
+  } catch (error) {
+    if (
+      error instanceof ComputerBridgeError &&
+      (error.code === 'invalid_request' || error.code === 'invalid_response')
+    ) {
+      bridgePresentationRejected.add(bridgeId);
+      return null;
+    }
+    throw error;
+  }
+}
+
 export async function getComputerBridgeVersion(
   bridgeId: string,
 ): Promise<ComputerBridgeVersionStatus> {
@@ -1174,8 +1244,9 @@ export async function listComputerSessions(
 export async function loadComputerSession(
   bridgeId: string,
   sessionId: string,
+  options?: { timestamps?: boolean },
 ): Promise<ComputerLoadedSession> {
-  return (await openComputerBridge(bridgeId)).loadSession(sessionId);
+  return (await openComputerBridge(bridgeId)).loadSession(sessionId, options);
 }
 
 export async function getComputerSessionActivity(

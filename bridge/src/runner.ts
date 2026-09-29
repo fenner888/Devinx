@@ -223,6 +223,14 @@ function markLoadedSessionTimeouts(
     writable: true,
     configurable: true,
   });
+  if (loaded.messageTimes) {
+    Object.defineProperty(marked, 'messageTimes', {
+      value: loaded.messageTimes,
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+  }
   return marked;
 }
 

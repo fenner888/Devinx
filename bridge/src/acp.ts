@@ -653,10 +653,10 @@ export interface AcpLoadedSession {
   messages: AcpHistoryMessage[];
   truncated: boolean;
   modelId?: string;
-  // Attached as a non-enumerable own property by loaders so the established
-  // wire/serialization shape (JSON.stringify, spreads) is unchanged; read it
-  // via `loaded.activity` before any serialization boundary.
+  // Attached as non-enumerable own properties so the established message
+  // shape remains unchanged until a presentation response is requested.
   activity?: ActivityEntry[];
+  messageTimes?: Array<number | undefined>;
 }
 
 export interface AcpSessionTurn {
@@ -669,6 +669,19 @@ export interface AcpSessionTurn {
 function attachActivity<T extends object>(target: T, activity: ActivityEntry[]): T {
   Object.defineProperty(target, 'activity', {
     value: activity,
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+  return target;
+}
+
+function attachMessageTimes<T extends object>(
+  target: T,
+  messageTimes: Array<number | undefined>,
+): T {
+  Object.defineProperty(target, 'messageTimes', {
+    value: messageTimes,
     enumerable: false,
     writable: true,
     configurable: true,
@@ -743,6 +756,7 @@ interface CachedSessionMetadata {
 
 interface CollectedReplayMessage extends AcpHistoryMessage {
   messageId?: string;
+  createdAt?: number;
 }
 
 interface ReplayCollector {
@@ -1540,14 +1554,14 @@ export class AcpSessionClient {
     };
     this.activeLoad = collector;
     try {
-      const loaded = await this.request(
+      const loadResult = await this.request(
         'session/load',
         { sessionId, cwd: metadata.cwd, mcpServers: [] },
         loadSessionResultSchema,
         'session load',
       );
-      if (loaded) {
-        const selector = parseAcpModelSelector(loaded.configOptions);
+      if (loadResult) {
+        const selector = parseAcpModelSelector(loadResult.configOptions);
         if (selector) {
           this.modelCatalog = selector.catalog;
           this.sessionModelSelectors.set(sessionId, selector);
@@ -1559,7 +1573,7 @@ export class AcpSessionClient {
       // and mark still-running tools interrupted.
       collector.activity.finishTurn(collector.lastAt);
       this.loadedSessions.add(sessionId);
-      return attachActivity(
+      const loaded = attachActivity(
         {
           sessionId,
           cwd: metadata.cwd,
@@ -1568,6 +1582,10 @@ export class AcpSessionClient {
           modelId: this.sessionModelSelectors.get(sessionId)?.catalog.defaultModelId,
         },
         collector.activity.list(),
+      );
+      return attachMessageTimes(
+        loaded,
+        collector.messages.map((message) => message.createdAt),
       );
     } finally {
       if (this.activeLoad === collector) this.activeLoad = null;
@@ -2169,6 +2187,9 @@ export class AcpSessionClient {
       source: updateResult.data.sessionUpdate === 'user_message_chunk' ? 'user' : 'devin',
       text: updateResult.data.content.text,
       messageId: updateResult.data.messageId ?? undefined,
+      ...(replayAt !== undefined && replayAt >= 0 && replayAt <= 8_640_000_000_000_000
+        ? { createdAt: replayAt }
+        : {}),
     });
   }
 
@@ -2356,6 +2377,7 @@ export class AcpSessionClient {
         source: input.source,
         text: clipped.text,
         messageId: input.messageId,
+        ...(input.createdAt !== undefined ? { createdAt: input.createdAt } : {}),
       };
       collector.messages.push(message);
       collector.textBytes += messageBytes(message);

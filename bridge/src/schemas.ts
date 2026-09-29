@@ -97,7 +97,10 @@ export const signedRequestEnvelopeSchema = z
 
 export const bridgeHealthBodySchema = z.object({}).strict();
 export const bridgeFeaturesBodySchema = z
-  .object({ interaction: z.literal(true).optional() })
+  .object({
+    interaction: z.literal(true).optional(),
+    presentation: z.literal(true).optional(),
+  })
   .strict();
 export const bridgePlatformBodySchema = z.object({}).strict();
 export const bridgeVersionBodySchema = z.object({}).strict();
@@ -114,6 +117,7 @@ export const sessionLoadBodySchema = z
   .object({
     sessionId: sessionIdSchema,
     interaction: z.literal(true).optional(),
+    timestamps: z.literal(true).optional(),
   })
   .strict();
 

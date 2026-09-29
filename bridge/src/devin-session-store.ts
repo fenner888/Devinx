@@ -30,6 +30,7 @@ const MAXIMUM_HISTORY_BYTES = 160 * 1024;
 const MAXIMUM_CREATE_OPTIONS = 100;
 const MAXIMUM_LOCK_BYTES = 32;
 const ACTIVITY_RECENT_WINDOW_MS = 60_000;
+const MAX_MESSAGE_TIMESTAMP_MS = 8_640_000_000_000_000;
 
 const modelIdSchema = z
   .string()
@@ -50,6 +51,7 @@ const chainRowSchema = z
     depth: z.number().int().min(0).max(MAXIMUM_CHAIN_NODES),
     nodeId: z.number().int().nonnegative(),
     chatMessage: z.string().max(2 * 1024 * 1024),
+    createdAt: z.unknown(),
   })
   .strict();
 
@@ -215,10 +217,31 @@ function attachActivity<T extends object>(target: T, activity: ActivityEntry[]):
   return target;
 }
 
+function attachMessageTimes<T extends object>(
+  target: T,
+  messageTimes: Array<number | undefined>,
+): T {
+  Object.defineProperty(target, 'messageTimes', {
+    value: messageTimes,
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+  return target;
+}
+
 function isoToMs(value: string | undefined): number | undefined {
   if (!value) return undefined;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function unixSecondsToMs(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined;
+  const milliseconds = Math.floor(value * 1_000);
+  return Number.isSafeInteger(milliseconds) && milliseconds <= MAX_MESSAGE_TIMESTAMP_MS
+    ? milliseconds
+    : undefined;
 }
 
 function lastActivityMs(value: unknown): number {
@@ -290,6 +313,7 @@ function defaultIsProcessAlive(pid: number): boolean {
 interface ParsedChainNode {
   nodeId: number;
   message: z.infer<typeof chatMessageSchema>;
+  createdAt: unknown;
 }
 
 interface ToolResultRecord {
@@ -433,13 +457,19 @@ export class DevinSessionStore {
           )
           .get(sessionId),
       );
+      const hasMessageCreatedAt = this.hasColumns(
+        database,
+        'message_nodes',
+        new Set(['created_at']),
+      );
       const chainSql = `
-        WITH RECURSIVE chain(depth, node_id, parent_node_id, chat_message) AS (
+        WITH RECURSIVE chain(depth, node_id, parent_node_id, chat_message, created_at) AS (
           SELECT
             0,
             node.node_id,
             node.parent_node_id,
-            node.chat_message
+            node.chat_message,
+            ${hasMessageCreatedAt ? 'node.created_at' : 'NULL'}
           FROM message_nodes AS node
           WHERE node.session_id = ? AND node.node_id = ?
           UNION ALL
@@ -447,7 +477,8 @@ export class DevinSessionStore {
             chain.depth + 1,
             parent.node_id,
             parent.parent_node_id,
-            parent.chat_message
+            parent.chat_message,
+            ${hasMessageCreatedAt ? 'parent.created_at' : 'NULL'}
           FROM message_nodes AS parent
           JOIN chain
             ON parent.session_id = ? AND parent.node_id = chain.parent_node_id
@@ -456,7 +487,7 @@ export class DevinSessionStore {
       const rows = database
         .prepare(
           `${chainSql}
-           SELECT depth, node_id AS nodeId, chat_message AS chatMessage
+           SELECT depth, node_id AS nodeId, chat_message AS chatMessage, created_at AS createdAt
            FROM chain
            ORDER BY depth ASC
            LIMIT ?`,
@@ -519,9 +550,10 @@ export class DevinSessionStore {
           activity.markTruncated();
           continue;
         }
-        nodes.push({ nodeId: row.nodeId, message: parsed });
+        nodes.push({ nodeId: row.nodeId, message: parsed, createdAt: row.createdAt });
       }
 
+      const messageTimes: Array<number | undefined> = [];
       for (const node of nodes) {
         const message = node.message;
         if (message.role !== 'user' && message.role !== 'assistant') continue;
@@ -545,6 +577,16 @@ export class DevinSessionStore {
           source: message.role === 'user' ? 'user' : 'devin',
           text: clipped.text,
         });
+        const metadataTimestamp = isoToMs(
+          typeof metadata.created_at === 'string' ? metadata.created_at : undefined,
+        );
+        messageTimes.push(
+          metadataTimestamp !== undefined &&
+            metadataTimestamp >= 0 &&
+            metadataTimestamp <= MAX_MESSAGE_TIMESTAMP_MS
+            ? metadataTimestamp
+            : unixSecondsToMs(node.createdAt),
+        );
 
         const thinking = message.thinking;
         if (
@@ -582,6 +624,7 @@ export class DevinSessionStore {
       while (textMessages.length > MAXIMUM_MESSAGES || totalBytes > MAXIMUM_HISTORY_BYTES) {
         const removed = textMessages.shift();
         if (!removed) break;
+        messageTimes.shift();
         totalBytes -= messageBytes(removed);
         droppedMessages += 1;
         truncated = true;
@@ -594,7 +637,7 @@ export class DevinSessionStore {
         }))
         .filter((entry) => entry.afterSequence <= textMessages.length);
 
-      return attachActivity(
+      const loaded = attachActivity(
         {
           sessionId,
           cwd: session.workingDirectory,
@@ -604,6 +647,7 @@ export class DevinSessionStore {
         },
         entries,
       );
+      return attachMessageTimes(loaded, messageTimes);
     } catch {
       try {
         database.exec('ROLLBACK;');

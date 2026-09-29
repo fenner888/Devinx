@@ -130,6 +130,15 @@ const featuresResponseSchema = z
     sessionElicitation: z.boolean(),
     activityTimeline: z.boolean(),
     permissionPrompts: z.boolean().optional(),
+    messageTimestamps: z.boolean().optional(),
+    grants: z
+      .object({
+        viewSessions: z.boolean(),
+        sendPrompts: z.boolean(),
+        startSessions: z.boolean(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -153,6 +162,7 @@ const localHistoryMessageSchema = z
     sequence: z.number().int().positive(),
     source: z.enum(['user', 'devin']),
     text: z.string().max(100_000),
+    createdAt: z.number().int().min(0).max(8_640_000_000_000_000).optional(),
   })
   .strict();
 
@@ -700,6 +710,18 @@ export class BridgeService {
                 ),
               }
             : {}),
+          ...(body.presentation === true
+            ? {
+                messageTimestamps: this.dependencies.sessions.isSessionLoadSupported(),
+                grants: {
+                  viewSessions:
+                    authorization.request.device.permissions.includes('session:content:read'),
+                  sendPrompts:
+                    authorization.request.device.permissions.includes('session:prompt:send'),
+                  startSessions: authorization.request.device.permissions.includes('session:create'),
+                },
+              }
+            : {}),
         }),
       };
     }
@@ -836,10 +858,10 @@ export class BridgeService {
       if (loaded.sessionId !== rawSessionId) {
         throw new Error('Loaded ACP session did not match the requested session');
       }
-      const keptOldIndexes = loaded.messages
+      const keptMessages = loaded.messages
         .map((message, index) => ({ message, index }))
-        .filter(({ message }) => message.text.trim().length > 0)
-        .map(({ index }) => index);
+        .filter(({ message }) => message.text.trim().length > 0);
+      const keptOldIndexes = keptMessages.map(({ index }) => index);
       const remappedActivity = loaded.activity
         ? boundActivityDetail(
             remapActivitySequences(loaded.activity, (sequence) => {
@@ -864,13 +886,14 @@ export class BridgeService {
             ? { id: loaded.modelId, name: modelDisplayName(loaded.modelId) }
             : undefined,
         },
-        messages: loaded.messages
-          .filter((message) => message.text.trim().length > 0)
-          .map((message, index) => ({
-            sequence: index + 1,
-            source: message.source,
-            text: message.text,
-          })),
+        messages: keptMessages.map(({ message, index }, sequence) => ({
+          sequence: sequence + 1,
+          source: message.source,
+          text: message.text,
+          ...(body.timestamps === true && loaded.messageTimes?.[index] !== undefined
+            ? { createdAt: loaded.messageTimes[index] }
+            : {}),
+        })),
         activity: responseActivity,
         truncated: loaded.truncated,
       });

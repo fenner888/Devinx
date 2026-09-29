@@ -28,6 +28,7 @@ import {
   useCreateComputerSession,
   type ComputerSessionListItem,
 } from '@api/bridge/queries';
+import { useComputerGrants } from '@api/bridge/presentation';
 import {
   useSessions,
   useCreateSession,
@@ -96,6 +97,78 @@ function localOptionsFailureCopy(error: unknown): { title: string; message: stri
   };
 }
 
+function HomeRecent({ items }: { items: RecentSession[] }) {
+  const router = useRouter();
+  const { tokens } = useTheme();
+
+  if (items.length === 0) return null;
+
+  return (
+    <View className="mt-8" testID="home-recent">
+      <View className="mb-3 flex-row items-center justify-between">
+        <Text className="text-text-hi text-text16 font-medium">Recent</Text>
+        <Pressable
+          onPress={() => router.push('/(main)/sessions')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text className="text-brand-text text-text13">View all</Text>
+        </Pressable>
+      </View>
+      <View className="gap-2">
+        {items.map((item) =>
+          item.kind === 'computer' ? (
+            <ComputerSessionRow
+              key={`computer:${item.session.bridgeId}:${item.session.id}`}
+              session={item.session}
+              compact
+              onPress={
+                item.session.canLoad
+                  ? () =>
+                      router.push({
+                        pathname: '/(main)/computer-session/[bridgeId]/[id]',
+                        params: {
+                          bridgeId: item.session.bridgeId,
+                          id: item.session.id,
+                        },
+                      })
+                  : undefined
+              }
+            />
+          ) : (
+            <Pressable
+              key={`cloud:${item.session.session_id}`}
+              className="bg-surface1 rounded-card border border-border-subtle px-4 py-3.5"
+              onPress={() => router.push(`/(main)/session/${item.session.session_id}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.session.title || 'Untitled session'}, ${statusLabel(item.session)}`}
+            >
+              <Text className="text-text-hi text-text14" numberOfLines={1}>
+                {item.session.title || 'Untitled session'}
+              </Text>
+              <View className="flex-row items-center mt-1">
+                <Text className={`text-text12 ${statusColorClass(deriveStatusKey(item.session))}`}>
+                  {statusLabel(item.session)}
+                </Text>
+                <Text className="text-text-low text-text12 ml-2">
+                  {relativeTime(item.session.updated_at)}
+                </Text>
+                {item.session.pull_requests[0] && (
+                  <View className="flex-row items-center ml-auto">
+                    <Ionicons name="git-pull-request-outline" size={12} color={tokens.merged.hex} />
+                    <Text className="text-merged text-text12 ml-1">
+                      #{prNumber(item.session.pull_requests[0].pr_url)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Pressable>
+          ),
+        )}
+      </View>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { name, tokens } = useTheme();
@@ -112,12 +185,22 @@ export default function HomeScreen() {
   );
   const computer =
     computers.find((candidate) => candidate.bridgeId === selectedComputerBridgeId) ?? computers[0];
+  const computerGrantInfo = useComputerGrants(
+    connectionMode === 'computer' ? (computer?.bridgeId ?? '') : '',
+    connectionMode === 'computer' && Boolean(computer),
+  );
   const [destination, setDestination] = useState<'cloud' | 'computer'>(
     connectionMode === 'computer' ? 'computer' : 'cloud',
   );
   const localOptions = useComputerCreateOptions(
     computer?.bridgeId ?? '',
-    destination === 'computer' && Boolean(computer),
+    destination === 'computer' &&
+      Boolean(computer) &&
+      !(
+        connectionMode === 'computer' &&
+        computerGrantInfo?.source === 'connector' &&
+        computerGrantInfo.grants.startSessions === false
+      ),
   );
   const createComputerSession = useCreateComputerSession(computer?.bridgeId ?? '');
   const createSession = useCreateSession();
@@ -288,6 +371,13 @@ export default function HomeScreen() {
       repository.repo_path.normalize('NFKC').toLocaleLowerCase().includes(normalizedRepoQuery),
   );
   const companionSize = Math.round(Math.min(height < 700 ? 184 : 220, Math.max(164, width * 0.54)));
+  const localRecentCompanionSize = Math.round(Math.min(148, Math.max(132, width * 0.36)));
+  const readOnlyLocalHome =
+    connectionMode === 'computer' &&
+    computerGrantInfo?.source === 'connector' &&
+    computerGrantInfo.grants.startSessions === false;
+  const localRecentBeforeComposer =
+    connectionMode === 'computer' && !readOnlyLocalHome && recent.length > 0;
   const voice = useVoiceComposer({
     value: prompt,
     onChangeText: setPrompt,
@@ -559,335 +649,321 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          {/* Devin is the home-screen visual anchor, not a floating overlay. */}
-          <HomeCompanionStage companionSize={companionSize}>
-            <DevinCompanion
-              state={companionState}
-              size={companionSize}
-              active={companionActive}
-              accessibilityLabel={`Devin companion, ${companionState}`}
-            />
-          </HomeCompanionStage>
-
-          {/* One clean composer surface; no additional card around it. */}
-          <Text className="mb-3 text-text-hi text-text17 font-medium">
-            What should Devin build?
-          </Text>
-          <View className="rounded-cardLg border border-border bg-surface1">
-            <TextInput
-              ref={voice.inputRef}
-              className="min-h-[84px] max-h-40 px-5 pt-4 pb-2 text-text-hi text-text16"
-              value={prompt}
-              onChangeText={(v) => setPrompt(v.slice(0, MAX_PROMPT))}
-              editable={canUseComposer}
-              placeholder={
-                isComputerDestination
-                  ? 'Ask Devin locally to build, fix, or investigate…'
-                  : 'Ask Devin to build features, fix bugs, or work on your code…'
-              }
-              placeholderTextColor={tokens.textLow.hex}
-              multiline
-              maxLength={MAX_PROMPT}
-              autoCapitalize="sentences"
-              autoCorrect
-              textAlignVertical="top"
-              accessibilityLabel="Session prompt"
-              onSelectionChange={voice.onSelectionChange}
-            />
-            {!isComputerDestination && (attachments.length > 0 || uploadingAttachmentName) && (
-              <View className="flex-row flex-wrap px-4 pb-2">
-                {uploadingAttachmentName && (
-                  <View className="flex-row items-center bg-tint-blue rounded-chip px-pillX py-pillY mr-2 mb-1">
-                    <ActivityIndicator size="small" color={tokens.brandText.hex} />
-                    <Text className="text-brand-text text-text12 ml-1.5 max-w-40" numberOfLines={1}>
-                      Uploading {uploadingAttachmentName}…
-                    </Text>
-                  </View>
-                )}
-                {attachments.map((attachment) => (
-                  <Pressable
-                    key={attachment.url}
-                    className="flex-row items-center bg-tint-secondary rounded-chip px-pillX py-pillY mr-2 mb-1"
-                    onPress={() =>
-                      setAttachments((current) =>
-                        current.filter((item) => item.url !== attachment.url),
-                      )
-                    }
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${attachment.name}`}
-                  >
-                    {attachment.previewUri ? (
-                      <Image
-                        source={{ uri: attachment.previewUri }}
-                        className="w-6 h-6 rounded-chip"
-                      />
-                    ) : (
-                      <Ionicons name="attach" size={12} color={tokens.textMid.hex} />
-                    )}
-                    <Text
-                      className="text-text-mid text-text12 ml-1 mr-1 max-w-40"
-                      numberOfLines={1}
-                    >
-                      {attachment.name}
-                    </Text>
-                    <Ionicons name="close" size={11} color={tokens.textLow.hex} />
-                  </Pressable>
-                ))}
+          {readOnlyLocalHome ? (
+            <>
+              <HomeRecent items={recent.slice(0, 5)} />
+              <Pressable
+                className="mt-3 flex-row items-center rounded-card border border-border-subtle bg-surface1 px-4 py-3"
+                onPress={() => router.push('/(main)/computer')}
+                testID="home-read-only-card"
+                accessibilityRole="button"
+              >
+                <Ionicons name="lock-closed-outline" size={18} color={tokens.textMid.hex} />
+                <Text className="mx-3 flex-1 text-text-mid text-text13 leading-5">
+                  {`This device can view sessions but can't start them — change permissions in DevinX Connector on ${computer?.computerName ?? 'your local device'}`}
+                </Text>
+                <Ionicons name="chevron-forward" size={15} color={tokens.textLow.hex} />
+              </Pressable>
+              <View className="mt-3">
+                <ComputerDiscoveryNotices
+                  computers={usesComputer ? (computerSessions.data?.computers ?? []) : []}
+                />
               </View>
-            )}
-            <VoiceComposerStatus voice={voice} />
-            <View
-              className={`flex-row items-center justify-between px-4 pb-4 ${voice.isRecording ? 'hidden' : ''}`}
-            >
-              <View className="flex-row items-center gap-1">
-                <Pressable
-                  className="w-9 h-9 rounded-full items-center justify-center"
-                  onPress={() => setShowAttachmentPicker(true)}
-                  disabled={
-                    isComputerDestination || !canCreateCloudSession || uploadAttachment.isPending
+              <HomeCompanionStage companionSize={companionSize}>
+                <DevinCompanion
+                  state={companionState}
+                  size={companionSize}
+                  active={companionActive}
+                  accessibilityLabel={`Devin companion, ${companionState}`}
+                />
+              </HomeCompanionStage>
+            </>
+          ) : (
+            <>
+              {localRecentBeforeComposer && <HomeRecent items={recent.slice(0, 3)} />}
+              <HomeCompanionStage
+                companionSize={localRecentBeforeComposer ? localRecentCompanionSize : companionSize}
+              >
+                <DevinCompanion
+                  state={companionState}
+                  size={localRecentBeforeComposer ? localRecentCompanionSize : companionSize}
+                  active={companionActive}
+                  accessibilityLabel={`Devin companion, ${companionState}`}
+                />
+              </HomeCompanionStage>
+
+              {/* One clean composer surface; no additional card around it. */}
+              <Text
+                className="mb-3 text-text-hi text-text17 font-medium"
+                testID="home-composer-heading"
+              >
+                What should Devin build?
+              </Text>
+              <View className="rounded-cardLg border border-border bg-surface1">
+                <TextInput
+                  ref={voice.inputRef}
+                  className="min-h-[84px] max-h-40 px-5 pt-4 pb-2 text-text-hi text-text16"
+                  value={prompt}
+                  onChangeText={(v) => setPrompt(v.slice(0, MAX_PROMPT))}
+                  editable={canUseComposer}
+                  placeholder={
+                    isComputerDestination
+                      ? 'Ask Devin locally to build, fix, or investigate…'
+                      : 'Ask Devin to build features, fix bugs, or work on your code…'
                   }
-                  accessibilityRole="button"
-                  accessibilityLabel="Add attachment"
-                >
-                  {uploadAttachment.isPending ? (
-                    <ActivityIndicator size="small" color={tokens.brandText.hex} />
-                  ) : (
-                    <Ionicons name="add" size={22} color={tokens.textMid.hex} />
-                  )}
-                </Pressable>
-                {isComputerDestination ? (
-                  <>
-                    <Pressable
-                      className="flex-row items-center rounded-full px-3 py-2"
-                      onPress={() => openLocalPicker('model')}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Model: ${selectedFamily?.name ?? 'Default'}`}
-                    >
-                      <ModelFamilyMark name={selectedFamily?.name ?? 'Default model'} size={17} />
-                      <Text className="text-text-mid text-text13 ml-1.5 max-w-28" numberOfLines={1}>
-                        {selectedFamily?.name ?? 'Default model'}
-                      </Text>
-                      <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
-                    </Pressable>
-                    {selectedFamily && selectedFamily.variants.length > 1 && selectedVariant && (
-                      <Pressable
-                        className="flex-row items-center rounded-full px-2 py-2"
-                        onPress={() => setShowModelVariantPicker(true)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Reasoning and speed: ${selectedVariant.label}`}
-                      >
-                        <Ionicons name="sparkles-outline" size={14} color={tokens.textMid.hex} />
+                  placeholderTextColor={tokens.textLow.hex}
+                  multiline
+                  maxLength={MAX_PROMPT}
+                  autoCapitalize="sentences"
+                  autoCorrect
+                  textAlignVertical="top"
+                  accessibilityLabel="Session prompt"
+                  onSelectionChange={voice.onSelectionChange}
+                />
+                {!isComputerDestination && (attachments.length > 0 || uploadingAttachmentName) && (
+                  <View className="flex-row flex-wrap px-4 pb-2">
+                    {uploadingAttachmentName && (
+                      <View className="flex-row items-center bg-tint-blue rounded-chip px-pillX py-pillY mr-2 mb-1">
+                        <ActivityIndicator size="small" color={tokens.brandText.hex} />
                         <Text
-                          className="ml-1.5 max-w-20 text-text-mid text-text13"
+                          className="text-brand-text text-text12 ml-1.5 max-w-40"
                           numberOfLines={1}
                         >
-                          {selectedVariant.label}
+                          Uploading {uploadingAttachmentName}…
                         </Text>
-                        <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
-                      </Pressable>
+                      </View>
                     )}
-                  </>
-                ) : (
-                  <>
-                    <Pressable
-                      className="flex-row items-center rounded-full px-3 py-2"
-                      onPress={() => setShowModePicker(true)}
-                      disabled={!canCreateCloudSession}
-                      accessibilityRole="button"
-                      accessibilityLabel="Execution mode"
-                    >
-                      <Ionicons name="options-outline" size={15} color={tokens.textMid.hex} />
-                      <Text className="text-text-mid text-text13 ml-1.5">{modeLabel(mode)}</Text>
-                    </Pressable>
-                    <Pressable
-                      className="flex-row items-center rounded-full px-3 py-2"
-                      onPress={() => setShowPlaybookPicker(true)}
-                      disabled={!canCreateCloudSession}
-                      accessibilityRole="button"
-                      accessibilityLabel="Select playbook"
-                    >
-                      <Ionicons
-                        name="book-outline"
-                        size={14}
-                        color={selectedPlaybook ? tokens.brandText.hex : tokens.textMid.hex}
-                      />
-                      <Text
-                        className={`text-text13 ml-1.5 max-w-28 ${selectedPlaybook ? 'text-brand-text' : 'text-text-mid'}`}
-                        numberOfLines={1}
+                    {attachments.map((attachment) => (
+                      <Pressable
+                        key={attachment.url}
+                        className="flex-row items-center bg-tint-secondary rounded-chip px-pillX py-pillY mr-2 mb-1"
+                        onPress={() =>
+                          setAttachments((current) =>
+                            current.filter((item) => item.url !== attachment.url),
+                          )
+                        }
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${attachment.name}`}
                       >
-                        {selectedPlaybookTitle ?? 'Playbook'}
-                      </Text>
-                    </Pressable>
-                  </>
+                        {attachment.previewUri ? (
+                          <Image
+                            source={{ uri: attachment.previewUri }}
+                            className="w-6 h-6 rounded-chip"
+                          />
+                        ) : (
+                          <Ionicons name="attach" size={12} color={tokens.textMid.hex} />
+                        )}
+                        <Text
+                          className="text-text-mid text-text12 ml-1 mr-1 max-w-40"
+                          numberOfLines={1}
+                        >
+                          {attachment.name}
+                        </Text>
+                        <Ionicons name="close" size={11} color={tokens.textLow.hex} />
+                      </Pressable>
+                    ))}
+                  </View>
                 )}
-              </View>
-              <View className="flex-row items-center gap-1">
-                <VoiceMicButton voice={voice} disabled={!canUseComposer || composerPending} />
-                <Pressable
-                  className={`w-10 h-10 rounded-full items-center justify-center ${canUseComposer && prompt.trim() && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
-                  onPress={handleSend}
-                  disabled={
-                    !canUseComposer ||
-                    !prompt.trim() ||
-                    composerPending ||
-                    uploadAttachment.isPending
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel="Start session"
+                <VoiceComposerStatus voice={voice} />
+                <View
+                  className={`flex-row items-center justify-between px-4 pb-4 ${voice.isRecording ? 'hidden' : ''}`}
                 >
-                  {composerPending ? (
-                    <ActivityIndicator color={tokens.textAlwaysWhite.hex} size="small" />
-                  ) : (
-                    <Ionicons
-                      name="arrow-up"
-                      size={20}
-                      color={
-                        canUseComposer && prompt.trim() && !uploadAttachment.isPending
-                          ? tokens.textAlwaysWhite.hex
-                          : tokens.textLow.hex
+                  <View className="flex-row items-center gap-1">
+                    <Pressable
+                      className="w-9 h-9 rounded-full items-center justify-center"
+                      onPress={() => setShowAttachmentPicker(true)}
+                      disabled={
+                        isComputerDestination ||
+                        !canCreateCloudSession ||
+                        uploadAttachment.isPending
                       }
-                    />
+                      accessibilityRole="button"
+                      accessibilityLabel="Add attachment"
+                    >
+                      {uploadAttachment.isPending ? (
+                        <ActivityIndicator size="small" color={tokens.brandText.hex} />
+                      ) : (
+                        <Ionicons name="add" size={22} color={tokens.textMid.hex} />
+                      )}
+                    </Pressable>
+                    {isComputerDestination ? (
+                      <>
+                        <Pressable
+                          className="flex-row items-center rounded-full px-3 py-2"
+                          onPress={() => openLocalPicker('model')}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Model: ${selectedFamily?.name ?? 'Default'}`}
+                        >
+                          <ModelFamilyMark
+                            name={selectedFamily?.name ?? 'Default model'}
+                            size={17}
+                          />
+                          <Text
+                            className="text-text-mid text-text13 ml-1.5 max-w-28"
+                            numberOfLines={1}
+                          >
+                            {selectedFamily?.name ?? 'Default model'}
+                          </Text>
+                          <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
+                        </Pressable>
+                        {selectedFamily &&
+                          selectedFamily.variants.length > 1 &&
+                          selectedVariant && (
+                            <Pressable
+                              className="flex-row items-center rounded-full px-2 py-2"
+                              onPress={() => setShowModelVariantPicker(true)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Reasoning and speed: ${selectedVariant.label}`}
+                            >
+                              <Ionicons
+                                name="sparkles-outline"
+                                size={14}
+                                color={tokens.textMid.hex}
+                              />
+                              <Text
+                                className="ml-1.5 max-w-20 text-text-mid text-text13"
+                                numberOfLines={1}
+                              >
+                                {selectedVariant.label}
+                              </Text>
+                              <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
+                            </Pressable>
+                          )}
+                      </>
+                    ) : (
+                      <>
+                        <Pressable
+                          className="flex-row items-center rounded-full px-3 py-2"
+                          onPress={() => setShowModePicker(true)}
+                          disabled={!canCreateCloudSession}
+                          accessibilityRole="button"
+                          accessibilityLabel="Execution mode"
+                        >
+                          <Ionicons name="options-outline" size={15} color={tokens.textMid.hex} />
+                          <Text className="text-text-mid text-text13 ml-1.5">
+                            {modeLabel(mode)}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          className="flex-row items-center rounded-full px-3 py-2"
+                          onPress={() => setShowPlaybookPicker(true)}
+                          disabled={!canCreateCloudSession}
+                          accessibilityRole="button"
+                          accessibilityLabel="Select playbook"
+                        >
+                          <Ionicons
+                            name="book-outline"
+                            size={14}
+                            color={selectedPlaybook ? tokens.brandText.hex : tokens.textMid.hex}
+                          />
+                          <Text
+                            className={`text-text13 ml-1.5 max-w-28 ${selectedPlaybook ? 'text-brand-text' : 'text-text-mid'}`}
+                            numberOfLines={1}
+                          >
+                            {selectedPlaybookTitle ?? 'Playbook'}
+                          </Text>
+                        </Pressable>
+                      </>
+                    )}
+                  </View>
+                  <View className="flex-row items-center gap-1">
+                    <VoiceMicButton voice={voice} disabled={!canUseComposer || composerPending} />
+                    <Pressable
+                      className={`w-10 h-10 rounded-full items-center justify-center ${canUseComposer && prompt.trim() && !uploadAttachment.isPending ? 'bg-brand' : 'bg-tint-secondary'}`}
+                      onPress={handleSend}
+                      disabled={
+                        !canUseComposer ||
+                        !prompt.trim() ||
+                        composerPending ||
+                        uploadAttachment.isPending
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel="Start session"
+                    >
+                      {composerPending ? (
+                        <ActivityIndicator color={tokens.textAlwaysWhite.hex} size="small" />
+                      ) : (
+                        <Ionicons
+                          name="arrow-up"
+                          size={20}
+                          color={
+                            canUseComposer && prompt.trim() && !uploadAttachment.isPending
+                              ? tokens.textAlwaysWhite.hex
+                              : tokens.textLow.hex
+                          }
+                        />
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+              <View
+                className={`flex-row items-center px-2 pt-2 gap-4 ${voice.isRecording ? 'hidden' : ''}`}
+              >
+                <Pressable
+                  className="flex-row items-center"
+                  onPress={() => canChooseDestination && setShowDestinationPicker(true)}
+                  disabled={!canChooseDestination}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Session destination: ${isComputerDestination ? (computer?.computerName ?? 'Local') : 'Devin Cloud'}`}
+                >
+                  <Ionicons
+                    name={isComputerDestination ? 'desktop-outline' : 'cloud-outline'}
+                    size={14}
+                    color={tokens.textLow.hex}
+                  />
+                  <Text className="text-text-mid text-text12 ml-1.5" numberOfLines={1}>
+                    {isComputerDestination ? (computer?.computerName ?? 'Local') : 'Devin Cloud'}
+                  </Text>
+                  {canChooseDestination && (
+                    <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
                   )}
                 </Pressable>
-              </View>
-            </View>
-          </View>
-          <View
-            className={`flex-row items-center px-2 pt-2 gap-4 ${voice.isRecording ? 'hidden' : ''}`}
-          >
-            <Pressable
-              className="flex-row items-center"
-              onPress={() => canChooseDestination && setShowDestinationPicker(true)}
-              disabled={!canChooseDestination}
-              accessibilityRole="button"
-              accessibilityLabel={`Session destination: ${isComputerDestination ? (computer?.computerName ?? 'Local') : 'Devin Cloud'}`}
-            >
-              <Ionicons
-                name={isComputerDestination ? 'desktop-outline' : 'cloud-outline'}
-                size={14}
-                color={tokens.textLow.hex}
-              />
-              <Text className="text-text-mid text-text12 ml-1.5" numberOfLines={1}>
-                {isComputerDestination ? (computer?.computerName ?? 'Local') : 'Devin Cloud'}
-              </Text>
-              {canChooseDestination && (
-                <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
-              )}
-            </Pressable>
-            <Pressable
-              className="flex-row items-center flex-1 min-w-0"
-              onPress={() => {
-                if (isComputerDestination) {
-                  openLocalPicker('workspace');
-                } else {
-                  setRepoQuery('');
-                  setShowRepoPicker(true);
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isComputerDestination
-                  ? `Workspace: ${selectedWorkspace?.name ?? 'Unavailable'}`
-                  : `Repository: ${selectedRepo ?? 'Any repository'}`
-              }
-            >
-              <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
-              <Text className="text-text-mid text-text12 ml-1.5 flex-1" numberOfLines={1}>
-                {isComputerDestination
-                  ? (selectedWorkspace?.name ?? 'Select workspace')
-                  : selectedRepoName}
-              </Text>
-              <Ionicons name="chevron-down" size={13} color={tokens.textLow.hex} />
-            </Pressable>
-          </View>
-          {isComputerDestination && localOptions.error && (
-            <Text className="px-2 pt-2 text-failed text-text12">
-              {localOptionsFailureCopy(localOptions.error).message}
-            </Text>
-          )}
-          {composerError && (
-            <View className="flex-row items-center bg-tint-red rounded-card px-3 py-2 mt-3">
-              <Ionicons name="alert-circle-outline" size={14} color={tokens.failed.hex} />
-              <Text className="text-failed text-text12 ml-2 flex-1">{composerError}</Text>
-            </View>
-          )}
-
-          <View className="mt-3">
-            <ComputerDiscoveryNotices
-              computers={usesComputer ? (computerSessions.data?.computers ?? []) : []}
-            />
-          </View>
-
-          {/* Recent */}
-          {recent.length > 0 && (
-            <View className="mt-8">
-              <View className="flex-row items-center justify-between mb-3">
-                <Text className="text-text-hi text-text16 font-medium">Recent</Text>
                 <Pressable
-                  onPress={() => router.push('/(main)/sessions')}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  className="flex-row items-center flex-1 min-w-0"
+                  onPress={() => {
+                    if (isComputerDestination) {
+                      openLocalPicker('workspace');
+                    } else {
+                      setRepoQuery('');
+                      setShowRepoPicker(true);
+                    }
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isComputerDestination
+                      ? `Workspace: ${selectedWorkspace?.name ?? 'Unavailable'}`
+                      : `Repository: ${selectedRepo ?? 'Any repository'}`
+                  }
                 >
-                  <Text className="text-brand-text text-text13">View all</Text>
+                  <Ionicons name="folder-outline" size={15} color={tokens.textLow.hex} />
+                  <Text className="text-text-mid text-text12 ml-1.5 flex-1" numberOfLines={1}>
+                    {isComputerDestination
+                      ? (selectedWorkspace?.name ?? 'Select workspace')
+                      : selectedRepoName}
+                  </Text>
+                  <Ionicons name="chevron-down" size={13} color={tokens.textLow.hex} />
                 </Pressable>
               </View>
-              <View className="gap-2">
-                {recent.map((item) =>
-                  item.kind === 'computer' ? (
-                    <ComputerSessionRow
-                      key={`computer:${item.session.bridgeId}:${item.session.id}`}
-                      session={item.session}
-                      compact
-                      onPress={
-                        item.session.canLoad
-                          ? () =>
-                              router.push({
-                                pathname: '/(main)/computer-session/[bridgeId]/[id]',
-                                params: {
-                                  bridgeId: item.session.bridgeId,
-                                  id: item.session.id,
-                                },
-                              })
-                          : undefined
-                      }
-                    />
-                  ) : (
-                    <Pressable
-                      key={`cloud:${item.session.session_id}`}
-                      className="bg-surface1 rounded-card border border-border-subtle px-4 py-3.5"
-                      onPress={() => router.push(`/(main)/session/${item.session.session_id}`)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${item.session.title || 'Untitled session'}, ${statusLabel(item.session)}`}
-                    >
-                      <Text className="text-text-hi text-text14" numberOfLines={1}>
-                        {item.session.title || 'Untitled session'}
-                      </Text>
-                      <View className="flex-row items-center mt-1">
-                        <Text
-                          className={`text-text12 ${statusColorClass(deriveStatusKey(item.session))}`}
-                        >
-                          {statusLabel(item.session)}
-                        </Text>
-                        <Text className="text-text-low text-text12 ml-2">
-                          {relativeTime(item.session.updated_at)}
-                        </Text>
-                        {item.session.pull_requests[0] && (
-                          <View className="flex-row items-center ml-auto">
-                            <Ionicons
-                              name="git-pull-request-outline"
-                              size={12}
-                              color={tokens.merged.hex}
-                            />
-                            <Text className="text-merged text-text12 ml-1">
-                              #{prNumber(item.session.pull_requests[0].pr_url)}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </Pressable>
-                  ),
-                )}
+              {isComputerDestination && localOptions.error && (
+                <Text className="px-2 pt-2 text-failed text-text12">
+                  {localOptionsFailureCopy(localOptions.error).message}
+                </Text>
+              )}
+              {composerError && (
+                <View className="flex-row items-center bg-tint-red rounded-card px-3 py-2 mt-3">
+                  <Ionicons name="alert-circle-outline" size={14} color={tokens.failed.hex} />
+                  <Text className="text-failed text-text12 ml-2 flex-1">{composerError}</Text>
+                </View>
+              )}
+
+              <View className="mt-3">
+                <ComputerDiscoveryNotices
+                  computers={usesComputer ? (computerSessions.data?.computers ?? []) : []}
+                />
               </View>
-            </View>
+              {!localRecentBeforeComposer && <HomeRecent items={recent} />}
+            </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
