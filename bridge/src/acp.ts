@@ -153,7 +153,7 @@ const loadSessionResultSchema = z.union([
   z.null(),
   z
     .object({
-      modes: acpSessionModesSchema.nullable().optional(),
+      modes: z.unknown().nullable().optional(),
       configOptions: z.array(z.unknown()).max(1_000).nullable().optional(),
       _meta: z.record(z.unknown()).nullable().optional(),
     })
@@ -163,7 +163,7 @@ const loadSessionResultSchema = z.union([
 const newSessionResultSchema = z
   .object({
     sessionId: sessionIdSchema,
-    modes: acpSessionModesSchema.nullable().optional(),
+    modes: z.unknown().nullable().optional(),
     configOptions: z.array(z.unknown()).max(1_000).nullable().optional(),
     _meta: z.record(z.unknown()).nullable().optional(),
   })

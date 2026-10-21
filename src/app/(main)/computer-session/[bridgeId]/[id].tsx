@@ -139,7 +139,7 @@ export function promptErrorMessage(error: unknown): string {
     return 'Otterin Connector is temporarily unavailable. Confirm it is running on your local device.';
   }
   if (error.code === 'auto_approve_unavailable') {
-    return "Auto-approve isn't allowed on this Mac (organisation policy). Your message wasn't sent.";
+    return "Auto-approve isn't allowed on this Mac (organization policy). Your message wasn't sent.";
   }
   return 'The message could not be sent. Try again.';
 }
@@ -570,7 +570,7 @@ export default function ComputerSessionDetailScreen() {
     }
     Alert.alert(
       'Auto-approve commands?',
-      "Devin will run commands and edit files in this folder without asking you first. Your organisation's rules still apply. Takes effect from your next message.",
+      "Devin will run commands and edit files in this folder without asking you first. Your organization's rules still apply. Takes effect from your next message.",
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Turn on', onPress: () => setAutoApproveSession(bridgeId, sessionId, true) },

@@ -318,7 +318,7 @@ export default function HomeScreen() {
     }
     Alert.alert(
       'Auto-approve commands?',
-      "Devin will run commands and edit files in this folder without asking you first. Your organisation's rules still apply. Takes effect from your next message.",
+      "Devin will run commands and edit files in this folder without asking you first. Your organization's rules still apply. Takes effect from your next message.",
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Turn on', onPress: () => setAutoApproveEnabled(true) },
@@ -352,7 +352,7 @@ export default function HomeScreen() {
           hapticError();
           setComposerError(
             error instanceof ComputerBridgeError && error.code === 'auto_approve_unavailable'
-              ? "Auto-approve isn't allowed on this Mac (organisation policy). Your message wasn't sent."
+              ? "Auto-approve isn't allowed on this Mac (organization policy). Your message wasn't sent."
               : error instanceof Error
                 ? error.message
                 : 'The local session could not be created.',

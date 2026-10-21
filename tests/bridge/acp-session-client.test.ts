@@ -1332,6 +1332,7 @@ if (request.method === 'initialize') {
       currentModeId: string,
       modeIds: string[],
       autoApprove: boolean | undefined,
+      reportedModes?: unknown,
     ): Promise<{ error: unknown; events: string[] }> {
       const directory = mkdtempSync(join(tmpdir(), 'devinx-acp-mode-'));
       temporaryDirectories.push(directory);
@@ -1349,7 +1350,7 @@ if (request.method === 'initialize') {
   } }) + '\\n');
 } else if (request.method === 'session/load') {
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
-    modes: ${JSON.stringify({ currentModeId, availableModes })}
+    modes: ${JSON.stringify(reportedModes ?? { currentModeId, availableModes })}
   } }) + '\\n');
 } else if (request.method === 'session/set_mode') {
   require('node:fs').appendFileSync(${JSON.stringify(logPath)}, 'mode:' + request.params.modeId + '\\n');
@@ -1389,6 +1390,18 @@ if (request.method === 'initialize') {
     const unavailable = await runModeTurn('accept-edits', ['accept-edits', 'ask', 'plan'], true);
     expect(unavailable.error).toBeInstanceOf(AcpAutoApproveUnavailableError);
     expect(unavailable.events).not.toContain('prompt');
+    const malformedModes = { currentModeId: 5 };
+    const withoutAutoApprove = await runModeTurn(
+      'accept-edits',
+      [],
+      undefined,
+      malformedModes,
+    );
+    expect(withoutAutoApprove.error).toBeUndefined();
+    expect(withoutAutoApprove.events).toEqual(['prompt']);
+    const withAutoApprove = await runModeTurn('accept-edits', [], true, malformedModes);
+    expect(withAutoApprove.error).toBeInstanceOf(AcpAutoApproveUnavailableError);
+    expect(withAutoApprove.events).not.toContain('prompt');
     await expect(
       runModeTurn('accept-edits', ['accept-edits', 'ask', 'plan', 'bypass'], true),
     ).resolves.toMatchObject({ events: ['mode:bypass', 'prompt'] });
