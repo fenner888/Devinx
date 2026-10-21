@@ -48,7 +48,7 @@ export default function WelcomeScreen() {
             Your Mac&apos;s coding agent, in your pocket.
           </Text>
           <Text className="text-text-mid text-text16 leading-6 mt-3">
-            Start, follow and steer Devin for Terminal sessions on your Mac from your iPhone.
+            Start, follow and steer local Devin sessions on your Mac from your iPhone.
           </Text>
 
           <View className="flex-row flex-wrap gap-2 mt-5">

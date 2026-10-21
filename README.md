@@ -10,7 +10,7 @@
   </picture>
 </p>
 
-<p align="center"><strong>Local coding sessions, mobile. Start, follow and steer Devin for Terminal on your Mac from your iPhone.</strong></p>
+<p align="center"><strong>Local coding sessions, mobile. Start, follow and steer local Devin sessions on your Mac from your iPhone.</strong></p>
 
 <p align="center">
   <a href="https://testflight.apple.com/join/KBD25apN"><strong>Join the TestFlight beta</strong></a>
