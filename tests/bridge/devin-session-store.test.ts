@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -29,6 +29,28 @@ function createFixture(path: string, schemaVersion = 16): DatabaseSync {
     );
   `);
   database.prepare('INSERT INTO refinery_schema_history(version) VALUES (?)').run(schemaVersion);
+  return database;
+}
+
+function createSchema19Fixture(path: string): DatabaseSync {
+  const database = createFixture(path, 19);
+  database.exec(`
+    CREATE TABLE tool_call_state (
+      session_id TEXT NOT NULL,
+      tool_call_id TEXT NOT NULL,
+      tool_call_json TEXT,
+      tool_call_update_json TEXT,
+      source_node_ids TEXT,
+      PRIMARY KEY(session_id, tool_call_id)
+    );
+    CREATE VIRTUAL TABLE message_search USING fts5(content);
+    CREATE TRIGGER message_nodes_search_insert
+    AFTER INSERT ON message_nodes
+    BEGIN
+      INSERT INTO message_search(rowid, content)
+      VALUES (new.row_id, json_extract(new.chat_message, '$.content'));
+    END;
+  `);
   return database;
 }
 
@@ -73,7 +95,7 @@ describe('read-only Devin session store', () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  it.each([16, 17])(
+  it.each([16, 17, 18, 19])(
     'reads only main-chain text during a WAL writer on schema %i',
     async (version) => {
       const databasePath = join(directory, 'sessions.db');
@@ -185,7 +207,7 @@ describe('read-only Devin session store', () => {
 
   it('fails closed for an unreviewed schema version', async () => {
     const databasePath = join(directory, 'sessions.db');
-    const database = createFixture(databasePath, 18);
+    const database = createFixture(databasePath, 20);
     database.close();
     await chmod(databasePath, 0o600);
 
@@ -194,9 +216,64 @@ describe('read-only Devin session store', () => {
     );
   });
 
-  it('lists only visible, recently observed local workspaces and models', async () => {
+  it.each([16, 17, 18, 19])(
+    'lists only visible, recently observed local workspaces and models on schema %i',
+    async (version) => {
+      const databasePath = join(directory, 'sessions.db');
+      const database = createFixture(databasePath, version);
+      database
+        .prepare(
+          `INSERT INTO sessions(
+          id, working_directory, main_chain_id, model, agent_mode, last_activity_at, hidden
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          'session-visible',
+          '/Users/example/current-project',
+          0,
+          'gpt-5-6-sol-medium',
+          'agent',
+          '2026-07-11T12:00:00.000Z',
+          0,
+        );
+      database
+        .prepare(
+          `INSERT INTO sessions(
+          id, working_directory, main_chain_id, model, agent_mode, last_activity_at, hidden
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          'session-hidden',
+          '/Users/example/private-project',
+          0,
+          'private-model',
+          'agent',
+          '2026-07-11T13:00:00.000Z',
+          1,
+        );
+      database.close();
+      await chmod(databasePath, 0o600);
+
+      const store = new DevinSessionStore({ databasePath });
+      await store.start();
+      await expect(store.listCreateOptions()).resolves.toEqual({
+        workspaces: [{ path: '/Users/example/current-project' }],
+        models: [{ id: 'gpt-5-6-sol-medium' }],
+      });
+      await expect(store.getSessionPresentation('session-visible')).resolves.toEqual({
+        modelId: 'gpt-5-6-sol-medium',
+        agentMode: 'agent',
+      });
+      await expect(store.getSessionPresentation('session-hidden')).rejects.toThrow(
+        'metadata is unavailable',
+      );
+      await store.stop();
+    },
+  );
+
+  it('reads realistic schema 19 without changing the database file', async () => {
     const databasePath = join(directory, 'sessions.db');
-    const database = createFixture(databasePath);
+    const database = createSchema19Fixture(databasePath);
     database
       .prepare(
         `INSERT INTO sessions(
@@ -204,46 +281,51 @@ describe('read-only Devin session store', () => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
-        'session-visible',
-        '/Users/example/current-project',
-        0,
+        'session-schema-19',
+        '/Users/example/schema-19-project',
+        2,
         'gpt-5-6-sol-medium',
         'agent',
         '2026-07-11T12:00:00.000Z',
         0,
       );
-    database
-      .prepare(
-        `INSERT INTO sessions(
-          id, working_directory, main_chain_id, model, agent_mode, last_activity_at, hidden
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        'session-hidden',
-        '/Users/example/private-project',
-        0,
-        'private-model',
-        'agent',
-        '2026-07-11T13:00:00.000Z',
-        1,
-      );
+    insertNode(database, {
+      sessionId: 'session-schema-19',
+      nodeId: 1,
+      role: 'user',
+      content: 'Read schema 19.',
+    });
+    insertNode(database, {
+      sessionId: 'session-schema-19',
+      nodeId: 2,
+      parentNodeId: 1,
+      role: 'assistant',
+      content: 'Schema 19 is supported.',
+    });
     database.close();
     await chmod(databasePath, 0o600);
+    const before = await readFile(databasePath);
 
     const store = new DevinSessionStore({ databasePath });
     await store.start();
+    expect(store.isSessionLoadSupported()).toBe(true);
     await expect(store.listCreateOptions()).resolves.toEqual({
-      workspaces: [{ path: '/Users/example/current-project' }],
+      workspaces: [{ path: '/Users/example/schema-19-project' }],
       models: [{ id: 'gpt-5-6-sol-medium' }],
     });
-    await expect(store.getSessionPresentation('session-visible')).resolves.toEqual({
+    await expect(store.loadSession('session-schema-19')).resolves.toEqual({
+      sessionId: 'session-schema-19',
+      cwd: '/Users/example/schema-19-project',
       modelId: 'gpt-5-6-sol-medium',
-      agentMode: 'agent',
+      messages: [
+        { source: 'user', text: 'Read schema 19.' },
+        { source: 'devin', text: 'Schema 19 is supported.' },
+      ],
+      truncated: false,
     });
-    await expect(store.getSessionPresentation('session-hidden')).rejects.toThrow(
-      'metadata is unavailable',
-    );
     await store.stop();
+
+    expect(await readFile(databasePath)).toEqual(before);
   });
 
   it('ignores an empty historical model without blocking workspaces or minimized history', async () => {

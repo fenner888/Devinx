@@ -60,10 +60,12 @@ now returns -32015 for a session already open in another process.
 
 ### Connector 0.1.9 compatibility correction
 
-- Review and allow schemas 16 and 17 only. Schema 17 adds separate subagent
-  heads; continue reading exclusively `sessions.main_chain_id`, never subagent
-  chains, tools, reasoning or metadata. Preserve read-only SQL, owner/permissions,
-  column checks, bounds and per-iPhone content authorization.
+- Review and allow schemas 16–19 only. Schema 17 adds separate subagent
+  heads; schemas 18/19 add auxiliary tool-call metadata and FTS search without
+  changing the queried session or message-node columns. Continue reading
+  exclusively `sessions.main_chain_id`, never subagent chains, tools, reasoning
+  or metadata. Preserve read-only SQL, owner/permissions, column checks, bounds
+  and per-iPhone content authorization.
 - Recognize both observed session-in-use error codes (-32600 and -32015) with
   the existing message guard. Preserve ownership locks and the existing explicit
   continuation behavior rather than trying to force access to desktop sessions.
