@@ -14,7 +14,7 @@ describe('ModelFamilyMark', () => {
     },
   );
 
-  it.each(['glm', 'gpt', 'grok'])('theme-tints the transparent %s mark', (family) => {
+  it.each(['glm', 'swe', 'gpt', 'grok'])('theme-tints the transparent %s mark', (family) => {
     render(<ModelFamilyMark name={family} />);
 
     expect(screen.getByTestId(`model-family-mark-image-${family}`).props.style).toEqual(
@@ -22,7 +22,7 @@ describe('ModelFamilyMark', () => {
     );
   });
 
-  it.each(['claude', 'swe', 'gemini', 'deepseek', 'kimi'])(
+  it.each(['claude', 'gemini', 'deepseek', 'kimi'])(
     'preserves the supplied colors for the %s mark',
     (family) => {
       render(<ModelFamilyMark name={family} />);
