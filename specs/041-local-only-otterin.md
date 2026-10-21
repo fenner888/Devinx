@@ -23,4 +23,4 @@ The iPhone app is a Local-only companion named **Otterin**. Devin's official app
 - Name: Otterin.
 - Subtitle: Local coding sessions, mobile.
 - Preserve the existing slug, scheme, iOS bundle identifier/build number, Android package, and EAS project ID for TestFlight continuity.
-- The Mac app name **DevinX Connector** is unchanged; renaming it is deferred to a separate change.
+- The Mac app name was initially unchanged; the Connector rename shipped in version 0.1.15.

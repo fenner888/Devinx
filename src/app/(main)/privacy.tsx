@@ -43,7 +43,7 @@ const rows = [
   {
     title: 'Your controls and deletion',
     detail:
-      'Wiping local data removes paired-Mac keys, drafts, saved session context, and cached data from this iPhone. Revoking the iPhone in DevinX Connector ends its local-device access.',
+      'Wiping local data removes paired-Mac keys, drafts, saved session context, and cached data from this iPhone. Revoking the iPhone in Otterin Connector ends its local-device access.',
   },
 ] as const;
 

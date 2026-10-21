@@ -57,7 +57,7 @@ import { useTheme } from '@theme/index';
 const STEPS = [
   'Send the assisted setup prompt to an AI assistant on your local device.',
   'Approve the signed install, Tailscale login, and visible background setting there.',
-  'Scan its code, then approve this iPhone in DevinX Connector.',
+  'Scan its code, then approve this iPhone in Otterin Connector.',
 ];
 
 const TAILSCALE_IOS_GUIDE = 'https://tailscale.com/docs/install/ios';
@@ -126,29 +126,29 @@ function pairingFailureMessage(error: unknown, stage: ComputerPairingStatus | nu
       ? (error as { code?: unknown }).code
       : undefined;
   if (code === 'pairing_version_incompatible') {
-    return 'This pairing code uses a different connection version. Update Otterin on this iPhone and DevinX Connector on your local device, then scan again.';
+    return 'This pairing code uses a different connection version. Update Otterin on this iPhone and Otterin Connector on your local device, then scan again.';
   }
   if (code === 'pairing_code_expired') {
-    return 'This pairing code expired. Generate a new code in DevinX Connector and scan it promptly. Check that both devices use automatic date and time.';
+    return 'This pairing code expired. Generate a new code in Otterin Connector and scan it promptly. Check that both devices use automatic date and time.';
   }
   if (code === 'pairing_code_invalid') {
-    return 'This is not a supported Otterin pairing code. Scan the code shown inside DevinX Connector.';
+    return 'This is not a supported Otterin pairing code. Scan the code shown inside Otterin Connector.';
   }
   if (code === 'ERR_PINNED_HTTPS_NETWORK') {
-    return 'Otterin could not reach DevinX Connector. Confirm Tailscale is connected on this iPhone and local device, then generate a new code.';
+    return 'Otterin could not reach Otterin Connector. Confirm Tailscale is connected on this iPhone and local device, then generate a new code.';
   }
   if (code === 'unavailable' && stage === 'submitting') {
-    return 'The signed request could not reach DevinX Connector through Tailscale.';
+    return 'The signed request could not reach Otterin Connector through Tailscale.';
   }
   if (code === 'ERR_PINNED_HTTPS_CERTIFICATE_MISMATCH') {
-    return 'The pairing code no longer matches DevinX Connector. Generate a new code and scan it again.';
+    return 'The pairing code no longer matches Otterin Connector. Generate a new code and scan it again.';
   }
   if (
     code === 'ERR_PINNED_HTTPS_INVALID_INPUT' ||
     code === 'ERR_PINNED_HTTPS_INVALID_RESPONSE' ||
     code === 'ERR_PINNED_HTTPS_RESPONSE_TOO_LARGE'
   ) {
-    return 'Otterin and DevinX Connector are not using a compatible secure connection. Update both and try again.';
+    return 'Otterin and Otterin Connector are not using a compatible secure connection. Update both and try again.';
   }
   if (stage === 'checking_bridge_identity') {
     return 'This iPhone could not verify the Connector identity in the pairing code.';
@@ -162,7 +162,7 @@ function pairingFailureMessage(error: unknown, stage: ComputerPairingStatus | nu
   if (stage === 'preparing_secure_request') {
     return 'This iPhone could not prepare the signed pairing request.';
   }
-  return 'Pairing could not be completed. Generate a new code in DevinX Connector and try again.';
+  return 'Pairing could not be completed. Generate a new code in Otterin Connector and try again.';
 }
 
 export default function ComputerConnectionScreen() {
@@ -252,7 +252,7 @@ export default function ComputerConnectionScreen() {
                 ) {
                   Alert.alert(
                     'Local device unavailable',
-                    'Otterin cannot revoke this iPhone on the local device while Connector is offline. You can retry later, or remove the pairing key from this iPhone now. The inactive device record will remain until you revoke it in DevinX Connector.',
+                    'Otterin cannot revoke this iPhone on the local device while Connector is offline. You can retry later, or remove the pairing key from this iPhone now. The inactive device record will remain until you revoke it in Otterin Connector.',
                     [
                       { text: 'Cancel', style: 'cancel' },
                       {
@@ -275,7 +275,7 @@ export default function ComputerConnectionScreen() {
                   return;
                 }
                 setError(
-                  'The local device could not be securely disconnected. Open DevinX Connector and try again.',
+                  'The local device could not be securely disconnected. Open Otterin Connector and try again.',
                 );
               })
               .finally(() => setRemovingBridgeId(null));
@@ -288,7 +288,7 @@ export default function ComputerConnectionScreen() {
   function shareAssistedSetup() {
     setError(null);
     Share.share({
-      title: 'Set up DevinX Connector',
+      title: 'Set up Otterin Connector',
       message: CONNECTOR_SETUP_PROMPT,
     }).catch(() => setError('The assisted setup prompt could not be shared. Try again.'));
   }
@@ -311,7 +311,7 @@ export default function ComputerConnectionScreen() {
       if (!mountedRef.current) return;
       if (permission !== 'authorized') {
         setShowSettings(permission === 'denied' || permission === 'restricted');
-        resetForRetry('Camera access is required to scan the DevinX Connector pairing code.');
+        resetForRetry('Camera access is required to scan the Otterin Connector pairing code.');
         return;
       }
       setPhase('scanning');
@@ -383,7 +383,7 @@ export default function ComputerConnectionScreen() {
             <View className="flex-1 pr-4">
               <Text className="text-text-hi text-text20 font-semibold">Scan pairing code</Text>
               <Text className="text-text-low text-text12 leading-4 mt-1">
-                Point your camera at the code shown in DevinX Connector.
+                Point your camera at the code shown in Otterin Connector.
               </Text>
             </View>
             <Pressable
@@ -517,7 +517,7 @@ export default function ComputerConnectionScreen() {
                 disabled={!canScan}
                 onPress={startScanning}
                 accessibilityRole="button"
-                accessibilityLabel="Scan DevinX Connector pairing code"
+                accessibilityLabel="Scan Otterin Connector pairing code"
               >
                 {phase === 'requesting_permission' ? (
                   <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
@@ -582,11 +582,11 @@ export default function ComputerConnectionScreen() {
                     <Text className="text-text-hi text-text13 font-semibold">
                       {updateRequiredBridgeIds.size > 0
                         ? 'Connector update required'
-                        : 'Updating DevinX Connector'}
+                        : 'Updating Otterin Connector'}
                     </Text>
                     {updateRequiredBridgeIds.size > 0 && (
                       <Text className="text-text-mid text-text12 leading-4 mt-1">
-                        Install DevinX Connector {MINIMUM_SUPPORTED_CONNECTOR_VERSION} or later to
+                        Install Otterin Connector {MINIMUM_SUPPORTED_CONNECTOR_VERSION} or later to
                         keep local sessions compatible.
                       </Text>
                     )}
@@ -604,7 +604,7 @@ export default function ComputerConnectionScreen() {
                         className="mr-4"
                         onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
                         accessibilityRole="link"
-                        accessibilityLabel="Open official DevinX Connector update for Mac"
+                        accessibilityLabel="Open official Otterin Connector update for Mac"
                       >
                         <Text className="text-link text-text12 font-medium">Mac update</Text>
                       </Pressable>
@@ -613,7 +613,7 @@ export default function ComputerConnectionScreen() {
                           Linking.openURL(WINDOWS_CONNECTOR_STORE_PAGE).catch(() => {})
                         }
                         accessibilityRole="link"
-                        accessibilityLabel="Open DevinX Connector update in Microsoft Store"
+                        accessibilityLabel="Open Otterin Connector update in Microsoft Store"
                       >
                         <Text className="text-link text-text12 font-medium">Windows update</Text>
                       </Pressable>
@@ -632,7 +632,7 @@ export default function ComputerConnectionScreen() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-text-hi text-text14 font-semibold">
-                    Set up DevinX Connector
+                    Set up Otterin Connector
                   </Text>
                   <Text className="text-text-mid text-text12 leading-4 mt-1">
                     Tailscale alone does not expose Devin sessions. Send a guarded setup prompt to
@@ -645,7 +645,7 @@ export default function ComputerConnectionScreen() {
                 className="bg-brand rounded-button px-buttonPrimaryX py-buttonPrimaryY mt-4"
                 onPress={shareAssistedSetup}
                 accessibilityRole="button"
-                accessibilityLabel="Share assisted DevinX Connector setup prompt"
+                accessibilityLabel="Share assisted Otterin Connector setup prompt"
               >
                 <View className="flex-row items-center justify-center">
                   <Ionicons name="share-outline" size={17} color={tokens.textAlwaysWhite.hex} />
@@ -660,7 +660,7 @@ export default function ComputerConnectionScreen() {
                   className="flex-1 border border-border rounded-button px-3 py-buttonPrimaryY mr-1.5"
                   onPress={() => Linking.openURL(CONNECTOR_RELEASE_PAGE).catch(() => {})}
                   accessibilityRole="link"
-                  accessibilityLabel="Open official DevinX Connector release for Mac"
+                  accessibilityLabel="Open official Otterin Connector release for Mac"
                 >
                   <Text className="text-text-hi text-text13 font-medium text-center">
                     Mac release
@@ -670,7 +670,7 @@ export default function ComputerConnectionScreen() {
                   className="flex-1 border border-border rounded-button px-3 py-buttonPrimaryY ml-1.5"
                   onPress={() => Linking.openURL(WINDOWS_CONNECTOR_STORE_PAGE).catch(() => {})}
                   accessibilityRole="link"
-                  accessibilityLabel="Open DevinX Connector in Microsoft Store"
+                  accessibilityLabel="Open Otterin Connector in Microsoft Store"
                 >
                   <Text className="text-text-hi text-text13 font-medium text-center">
                     Windows Store

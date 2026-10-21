@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/wordmark-transparent.png">
     <source media="(prefers-color-scheme: light)" srcset="assets/brand/wordmark-onlight.png">
-    <img alt="DevinX" src="assets/brand/wordmark-onlight.png" width="280">
+    <img alt="Otterin" src="assets/brand/wordmark-onlight.png" width="280">
   </picture>
 </p>
 
@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://testflight.apple.com/join/KBD25apN"><strong>Join the TestFlight beta</strong></a>
   ·
-  <a href="https://github.com/fenner888/Devinx/releases/latest"><strong>Download DevinX Connector</strong></a>
+  <a href="https://github.com/fenner888/Devinx/releases/latest"><strong>Download Otterin Connector</strong></a>
   ·
   <a href="docs/devinx-connector.md"><strong>Local setup guide</strong></a>
 </p>
@@ -23,7 +23,7 @@
 </p>
 
 > [!IMPORTANT]
-> DevinX is an independent, unofficial client for Devin. It is not affiliated with, endorsed by,
+> Otterin is an independent, unofficial client for Devin. It is not affiliated with, endorsed by,
 > or a product of Cognition AI. Devin, Cognition, and third-party model names and marks belong to
 > their respective owners. Cloud features require the user's own Devin account and appropriate API
 > access.
@@ -32,17 +32,17 @@
 
 | Product                          | Current release     | Availability                                                                                      |
 | -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------- |
-| **DevinX for iPhone**            | `0.1.0 (82)`        | Testing in Team (Expo) and [DevinX Early Access](https://testflight.apple.com/join/KBD25apN)        |
+| **Otterin for iPhone**           | `0.1.0 (82)`        | Testing in Team (Expo) and [Otterin Early Access](https://testflight.apple.com/join/KBD25apN)       |
 | **Public App Store version**     | `1.0`               | Submitted to Apple and waiting for App Review · manual release after approval                     |
-| **DevinX Connector for macOS**   | `0.1.14`            | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
-| **DevinX Connector for Windows** | `0.1.7.0` live; `0.1.8.0` in certification | Windows 11 x64 compatibility update submitted to Microsoft; publication follows approval       |
+| **Otterin Connector for macOS**  | `0.1.15`            | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
+| **Otterin Connector for Windows** | `0.1.7.0` live; `0.1.8.0` in certification | Windows 11 x64 compatibility update submitted to Microsoft; Store listing retains its reserved DevinX Connector name |
 
 TestFlight access does not include a Devin account or shared Devin data. Each tester connects their
 own Devin organization, pairs a local device they control, or uses both.
 
-## What DevinX is
+## What Otterin is
 
-DevinX is mobile mission control for supported Devin Cloud and Devin for Terminal workflows. It is
+Otterin is mobile mission control for supported Devin Cloud and Devin for Terminal workflows. It is
 built for the moments when you are away from your desk but still need to start work, check progress,
 answer a question, or review a result.
 
@@ -60,18 +60,18 @@ answer a question, or review a result.
 - **Speak detailed prompts.** On supported iOS 26 devices, dictation is transcribed on device. The
   optional **Organize prompt** preview uses Apple Foundation Models when available and falls back to
   deterministic on-device formatting.
-- **Inspect supported product surfaces.** Depending on account permissions, DevinX can expose
+- **Inspect supported product surfaces.** Depending on account permissions, Otterin can expose
   Automations, Usage, Review, repository Wiki content, read-only integration/MCP status, and genuine
   `code_scan` Security Work.
-- **Keep a helpful companion nearby.** The DevinX companion reflects session state without becoming
+- **Keep a helpful companion nearby.** The Otterin companion reflects session state without becoming
   an operating-system overlay or covering primary controls.
 
 ## Choose where Devin runs
 
 | Mode              | Connects to                                      | Required setup                                                        |
 | ----------------- | ------------------------------------------------ | --------------------------------------------------------------------- |
-| **Devin Cloud**   | Documented Devin Cloud APIs over TLS             | DevinX, a Devin organization ID, and a scoped service-user credential |
-| **Local**         | Supported Devin sessions on a device you control | DevinX, Tailscale, supported local Devin ACP, and DevinX Connector    |
+| **Devin Cloud**   | Documented Devin Cloud APIs over TLS             | Otterin, a Devin organization ID, and a scoped service-user credential |
+| **Local**         | Supported Devin sessions on a device you control | Otterin, Tailscale, supported local Devin ACP, and Otterin Connector   |
 | **Cloud + Local** | Both sources in one app with explicit origins    | Both setups above                                                     |
 
 Cloud authentication does not pair a local device. Local pairing does not copy Devin credentials to
@@ -79,17 +79,17 @@ the iPhone. Each connection has its own authentication, permissions, storage, an
 
 ```mermaid
 flowchart LR
-    I["DevinX on iPhone"] -->|"Documented API over TLS"| C["Devin Cloud"]
-    I -->|"Tailscale + pinned TLS + signed requests"| X["DevinX Connector"]
+    I["Otterin on iPhone"] -->|"Documented API over TLS"| C["Devin Cloud"]
+    I -->|"Tailscale + pinned TLS + signed requests"| X["Otterin Connector"]
     X -->|"Bounded ACP operations"| T["Devin for Terminal"]
 ```
 
-DevinX operates no relay for normal Cloud or Local session traffic.
+Otterin operates no relay for normal Cloud or Local session traffic.
 
 ## Install on iPhone
 
 1. Install Apple's [TestFlight](https://apps.apple.com/app/testflight/id899247664) app.
-2. Open the [DevinX Early Access link](https://testflight.apple.com/join/KBD25apN).
+2. Open the [Otterin Early Access link](https://testflight.apple.com/join/KBD25apN).
 3. Install Build `0.1.0 (79)` and complete the in-app onboarding.
 4. Choose **Devin Cloud**, **Local**, or **Cloud + Local**.
 
@@ -98,14 +98,14 @@ DevinX operates no relay for normal Cloud or Local session traffic.
 Cloud mode requires an existing Devin organization and a least-privilege service user created by
 that organization. Follow Devin's official
 [service-user authentication guide](https://docs.devin.ai/api-reference/authentication), then enter
-the generated service-user key and organization ID only inside DevinX onboarding. The credential is
+the generated service-user key and organization ID only inside Otterin onboarding. The credential is
 validated directly against Devin and stored with device-only protection in iOS Keychain.
 
 Do not paste Devin credentials into issues, screenshots, setup prompts, shell history, or chat
 messages. TestFlight does not provide a shared Devin credential, and no tester receives access to
 another user's sessions through the beta link.
 
-## Install DevinX Connector for Local mode
+## Install Otterin Connector for Local mode
 
 Connector is optional. Cloud-only users do not install it.
 
@@ -114,16 +114,16 @@ Connector is optional. Cloud-only users do not install it.
 - macOS 13 or later on Apple silicon
 - [Tailscale](https://tailscale.com/download/mac) on the Mac and iPhone, signed into the same tailnet
 - Devin for Terminal installed and authenticated on the Mac
-- DevinX on the iPhone
+- Otterin on the iPhone
 
 ### Setup
 
 1. Download the signed DMG and checksum from the
-   [latest official DevinX release](https://github.com/fenner888/Devinx/releases/latest).
+   [latest official Otterin Connector release](https://github.com/fenner888/Devinx/releases/latest).
 2. Verify the checksum published with that release.
-3. Open the DMG and move **DevinX Connector** to Applications.
+3. Open the DMG and move **Otterin Connector** to Applications.
 4. Open Connector and confirm it detects both Tailscale and Devin for Terminal.
-5. In DevinX, open **Settings → Local devices → Add local device**.
+5. In Otterin, open **Your Mac → Scan pairing code**.
 6. Scan the short-lived code and approve the named iPhone plus its requested permissions on the Mac.
 
 The iPhone onboarding also includes a guarded assisted-setup prompt for an AI assistant on the Mac.
@@ -168,7 +168,7 @@ Tailscale and Connector provide two separate required layers for Local mode:
 
 A Tailscale IP, server URL, or shared password is not a Devin session service. Without compatible
 software listening on the Mac, there is nothing for the phone to authenticate to or request sessions
-from. DevinX uses short-lived QR pairing so every phone gets its own cryptographic identity,
+from. Otterin uses short-lived QR pairing so every phone gets its own cryptographic identity,
 permission set, and revocation path instead of sharing one reusable password.
 
 ## Local permissions and lifecycle
@@ -180,10 +180,10 @@ Connector grants are per iPhone and enforced on the Mac:
 - **Create new sessions**
 
 The Mac owner chooses these permissions during pairing and can revoke a phone later. The iPhone can
-request signed revocation while Connector is reachable. If the Mac is offline, DevinX offers an
+request signed revocation while Connector is reachable. If the Mac is offline, Otterin offers an
 honest local-only removal instead of claiming the Mac-side grant was revoked.
 
-Closing the Connector window leaves its visible menu-bar service running. **Quit DevinX Connector**
+Closing the Connector window leaves its visible menu-bar service running. **Quit Otterin Connector**
 stops it. Launch at login is an explicit user choice. Connector includes no root daemon, public
 tunnel, analytics SDK, or silent updater.
 
@@ -196,7 +196,7 @@ tunnel, analytics SDK, or silent updater.
   and authorized server-side. Unauthorized resource access receives a generic non-disclosing error.
 - Local transport pins the Connector certificate and signs requests with a per-install iPhone
   key.
-- Raw dictation audio is processed on device, is not uploaded by DevinX, and is not retained after
+- Raw dictation audio is processed on device, is not uploaded by Otterin, and is not retained after
   transcription.
 - Session content, transcripts, credentials, and QR payloads are excluded from analytics and logs.
 - Disconnecting wipes credentials, protected caches, drafts, templates, and remembered session
@@ -211,7 +211,7 @@ never through a public issue containing sensitive details.
 
 ## Honest capability boundaries
 
-DevinX exposes only behavior supported by the authenticated account and a documented Cloud API,
+Otterin exposes only behavior supported by the authenticated account and a documented Cloud API,
 official Devin MCP tool, or approved local ACP capability.
 
 - Cloud availability depends on organization tier and service-user permissions. Missing access is
@@ -329,13 +329,13 @@ private session content, repository secrets, or exploit details.
 - [Open a bug or feature request](https://github.com/fenner888/Devinx/issues)
 - [Report a vulnerability privately](https://github.com/fenner888/Devinx/security/advisories/new)
 - [Read the privacy policy](PRIVACY.md)
-- [View DevinX releases](https://github.com/fenner888/Devinx/releases)
+- [View Otterin releases](https://github.com/fenner888/Devinx/releases)
 
 ## License and trademarks
 
-Original DevinX software and documentation are available under the [MIT License](LICENSE). See
+Original Otterin software and documentation are available under the [MIT License](LICENSE). See
 [NOTICE](NOTICE) for third-party dependencies, names, model-provider marks, screenshots, reference
 material, and trademark boundaries.
 
-The MIT License does not grant permission to use the DevinX name or branding as a trademark or to
+The MIT License does not grant permission to use the Otterin name or branding as a trademark or to
 imply affiliation with Cognition AI, Devin, or any model provider.

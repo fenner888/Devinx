@@ -40,7 +40,7 @@ installed Build 67 for every remaining check below.
 
 ## Launch, navigation, and appearance
 
-- Cold-launch once in light mode and once in dark mode. Confirm the transparent DevinX wordmark
+- Cold-launch once in light mode and once in dark mode. Confirm the transparent Otterin wordmark
   has no rectangular background or color flash.
 - Open every primary navigation and supported Settings row. Confirm Security Work is native and that no
   private Devin Web login, unsupported Code Scan dashboard, or dead route appears.
@@ -104,7 +104,7 @@ installed Build 67 for every remaining check below.
 
 ## Computer sessions, ownership, and device authorization
 
-- In DevinX Connector, grant the test iPhone read, send, and create-session permissions.
+- In Otterin Connector, grant the test iPhone read, send, and create-session permissions.
 - Create a Computer session from the phone with an approved opaque workspace and selected live
   model/variant. When Adaptive is present in the live catalog, select it explicitly. Confirm the
   selected exact model appears, is accepted by Devin for Terminal, and the initial prompt receives
@@ -164,7 +164,7 @@ installed Build 67 for every remaining check below.
   first launch, QR pairing, explicit launch-at-login enablement, logout/login startup, and repair
   after stopping Tailscale or Devin for Terminal.
 - Close the Connector window and confirm its menu-bar item and mobile bridge stay available. Reopen
-  the window from the menu-bar item, then choose **Quit DevinX Connector** and confirm the bridge
+  the window from the menu-bar item, then choose **Quit Otterin Connector** and confirm the bridge
   stops.
 - With Connector offline, confirm mobile disconnect offers retry or clearly labeled local-only
   removal. Reopen Connector later and revoke the inactive iPhone record from the Mac.

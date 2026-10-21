@@ -1,4 +1,4 @@
-# DevinX Connector platform roadmap
+# Otterin Connector platform roadmap
 
 Last updated: July 22, 2026
 
@@ -11,7 +11,7 @@ after its native adapter, signed package, and physical test matrix pass.
 
 All platforms reuse protocol version 2, the TypeScript bridge/security core, strict Zod boundaries, opaque session handles, per-device grants, signed expiring requests, replay protection, rate limits, exact Tailscale-interface binding, minimized ACP output, and generic unauthorized `404` responses.
 
-Platform code may implement only secure storage, executable discovery, lifecycle integration, UI, packaging/signing, updates, diagnostics, and uninstall. It may never introduce shared passwords, wildcard/LAN/public listeners, persisted QR payloads, silent privilege escalation, or a DevinX-operated relay.
+Platform code may implement only secure storage, executable discovery, lifecycle integration, UI, packaging/signing, updates, diagnostics, and uninstall. It may never introduce shared passwords, wildcard/LAN/public listeners, persisted QR payloads, silent privilege escalation, or an Otterin-operated relay.
 
 ## Windows x64 implementation checkpoint
 

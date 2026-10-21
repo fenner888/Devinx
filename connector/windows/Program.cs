@@ -303,7 +303,7 @@ internal sealed class ConnectorForm : Form
         SizeMode = PictureBoxSizeMode.Zoom,
     };
     private readonly Button regenerateButton = new() { Text = "Generate new code", AutoSize = true };
-    private readonly CheckBox launchAtLogin = new() { Text = "Open DevinX Connector when I sign in", AutoSize = true };
+    private readonly CheckBox launchAtLogin = new() { Text = "Open Otterin Connector when I sign in", AutoSize = true };
     private readonly Label devicesTitle = new()
     {
         Text = "Paired iPhones",
@@ -333,7 +333,7 @@ internal sealed class ConnectorForm : Form
     private readonly Button revokeButton = new() { Text = "Revoke selected iPhone", AutoSize = true };
     private readonly Button releasesButton = new() { Text = "Open Microsoft Store", AutoSize = true };
     private readonly Button helpButton = new() { Text = "Setup and uninstall help", AutoSize = true };
-    private readonly NotifyIcon trayIcon = new() { Text = "DevinX Connector", Visible = true };
+    private readonly NotifyIcon trayIcon = new() { Text = "Otterin Connector", Visible = true };
     private readonly SemaphoreSlim writeLock = new(1, 1);
     private Process? runtime;
     private bool exiting;
@@ -341,7 +341,7 @@ internal sealed class ConnectorForm : Form
 
     public ConnectorForm()
     {
-        Text = "DevinX Connector";
+        Text = "Otterin Connector";
         Width = 620;
         Height = 860;
         MinimumSize = new Size(560, 700);
@@ -356,7 +356,7 @@ internal sealed class ConnectorForm : Form
 
         var heading = new Label
         {
-            Text = "DevinX Connector",
+            Text = "Otterin Connector",
             AutoSize = true,
             Font = new Font("Segoe UI", 24, FontStyle.Bold),
             Margin = new Padding(0, 0, 0, 8),
@@ -415,8 +415,8 @@ internal sealed class ConnectorForm : Form
         };
 
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Open DevinX Connector", null, (_, _) => RestoreWindow());
-        menu.Items.Add("Quit DevinX Connector", null, async (_, _) => await ExitAsync());
+        menu.Items.Add("Open Otterin Connector", null, (_, _) => RestoreWindow());
+        menu.Items.Add("Quit Otterin Connector", null, async (_, _) => await ExitAsync());
         trayIcon.ContextMenuStrip = menu;
         trayIcon.Icon = SystemIcons.Application;
         trayIcon.DoubleClick += (_, _) => RestoreWindow();
@@ -445,7 +445,7 @@ internal sealed class ConnectorForm : Form
                 },
                 EnableRaisingEvents = true,
             };
-            runtime.Exited += (_, _) => BeginInvoke(() => SetStatus("Needs attention", "The Connector runtime stopped. Quit and reopen DevinX Connector."));
+            runtime.Exited += (_, _) => BeginInvoke(() => SetStatus("Needs attention", "The Connector runtime stopped. Quit and reopen Otterin Connector."));
             if (!runtime.Start()) throw new InvalidOperationException();
             _ = Task.Run(() => DrainErrorsAsync(runtime.StandardError));
             await ReadEventsAsync(runtime.StandardOutput);
@@ -454,7 +454,7 @@ internal sealed class ConnectorForm : Form
         {
             runtime?.Dispose();
             runtime = null;
-            SetStatus("Connector runtime unavailable", "Update DevinX Connector from Microsoft Store, then reopen it.");
+            SetStatus("Connector runtime unavailable", "Update Otterin Connector from Microsoft Store, then reopen it.");
         }
     }
 
@@ -644,7 +644,7 @@ internal sealed class ConnectorForm : Form
         }
         eventArgs.Cancel = true;
         Hide();
-        trayIcon.ShowBalloonTip(1500, "DevinX Connector", "Connector remains available from the notification area.", ToolTipIcon.Info);
+        trayIcon.ShowBalloonTip(1500, "Otterin Connector", "Connector remains available from the notification area.", ToolTipIcon.Info);
     }
 
     private void RestoreWindow()
@@ -716,8 +716,8 @@ internal sealed class ConnectorForm : Form
             launchAtLogin.Checked = false;
             var detail =
                 state == global::Windows.ApplicationModel.StartupTaskState.DisabledByUser
-                    ? "Windows has disabled this startup task. Re-enable DevinX Connector in Settings > Apps > Startup."
-                    : "Windows could not enable DevinX Connector at sign in on this PC.";
+                    ? "Windows has disabled this startup task. Re-enable Otterin Connector in Settings > Apps > Startup."
+                    : "Windows could not enable Otterin Connector at sign in on this PC.";
             MessageBox.Show(
                 this,
                 detail,
@@ -730,7 +730,7 @@ internal sealed class ConnectorForm : Form
             launchAtLogin.Checked = false;
             MessageBox.Show(
                 this,
-                "Windows could not update the startup setting. Reopen DevinX Connector and try again.",
+                "Windows could not update the startup setting. Reopen Otterin Connector and try again.",
                 "Open at sign in",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
@@ -776,8 +776,8 @@ internal sealed class ConnectorForm : Form
         catch
         {
             MessageBox.Show(
-                "The official DevinX page could not be opened.",
-                "DevinX Connector",
+                "The official Otterin Connector page could not be opened.",
+                "Otterin Connector",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
         }

@@ -9,8 +9,8 @@ import {
 
 describe('Connector assisted setup', () => {
   it('explains separate platform updates without erasing pairing', () => {
-    expect(CONNECTOR_UPDATE_NOTICE).toContain('does not update DevinX Connector');
-    expect(MAC_CONNECTOR_UPDATE_STEPS).toContain('Quit DevinX Connector');
+    expect(CONNECTOR_UPDATE_NOTICE).toContain('does not update Otterin Connector');
+    expect(MAC_CONNECTOR_UPDATE_STEPS).toContain('Quit Otterin Connector');
     expect(MAC_CONNECTOR_UPDATE_STEPS).toContain('Applications and choose Replace');
     expect(MAC_CONNECTOR_UPDATE_STEPS).toContain('Your pairing is kept');
     expect(WINDOWS_CONNECTOR_UPDATE_STEPS).toContain('Microsoft Store');

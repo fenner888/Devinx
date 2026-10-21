@@ -123,7 +123,7 @@ function discoveryMessage(status: ComputerDiscoveryStatus): string | null {
   if (status.state === 'busy') {
     return `${status.computerName} is busy. Showing the last session list — pull to refresh again in a moment.`;
   }
-  return `${status.computerName} is offline or DevinX Connector is not running.`;
+  return `${status.computerName} is offline or Otterin Connector is not running.`;
 }
 
 export function ComputerDiscoveryNotices({ computers }: { computers: ComputerDiscoveryStatus[] }) {

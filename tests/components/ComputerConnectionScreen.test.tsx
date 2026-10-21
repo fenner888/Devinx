@@ -121,17 +121,17 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByText('Pair a Mac')).toBeTruthy();
     expect(screen.getByText('Name this computer')).toBeTruthy();
     expect(screen.getByText('Open Tailscale setup guide')).toBeTruthy();
-    expect(screen.getByText('Set up DevinX Connector')).toBeTruthy();
+    expect(screen.getByText('Set up Otterin Connector')).toBeTruthy();
     expect(screen.getByText('Send assisted setup prompt')).toBeTruthy();
     expect(screen.getByText('Mac release')).toBeTruthy();
     expect(screen.getByText('Windows Store')).toBeTruthy();
     expect(screen.getByText(/Tailscale alone does not expose Devin sessions/)).toBeTruthy();
     expect(screen.queryByText('Pairing transport pending')).toBeNull();
 
-    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan Otterin Connector pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
     expect(
-      screen.getByText('Point your camera at the code shown in DevinX Connector.'),
+      screen.getByText('Point your camera at the code shown in Otterin Connector.'),
     ).toBeTruthy();
     expect(screen.getByText('Hold the code inside the frame.')).toBeTruthy();
     expect(screen.getByLabelText('Cancel QR scanning')).toBeTruthy();
@@ -144,7 +144,7 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByText(/Tailscale supplies the private network/)).toBeTruthy();
     expect(screen.getByText(/Connector supplies the local Devin service/)).toBeTruthy();
     expect(screen.queryByText('Same Wi-Fi')).toBeNull();
-    expect(screen.getByLabelText('Scan DevinX Connector pairing code')).toBeTruthy();
+    expect(screen.getByLabelText('Scan Otterin Connector pairing code')).toBeTruthy();
   });
 
   it('shows local pairing without a Cloud alternative', () => {
@@ -169,8 +169,8 @@ describe('Computer connection onboarding', () => {
     const screen = render(<ComputerConnectionScreen />);
 
     await waitFor(() => expect(screen.getByText('Connector update required')).toBeTruthy());
-    expect(screen.getByLabelText('Open official DevinX Connector update for Mac')).toBeTruthy();
-    expect(screen.getByLabelText('Open DevinX Connector update in Microsoft Store')).toBeTruthy();
+    expect(screen.getByLabelText('Open official Otterin Connector update for Mac')).toBeTruthy();
+    expect(screen.getByLabelText('Open Otterin Connector update in Microsoft Store')).toBeTruthy();
     expect(screen.getByText(/0.1.2 or later/)).toBeTruthy();
   });
 
@@ -208,14 +208,14 @@ describe('Computer connection onboarding', () => {
       try {
         const screen = render(<ComputerConnectionScreen />);
         await waitFor(() => expect(mockGetComputerBridgeVersion).toHaveBeenCalled());
-        expect(screen.getByText('Updating DevinX Connector')).toBeTruthy();
+        expect(screen.getByText('Updating Otterin Connector')).toBeTruthy();
         expect(screen.queryByText('Connector update required')).toBeNull();
         expect(screen.getByText(CONNECTOR_UPDATE_NOTICE)).toBeTruthy();
         expect(screen.getByText(MAC_CONNECTOR_UPDATE_STEPS)).toBeTruthy();
         expect(screen.getByText(WINDOWS_CONNECTOR_UPDATE_STEPS)).toBeTruthy();
-        fireEvent.press(screen.getByLabelText('Open official DevinX Connector update for Mac'));
+        fireEvent.press(screen.getByLabelText('Open official Otterin Connector update for Mac'));
         expect(openURL).toHaveBeenLastCalledWith(CONNECTOR_RELEASE_PAGE);
-        fireEvent.press(screen.getByLabelText('Open DevinX Connector update in Microsoft Store'));
+        fireEvent.press(screen.getByLabelText('Open Otterin Connector update in Microsoft Store'));
         expect(openURL).toHaveBeenLastCalledWith(WINDOWS_CONNECTOR_STORE_PAGE);
       } finally {
         openURL.mockRestore();
@@ -227,7 +227,7 @@ describe('Computer connection onboarding', () => {
     mockGetPermission.mockResolvedValueOnce('notDetermined');
     const screen = render(<ComputerConnectionScreen />);
 
-    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan Otterin Connector pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
     expect(mockRequestPermission).toHaveBeenCalledTimes(1);
 
@@ -245,10 +245,10 @@ describe('Computer connection onboarding', () => {
     mockGetPermission.mockResolvedValueOnce('denied');
     const screen = render(<ComputerConnectionScreen />);
 
-    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan Otterin Connector pairing code'));
     await waitFor(() =>
       expect(
-        screen.getByText('Camera access is required to scan the DevinX Connector pairing code.'),
+        screen.getByText('Camera access is required to scan the Otterin Connector pairing code.'),
       ).toBeTruthy(),
     );
     expect(screen.queryByTestId('qr-scanner')).toBeNull();
@@ -260,7 +260,7 @@ describe('Computer connection onboarding', () => {
     mockPairComputer.mockRejectedValueOnce({ code: 'ERR_PINNED_HTTPS_NETWORK' });
     const screen = render(<ComputerConnectionScreen />);
 
-    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan Otterin Connector pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
     fireEvent.press(screen.getByTestId('qr-scanner'));
 
@@ -278,12 +278,12 @@ describe('Computer connection onboarding', () => {
   ])('shows specific recovery guidance for %s and permits another scan', async (code, message) => {
     mockPairComputer.mockRejectedValueOnce({ code });
     const screen = render(<ComputerConnectionScreen />);
-    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan Otterin Connector pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
     fireEvent.press(screen.getByTestId('qr-scanner'));
     await waitFor(() => expect(screen.getByText(message)).toBeTruthy());
     expect(mockRefreshComputers).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan Otterin Connector pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
   });
 });

@@ -13,9 +13,9 @@
       "buildNumber": "84",
       "infoPlist": {
         "NSFileProtection": "NSFileProtectionComplete",
-        "NSCameraUsageDescription": "Allow Otterin to scan a pairing code shown by DevinX Connector.",
+        "NSCameraUsageDescription": "Allow Otterin to scan a pairing code shown by Otterin Connector.",
         "NSMicrophoneUsageDescription": "Otterin uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded.",
-        "NSLocalNetworkUsageDescription": "Allow Otterin to connect securely to a local device you approve in DevinX Connector.",
+        "NSLocalNetworkUsageDescription": "Allow Otterin to connect securely to a local device you approve in Otterin Connector.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
           "NSExceptionDomains": {

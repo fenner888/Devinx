@@ -23,11 +23,11 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '..', '..');
 const pinnedNodeVersion = readFileSync(resolve(repositoryRoot, '.nvmrc'), 'utf8').trim();
 if (!/^24\.\d+\.\d+$/.test(pinnedNodeVersion)) {
-  throw new Error('DevinX Connector requires a pinned Node 24 runtime in .nvmrc');
+  throw new Error('Otterin Connector requires a pinned Node 24 runtime in .nvmrc');
 }
 const NODE_VERSION = `v${pinnedNodeVersion}`;
 const outputRoot = resolve(repositoryRoot, 'artifacts', 'connector');
-const appRoot = resolve(outputRoot, 'DevinX Connector.app');
+const appRoot = resolve(outputRoot, 'Otterin Connector.app');
 const contentsRoot = resolve(appRoot, 'Contents');
 const macOSRoot = resolve(contentsRoot, 'MacOS');
 const resourcesRoot = resolve(contentsRoot, 'Resources');
@@ -42,7 +42,7 @@ function run(executable, args, options = {}) {
     ...options,
   });
   if (result.error || result.status !== 0) {
-    throw new Error(`${basename(executable)} failed while building DevinX Connector`);
+    throw new Error(`${basename(executable)} failed while building Otterin Connector`);
   }
 }
 
@@ -53,7 +53,7 @@ function capture(executable, args) {
     shell: false,
   });
   if (result.error || result.status !== 0) {
-    throw new Error(`${basename(executable)} failed while validating DevinX Connector signing`);
+    throw new Error(`${basename(executable)} failed while validating Otterin Connector signing`);
   }
   return `${result.stdout ?? ''}${result.stderr ?? ''}`;
 }
@@ -99,7 +99,7 @@ function validateRuntimeEntitlements(path) {
 function nodePlatformArchive() {
   if (architecture === 'arm64') return `node-${NODE_VERSION}-darwin-arm64.tar.gz`;
   if (architecture === 'x64') return `node-${NODE_VERSION}-darwin-x64.tar.gz`;
-  throw new Error('DevinX Connector macOS builds require arm64 or x64');
+  throw new Error('Otterin Connector macOS builds require arm64 or x64');
 }
 
 async function download(url, destination) {
@@ -285,17 +285,17 @@ signOwnedCode(appRoot, identity);
 run('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', appRoot]);
 
 const stagingRoot = resolve(outputRoot, 'dmg-staging');
-const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.14-macos-${architecture}.dmg`);
+const dmgPath = resolve(outputRoot, `Otterin-Connector-0.1.15-macos-${architecture}.dmg`);
 rmSync(stagingRoot, { recursive: true, force: true });
 rmSync(dmgPath, { force: true });
 mkdirSync(stagingRoot, { recursive: true });
-cpSync(appRoot, resolve(stagingRoot, 'DevinX Connector.app'), { recursive: true });
+cpSync(appRoot, resolve(stagingRoot, 'Otterin Connector.app'), { recursive: true });
 copyFileSync(resolve(repositoryRoot, 'LICENSE'), resolve(stagingRoot, 'LICENSE.txt'));
 symlinkSync('/Applications', resolve(stagingRoot, 'Applications'));
 run('/usr/bin/hdiutil', [
   'create',
   '-volname',
-  'DevinX Connector',
+  'Otterin Connector',
   '-srcfolder',
   stagingRoot,
   '-ov',

@@ -17,11 +17,11 @@ import { spawnSync } from 'node:child_process';
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '..', '..');
 const outputRoot = resolve(repositoryRoot, 'artifacts', 'connector');
-const appRoot = resolve(outputRoot, 'DevinX Connector.app');
+const appRoot = resolve(outputRoot, 'Otterin Connector.app');
 const nodeRuntimePath = resolve(appRoot, 'Contents', 'Resources', 'runtime', 'node');
 const architecture = arch() === 'arm64' ? 'arm64' : arch() === 'x64' ? 'x64' : null;
-const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.14-macos-${architecture}.dmg`);
-const zipPath = resolve(outputRoot, 'DevinX-Connector-notarization.zip');
+const dmgPath = resolve(outputRoot, `Otterin-Connector-0.1.15-macos-${architecture}.dmg`);
+const zipPath = resolve(outputRoot, 'Otterin-Connector-notarization.zip');
 const stagingRoot = resolve(outputRoot, 'notarization-dmg-staging');
 const auditPath = resolve(outputRoot, 'notarization-audit.json');
 const checkOnly = process.argv.slice(2).includes('--check');
@@ -170,13 +170,13 @@ function rebuildSignedDmg(identity) {
   rmSync(stagingRoot, { recursive: true, force: true });
   rmSync(dmgPath, { force: true });
   mkdirSync(stagingRoot, { recursive: true });
-  cpSync(appRoot, resolve(stagingRoot, 'DevinX Connector.app'), { recursive: true });
+  cpSync(appRoot, resolve(stagingRoot, 'Otterin Connector.app'), { recursive: true });
   copyFileSync(resolve(repositoryRoot, 'LICENSE'), resolve(stagingRoot, 'LICENSE.txt'));
   symlinkSync('/Applications', resolve(stagingRoot, 'Applications'));
   run('/usr/bin/hdiutil', [
     'create',
     '-volname',
-    'DevinX Connector',
+    'Otterin Connector',
     '-srcfolder',
     stagingRoot,
     '-ov',

@@ -47,12 +47,12 @@ describe('ComputerPermissionsSheet', () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        "Permissions are managed in DevinX Connector on Studio Mac. Open it and change what this iPhone is allowed to do — you don't need to pair again.",
+        "Permissions are managed in Otterin Connector on Studio Mac. Open it and change what this iPhone is allowed to do — you don't need to pair again.",
       ),
     ).toBeTruthy();
     expect(
       screen.queryByText(
-        'Shown as granted when this iPhone was paired. Update DevinX Connector to see its current permissions.',
+        'Shown as granted when this iPhone was paired. Update Otterin Connector to see its current permissions.',
       ),
     ).toBeNull();
   });
@@ -71,7 +71,7 @@ describe('ComputerPermissionsSheet', () => {
 
     expect(
       screen.getByText(
-        'Shown as granted when this iPhone was paired. Update DevinX Connector to see its current permissions.',
+        'Shown as granted when this iPhone was paired. Update Otterin Connector to see its current permissions.',
       ),
     ).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Done'));

@@ -191,9 +191,9 @@ describe('Phase 15 local-device pairing screen', () => {
     const screen = render(<ComputerConnectionScreen />);
     const tree = JSON.stringify(screen.toJSON());
 
-    expect(screen.getByLabelText('Scan DevinX Connector pairing code')).toBeTruthy();
+    expect(screen.getByLabelText('Scan Otterin Connector pairing code')).toBeTruthy();
     expect(screen.getByLabelText('Permissions for Studio Mac')).toBeTruthy();
-    expect(tree.indexOf('Scan DevinX Connector pairing code')).toBeLessThan(
+    expect(tree.indexOf('Scan Otterin Connector pairing code')).toBeLessThan(
       tree.indexOf('Permissions for Studio Mac'),
     );
   });
@@ -203,7 +203,7 @@ describe('Phase 15 local-device pairing screen', () => {
 
     expect(screen.getByText('Name this computer')).toBeTruthy();
     expect(screen.getByDisplayValue('My Mac')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan Otterin Connector pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
     fireEvent.press(screen.getByTestId('qr-scanner'));
 
@@ -222,7 +222,7 @@ describe('Phase 15 local-device pairing screen', () => {
     const screen = render(<ComputerConnectionScreen />);
 
     fireEvent.changeText(screen.getByLabelText('Paired local-device name'), 'Work PC');
-    fireEvent.press(screen.getByLabelText('Scan DevinX Connector pairing code'));
+    fireEvent.press(screen.getByLabelText('Scan Otterin Connector pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
     fireEvent.press(screen.getByTestId('qr-scanner'));
 
