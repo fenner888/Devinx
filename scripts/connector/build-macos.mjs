@@ -285,7 +285,7 @@ signOwnedCode(appRoot, identity);
 run('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', appRoot]);
 
 const stagingRoot = resolve(outputRoot, 'dmg-staging');
-const dmgPath = resolve(outputRoot, `Otterin-Connector-0.1.16-macos-${architecture}.dmg`);
+const dmgPath = resolve(outputRoot, `Otterin-Connector-0.1.17-macos-${architecture}.dmg`);
 rmSync(stagingRoot, { recursive: true, force: true });
 rmSync(dmgPath, { force: true });
 mkdirSync(stagingRoot, { recursive: true });
