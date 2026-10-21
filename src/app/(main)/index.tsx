@@ -21,9 +21,11 @@ import {
   useComputerSessions,
   useComputerCreateOptions,
   useCreateComputerSession,
+  useComputerBridgeFeatures,
   type ComputerSessionListItem,
 } from '@api/bridge/queries';
 import { useComputerGrants } from '@api/bridge/presentation';
+import { ComputerBridgeError } from '@auth/computerBridge';
 import { OfflineBanner } from '@components/OfflineBanner';
 import { NavMenu } from '@components/NavMenu';
 import { DevinCompanion, HomeCompanionStage } from '@components/pets';
@@ -44,6 +46,7 @@ import {
   type ComputerModelFamily,
 } from '@lib/computer-model-catalog';
 import { branding } from '@lib/branding';
+import { useAppPreferences } from '@store/preferences';
 import WORDMARK_DARK from '../../../assets/wordmark.png';
 import WORDMARK_LIGHT from '../../../assets/wordmark-light.png';
 
@@ -135,7 +138,10 @@ export default function HomeScreen() {
   const [modelQuery, setModelQuery] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [autoApproveEnabled, setAutoApproveEnabled] = useState(false);
   const [companionActive, setCompanionActive] = useState(false);
+  const bridgeFeatures = useComputerBridgeFeatures(computer?.bridgeId ?? '', Boolean(computer));
+  const setAutoApproveSession = useAppPreferences((state) => state.setAutoApproveSession);
 
   useEffect(() => {
     if (!computers.some((candidate) => candidate.bridgeId === selectedComputerBridgeId)) {
@@ -305,6 +311,21 @@ export default function HomeScreen() {
     );
   }
 
+  function toggleAutoApprove() {
+    if (autoApproveEnabled) {
+      setAutoApproveEnabled(false);
+      return;
+    }
+    Alert.alert(
+      'Auto-approve commands?',
+      "Devin will run commands and edit files in this folder without asking you first. Your organization's rules still apply. Takes effect from your next message.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Turn on', onPress: () => setAutoApproveEnabled(true) },
+      ],
+    );
+  }
+
   function handleSend() {
     if (!computer || !selectedWorkspaceId || !prompt.trim() || createComputerSession.isPending) {
       return;
@@ -316,17 +337,25 @@ export default function HomeScreen() {
         workspaceId: selectedWorkspaceId,
         modelId: selectedModelId ?? localOptions.data?.defaultModelId ?? null,
         text: prompt.trim().slice(0, MAX_PROMPT),
+        ...(bridgeFeatures.data?.autoApprove === true ? { autoApprove: autoApproveEnabled } : {}),
       },
       {
         onSuccess: ({ sessionId }) => {
           hapticSuccess();
+          if (autoApproveEnabled) {
+            setAutoApproveSession(computer.bridgeId, sessionId, true);
+          }
           setPrompt('');
           router.push(`/computer-session/${computer.bridgeId}/${sessionId}?continuing=1`);
         },
         onError: (error) => {
           hapticError();
           setComposerError(
-            error instanceof Error ? error.message : 'The local session could not be created.',
+            error instanceof ComputerBridgeError && error.code === 'auto_approve_unavailable'
+              ? "Auto-approve isn't allowed on this Mac (organization policy). Your message wasn't sent."
+              : error instanceof Error
+                ? error.message
+                : 'The local session could not be created.',
           );
         },
       },
@@ -474,6 +503,22 @@ export default function HomeScreen() {
                     )}
                   </View>
                   <View className="flex-row items-center gap-1">
+                    {bridgeFeatures.data?.autoApprove === true && (
+                      <Pressable
+                        className="h-10 w-10 items-center justify-center rounded-full"
+                        onPress={toggleAutoApprove}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          autoApproveEnabled ? 'Auto-approve on' : 'Auto-approve off'
+                        }
+                      >
+                        <Ionicons
+                          name={autoApproveEnabled ? 'shield-checkmark' : 'shield-outline'}
+                          size={19}
+                          color={autoApproveEnabled ? tokens.brand.hex : tokens.textMid.hex}
+                        />
+                      </Pressable>
+                    )}
                     <VoiceMicButton voice={voice} disabled={!canUseComposer || composerPending} />
                     <Pressable
                       className={`w-10 h-10 rounded-full items-center justify-center ${canUseComposer && prompt.trim() ? 'bg-brand' : 'bg-tint-secondary'}`}

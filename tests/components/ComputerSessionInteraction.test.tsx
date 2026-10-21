@@ -85,6 +85,7 @@ jest.mock('../../src/api/bridge/queries', () => ({
     error: null,
   }),
   usePromptComputerSession: () => ({ mutate: mockMutate, isPending: false, error: null }),
+  useCancelComputerSession: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useComputerCreateOptions: () => ({
     data: { models: [], catalogSource: 'live' },
     isLoading: false,

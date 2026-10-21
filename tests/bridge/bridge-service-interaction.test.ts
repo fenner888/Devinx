@@ -114,6 +114,9 @@ describe('Bridge service interaction compatibility', () => {
         pendingPermission = null;
       },
       isSessionPromptSupported: () => false,
+      isSessionCancelSupported: () => true,
+      cancelSession: async () => undefined,
+      isSessionAutoApproveSupported: () => true,
       promptSession: async () => undefined,
     };
   });
@@ -160,7 +163,7 @@ describe('Bridge service interaction compatibility', () => {
 
   const context = { peerKey: 'test-peer', now: NOW };
 
-  it('advertises permission prompts only for an opted-in supported adapter', async () => {
+  it('advertises local interaction capabilities only when opted in and supported', async () => {
     const bridge = service();
 
     await expect(
@@ -177,6 +180,8 @@ describe('Bridge service interaction compatibility', () => {
         sessionElicitation: false,
         activityTimeline: true,
         permissionPrompts: true,
+        sessionCancel: true,
+        autoApprove: true,
       },
     });
   });

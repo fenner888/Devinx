@@ -12,6 +12,7 @@ import { branding } from '@lib/branding';
 import { confirmAction } from '@lib/confirm';
 import { purgeUserScopedStorage } from '@lib/localUserData';
 import { useAppPreferences } from '@store/preferences';
+import { formatRefreshInterval, localRefreshIntervals } from '@lib/polling';
 import {
   setThemePreference,
   useThemePreference,
@@ -33,6 +34,8 @@ export default function SettingsScreen() {
   const themePreference = useThemePreference();
   const hapticsEnabled = useAppPreferences((state) => state.hapticsEnabled);
   const setHaptics = useAppPreferences((state) => state.setHaptics);
+  const pollingMode = useAppPreferences((state) => state.pollingMode);
+  const setPollingMode = useAppPreferences((state) => state.setPollingMode);
   const [wipeError, setWipeError] = useState<string | null>(null);
 
   function handleWipe() {
@@ -152,6 +155,40 @@ export default function SettingsScreen() {
               />
             </View>
           </Pressable>
+          <View className="border-t border-border-subtle px-4 py-3">
+            <Text className="text-text-hi text-text14 mb-2">Refresh speed</Text>
+            <View className="flex-row bg-tint-secondary rounded-button p-1">
+              {([
+                ['battery_saver', 'Battery saver'],
+                ['balanced', 'Balanced'],
+                ['fast', 'Fast'],
+              ] as const).map(([mode, label]) => (
+                <Pressable
+                  key={mode}
+                  className={`min-h-11 flex-1 items-center justify-center rounded-button px-1 ${pollingMode === mode ? 'bg-surface2' : ''}`}
+                  onPress={() => setPollingMode(mode)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${label} refresh speed`}
+                  accessibilityState={{ selected: pollingMode === mode }}
+                >
+                  <Text
+                    className={`text-center text-text12 ${pollingMode === mode ? 'text-text-hi font-medium' : 'text-text-mid'}`}
+                    numberOfLines={1}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text className="mt-2 text-text-low text-text12">
+              Session list checks every{' '}
+              {formatRefreshInterval(localRefreshIntervals(pollingMode).sessionList)}.
+            </Text>
+            <Text className="mt-1 text-text-low text-text12">
+              How often the session list checks your Mac. Open sessions update every{' '}
+              {formatRefreshInterval(localRefreshIntervals(pollingMode).activity)}.
+            </Text>
+          </View>
         </View>
 
         <Text className="text-text-low text-text12 font-medium uppercase mb-2">Privacy</Text>

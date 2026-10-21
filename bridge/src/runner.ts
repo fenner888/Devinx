@@ -114,10 +114,16 @@ export interface AcpSessionLifecycle extends SessionDiscoveryAdapter {
     context: string,
     text: string,
     modelId?: string,
+    autoApprove?: boolean,
   ): Promise<string>;
   isSessionCreateSupported?(): boolean;
   listModelCatalog?(forceRefresh?: boolean): Promise<AcpModelCatalog>;
-  createSession?(cwd: string, modelId: string | null, text: string): Promise<string>;
+  createSession?(
+    cwd: string,
+    modelId: string | null,
+    text: string,
+    autoApprove?: boolean,
+  ): Promise<string>;
 }
 
 export interface SessionHistoryLifecycle {
@@ -419,6 +425,23 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     return this.current.isSessionPromptSupported();
   }
 
+  isSessionCancelSupported(): boolean {
+    return Boolean(
+      this.current.isSessionCancelSupported?.() && this.current.cancelSession,
+    );
+  }
+
+  cancelSession(sessionId: string): void | Promise<void> {
+    if (!this.isSessionCancelSupported() || !this.current.cancelSession) {
+      throw new Error('Session cancellation is not enabled');
+    }
+    return this.current.cancelSession(sessionId);
+  }
+
+  isSessionAutoApproveSupported(): boolean {
+    return this.current.isSessionAutoApproveSupported?.() === true;
+  }
+
   isSessionCreateSupported(): boolean {
     const canDiscoverWorkspaces = Boolean(
       this.history?.listCreateOptions || this.current.isSessionListSupported(),
@@ -495,11 +518,19 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     return [...paths].map((path) => ({ path }));
   }
 
-  async createSession(cwd: string, modelId: string | null, text: string): Promise<string> {
+  async createSession(
+    cwd: string,
+    modelId: string | null,
+    text: string,
+    autoApprove?: boolean,
+  ): Promise<string> {
     if (!this.isSessionCreateSupported() || !this.current.createSession) {
       throw new Error('Session creation is not enabled');
     }
-    const sessionId = await this.current.createSession(cwd, modelId, text);
+    const sessionId =
+      autoApprove === undefined
+        ? await this.current.createSession(cwd, modelId, text)
+        : await this.current.createSession(cwd, modelId, text, autoApprove);
     this.listedSessionIds.add(sessionId);
     // ACP releases ownership after the asynchronous prompt settles. Do not
     // cache that process-local load beyond the accepted prompt, or the next
@@ -512,6 +543,7 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
     sessionId: string,
     text: string,
     modelId?: string,
+    autoApprove?: boolean,
   ): ReturnType<SessionDiscoveryAdapter['promptSession']> {
     await this.ensureSessionListed(sessionId);
     if (!this.acpLoadedSessionIds.has(sessionId)) {
@@ -530,18 +562,30 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
         const history = await this.history.loadSession(sessionId);
         if (history.messages.length === 0) throw new Error('Session continuation has no context');
         const context = continuationContext(history.messages, history.truncated);
-        const continuedSessionId = modelId
-          ? await createContinuation.call(this.current, history.cwd, context, text, modelId)
-          : await createContinuation.call(this.current, history.cwd, context, text);
+        const continuedSessionId =
+          autoApprove !== undefined
+            ? await createContinuation.call(
+                this.current,
+                history.cwd,
+                context,
+                text,
+                modelId,
+                autoApprove,
+              )
+            : modelId
+              ? await createContinuation.call(this.current, history.cwd, context, text, modelId)
+              : await createContinuation.call(this.current, history.cwd, context, text);
         this.listedSessionIds.add(continuedSessionId);
         this.acpLoadedSessionIds.delete(continuedSessionId);
         return { continuedSessionId };
       }
     }
     try {
-      return modelId
-        ? await this.current.promptSession(sessionId, text, modelId)
-        : await this.current.promptSession(sessionId, text);
+      return autoApprove !== undefined
+        ? await this.current.promptSession(sessionId, text, modelId, autoApprove)
+        : modelId
+          ? await this.current.promptSession(sessionId, text, modelId)
+          : await this.current.promptSession(sessionId, text);
     } finally {
       // AcpSessionClient releases the lock when this accepted prompt finishes.
       // Force a fresh load before every later prompt instead of retaining a

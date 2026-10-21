@@ -13,6 +13,12 @@ import {
   storePairedComputers,
   type PairedComputerCredential,
 } from './pairedComputers';
+import {
+  createScreenshotFixtureData,
+  isScreenshotFixtureMode,
+  SCREENSHOT_FIXTURE_BRIDGE_ID,
+  SCREENSHOT_FIXTURE_SESSION_IDS,
+} from './screenshotFixtures';
 
 const BRIDGE_PROTOCOL_VERSION = 2 as const;
 const REQUEST_LIFETIME_MS = 15_000;
@@ -75,6 +81,7 @@ const bridgeMethodSchema = z.enum([
   'session.elicitation.respond',
   'session.permission',
   'session.permission.respond',
+  'session.cancel',
   'session.prompt',
   'session.create_options',
   'session.create',
@@ -89,11 +96,13 @@ const bridgeFeaturesBodySchema = z
   .strict();
 const bridgePlatformBodySchema = z.object({}).strict();
 const bridgeVersionBodySchema = z.object({}).strict();
-const computerBridgeFeaturesSchema = z
+export const computerBridgeFeaturesSchema = z
   .object({
     sessionElicitation: z.boolean(),
     activityTimeline: z.boolean().optional(),
     permissionPrompts: z.boolean().optional(),
+    sessionCancel: z.boolean().optional(),
+    autoApprove: z.boolean().optional(),
   })
   .passthrough();
 const computerGrantsSchema = z
@@ -102,11 +111,11 @@ const computerGrantsSchema = z
     sendPrompts: z.boolean(),
     startSessions: z.boolean(),
   });
-const computerBridgePresentationSchema = z.object({
+export const computerBridgePresentationSchema = z.object({
   messageTimestamps: z.boolean(),
   grants: computerGrantsSchema.strict(),
 }).passthrough();
-const computerBridgePlatformSchema = z
+export const computerBridgePlatformSchema = z
   .object({ platform: z.enum(['macos', 'windows', 'linux']) })
   .strict();
 export const computerBridgeVersionSchema = z
@@ -185,7 +194,7 @@ export const computerActivityEntrySchema = z
     endedAt: z.number().int().nonnegative().optional(),
   })
   .strict();
-const computerSessionActivitySchema = z
+export const computerSessionActivitySchema = z
   .object({
     active: z.boolean(),
     kind: computerSessionActivityKindSchema,
@@ -227,7 +236,7 @@ const elicitationValueSchema = z.union([
   z.boolean(),
   z.array(z.string().max(500)).max(100),
 ]);
-const computerSessionElicitationSchema = z
+export const computerSessionElicitationSchema = z
   .object({
     interaction: z
       .object({
@@ -295,10 +304,10 @@ const sessionElicitationResponseBodySchema = z.union([
     })
     .strict(),
 ]);
-const sessionElicitationResponseSchema = z.object({ accepted: z.literal(true) }).strict();
+export const sessionElicitationResponseSchema = z.object({ accepted: z.literal(true) }).strict();
 const sessionPermissionBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
 const sessionPermissionDecisionSchema = z.enum(['allow_once', 'allow_session', 'reject_once']);
-const computerSessionPermissionSchema = z
+export const computerSessionPermissionSchema = z
   .object({
     permission: z
       .object({
@@ -324,23 +333,26 @@ const sessionPermissionResponseBodySchema = z
     decision: sessionPermissionDecisionSchema,
   })
   .strict();
-const sessionPermissionResponseSchema = z.object({ accepted: z.literal(true) }).strict();
+export const sessionPermissionResponseSchema = z.object({ accepted: z.literal(true) }).strict();
 const sessionPromptBodySchema = z
   .object({
     sessionId: localSessionIdSchema,
     text: z.string().trim().min(1).max(100_000),
     modelId: modelIdSchema.optional(),
+    autoApprove: z.boolean().optional(),
   })
   .strict();
-const sessionPromptResponseSchema = z
+export const sessionPromptResponseSchema = z
   .object({ accepted: z.literal(true), sessionId: localSessionIdSchema.optional() })
   .strict();
+const sessionCancelBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
+const sessionCancelResponseSchema = z.object({ cancelled: z.literal(true) }).strict();
 const sessionCreateOptionsBodySchema = z
   .object({
     refresh: z.boolean().optional(),
   })
   .strict();
-const sessionCreateOptionsResponseSchema = z
+export const sessionCreateOptionsResponseSchema = z
   .object({
     workspaces: z
       .array(z.object({ id: workspaceIdSchema, name: z.string().min(1).max(160) }).strict())
@@ -375,9 +387,10 @@ const sessionCreateBodySchema = z
     workspaceId: workspaceIdSchema,
     modelId: modelIdSchema.nullable().optional(),
     text: z.string().trim().min(1).max(10_000),
+    autoApprove: z.boolean().optional(),
   })
   .strict();
-const sessionCreateResponseSchema = z
+export const sessionCreateResponseSchema = z
   .object({ accepted: z.literal(true), sessionId: localSessionIdSchema })
   .strict();
 
@@ -558,6 +571,8 @@ export type ComputerBridgeErrorCode =
   | 'permission_denied'
   | 'authorization_failed'
   | 'busy'
+  | 'conflict'
+  | 'auto_approve_unavailable'
   | 'rate_limited'
   | 'unavailable'
   | 'unsupported_method'
@@ -590,6 +605,7 @@ const permissionByMethod = {
   'session.elicitation.respond': 'session:prompt:send',
   'session.permission': 'session:content:read',
   'session.permission.respond': 'session:prompt:send',
+  'session.cancel': 'session:prompt:send',
   'session.prompt': 'session:prompt:send',
   'session.create_options': 'session:metadata:read',
   'session.create': 'session:create',
@@ -612,6 +628,7 @@ function bodyForMethod(method: SupportedMethod, input: unknown): object {
   if (method === 'session.permission.respond') {
     return sessionPermissionResponseBodySchema.parse(input);
   }
+  if (method === 'session.cancel') return sessionCancelBodySchema.parse(input);
   if (method === 'session.prompt') return sessionPromptBodySchema.parse(input);
   if (method === 'session.create_options') return sessionCreateOptionsBodySchema.parse(input);
   return sessionCreateBodySchema.parse(input);
@@ -640,6 +657,15 @@ function publicResponseError(
     );
   }
   if (status === 409) {
+    if (body.error === 'auto_approve_unavailable') {
+      return new ComputerBridgeError(
+        "Auto-approve isn't available on this local device.",
+        'auto_approve_unavailable',
+      );
+    }
+    if (method === 'session.cancel' && body.error === 'conflict') {
+      return new ComputerBridgeError('The session is not running in the Connector.', 'conflict');
+    }
     return new ComputerBridgeError('Devin is finishing the previous turn.', 'busy');
   }
   if (status === 503) {
@@ -1018,9 +1044,23 @@ async function requestSessionPermissionResponse(
   }
 }
 
+async function requestSessionCancel(
+  credential: PairedComputerCredential,
+  sessionId: string,
+): Promise<void> {
+  const body = sessionCancelBodySchema.parse({ sessionId });
+  const response = await requestComputer(credential, 'session.cancel', body);
+  if (!sessionCancelResponseSchema.safeParse(response.body).success) {
+    throw new ComputerBridgeError(
+      'The paired local device returned an invalid cancellation response.',
+      'invalid_response',
+    );
+  }
+}
+
 async function requestSessionPrompt(
   credential: PairedComputerCredential,
-  input: { sessionId: string; text: string; modelId?: string },
+  input: { sessionId: string; text: string; modelId?: string; autoApprove?: boolean },
 ): Promise<void | { sessionId: string }> {
   const body = sessionPromptBodySchema.parse(input);
   const response = await requestComputer(credential, 'session.prompt', body);
@@ -1052,7 +1092,7 @@ async function requestSessionCreateOptions(
 
 async function requestSessionCreate(
   credential: PairedComputerCredential,
-  input: { workspaceId: string; modelId?: string | null; text: string },
+  input: { workspaceId: string; modelId?: string | null; text: string; autoApprove?: boolean },
 ): Promise<{ sessionId: string }> {
   const body = sessionCreateBodySchema.parse(input);
   const response = await requestComputer(credential, 'session.create', body);
@@ -1081,16 +1121,19 @@ export interface ComputerBridgeConnection {
   respondToSessionElicitation(input: ComputerElicitationResponse): Promise<void>;
   getSessionPermission(sessionId: string): Promise<ComputerSessionPermission | null>;
   respondToSessionPermission(input: { sessionId: string } & ComputerPermissionAnswer): Promise<void>;
+  cancelSession(sessionId: string): Promise<void>;
   promptSession(
     sessionId: string,
     text: string,
     modelId?: string,
+    autoApprove?: boolean,
   ): Promise<void | { sessionId: string }>;
   getCreateOptions(refresh?: boolean): Promise<ComputerCreateOptions>;
   createSession(input: {
     workspaceId: string;
     modelId?: string | null;
     text: string;
+    autoApprove?: boolean;
   }): Promise<{ sessionId: string }>;
 }
 
@@ -1126,11 +1169,13 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
     respondToSessionElicitation: (input) => requestSessionElicitationResponse(credential, input),
     getSessionPermission: (sessionId) => requestSessionPermission(credential, { sessionId }),
     respondToSessionPermission: (input) => requestSessionPermissionResponse(credential, input),
-    promptSession: (sessionId, text, modelId) =>
+    cancelSession: (sessionId) => requestSessionCancel(credential, sessionId),
+    promptSession: (sessionId, text, modelId, autoApprove) =>
       requestSessionPrompt(credential, {
         sessionId,
         text,
         ...(modelId ? { modelId } : {}),
+        ...(autoApprove !== undefined ? { autoApprove } : {}),
       }),
     getCreateOptions: (refresh = false) =>
       requestSessionCreateOptions(credential, refresh ? { refresh: true } : {}),
@@ -1138,9 +1183,149 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
   };
 }
 
+function requireScreenshotFixtureBridge(bridgeId: string): void {
+  opaqueIdSchema.parse(bridgeId);
+  if (bridgeId !== SCREENSHOT_FIXTURE_BRIDGE_ID) {
+    throw new ComputerBridgeError('This local device is not paired.', 'not_paired');
+  }
+}
+
+function connectionForScreenshotFixture(bridgeId: string): ComputerBridgeConnection {
+  requireScreenshotFixtureBridge(bridgeId);
+  return {
+    bridgeId,
+    getHealth: async () =>
+      computerBridgeHealthSchema.parse(createScreenshotFixtureData().health),
+    getFeatures: async () =>
+      computerBridgeFeaturesSchema.parse(createScreenshotFixtureData().features),
+    getVersion: async () => {
+      const { version } = computerBridgeVersionSchema.parse(
+        createScreenshotFixtureData().version,
+      );
+      return { kind: 'supported', version };
+    },
+    listSessions: async (input = {}) => {
+      const body = sessionListBodySchema.parse(input);
+      const fixture = createScreenshotFixtureData();
+      return computerSessionPageSchema.parse(
+        body.cursor ? { sessions: [] } : fixture.sessionPage,
+      );
+    },
+    loadSession: async (sessionId) => {
+      const parsedSessionId = localSessionIdSchema.parse(sessionId);
+      const fixture = createScreenshotFixtureData();
+      const loaded = fixture.loadedSessions[parsedSessionId];
+      if (loaded) return computerLoadedSessionSchema.parse(loaded);
+
+      const page = computerSessionPageSchema.parse(fixture.sessionPage);
+      const summary = page.sessions.find(({ id }) => id === parsedSessionId);
+      if (!summary) {
+        throw new ComputerBridgeError(
+          'The paired local device returned an invalid session identifier.',
+          'invalid_request',
+        );
+      }
+      return computerLoadedSessionSchema.parse({
+        session: {
+          id: parsedSessionId,
+          origin: 'computer',
+          workspaceName: summary.workspaceName,
+          ...(summary.model ? { model: summary.model } : {}),
+        },
+        messages: [
+          {
+            sequence: 1,
+            source: 'devin',
+            text: `${summary.title ?? summary.workspaceName} is complete.`,
+            createdAt: Date.parse(summary.updatedAt ?? new Date().toISOString()),
+          },
+        ],
+        truncated: false,
+      });
+    },
+    getSessionActivity: async (sessionId) => {
+      const parsedSessionId = localSessionIdSchema.parse(sessionId);
+      const fixture = createScreenshotFixtureData();
+      return computerSessionActivitySchema.parse(
+        fixture.sessionActivities[parsedSessionId] ?? {
+          active: false,
+          kind: 'responding',
+          label: 'Completed',
+          updatedAt: Date.now(),
+        },
+      );
+    },
+    getSessionElicitation: async (sessionId) => {
+      const parsedSessionId = localSessionIdSchema.parse(sessionId);
+      const fixture = createScreenshotFixtureData();
+      return computerSessionElicitationSchema.parse({
+        interaction:
+          parsedSessionId === SCREENSHOT_FIXTURE_SESSION_IDS.question
+            ? fixture.elicitation.interaction
+            : null,
+      });
+    },
+    respondToSessionElicitation: async (input) => {
+      sessionElicitationResponseBodySchema.parse(input);
+      sessionElicitationResponseSchema.parse(
+        createScreenshotFixtureData().mutationResponses.accepted,
+      );
+    },
+    getSessionPermission: async (sessionId) => {
+      const parsedSessionId = localSessionIdSchema.parse(sessionId);
+      const fixture = createScreenshotFixtureData();
+      return computerSessionPermissionSchema.parse({
+        permission:
+          parsedSessionId === SCREENSHOT_FIXTURE_SESSION_IDS.permission
+            ? fixture.permission.permission
+            : null,
+      }).permission;
+    },
+    respondToSessionPermission: async (input) => {
+      sessionPermissionResponseBodySchema.parse(input);
+      sessionPermissionResponseSchema.parse(
+        createScreenshotFixtureData().mutationResponses.accepted,
+      );
+    },
+    cancelSession: async (sessionId) => {
+      sessionCancelBodySchema.parse({ sessionId });
+      sessionCancelResponseSchema.parse({ cancelled: true });
+    },
+    promptSession: async (sessionId, text, modelId, autoApprove) => {
+      const body = sessionPromptBodySchema.parse({
+        sessionId,
+        text,
+        ...(modelId ? { modelId } : {}),
+        ...(autoApprove !== undefined ? { autoApprove } : {}),
+      });
+      const response = sessionPromptResponseSchema.parse({
+        ...createScreenshotFixtureData().mutationResponses.prompt,
+        sessionId: body.sessionId,
+      });
+      return response.sessionId ? { sessionId: response.sessionId } : undefined;
+    },
+    getCreateOptions: async (refresh = false) => {
+      sessionCreateOptionsBodySchema.parse(refresh ? { refresh: true } : {});
+      return sessionCreateOptionsResponseSchema.parse(
+        createScreenshotFixtureData().createOptions,
+      );
+    },
+    createSession: async (input) => {
+      sessionCreateBodySchema.parse(input);
+      const response = sessionCreateResponseSchema.parse(
+        createScreenshotFixtureData().mutationResponses.created,
+      );
+      return { sessionId: response.sessionId };
+    },
+  };
+}
+
 export async function verifyComputerBridgeCredential(
   credentialInput: PairedComputerCredential,
 ): Promise<ComputerBridgeHealth> {
+  if (isScreenshotFixtureMode()) {
+    return computerBridgeHealthSchema.parse(createScreenshotFixtureData().health);
+  }
   return requestHealth(credentialInput);
 }
 
@@ -1148,6 +1333,13 @@ export async function openComputerBridges(
   bridgeIdsInput: string[],
 ): Promise<Map<string, ComputerBridgeConnection>> {
   const bridgeIds = bridgeIdListSchema.parse(bridgeIdsInput);
+  if (isScreenshotFixtureMode()) {
+    const connections = new Map<string, ComputerBridgeConnection>();
+    for (const bridgeId of bridgeIds) {
+      connections.set(bridgeId, connectionForScreenshotFixture(bridgeId));
+    }
+    return connections;
+  }
   const computers = await validatedComputerRegistry();
   const credentials = new Map(computers.map((computer) => [computer.bridgeId, computer]));
   const connections = new Map<string, ComputerBridgeConnection>();
@@ -1182,6 +1374,12 @@ export async function getComputerBridgeFeatures(bridgeId: string): Promise<Compu
 export async function getComputerBridgePresentation(
   bridgeId: string,
 ): Promise<ComputerBridgePresentation | null> {
+  if (isScreenshotFixtureMode()) {
+    requireScreenshotFixtureBridge(bridgeId);
+    return computerBridgePresentationSchema.parse(
+      createScreenshotFixtureData().presentation,
+    );
+  }
   if (bridgePresentationRejected.has(bridgeId)) return null;
   const computers = await validatedComputerRegistry();
   const credential = computers.find((computer) => computer.bridgeId === bridgeId);
@@ -1223,6 +1421,12 @@ export async function getComputerBridgeVersion(
 export async function getComputerBridgePlatform(
   bridgeId: string,
 ): Promise<ComputerBridgePlatform | 'unknown'> {
+  if (isScreenshotFixtureMode()) {
+    requireScreenshotFixtureBridge(bridgeId);
+    return computerBridgePlatformSchema.parse(
+      createScreenshotFixtureData().platform,
+    ).platform;
+  }
   const computers = await validatedComputerRegistry();
   const credential = computers.find((computer) => computer.bridgeId === bridgeId);
   if (!credential || credential.transportSecurity !== 'tailscale_wireguard') {
@@ -1284,13 +1488,18 @@ export async function respondToComputerSessionPermission(
   return (await openComputerBridge(bridgeId)).respondToSessionPermission(input);
 }
 
+export async function cancelComputerSession(bridgeId: string, sessionId: string): Promise<void> {
+  return (await openComputerBridge(bridgeId)).cancelSession(sessionId);
+}
+
 export async function promptComputerSession(
   bridgeId: string,
   sessionId: string,
   text: string,
   modelId?: string,
+  autoApprove?: boolean,
 ): Promise<void | { sessionId: string }> {
-  return (await openComputerBridge(bridgeId)).promptSession(sessionId, text, modelId);
+  return (await openComputerBridge(bridgeId)).promptSession(sessionId, text, modelId, autoApprove);
 }
 
 export async function getComputerCreateOptions(
@@ -1302,13 +1511,14 @@ export async function getComputerCreateOptions(
 
 export async function createComputerSession(
   bridgeId: string,
-  input: { workspaceId: string; modelId?: string | null; text: string },
+  input: { workspaceId: string; modelId?: string | null; text: string; autoApprove?: boolean },
 ): Promise<{ sessionId: string }> {
   return (await openComputerBridge(bridgeId)).createSession(input);
 }
 
 export async function disconnectComputer(bridgeIdInput: string): Promise<void> {
   const bridgeId = opaqueIdSchema.parse(bridgeIdInput);
+  if (isScreenshotFixtureMode()) return;
   const computers = await validatedComputerRegistry();
   const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
   if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {
@@ -1330,6 +1540,7 @@ export async function disconnectComputer(bridgeIdInput: string): Promise<void> {
 
 export async function removeComputerFromThisIPhone(bridgeIdInput: string): Promise<void> {
   const bridgeId = opaqueIdSchema.parse(bridgeIdInput);
+  if (isScreenshotFixtureMode()) return;
   const computers = await validatedComputerRegistry();
   const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
   if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {

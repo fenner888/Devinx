@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -26,6 +27,7 @@ import {
   useComputerSessionElicitation,
   useComputerCreateOptions,
   useComputerSessionDetail,
+  useCancelComputerSession,
   computerSessionAccessQueryKey,
   computerSessionsQueryKey,
   usePromptComputerSession,
@@ -70,10 +72,11 @@ import { activityShortLabel } from '@lib/activity-labels';
 import { formatFullDate, messageTimeLabels } from '@lib/messageTime';
 import { useTheme } from '@theme/index';
 import { activityForComputerSession } from '@/pets/devin/activity';
+import { localRefreshIntervals } from '@lib/polling';
+import { useAppPreferences } from '@store/preferences';
 
 const BRIDGE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 const LOCAL_SESSION_ID_PATTERN = /^local_[A-Za-z0-9_-]{43}$/;
-const HISTORY_REFRESH_INTERVAL_MS = 3_000;
 const MAXIMUM_HISTORY_REFRESH_ATTEMPTS = 39;
 
 export function devinReplySignature(session: ComputerLoadedSession | undefined): string {
@@ -134,6 +137,9 @@ export function promptErrorMessage(error: unknown): string {
   }
   if (error.code === 'unavailable') {
     return 'Otterin Connector is temporarily unavailable. Confirm it is running on your local device.';
+  }
+  if (error.code === 'auto_approve_unavailable') {
+    return "Auto-approve isn't allowed on this Mac (organization policy). Your message wasn't sent.";
   }
   return 'The message could not be sent. Try again.';
 }
@@ -266,6 +272,9 @@ export default function ComputerSessionDetailScreen() {
   const continuationPending = singleParameter(parameters.continuing) === '1';
   const router = useRouter();
   const { tokens } = useTheme();
+  const pollingMode = useAppPreferences((state) => state.pollingMode);
+  const autoApproveSessions = useAppPreferences((state) => state.autoApproveSessions);
+  const setAutoApproveSession = useAppPreferences((state) => state.setAutoApproveSession);
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const { computers } = useConnections();
@@ -276,6 +285,7 @@ export default function ComputerSessionDetailScreen() {
   const [answeredSummary, setAnsweredSummary] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [pendingText, setPendingText] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [steeringActive, setSteeringActive] = useState(continuationPending);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
@@ -336,6 +346,11 @@ export default function ComputerSessionDetailScreen() {
       ? sessionActivity.data.turn
       : null;
   const prompt = usePromptComputerSession(bridgeId, sessionId);
+  const cancel = useCancelComputerSession(bridgeId, sessionId);
+  const autoApproveKey = `${bridgeId}:${sessionId}`;
+  const autoApproveEnabled = autoApproveSessions[autoApproveKey] === true;
+  const autoApproveSupported = bridgeFeatures.data?.autoApprove === true;
+  const historyRefreshIntervalMs = localRefreshIntervals(pollingMode).history;
   const canPrompt = Boolean(access.data?.capabilities.sessionPrompt);
   const awaiting =
     sessionActivity.data?.awaiting ??
@@ -440,11 +455,11 @@ export default function ComputerSessionDetailScreen() {
       }
       refreshTimer.current = setTimeout(
         () => refreshUntilComplete(attempt + 1),
-        HISTORY_REFRESH_INTERVAL_MS,
+        historyRefreshIntervalMs,
       );
     };
-    refreshTimer.current = setTimeout(() => refreshUntilComplete(0), HISTORY_REFRESH_INTERVAL_MS);
-  }, [continuationPending, mayReadContent, query]);
+    refreshTimer.current = setTimeout(() => refreshUntilComplete(0), historyRefreshIntervalMs);
+  }, [continuationPending, historyRefreshIntervalMs, mayReadContent, query]);
 
   useEffect(
     () => () => {
@@ -487,7 +502,11 @@ export default function ComputerSessionDetailScreen() {
         .map((message) => message.text) ?? [],
     );
     prompt.mutate(
-      { text, ...(selectedModelId ? { modelId: selectedModelId } : {}) },
+      {
+        text,
+        ...(selectedModelId ? { modelId: selectedModelId } : {}),
+        ...(autoApproveSupported ? { autoApprove: autoApproveEnabled } : {}),
+      },
       {
         onSuccess: (result) => {
           if (result?.sessionId && result.sessionId !== sessionId) {
@@ -524,12 +543,12 @@ export default function ComputerSessionDetailScreen() {
             }
             refreshTimer.current = setTimeout(
               () => refreshUntilComplete(attempt + 1),
-              HISTORY_REFRESH_INTERVAL_MS,
+              historyRefreshIntervalMs,
             );
           };
           refreshTimer.current = setTimeout(
             () => refreshUntilComplete(0),
-            HISTORY_REFRESH_INTERVAL_MS,
+            historyRefreshIntervalMs,
           );
         },
         onError: () => {
@@ -542,6 +561,40 @@ export default function ComputerSessionDetailScreen() {
         },
       },
     );
+  }
+
+  function toggleAutoApprove() {
+    if (autoApproveEnabled) {
+      setAutoApproveSession(bridgeId, sessionId, false);
+      return;
+    }
+    Alert.alert(
+      'Auto-approve commands?',
+      "Devin will run commands and edit files in this folder without asking you first. Your organization's rules still apply. Takes effect from your next message.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Turn on', onPress: () => setAutoApproveSession(bridgeId, sessionId, true) },
+      ],
+    );
+  }
+
+  function stopTurn() {
+    setCancelError(null);
+    cancel.mutate(undefined, {
+      onSuccess: () => {
+        refreshGeneration.current += 1;
+        setPendingText(null);
+        setSteeringActive(false);
+        promptStartedAt.current = null;
+      },
+      onError: (error) => {
+        setCancelError(
+          error instanceof ComputerBridgeError && error.code === 'conflict'
+            ? 'This turn was started in Terminal on your Mac. Stop it there.'
+            : "Couldn't stop the turn. Try again.",
+        );
+      },
+    });
   }
 
   function answerQuestion(response: ComputerElicitationAnswer) {
@@ -573,12 +626,12 @@ export default function ComputerSessionDetailScreen() {
           }
           refreshTimer.current = setTimeout(
             () => refreshUntilComplete(attempt + 1),
-            HISTORY_REFRESH_INTERVAL_MS,
+            historyRefreshIntervalMs,
           );
         };
         refreshTimer.current = setTimeout(
           () => refreshUntilComplete(0),
-          HISTORY_REFRESH_INTERVAL_MS,
+          historyRefreshIntervalMs,
         );
       },
     });
@@ -915,6 +968,12 @@ export default function ComputerSessionDetailScreen() {
               onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
               testID="computer-session-composer-shell"
             >
+              {cancelError && <Text className="mb-2 text-failed text-text12">{cancelError}</Text>}
+              {autoApproveSupported && autoApproveEnabled && (
+                <Text className="mb-2 text-text-mid text-text12">
+                  Auto-approve is on. Devin won't ask before running commands.
+                </Text>
+              )}
               {prompt.error && (
                 <Text className="mb-2 text-failed text-text12">
                   {promptErrorMessage(prompt.error)}
@@ -988,6 +1047,23 @@ export default function ComputerSessionDetailScreen() {
                   </Pressable>
                   <View className="ml-auto flex-row items-center gap-1">
                     <KeyboardDismissButton visible={keyboardVisible} />
+                    {autoApproveSupported && (
+                      <Pressable
+                        className="h-10 w-10 items-center justify-center rounded-full"
+                        onPress={toggleAutoApprove}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          autoApproveEnabled ? 'Auto-approve on' : 'Auto-approve off'
+                        }
+                        hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}
+                      >
+                        <Ionicons
+                          name={autoApproveEnabled ? 'shield-checkmark' : 'shield-outline'}
+                          size={19}
+                          color={autoApproveEnabled ? tokens.brand.hex : tokens.textMid.hex}
+                        />
+                      </Pressable>
+                    )}
                     <VoiceMicButton
                       voice={voice}
                       disabled={
@@ -998,23 +1074,40 @@ export default function ComputerSessionDetailScreen() {
                         terminalQuestionPresent
                       }
                     />
-                    <Pressable
-                      className={`h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive && !sessionBusy ? 'bg-brand' : 'bg-tint-secondary'}`}
-                      onPress={sendPrompt}
-                      disabled={!draft.trim() || prompt.isPending || steeringActive || sessionBusy}
-                      accessibilityRole="button"
-                      accessibilityLabel="Send local session message"
-                    >
-                      {prompt.isPending ? (
-                        <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
-                      ) : (
-                        <Ionicons
-                          name="arrow-up"
-                          size={19}
-                          color={draft.trim() ? tokens.textAlwaysWhite.hex : tokens.textLow.hex}
-                        />
-                      )}
-                    </Pressable>
+                    {(steeringActive || sessionBusy) && bridgeFeatures.data?.sessionCancel ? (
+                      <Pressable
+                        className="h-10 w-10 items-center justify-center rounded-full bg-destructive"
+                        onPress={stopTurn}
+                        disabled={cancel.isPending}
+                        accessibilityRole="button"
+                        accessibilityLabel="Stop this turn"
+                        hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}
+                      >
+                        {cancel.isPending ? (
+                          <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+                        ) : (
+                          <Ionicons name="stop" size={18} color={tokens.textAlwaysWhite.hex} />
+                        )}
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        className={`h-10 w-10 items-center justify-center rounded-full ${draft.trim() && !prompt.isPending && !steeringActive && !sessionBusy ? 'bg-brand' : 'bg-tint-secondary'}`}
+                        onPress={sendPrompt}
+                        disabled={!draft.trim() || prompt.isPending || steeringActive || sessionBusy}
+                        accessibilityRole="button"
+                        accessibilityLabel="Send local session message"
+                      >
+                        {prompt.isPending ? (
+                          <ActivityIndicator size="small" color={tokens.textAlwaysWhite.hex} />
+                        ) : (
+                          <Ionicons
+                            name="arrow-up"
+                            size={19}
+                            color={draft.trim() ? tokens.textAlwaysWhite.hex : tokens.textLow.hex}
+                          />
+                        )}
+                      </Pressable>
+                    )}
                   </View>
                 </View>
               </View>

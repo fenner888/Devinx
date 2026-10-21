@@ -30,6 +30,7 @@ import { SessionHandleRegistry } from '../../bridge/src/session-handles';
 import { WorkspaceHandleRegistry } from '../../bridge/src/workspace-handles';
 import {
   ComputerBridgeError,
+  cancelComputerSession,
   createComputerSession,
   disconnectComputer,
   getComputerBridgeFeatures,
@@ -305,6 +306,47 @@ describe('authenticated mobile Computer Bridge client', () => {
       method: 'session.prompt',
       body: { sessionId, text: 'Continue the task.', modelId: 'swe-1.7-high' },
     });
+    expect((mockPostPinnedBridgeJson.mock.calls[0]?.[2] as { body: object }).body).not.toHaveProperty(
+      'autoApprove',
+    );
+  });
+
+  it('sends an explicitly disabled auto-approve value and maps policy rejection', async () => {
+    const sessionId = `local_${'P'.repeat(43)}`;
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({ status: 200, body: { accepted: true } });
+    await expect(
+      promptComputerSession(BRIDGE_ID, sessionId, 'Continue.', undefined, false),
+    ).resolves.toBeUndefined();
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
+      method: 'session.prompt',
+      body: { sessionId, autoApprove: false },
+    });
+
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 409,
+      body: { error: 'auto_approve_unavailable' },
+    });
+    await expect(
+      promptComputerSession(BRIDGE_ID, sessionId, 'Continue.', undefined, true),
+    ).rejects.toMatchObject({ code: 'auto_approve_unavailable' });
+  });
+
+  it('signs session cancellation and validates its success response', async () => {
+    const sessionId = `local_${'C'.repeat(43)}`;
+    mockLoadPairedComputers.mockResolvedValue([
+      { ...COMPUTER, permissions: [...COMPUTER.permissions, 'session:prompt:send'] },
+    ]);
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({ status: 200, body: { cancelled: true } });
+    await expect(cancelComputerSession(BRIDGE_ID, sessionId)).resolves.toBeUndefined();
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
+      method: 'session.cancel',
+      body: { sessionId },
+    });
+
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({ status: 200, body: { cancelled: false } });
+    await expect(cancelComputerSession(BRIDGE_ID, sessionId)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
   });
 
   it('returns a validated continuation handle from the authoritative Mac', async () => {
@@ -359,6 +401,25 @@ describe('authenticated mobile Computer Bridge client', () => {
     expect(mockPostPinnedBridgeJson.mock.calls[1]?.[2]).toMatchObject({
       method: 'session.create',
       body: { workspaceId, modelId: 'gpt-5-6-sol-medium', text: 'Build this.' },
+    });
+    expect((mockPostPinnedBridgeJson.mock.calls[1]?.[2] as { body: object }).body).not.toHaveProperty(
+      'autoApprove',
+    );
+
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({
+      status: 200,
+      body: { accepted: true, sessionId },
+    });
+    await expect(
+      createComputerSession(BRIDGE_ID, {
+        workspaceId,
+        text: 'Build this safely.',
+        autoApprove: false,
+      }),
+    ).resolves.toEqual({ sessionId });
+    expect(mockPostPinnedBridgeJson.mock.calls[2]?.[2]).toMatchObject({
+      method: 'session.create',
+      body: { workspaceId, text: 'Build this safely.', autoApprove: false },
     });
   });
 

@@ -42,8 +42,8 @@ Do not use production credentials or a destructive prompt for this checkpoint.
 
 ## macOS Connector distribution
 
-Connector 0.1.15 artifacts are `Otterin Connector.app` and
-`Otterin-Connector-0.1.15-macos-${architecture}.dmg`.
+Connector 0.1.16 artifacts are `Otterin Connector.app` and
+`Otterin-Connector-0.1.16-macos-${architecture}.dmg`.
 
 The July 14, 2026 Apple-silicon Connector candidate is signed with **Developer ID Application: Mark
 Fenner (Q7H78WYTAR)**, accepted by Apple's notarization service, stapled, and accepted by Gatekeeper.

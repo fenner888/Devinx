@@ -134,6 +134,21 @@ const listSessionsResultSchema = z
     }
   });
 
+const acpSessionModeSchema = z
+  .object({
+    id: z.string().min(1).max(160),
+    name: z.string().min(1).max(160),
+    description: z.string().max(500).optional(),
+  })
+  .passthrough();
+
+const acpSessionModesSchema = z
+  .object({
+    currentModeId: z.string().min(1).max(160),
+    availableModes: z.array(acpSessionModeSchema).max(100),
+  })
+  .passthrough();
+
 const loadSessionResultSchema = z.union([
   z.null(),
   z
@@ -153,6 +168,15 @@ const newSessionResultSchema = z
     _meta: z.record(z.unknown()).nullable().optional(),
   })
   .passthrough();
+
+const currentModeUpdateSchema = z
+  .object({
+    sessionUpdate: z.literal('current_mode_update'),
+    currentModeId: z.string().min(1).max(160),
+  })
+  .passthrough();
+
+const setSessionModeResultSchema = z.object({}).strict();
 
 const selectConfigOptionSchema = z
   .object({
@@ -746,12 +770,32 @@ export class AcpBusyError extends Error {
   }
 }
 
+export class AcpAutoApproveUnavailableError extends Error {
+  constructor() {
+    super('ACP bypass mode is unavailable');
+    this.name = 'AcpAutoApproveUnavailableError';
+  }
+}
+
+export class AcpNotRunningError extends Error {
+  constructor() {
+    super('ACP session is not running');
+    this.name = 'AcpNotRunningError';
+  }
+}
+
 export function isAcpSessionInUseError(error: unknown): boolean {
   return error instanceof AcpOperationError && error.kind === 'session_in_use';
 }
 
 interface CachedSessionMetadata {
   cwd: string;
+}
+
+interface AcpSessionModeState {
+  currentModeId: string;
+  firstReportedModeId: string;
+  availableModeIds: Set<string>;
 }
 
 interface CollectedReplayMessage extends AcpHistoryMessage {
@@ -1198,6 +1242,7 @@ export class AcpSessionClient {
   private canCloseSessions = false;
   private readonly listedSessions = new Map<string, CachedSessionMetadata>();
   private readonly loadedSessions = new Set<string>();
+  private readonly sessionModes = new Map<string, AcpSessionModeState>();
   private activeLoad: ReplayCollector | null = null;
   private activePromptSessionId: string | null = null;
   private latestQuestionToolCallId: string | null = null;
@@ -1224,6 +1269,7 @@ export class AcpSessionClient {
     this.unmatchedMessages = 0;
     this.listedSessions.clear();
     this.loadedSessions.clear();
+    this.sessionModes.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
     this.latestQuestionToolCallId = null;
@@ -1323,6 +1369,14 @@ export class AcpSessionClient {
   }
 
   isSessionPromptSupported(): boolean {
+    return Boolean(this.child);
+  }
+
+  isSessionCancelSupported(): boolean {
+    return Boolean(this.child);
+  }
+
+  isSessionAutoApproveSupported(): boolean {
     return Boolean(this.child);
   }
 
@@ -1560,6 +1614,7 @@ export class AcpSessionClient {
         loadSessionResultSchema,
         'session load',
       );
+      this.registerSessionModes(sessionId, loadResult?.modes);
       if (loadResult) {
         const selector = parseAcpModelSelector(loadResult.configOptions);
         if (selector) {
@@ -1596,6 +1651,7 @@ export class AcpSessionClient {
     sessionIdInput: unknown,
     textInput: unknown,
     modelInput?: unknown,
+    autoApprove?: boolean,
   ): Promise<void> {
     if (!this.child) throw new Error('ACP client is not started');
     const sessionId = sessionIdSchema.parse(sessionIdInput);
@@ -1604,6 +1660,7 @@ export class AcpSessionClient {
       throw new Error('ACP session must be loaded before prompting');
     }
     if (modelInput !== undefined) await this.selectSessionModel(sessionId, modelInput);
+    if (autoApprove !== undefined) await this.applyAutoApprove(sessionId, autoApprove);
     this.startPrompt(sessionId, [{ type: 'text', text }]);
   }
 
@@ -1612,6 +1669,7 @@ export class AcpSessionClient {
     contextInput: unknown,
     textInput: unknown,
     modelInput?: unknown,
+    autoApprove?: boolean,
   ): Promise<string> {
     if (!this.child) throw new Error('ACP client is not started');
     if (!this.canEmbedContext) throw new Error('ACP agent does not support embedded context');
@@ -1633,6 +1691,7 @@ export class AcpSessionClient {
         newSessionResultSchema,
         'session creation',
       );
+      this.registerSessionModes(created.sessionId, created.modes);
       if (this.listedSessions.size >= MAX_CACHED_SESSIONS) {
         throw new Error('ACP listed session cache capacity reached');
       }
@@ -1645,6 +1704,9 @@ export class AcpSessionClient {
       }
       if (modelInput !== undefined) {
         await this.selectSessionModel(created.sessionId, modelInput);
+      }
+      if (autoApprove !== undefined) {
+        await this.applyAutoApprove(created.sessionId, autoApprove);
       }
       this.startPrompt(created.sessionId, [
         {
@@ -1663,7 +1725,12 @@ export class AcpSessionClient {
     }
   }
 
-  async createSession(cwdInput: unknown, modelInput: unknown, textInput: unknown): Promise<string> {
+  async createSession(
+    cwdInput: unknown,
+    modelInput: unknown,
+    textInput: unknown,
+    autoApprove?: boolean,
+  ): Promise<string> {
     if (!this.child) throw new Error('ACP client is not started');
     const cwd = absolutePathSchema.parse(cwdInput);
     const modelId = z
@@ -1685,6 +1752,7 @@ export class AcpSessionClient {
         newSessionResultSchema,
         'session creation',
       );
+      this.registerSessionModes(created.sessionId, created.modes);
       const selector = parseAcpModelSelector(created.configOptions);
       if (selector) {
         this.modelCatalog = selector.catalog;
@@ -1692,6 +1760,9 @@ export class AcpSessionClient {
       }
       if (modelId) {
         await this.selectSessionModel(created.sessionId, modelId);
+      }
+      if (autoApprove !== undefined) {
+        await this.applyAutoApprove(created.sessionId, autoApprove);
       }
       if (this.listedSessions.size >= MAX_CACHED_SESSIONS) {
         throw new Error('ACP listed session cache capacity reached');
@@ -1711,6 +1782,7 @@ export class AcpSessionClient {
     if (!this.child) {
       this.loadedSessions.delete(sessionId);
       this.sessionModelSelectors.delete(sessionId);
+      this.sessionModes.delete(sessionId);
       return;
     }
     if (this.canCloseSessions) {
@@ -1723,6 +1795,7 @@ export class AcpSessionClient {
         );
         this.loadedSessions.delete(sessionId);
         this.sessionModelSelectors.delete(sessionId);
+        this.sessionModes.delete(sessionId);
         return;
       } catch {
         // A declared but failed close must not leave a Connector-owned lock behind.
@@ -1771,6 +1844,68 @@ export class AcpSessionClient {
     }
     this.sessionModelSelectors.set(sessionId, updated);
     this.modelCatalog = updated.catalog;
+  }
+
+  private registerSessionModes(sessionId: string, input: unknown): void {
+    const parsed = acpSessionModesSchema.safeParse(input);
+    if (!parsed.success) {
+      this.sessionModes.delete(sessionId);
+      return;
+    }
+    this.sessionModes.set(sessionId, {
+      currentModeId: parsed.data.currentModeId,
+      firstReportedModeId: parsed.data.currentModeId,
+      availableModeIds: new Set(parsed.data.availableModes.map((mode) => mode.id)),
+    });
+  }
+
+  private async applyAutoApprove(sessionId: string, enabled: boolean): Promise<void> {
+    const modes = this.sessionModes.get(sessionId);
+    if (enabled) {
+      if (!modes?.availableModeIds.has('bypass')) {
+        throw new AcpAutoApproveUnavailableError();
+      }
+      if (modes.currentModeId !== 'bypass') {
+        await this.setSessionMode(sessionId, 'bypass');
+      }
+      return;
+    }
+    if (!modes || modes.currentModeId !== 'bypass') return;
+
+    const restoreMode =
+      (modes.firstReportedModeId !== 'bypass' &&
+      modes.availableModeIds.has(modes.firstReportedModeId)
+        ? modes.firstReportedModeId
+        : undefined) ??
+      (modes.availableModeIds.has('accept-edits')
+        ? 'accept-edits'
+        : [...modes.availableModeIds].find((modeId) => modeId !== 'bypass'));
+    if (!restoreMode) throw new Error('ACP has no non-bypass mode to restore');
+    await this.setSessionMode(sessionId, restoreMode);
+  }
+
+  private async setSessionMode(sessionId: string, modeId: string): Promise<void> {
+    await this.request(
+      'session/set_mode',
+      { sessionId, modeId },
+      setSessionModeResultSchema,
+      'mode selection',
+    );
+    const modes = this.sessionModes.get(sessionId);
+    if (modes) modes.currentModeId = modeId;
+  }
+
+  cancelSession(sessionIdInput: unknown): void {
+    const sessionId = sessionIdSchema.parse(sessionIdInput);
+    const child = this.child;
+    if (!child || this.activePromptSessionId !== sessionId) {
+      throw new AcpNotRunningError();
+    }
+    this.clearPendingPermission(sessionId, true);
+    this.clearPendingElicitation(sessionId, true);
+    child.stdin.write(
+      `${JSON.stringify({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId } })}\n`,
+    );
   }
 
   private startPrompt(sessionId: string, prompt: unknown[]): void {
@@ -1838,6 +1973,7 @@ export class AcpSessionClient {
     this.canCloseSessions = false;
     this.listedSessions.clear();
     this.loadedSessions.clear();
+    this.sessionModes.clear();
     this.sessionModelSelectors.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
@@ -2128,6 +2264,18 @@ export class AcpSessionClient {
   }
 
   private handleSessionUpdate(child: ChildProcessWithoutNullStreams, input: unknown): void {
+    const updateNotification = sessionUpdateNotificationSchema.safeParse(input);
+    if (
+      updateNotification.success &&
+      updateNotification.data.update.sessionUpdate === 'current_mode_update'
+    ) {
+      const modeUpdate = currentModeUpdateSchema.safeParse(updateNotification.data.update);
+      if (modeUpdate.success) {
+        const modes = this.sessionModes.get(updateNotification.data.sessionId);
+        if (modes) modes.currentModeId = modeUpdate.data.currentModeId;
+      }
+      return;
+    }
     const collector = this.activeLoad;
     if (!collector && this.activePromptSessionId) {
       const result = sessionUpdateNotificationSchema.safeParse(input);

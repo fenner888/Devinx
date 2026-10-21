@@ -1,7 +1,9 @@
 import { generateKeyPairSync, randomBytes, randomUUID, sign } from 'node:crypto';
 
 import {
+  AcpAutoApproveUnavailableError,
   AcpBusyError,
+  AcpNotRunningError,
   type AcpLoadedSession,
   type AcpElicitationResponse,
   type AcpPendingElicitation,
@@ -91,9 +93,12 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     interactionId: string;
     response: AcpElicitationResponse;
   }> = [];
-  prompts: Array<{ sessionId: string; text: string; modelId?: string }> = [];
+  prompts: Array<{ sessionId: string; text: string; modelId?: string; autoApprove?: boolean }> = [];
   continuedSessionId: string | null = null;
   promptFailure: Error | null = null;
+  createFailure: Error | null = null;
+  cancelFailure: Error | null = null;
+  cancelCalls: string[] = [];
   createSupported = true;
   createOptions: DevinCreateOptions = {
     workspaces: [{ path: '/Users/frank/Secret Project' }],
@@ -114,7 +119,7 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     catalogSource: 'live' as const,
   };
   createOptionRefreshes: boolean[] = [];
-  creations: Array<{ cwd: string; modelId: string | null; text: string }> = [];
+  creations: Array<{ cwd: string; modelId: string | null; text: string; autoApprove?: boolean }> = [];
 
   isSessionListSupported(): boolean {
     return this.supported;
@@ -173,8 +178,14 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     sessionId: string,
     text: string,
     modelId?: string,
+    autoApprove?: boolean,
   ): Promise<void | { continuedSessionId: string }> {
-    this.prompts.push({ sessionId, text, ...(modelId ? { modelId } : {}) });
+    this.prompts.push({
+      sessionId,
+      text,
+      ...(modelId ? { modelId } : {}),
+      ...(autoApprove !== undefined ? { autoApprove } : {}),
+    });
     if (this.promptFailure) throw this.promptFailure;
     return this.continuedSessionId ? { continuedSessionId: this.continuedSessionId } : undefined;
   }
@@ -188,9 +199,33 @@ class FakeSessionAdapter implements SessionDiscoveryAdapter {
     return this.createOptions;
   }
 
-  async createSession(cwd: string, modelId: string | null, text: string): Promise<string> {
-    this.creations.push({ cwd, modelId, text });
+  async createSession(
+    cwd: string,
+    modelId: string | null,
+    text: string,
+    autoApprove?: boolean,
+  ): Promise<string> {
+    if (this.createFailure) throw this.createFailure;
+    this.creations.push({
+      cwd,
+      modelId,
+      text,
+      ...(autoApprove !== undefined ? { autoApprove } : {}),
+    });
     return 'raw-private-created-session-id';
+  }
+
+  isSessionCancelSupported(): boolean {
+    return true;
+  }
+
+  isSessionAutoApproveSupported(): boolean {
+    return true;
+  }
+
+  cancelSession(sessionId: string): void {
+    this.cancelCalls.push(sessionId);
+    if (this.cancelFailure) throw this.cancelFailure;
   }
 }
 
@@ -305,7 +340,7 @@ describe('authenticated Desktop Bridge service', () => {
   it('returns the authenticated Connector version without changing the health contract', async () => {
     await expect(service().handle(envelope('bridge.version', {}), context())).resolves.toEqual({
       status: 200,
-      body: { version: '0.1.15' },
+      body: { version: '0.1.16' },
     });
   });
 
@@ -355,6 +390,46 @@ describe('authenticated Desktop Bridge service', () => {
         modelId: 'gpt-5-6-sol-medium',
       },
     ]);
+  });
+
+  it('threads auto-approve and maps an unavailable mode to conflict', async () => {
+    const bridge = service();
+    const listed = await bridge.handle(
+      envelope('session.list', {}, ['session:metadata:read']),
+      context(),
+    );
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+    adapter.promptFailure = new AcpAutoApproveUnavailableError();
+
+    await expect(
+      bridge.handle(
+        envelope(
+          'session.prompt',
+          { sessionId: handle, text: 'Continue.', autoApprove: true },
+          ['session:prompt:send'],
+        ),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 409, body: { error: 'auto_approve_unavailable' } });
+    expect(adapter.prompts[0]).toMatchObject({ autoApprove: true });
+  });
+
+  it('maps cancellation of an idle turn to conflict and conceals unknown handles', async () => {
+    const bridge = service();
+    const permissions: BridgePermission[] = ['session:metadata:read', 'session:prompt:send'];
+    const listed = await bridge.handle(envelope('session.list', {}, permissions), context());
+    const handle = (listed.body as { sessions: Array<{ id: string }> }).sessions[0]?.id ?? '';
+    adapter.cancelFailure = new AcpNotRunningError();
+
+    await expect(
+      bridge.handle(envelope('session.cancel', { sessionId: handle }, permissions), context()),
+    ).resolves.toEqual({ status: 409, body: { error: 'conflict' } });
+    await expect(
+      bridge.handle(
+        envelope('session.cancel', { sessionId: `local_${'Z'.repeat(43)}` }, permissions),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 404, body: { error: 'not_found' } });
   });
 
   it('returns only an opaque handle when a locked session is continued', async () => {
@@ -719,6 +794,27 @@ describe('authenticated Desktop Bridge service', () => {
       },
     ]);
     expect(JSON.stringify(created)).not.toContain('raw-private-created-session-id');
+  });
+
+  it('maps unavailable auto-approve mode during session creation', async () => {
+    const bridge = service();
+    const options = await bridge.handle(
+      envelope('session.create_options', {}, ['session:metadata:read']),
+      context(),
+    );
+    const workspaceId = (options.body as { workspaces: Array<{ id: string }> }).workspaces[0]?.id;
+    adapter.createFailure = new AcpAutoApproveUnavailableError();
+
+    await expect(
+      bridge.handle(
+        envelope(
+          'session.create',
+          { workspaceId, modelId: null, text: 'Start.', autoApprove: true },
+          ['session:create'],
+        ),
+        context(),
+      ),
+    ).resolves.toEqual({ status: 409, body: { error: 'auto_approve_unavailable' } });
   });
 
   it('conceals stale workspace and model selections with 404 before ACP creation', async () => {

@@ -48,6 +48,7 @@ export const bridgeMethodSchema = z.enum([
   'session.elicitation.respond',
   'session.permission',
   'session.permission.respond',
+  'session.cancel',
   'session.prompt',
   'session.create_options',
   'session.create',
@@ -187,6 +188,13 @@ export const sessionPromptBodySchema = z
     sessionId: sessionIdSchema,
     text: z.string().min(1).max(100_000),
     modelId: modelIdSchema.optional(),
+    autoApprove: z.boolean().optional(),
+  })
+  .strict();
+
+export const sessionCancelBodySchema = z
+  .object({
+    sessionId: sessionIdSchema,
   })
   .strict();
 
@@ -201,6 +209,7 @@ export const sessionCreateBodySchema = z
     workspaceId: workspaceHandleSchema,
     modelId: modelIdSchema.nullable().optional(),
     text: z.string().trim().min(1).max(10_000),
+    autoApprove: z.boolean().optional(),
   })
   .strict();
 
@@ -245,6 +254,7 @@ export const bodySchemas = {
   'session.elicitation.respond': sessionElicitationResponseBodySchema,
   'session.permission': sessionPermissionBodySchema,
   'session.permission.respond': sessionPermissionResponseBodySchema,
+  'session.cancel': sessionCancelBodySchema,
   'session.prompt': sessionPromptBodySchema,
   'session.create_options': sessionCreateOptionsBodySchema,
   'session.create': sessionCreateBodySchema,
@@ -263,6 +273,7 @@ export const permissionByMethod = {
   'session.elicitation.respond': 'session:prompt:send',
   'session.permission': 'session:content:read',
   'session.permission.respond': 'session:prompt:send',
+  'session.cancel': 'session:prompt:send',
   'session.prompt': 'session:prompt:send',
   'session.create_options': 'session:metadata:read',
   'session.create': 'session:create',
@@ -284,6 +295,7 @@ export type SessionElicitationBody = z.infer<typeof sessionElicitationBodySchema
 export type SessionElicitationResponseBody = z.infer<typeof sessionElicitationResponseBodySchema>;
 export type SessionPermissionBody = z.infer<typeof sessionPermissionBodySchema>;
 export type SessionPermissionResponseBody = z.infer<typeof sessionPermissionResponseBodySchema>;
+export type SessionCancelBody = z.infer<typeof sessionCancelBodySchema>;
 export type SessionPromptBody = z.infer<typeof sessionPromptBodySchema>;
 export type SessionCreateOptionsBody = z.infer<typeof sessionCreateOptionsBodySchema>;
 export type SessionCreateBody = z.infer<typeof sessionCreateBodySchema>;
@@ -301,6 +313,7 @@ export type BridgeBodyByMethod = {
   'session.elicitation.respond': SessionElicitationResponseBody;
   'session.permission': SessionPermissionBody;
   'session.permission.respond': SessionPermissionResponseBody;
+  'session.cancel': SessionCancelBody;
   'session.prompt': SessionPromptBody;
   'session.create_options': SessionCreateOptionsBody;
   'session.create': SessionCreateBody;
