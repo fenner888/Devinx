@@ -1,4 +1,8 @@
 <p align="center">
+  <img alt="" src="assets/brand/icon-welcome.png" width="120">
+</p>
+
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/wordmark-transparent.png">
     <source media="(prefers-color-scheme: light)" srcset="assets/brand/wordmark-onlight.png">
@@ -6,7 +10,7 @@
   </picture>
 </p>
 
-<p align="center"><strong>Run and steer supported Devin work from your iPhone.</strong></p>
+<p align="center"><strong>Local coding sessions, mobile. Start, follow and steer Devin for Terminal on your Mac from your iPhone.</strong></p>
 
 <p align="center">
   <a href="https://testflight.apple.com/join/KBD25apN"><strong>Join the TestFlight beta</strong></a>
@@ -19,7 +23,7 @@
 <p align="center">
   <a href="https://github.com/fenner888/Devinx/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fenner888/Devinx/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <a href="https://testflight.apple.com/join/KBD25apN"><img alt="TestFlight Build 82" src="https://img.shields.io/badge/TestFlight-0.1.0%20(82)-0D96F6?logo=apple"></a>
+  <a href="https://testflight.apple.com/join/KBD25apN"><img alt="TestFlight Build 89" src="https://img.shields.io/badge/TestFlight-0.1.0%20(89)-0D96F6?logo=apple"></a>
 </p>
 
 > [!IMPORTANT]
