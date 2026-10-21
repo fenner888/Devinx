@@ -6,6 +6,7 @@ import {
   ComputerBridgeError,
   getComputerBridgeFeatures,
   getComputerBridgeHealth,
+  cancelComputerSession,
   getComputerSessionActivity,
   getComputerSessionElicitation,
   getComputerSessionPermission,
@@ -22,9 +23,10 @@ import {
   type ComputerPermissionAnswer,
 } from '@auth/computerBridge';
 import type { PairedComputerSummary } from '@auth/pairedComputers';
+import { useAppPreferences } from '@store/preferences';
+import { localRefreshIntervals } from '@lib/polling';
 
 const MAXIMUM_PAGES_PER_COMPUTER = 5;
-export const COMPUTER_SESSIONS_REFRESH_INTERVAL_MS = 30_000;
 const MAXIMUM_SESSIONS_PER_COMPUTER = 5_000;
 export const computerSessionAccessQueryKey = ['computerSessionAccess'] as const;
 
@@ -244,6 +246,7 @@ export async function loadComputerSessionWithRecovery(
 export function useComputerSessions() {
   const queryClient = useQueryClient();
   const { computers } = useConnections();
+  const pollingMode = useAppPreferences((state) => state.pollingMode);
   const enabled = computers.length > 0;
   const queryKey = computerSessionsQueryKey(computers);
 
@@ -255,7 +258,9 @@ export function useComputerSessions() {
     staleTime: 15_000,
     gcTime: 5 * 60_000,
     refetchInterval: () =>
-      AppState.currentState === 'active' ? COMPUTER_SESSIONS_REFRESH_INTERVAL_MS : false,
+      AppState.currentState === 'active'
+        ? localRefreshIntervals(pollingMode).sessionList
+        : false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: false,
@@ -293,26 +298,30 @@ export function useComputerSessionDetail(
 }
 
 export function useComputerSessionActivity(bridgeId: string, sessionId: string, enabled = true) {
+  const pollingMode = useAppPreferences((state) => state.pollingMode);
   return useQuery({
     queryKey: ['computerSessionActivity', bridgeId, sessionId],
     queryFn: () => getComputerSessionActivity(bridgeId, sessionId),
     enabled,
     staleTime: 750,
     gcTime: 60_000,
-    refetchInterval: () => (AppState.currentState === 'active' ? 1_500 : false),
+    refetchInterval: () =>
+      AppState.currentState === 'active' ? localRefreshIntervals(pollingMode).activity : false,
     refetchOnWindowFocus: true,
     retry: false,
   });
 }
 
 export function useComputerSessionElicitation(bridgeId: string, sessionId: string, enabled = true) {
+  const pollingMode = useAppPreferences((state) => state.pollingMode);
   return useQuery({
     queryKey: ['computerSessionElicitation', bridgeId, sessionId],
     queryFn: () => getComputerSessionElicitation(bridgeId, sessionId),
     enabled,
     staleTime: 500,
     gcTime: 60_000,
-    refetchInterval: () => (AppState.currentState === 'active' ? 1_500 : false),
+    refetchInterval: () =>
+      AppState.currentState === 'active' ? localRefreshIntervals(pollingMode).activity : false,
     refetchOnWindowFocus: true,
     retry: false,
   });
@@ -338,13 +347,15 @@ export function useRespondComputerSessionElicitation(bridgeId: string, sessionId
 }
 
 export function useComputerSessionPermission(bridgeId: string, sessionId: string, enabled = true) {
+  const pollingMode = useAppPreferences((state) => state.pollingMode);
   return useQuery({
     queryKey: ['computerSessionPermission', bridgeId, sessionId],
     queryFn: () => getComputerSessionPermission(bridgeId, sessionId),
     enabled,
     staleTime: 500,
     gcTime: 60_000,
-    refetchInterval: () => (AppState.currentState === 'active' ? 1_500 : false),
+    refetchInterval: () =>
+      AppState.currentState === 'active' ? localRefreshIntervals(pollingMode).activity : false,
     refetchOnWindowFocus: true,
     retry: false,
   });
@@ -369,13 +380,16 @@ export function useRespondComputerSessionPermission(bridgeId: string, sessionId:
 }
 
 export function useComputerSessionAccess(bridgeId: string, enabled = true) {
+  const pollingMode = useAppPreferences((state) => state.pollingMode);
   return useQuery({
     queryKey: [...computerSessionAccessQueryKey, bridgeId],
     queryFn: () => getComputerBridgeHealth(bridgeId),
     enabled,
     staleTime: 5_000,
     refetchInterval: () =>
-      AppState.currentState === 'active' ? COMPUTER_SESSIONS_REFRESH_INTERVAL_MS : false,
+      AppState.currentState === 'active'
+        ? localRefreshIntervals(pollingMode).sessionList
+        : false,
     refetchOnWindowFocus: true,
     retry: false,
   });
@@ -393,8 +407,21 @@ export function useComputerBridgeFeatures(bridgeId: string, enabled = true) {
 
 export function usePromptComputerSession(bridgeId: string, sessionId: string) {
   return useMutation({
-    mutationFn: (input: { text: string; modelId?: string }) =>
-      promptComputerSession(bridgeId, sessionId, input.text, input.modelId),
+    mutationFn: (input: { text: string; modelId?: string; autoApprove?: boolean }) =>
+      promptComputerSession(bridgeId, sessionId, input.text, input.modelId, input.autoApprove),
+  });
+}
+
+export function useCancelComputerSession(bridgeId: string, sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => cancelComputerSession(bridgeId, sessionId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['computerSession', bridgeId, sessionId] }),
+        queryClient.invalidateQueries({ queryKey: ['computerSessionActivity', bridgeId, sessionId] }),
+      ]);
+    },
   });
 }
 
@@ -425,7 +452,11 @@ export function useComputerCreateOptions(bridgeId: string, enabled = true) {
 
 export function useCreateComputerSession(bridgeId: string) {
   return useMutation({
-    mutationFn: (input: { workspaceId: string; modelId?: string | null; text: string }) =>
-      createComputerSession(bridgeId, input),
+    mutationFn: (input: {
+      workspaceId: string;
+      modelId?: string | null;
+      text: string;
+      autoApprove?: boolean;
+    }) => createComputerSession(bridgeId, input),
   });
 }

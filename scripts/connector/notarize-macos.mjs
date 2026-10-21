@@ -20,7 +20,7 @@ const outputRoot = resolve(repositoryRoot, 'artifacts', 'connector');
 const appRoot = resolve(outputRoot, 'Otterin Connector.app');
 const nodeRuntimePath = resolve(appRoot, 'Contents', 'Resources', 'runtime', 'node');
 const architecture = arch() === 'arm64' ? 'arm64' : arch() === 'x64' ? 'x64' : null;
-const dmgPath = resolve(outputRoot, `Otterin-Connector-0.1.15-macos-${architecture}.dmg`);
+const dmgPath = resolve(outputRoot, `Otterin-Connector-0.1.16-macos-${architecture}.dmg`);
 const zipPath = resolve(outputRoot, 'Otterin-Connector-notarization.zip');
 const stagingRoot = resolve(outputRoot, 'notarization-dmg-staging');
 const auditPath = resolve(outputRoot, 'notarization-audit.json');

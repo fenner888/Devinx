@@ -37,7 +37,6 @@ jest.mock('@auth/ConnectionContext', () => ({
   }),
 }));
 jest.mock('@api/bridge/queries', () => ({
-  COMPUTER_SESSIONS_REFRESH_INTERVAL_MS: 30_000,
   useComputerSessions: () => ({
     data: mockComputerBoard,
     isLoading: false,

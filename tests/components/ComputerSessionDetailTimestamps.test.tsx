@@ -75,6 +75,7 @@ jest.mock('../../src/api/bridge/queries', () => ({
   useComputerSessionElicitation: () => ({ data: { interaction: null } }),
   useRespondComputerSessionElicitation: () => ({ mutate: jest.fn(), isPending: false, error: null }),
   usePromptComputerSession: () => ({ mutate: jest.fn(), isPending: false, error: null }),
+  useCancelComputerSession: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useComputerCreateOptions: () => ({
     data: { workspaces: [], models: [], defaultModelId: null, catalogSource: 'recent' },
     isLoading: false,

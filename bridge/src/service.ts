@@ -9,6 +9,8 @@ import {
 } from './activity';
 import {
   AcpBusyError,
+  AcpAutoApproveUnavailableError,
+  AcpNotRunningError,
   defaultActivityLabel,
   type AcpLoadedSession,
   type AcpModelCatalog,
@@ -32,6 +34,7 @@ import {
   opaqueIdSchema,
   modelIdSchema,
   permissionIdSchema,
+  sessionCancelBodySchema,
   sessionCreateBodySchema,
   sessionCreateOptionsBodySchema,
   sessionActivityBodySchema,
@@ -186,6 +189,8 @@ const featuresResponseSchema = z
     sessionElicitation: z.boolean(),
     activityTimeline: z.boolean(),
     permissionPrompts: z.boolean().optional(),
+    sessionCancel: z.boolean().optional(),
+    autoApprove: z.boolean().optional(),
     messageTimestamps: z.boolean().optional(),
     grants: z
       .object({
@@ -403,16 +408,21 @@ export interface SessionDiscoveryAdapter {
     decision: SessionPermissionDecision,
   ): void;
   isSessionPromptSupported(): boolean;
+  isSessionCancelSupported?(): boolean;
+  cancelSession?(sessionId: string): void | Promise<void>;
+  isSessionAutoApproveSupported?(): boolean;
   promptSession(
     sessionId: string,
     text: string,
     modelId?: string,
+    autoApprove?: boolean,
   ): Promise<void | { continuedSessionId: string }>;
   createContinuation?(
     cwd: string,
     context: string,
     text: string,
     modelId?: string,
+    autoApprove?: boolean,
   ): Promise<string>;
   releaseSessionOwnership?(sessionId: string): Promise<void>;
   isSessionCreateSupported?(): boolean;
@@ -433,7 +443,12 @@ export interface SessionDiscoveryAdapter {
     defaultModelId?: string | null;
     catalogSource?: 'live' | 'recent';
   }>;
-  createSession?(cwd: string, modelId: string | null, text: string): Promise<string>;
+  createSession?(
+    cwd: string,
+    modelId: string | null,
+    text: string,
+    autoApprove?: boolean,
+  ): Promise<string>;
 }
 
 export interface BridgeServiceOptions {
@@ -855,6 +870,13 @@ export class BridgeService {
                   this.dependencies.sessions.getPendingPermission &&
                   this.dependencies.sessions.respondToPermission,
                 ),
+                sessionCancel: Boolean(
+                  this.dependencies.sessions.isSessionCancelSupported?.() &&
+                  this.dependencies.sessions.cancelSession,
+                ),
+                autoApprove: Boolean(
+                  this.dependencies.sessions.isSessionAutoApproveSupported?.(),
+                ),
               }
             : {}),
           ...(body.presentation === true
@@ -916,6 +938,9 @@ export class BridgeService {
     }
     if (authorization.request.method === 'session.permission.respond') {
       return this.respondToSessionPermission(authorization, context.now);
+    }
+    if (authorization.request.method === 'session.cancel') {
+      return this.cancelSession(authorization, context.now);
     }
     if (authorization.request.method === 'session.prompt') {
       return this.promptSession(authorization, context.now);
@@ -1274,6 +1299,7 @@ export class BridgeService {
         rawSessionId,
         body.text,
         body.modelId,
+        body.autoApprove,
       );
       const continuedSessionId = result?.continuedSessionId;
       return {
@@ -1287,6 +1313,33 @@ export class BridgeService {
       };
     } catch (error) {
       if (error instanceof AcpBusyError) {
+        return { status: 409, body: { error: 'conflict' } };
+      }
+      if (error instanceof AcpAutoApproveUnavailableError) {
+        return { status: 409, body: { error: 'auto_approve_unavailable' } };
+      }
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+  }
+
+  private async cancelSession(
+    authorization: RequestAuthorization,
+    now: number,
+  ): Promise<BridgeServiceResponse> {
+    if (
+      !this.dependencies.sessions.isSessionCancelSupported?.() ||
+      !this.dependencies.sessions.cancelSession
+    ) {
+      return { status: 503, body: { error: 'temporarily_unavailable' } };
+    }
+    const body = sessionCancelBodySchema.parse(authorization.request.body);
+    const rawSessionId = this.dependencies.sessionHandles.resolve(body.sessionId, now);
+    if (!rawSessionId) return { status: 404, body: { error: 'not_found' } };
+    try {
+      await this.dependencies.sessions.cancelSession(rawSessionId);
+      return { status: 200, body: { cancelled: true } };
+    } catch (error) {
+      if (error instanceof AcpNotRunningError) {
         return { status: 409, body: { error: 'conflict' } };
       }
       return { status: 503, body: { error: 'temporarily_unavailable' } };
@@ -1368,7 +1421,12 @@ export class BridgeService {
       if (modelId && !options.models.some((model) => model.id === modelId)) {
         return { status: 404, body: { error: 'not_found' } };
       }
-      const sessionId = await this.dependencies.sessions.createSession(cwd, modelId, body.text);
+      const sessionId = await this.dependencies.sessions.createSession(
+        cwd,
+        modelId,
+        body.text,
+        body.autoApprove,
+      );
       return {
         status: 200,
         body: {
@@ -1376,7 +1434,10 @@ export class BridgeService {
           sessionId: this.dependencies.sessionHandles.register(sessionId, now),
         },
       };
-    } catch {
+    } catch (error) {
+      if (error instanceof AcpAutoApproveUnavailableError) {
+        return { status: 409, body: { error: 'auto_approve_unavailable' } };
+      }
       return { status: 503, body: { error: 'temporarily_unavailable' } };
     }
   }

@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { COMPUTER_SESSIONS_REFRESH_INTERVAL_MS } from '@api/bridge/queries';
+import { formatRefreshInterval, localRefreshIntervals } from '@lib/polling';
+import { useAppPreferences } from '@store/preferences';
 import type { ComputerDiscoveryStatus, ComputerSessionListItem } from '@api/bridge/queries';
 import { activityShortLabel } from '@lib/activity-labels';
 import { relativeTime } from '@lib/session-utils';
@@ -152,6 +153,7 @@ export function ComputerDiscoveryNotices({ computers }: { computers: ComputerDis
 
 export function ComputerListFreshness({ lastSuccessfulAt }: { lastSuccessfulAt?: number }) {
   const [, setTick] = useState(0);
+  const pollingMode = useAppPreferences((state) => state.pollingMode);
   useEffect(() => {
     if (lastSuccessfulAt === undefined) return;
     const id = setInterval(() => setTick((tick) => tick + 1), 15_000);
@@ -162,7 +164,7 @@ export function ComputerListFreshness({ lastSuccessfulAt }: { lastSuccessfulAt?:
   return (
     <Text className="text-text-low text-text12 mb-2">
       Local list updated {relativeTime(lastSuccessfulAt / 1000)} · refreshes every{' '}
-      {COMPUTER_SESSIONS_REFRESH_INTERVAL_MS / 1000}s
+      {formatRefreshInterval(localRefreshIntervals(pollingMode).sessionList)}
     </Text>
   );
 }

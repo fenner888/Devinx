@@ -132,6 +132,7 @@ jest.mock('../../src/api/bridge/queries', () => ({
     isPending: false,
     error: mockPromptError,
   }),
+  useCancelComputerSession: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useComputerCreateOptions: () => ({
     data: {
       workspaces: [{ id: `workspace_${'W'.repeat(43)}`, name: 'DevinX' }],

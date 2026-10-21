@@ -440,12 +440,14 @@ export function createScreenshotFixtureData(now = Date.now()) {
       sessionElicitation: true,
       activityTimeline: true,
       permissionPrompts: true,
+      sessionCancel: true,
+      autoApprove: true,
     },
     presentation: {
       messageTimestamps: true,
       grants: { viewSessions: true, sendPrompts: true, startSessions: true },
     },
-    version: { version: '0.1.15' },
+    version: { version: '0.1.16' },
     platform: { platform: 'macos' },
     createOptions: {
       workspaces,

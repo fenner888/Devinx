@@ -19,7 +19,7 @@ describe('preferences', () => {
     expect(useAppPreferences.getState().hapticsEnabled).toBe(false);
   });
 
-  it('ignores obsolete Cloud and connection settings in persisted state', async () => {
+  it('restores a valid refresh speed while ignoring obsolete connection settings', async () => {
     const AsyncStorage = jest.requireMock('@react-native-async-storage/async-storage') as {
       setItem: (key: string, value: string) => Promise<void>;
     };
@@ -32,7 +32,7 @@ describe('preferences', () => {
           pollingMode: 'fast',
           hapticsEnabled: false,
         },
-        version: 3,
+        version: 4,
       }),
     );
 
@@ -41,6 +41,24 @@ describe('preferences', () => {
     expect(useAppPreferences.getState().hapticsEnabled).toBe(false);
     expect(useAppPreferences.getState()).not.toHaveProperty('connectionMode');
     expect(useAppPreferences.getState()).not.toHaveProperty('defaultTags');
-    expect(useAppPreferences.getState()).not.toHaveProperty('pollingMode');
+    expect(useAppPreferences.getState().pollingMode).toBe('fast');
+  });
+
+  it('discards an invalid persisted refresh speed and bounds enabled sessions', async () => {
+    const AsyncStorage = jest.requireMock('@react-native-async-storage/async-storage') as {
+      setItem: (key: string, value: string) => Promise<void>;
+    };
+    await AsyncStorage.setItem(
+      'devinx-prefs',
+      JSON.stringify({ state: { pollingMode: 'instant' }, version: 4 }),
+    );
+    await useAppPreferences.persist.rehydrate();
+    expect(useAppPreferences.getState().pollingMode).toBe('balanced');
+
+    for (let index = 0; index < 205; index += 1) {
+      useAppPreferences.getState().setAutoApproveSession('bridge_test', `local_${index}`, true);
+    }
+    expect(Object.keys(useAppPreferences.getState().autoApproveSessions)).toHaveLength(200);
+    expect(useAppPreferences.getState().autoApproveSessions['bridge_test:local_0']).toBeUndefined();
   });
 });

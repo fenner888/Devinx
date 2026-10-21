@@ -1,9 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  AcpAutoApproveUnavailableError,
   acpWorkingDirectory,
   AcpSessionClient,
   isAcpSessionInUseError,
@@ -675,11 +676,15 @@ if (request.method === 'initialize') {
     }
   });
 
-  it('cancels agent permission requests instead of auto-approving them', async () => {
+  it('cancels a running prompt and its pending permission request', async () => {
+    const logDirectory = mkdtempSync(join(tmpdir(), 'devinx-acp-cancel-'));
+    temporaryDirectories.push(logDirectory);
+    const logPath = join(logDirectory, 'cancel.log');
+    writeFileSync(logPath, '', 'utf8');
     const executablePath = fakeCli(`
 if (request.method === 'initialize') {
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
-    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {}, close: {} } }
   } }) + '\\n');
 } else if (request.method === 'session/list') {
   process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
@@ -693,14 +698,20 @@ if (request.method === 'initialize') {
     jsonrpc: '2.0', id: 'permission-1', method: 'session/request_permission', params: {
       sessionId: 'session-permission',
       toolCall: { toolCallId: 'dangerous-tool' },
-      options: [{ optionId: 'allow_once' }]
+      options: [{ optionId: 'allow_once', kind: 'allow_once' }]
     }
   }) + '\\n');
 } else if (request.id === 'permission-1') {
   if (request.result?.outcome?.outcome !== 'cancelled') process.exit(33);
+  require('node:fs').appendFileSync(${JSON.stringify(logPath)}, 'permission-cancelled\\n');
+} else if (request.method === 'session/cancel') {
+  if (request.id !== undefined) process.exit(34);
+  require('node:fs').appendFileSync(${JSON.stringify(logPath)}, 'cancel-notification\\n');
   process.stdout.write(JSON.stringify({
-    jsonrpc: '2.0', id: globalThis.promptRequestId, result: { stopReason: 'end_turn' }
+    jsonrpc: '2.0', id: globalThis.promptRequestId, result: { stopReason: 'cancelled' }
   }) + '\\n');
+} else if (request.method === 'session/close') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {} }) + '\\n');
 }`);
     const client = new AcpSessionClient({
       executablePath,
@@ -713,12 +724,22 @@ if (request.method === 'initialize') {
       await client.listSessions();
       await client.loadSession('session-permission');
       await client.promptSession('session-permission', 'Use a tool.');
+      let pending = client.getPendingPermission('session-permission');
+      for (let attempt = 0; attempt < 20 && !pending; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        pending = client.getPendingPermission('session-permission');
+      }
+      expect(pending).not.toBeNull();
+      client.cancelSession('session-permission');
       let activity = await client.getSessionActivity('session-permission');
       for (let attempt = 0; attempt < 20 && activity?.active; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 10));
         activity = await client.getSessionActivity('session-permission');
       }
       expect(activity?.active ?? false).toBe(false);
+      expect(readFileSync(logPath, 'utf8')).toBe(
+        'permission-cancelled\ncancel-notification\n',
+      );
       for (let attempt = 0; attempt < 20 && !client.isSessionListSupported(); attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
@@ -1304,5 +1325,78 @@ if (request.method === 'initialize') {
 
     await expect(client.start()).rejects.toThrow('size limit');
     await client.stop();
+  });
+
+  it('applies per-turn ACP modes before prompting and rejects unavailable bypass mode', async () => {
+    async function runModeTurn(
+      currentModeId: string,
+      modeIds: string[],
+      autoApprove: boolean | undefined,
+    ): Promise<{ error: unknown; events: string[] }> {
+      const directory = mkdtempSync(join(tmpdir(), 'devinx-acp-mode-'));
+      temporaryDirectories.push(directory);
+      const logPath = join(directory, 'events.log');
+      writeFileSync(logPath, '', 'utf8');
+      const availableModes = modeIds.map((id) => ({ id, name: id }));
+      const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {}, close: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-mode', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    modes: ${JSON.stringify({ currentModeId, availableModes })}
+  } }) + '\\n');
+} else if (request.method === 'session/set_mode') {
+  require('node:fs').appendFileSync(${JSON.stringify(logPath)}, 'mode:' + request.params.modeId + '\\n');
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {} }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  require('node:fs').appendFileSync(${JSON.stringify(logPath)}, 'prompt\\n');
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' } }) + '\\n');
+} else if (request.method === 'session/close') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {} }) + '\\n');
+}`);
+      const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+      try {
+        await client.start();
+        await client.listSessions();
+        await client.loadSession('session-mode');
+        let error: unknown;
+        try {
+          await client.promptSession('session-mode', 'Continue.', undefined, autoApprove);
+        } catch (caught) {
+          error = caught;
+        }
+        if (error === undefined) {
+          for (let attempt = 0; attempt < 20; attempt += 1) {
+            if (readFileSync(logPath, 'utf8').includes('prompt')) break;
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+        }
+        return {
+          error,
+          events: readFileSync(logPath, 'utf8').trim().split('\n').filter(Boolean),
+        };
+      } finally {
+        await client.stop();
+      }
+    }
+
+    const unavailable = await runModeTurn('accept-edits', ['accept-edits', 'ask', 'plan'], true);
+    expect(unavailable.error).toBeInstanceOf(AcpAutoApproveUnavailableError);
+    expect(unavailable.events).not.toContain('prompt');
+    await expect(
+      runModeTurn('accept-edits', ['accept-edits', 'ask', 'plan', 'bypass'], true),
+    ).resolves.toMatchObject({ events: ['mode:bypass', 'prompt'] });
+    await expect(
+      runModeTurn('bypass', ['accept-edits', 'ask', 'plan', 'bypass'], false),
+    ).resolves.toMatchObject({ events: ['mode:accept-edits', 'prompt'] });
+    await expect(
+      runModeTurn('accept-edits', ['accept-edits', 'ask', 'plan', 'bypass'], undefined),
+    ).resolves.toMatchObject({ events: ['prompt'] });
   });
 });

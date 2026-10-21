@@ -45,4 +45,28 @@ describe('local interaction request schemas', () => {
       'reject_once',
     ]);
   });
+
+  it('accepts only known cancellation and auto-approve request fields', () => {
+    expect(permissionByMethod['session.cancel']).toBe('session:prompt:send');
+    expect(bodySchemas['session.cancel'].parse({ sessionId: 'session-one' })).toEqual({
+      sessionId: 'session-one',
+    });
+    expect(() =>
+      bodySchemas['session.cancel'].parse({ sessionId: 'session-one', extra: true }),
+    ).toThrow();
+    expect(
+      bodySchemas['session.prompt'].parse({
+        sessionId: 'session-one',
+        text: 'Continue.',
+        autoApprove: false,
+      }),
+    ).toMatchObject({ autoApprove: false });
+    expect(() =>
+      bodySchemas['session.prompt'].parse({
+        sessionId: 'session-one',
+        text: 'Continue.',
+        unknown: true,
+      }),
+    ).toThrow();
+  });
 });
