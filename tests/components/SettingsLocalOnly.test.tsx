@@ -51,6 +51,7 @@ describe('Local-only Settings', () => {
       'Local devices',
       'Appearance',
       'Haptic feedback',
+      'Refresh speed',
       'Privacy',
       'About',
     ]) {
@@ -69,6 +70,10 @@ describe('Local-only Settings', () => {
     ]) {
       expect(screen.queryByText(removedSection)).toBeNull();
     }
+    fireEvent.press(screen.getByLabelText('Fast refresh speed'));
+    expect(
+      screen.getByText('Session list checks your Mac every 15s. Open sessions update every 1s.'),
+    ).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Wipe all local data'));
     expect(confirmAction).toHaveBeenCalledWith(
       expect.objectContaining({

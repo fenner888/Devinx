@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { OnboardingProgress } from '@components/onboarding/OnboardingProgress';
 import { branding } from '@lib/branding';
 import { useTheme } from '@theme/index';
+import ICON_WELCOME from '../../../assets/brand/icon-welcome.png';
 import WORDMARK_DARK from '../../../assets/wordmark.png';
 import WORDMARK_LIGHT from '../../../assets/wordmark-light.png';
 
@@ -20,10 +21,24 @@ export default function WelcomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="flex-1 justify-center min-h-80">
-          <View className="items-center justify-center h-52" accessibilityElementsHidden>
+          <View
+            className="items-center justify-center"
+            accessibilityElementsHidden
+            testID="welcome-branding"
+          >
+            <View className="w-[120px] h-[120px] rounded-[26px] overflow-hidden">
+              <Image
+                source={ICON_WELCOME}
+                className="w-full h-full"
+                resizeMode="cover"
+                accessible={false}
+                accessibilityIgnoresInvertColors
+                testID="welcome-app-icon"
+              />
+            </View>
             <Image
               source={name === 'light' ? WORDMARK_LIGHT : WORDMARK_DARK}
-              className="w-60 h-16"
+              className="w-60 h-16 mt-4"
               resizeMode="contain"
               accessibilityIgnoresInvertColors
             />
@@ -33,7 +48,7 @@ export default function WelcomeScreen() {
             Your Mac&apos;s coding agent, in your pocket.
           </Text>
           <Text className="text-text-mid text-text16 leading-6 mt-3">
-            Start, follow and steer Devin for Terminal sessions on your Mac from your iPhone.
+            Start, follow and steer local Devin sessions on your Mac from your iPhone.
           </Text>
 
           <View className="flex-row flex-wrap gap-2 mt-5">

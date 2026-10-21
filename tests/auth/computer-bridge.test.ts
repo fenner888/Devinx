@@ -42,6 +42,7 @@ import {
   openComputerBridge,
   openComputerBridges,
   promptComputerSession,
+  respondToComputerSessionPermission,
   removeComputerFromThisIPhone,
 } from '../../src/auth/computerBridge';
 
@@ -334,10 +335,12 @@ describe('authenticated mobile Computer Bridge client', () => {
   it('signs session cancellation and validates its success response', async () => {
     const sessionId = `local_${'C'.repeat(43)}`;
     mockLoadPairedComputers.mockResolvedValue([
-      { ...COMPUTER, permissions: [...COMPUTER.permissions, 'session:prompt:send'] },
+      { ...COMPUTER, permissions: [...COMPUTER.permissions, 'session:content:read'] },
     ]);
     mockPostPinnedBridgeJson.mockResolvedValueOnce({ status: 200, body: { cancelled: true } });
     await expect(cancelComputerSession(BRIDGE_ID, sessionId)).resolves.toBeUndefined();
+    expect(mockCreateRequestIdentity).toHaveBeenCalledTimes(1);
+    expect(mockSign).toHaveBeenCalledTimes(1);
     expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
       method: 'session.cancel',
       body: { sessionId },
@@ -346,6 +349,30 @@ describe('authenticated mobile Computer Bridge client', () => {
     mockPostPinnedBridgeJson.mockResolvedValueOnce({ status: 200, body: { cancelled: false } });
     await expect(cancelComputerSession(BRIDGE_ID, sessionId)).rejects.toMatchObject({
       code: 'invalid_response',
+    });
+  });
+
+  it('sends approval decisions when the paired send grant is stale', async () => {
+    const sessionId = `local_${'P'.repeat(43)}`;
+    const permissionId = `permission_${'P'.repeat(43)}`;
+    mockLoadPairedComputers.mockResolvedValue([
+      { ...COMPUTER, permissions: [...COMPUTER.permissions, 'session:content:read'] },
+    ]);
+    mockPostPinnedBridgeJson.mockResolvedValueOnce({ status: 200, body: { accepted: true } });
+
+    await expect(
+      respondToComputerSessionPermission(BRIDGE_ID, {
+        sessionId,
+        permissionId,
+        decision: 'allow_once',
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(mockCreateRequestIdentity).toHaveBeenCalledTimes(1);
+    expect(mockSign).toHaveBeenCalledTimes(1);
+    expect(mockPostPinnedBridgeJson.mock.calls[0]?.[2]).toMatchObject({
+      method: 'session.permission.respond',
+      body: { sessionId, permissionId, decision: 'allow_once' },
     });
   });
 

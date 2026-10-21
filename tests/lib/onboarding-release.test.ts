@@ -10,7 +10,7 @@ describe('Local-only onboarding', () => {
 
     expect(welcome).toContain('Your Mac&apos;s coding agent, in your pocket.');
     expect(welcome).toContain(
-      'Start, follow and steer Devin for Terminal sessions on your Mac from your iPhone.',
+      'Start, follow and steer local Devin sessions on your Mac from your iPhone.',
     );
     expect(welcome).toContain('Local only');
     expect(welcome).toContain('On-device voice');
