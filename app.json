@@ -76,7 +76,6 @@
           "microphonePermission": "Otterin uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded."
         }
       ],
-      "expo-asset",
       "expo-asset"
     ],
     "experiments": {

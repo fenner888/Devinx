@@ -70,7 +70,6 @@ jobs:
           scan "Secret-adjacent variable outside /src/auth" \
             '\b(apiKey|api_key|apiSecret|api_secret|password|passwd)\b\s*[=:(]' -- 'src' \
             ':!src/auth' ':!src/lib/branding.ts' ':!src/lib/diagnostics.ts' \
-            ':!src/api/devin/schemas.ts' ':!src/api/devin/types.ts' \
             ':!src/store/preferences.ts' ':!src/app/(onboarding)'
 
           if [ "$fail" -ne 0 ]; then exit 1; fi
