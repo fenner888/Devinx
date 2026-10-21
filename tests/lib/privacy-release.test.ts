@@ -69,12 +69,16 @@ describe('release privacy configuration', () => {
     expect(packageJson.engines?.node).toBe(nodeVersion);
   });
 
-  it('does not compile unsupported enterprise Code Scan routes into the v1 client', () => {
-    const apiFiles = ['types.ts', 'schemas.ts', 'endpoints.ts', 'queries.ts']
-      .map((file) => readFileSync(resolve(repositoryRoot, 'src/api/devin', file), 'utf8'))
-      .join('\n');
+  it('keeps the in-app privacy screen Local-only', () => {
+    const privacyScreen = readFileSync(
+      resolve(repositoryRoot, 'src/app/(main)/privacy.tsx'),
+      'utf8',
+    );
 
-    expect(apiFiles).not.toMatch(/\/v3\/enterprise\/code-scans|codeScanFindings|codeScanMetrics/);
+    expect(privacyScreen).toContain('directly from your Mac over Tailscale');
+    expect(privacyScreen).toContain('Paired-device keys stay in the system Keychain');
+    expect(privacyScreen).not.toContain('prompt templates');
+    expect(privacyScreen).not.toMatch(/Devin Cloud|Devin API|api\.devin\.ai|official Devin MCP/i);
   });
 
   it('describes the current Tailscale and app-delivery paths', () => {
@@ -83,7 +87,7 @@ describe('release privacy configuration', () => {
       'utf8',
     );
 
-    expect(privacyScreen).toContain('directly from your local device over Tailscale');
+    expect(privacyScreen).toContain('directly from your Mac over Tailscale');
     expect(privacyScreen).toContain('contact Expo over TLS');
     expect(privacyScreen).toContain('randomized installation token');
     expect(privacyScreen).toContain('does not register your iPhone for remote push notifications');
@@ -93,6 +97,7 @@ describe('release privacy configuration', () => {
 
     const privacyPolicy = readFileSync(resolve(repositoryRoot, 'PRIVACY.md'), 'utf8');
     expect(privacyPolicy).toContain('randomized token');
+    expect(privacyPolicy).not.toMatch(/Devin Cloud|Devin API|api\.devin\.ai|official Devin MCP/i);
 
     const privacyReview = readFileSync(
       resolve(repositoryRoot, 'docs/app-privacy-review.md'),

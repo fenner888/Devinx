@@ -25,7 +25,7 @@ export function PrivacyShield() {
       className="bg-surface0 items-center justify-center"
       accessibilityLabel="App content hidden"
     >
-      <Text className="text-text-hi text-text20 font-medium">DevinX</Text>
+      <Text className="text-text-hi text-text20 font-medium">Otterin</Text>
       <Text className="text-text-low text-text13 mt-2">Unlock the app to continue</Text>
     </View>
   );

@@ -9,6 +9,7 @@ import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/index';
 import { hapticLight } from '@lib/haptics';
+import { branding } from '@lib/branding';
 import WORDMARK_DARK from '../../assets/wordmark.png';
 import WORDMARK_LIGHT from '../../assets/wordmark-light.png';
 
@@ -33,11 +34,9 @@ export function NavMenu({
   const insets = useSafeAreaInsets();
 
   const primary: NavItem[] = [
-    { icon: 'add', label: 'New session', route: '/(main)/compose' },
+    { icon: 'add', label: 'New session', route: '/(main)' },
     { icon: 'chatbubbles-outline', label: 'Sessions', route: '/(main)/sessions' },
-    { icon: 'time-outline', label: 'Automations', route: '/(main)/automations' },
-    { icon: 'shield-checkmark-outline', label: 'Security Work', route: '/(main)/security-work' },
-    { icon: 'git-pull-request-outline', label: 'Review', route: '/(main)/review' },
+    { icon: 'desktop-outline', label: 'Your Mac', route: '/(main)/computer' },
   ];
 
   function go(route: Href) {
@@ -60,7 +59,7 @@ export function NavMenu({
                 source={name === 'light' ? WORDMARK_LIGHT : WORDMARK_DARK}
                 className="w-28 h-7"
                 resizeMode="contain"
-                accessibilityLabel="DevinX"
+                accessibilityLabel={branding.name}
               />
               <Pressable
                 className="w-9 h-9 rounded-full bg-tint-secondary items-center justify-center"

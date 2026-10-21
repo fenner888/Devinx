@@ -157,7 +157,7 @@ describe('Computer session presentation', () => {
     expect(screen.queryByText(/Busy Mac is offline/)).toBeNull();
   });
 
-  it('explains when a local computer has more sessions than DevinX can list', () => {
+  it('explains when a local computer has more sessions than Otterin can list', () => {
     const screen = render(
       <ComputerDiscoveryNotices
         computers={[
@@ -172,7 +172,7 @@ describe('Computer session presentation', () => {
 
     expect(
       screen.getByText(
-        'Studio Mac has more sessions than DevinX can list right now, so none are shown.',
+        'Studio Mac has more sessions than Otterin can list right now, so none are shown.',
       ),
     ).toBeTruthy();
   });

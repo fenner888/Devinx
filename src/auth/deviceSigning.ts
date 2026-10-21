@@ -139,7 +139,7 @@ function resolveNativeModule(): DevinXDeviceCryptoNativeModule | null {
 function getNativeModule(): DevinXDeviceCryptoNativeModule {
   const nativeModule = resolveNativeModule();
   if (!nativeModule) {
-    throw new Error('Local pairing requires a DevinX iOS development or release build');
+    throw new Error('Local pairing requires an Otterin iOS development or release build');
   }
   return nativeModule;
 }
@@ -188,7 +188,7 @@ export async function hmacSha256(secret: string, message: string): Promise<strin
 export async function fingerprintPublicKeySpki(publicKeySpki: string): Promise<string> {
   const nativeModule = getNativeModule();
   if (!nativeModule.fingerprintPublicKeySpki) {
-    throw new Error('Local pairing requires a current DevinX iOS build');
+    throw new Error('Local pairing requires a current Otterin iOS build');
   }
   return certificateFingerprintSchema.parse(
     await nativeModule.fingerprintPublicKeySpki(publicKeySpkiSchema.parse(publicKeySpki)),
@@ -198,7 +198,7 @@ export async function fingerprintPublicKeySpki(publicKeySpki: string): Promise<s
 export async function createRequestIdentity(): Promise<RequestIdentity> {
   const nativeModule = getNativeModule();
   if (!nativeModule.createRequestIdentity) {
-    throw new Error('Local requests require a current DevinX iOS build');
+    throw new Error('Local requests require a current Otterin iOS build');
   }
   return requestIdentitySchema.parse(await nativeModule.createRequestIdentity());
 }
@@ -239,7 +239,7 @@ export function isQrScannerAvailable(): boolean {
 export async function getQrScannerPermissionStatus(): Promise<QrScannerPermission> {
   const nativeModule = getNativeModule();
   if (!nativeModule.getQrScannerPermissionStatus) {
-    throw new Error('QR scanning requires a current DevinX iOS build');
+    throw new Error('QR scanning requires a current Otterin iOS build');
   }
   return qrScannerPermissionSchema.parse(await nativeModule.getQrScannerPermissionStatus());
 }
@@ -247,7 +247,7 @@ export async function getQrScannerPermissionStatus(): Promise<QrScannerPermissio
 export async function requestQrScannerPermission(): Promise<QrScannerPermission> {
   const nativeModule = getNativeModule();
   if (!nativeModule.requestQrScannerPermission) {
-    throw new Error('QR scanning requires a current DevinX iOS build');
+    throw new Error('QR scanning requires a current Otterin iOS build');
   }
   return qrScannerPermissionSchema.parse(await nativeModule.requestQrScannerPermission());
 }
@@ -260,7 +260,7 @@ export async function postPinnedBridgeJson(
 ): Promise<PinnedBridgeResponse> {
   const nativeModule = getNativeModule();
   if (!nativeModule.postPinnedJson) {
-    throw new Error('Secure local transport requires a current DevinX iOS build');
+    throw new Error('Secure local transport requires a current Otterin iOS build');
   }
   const parsedInput = z.record(z.unknown()).parse(input);
   const serialized = JSON.stringify(parsedInput);

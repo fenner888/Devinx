@@ -1,89 +1,46 @@
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: jest.fn(async () => null),
-  setItem: jest.fn(async () => undefined),
-  removeItem: jest.fn(async () => undefined),
-}));
+jest.mock('@react-native-async-storage/async-storage', () => {
+  const values = new Map<string, string>();
+  return {
+    getItem: jest.fn(async (key: string) => values.get(key) ?? null),
+    setItem: jest.fn(async (key: string, value: string) => {
+      values.set(key, value);
+    }),
+    removeItem: jest.fn(async (key: string) => {
+      values.delete(key);
+    }),
+  };
+});
 
-import {
-  connectionModeAfterComputerRefresh,
-  normalizeConnectionMode,
-  connectionModeUsesComputer,
-  isConnectionModeConfigured,
-  shouldEnableCloudRequests,
-} from '../../src/lib/connections';
-import { normalizeDefaultTags, useAppPreferences } from '../../src/store/preferences';
+import { useAppPreferences } from '../../src/store/preferences';
 
 describe('preferences', () => {
-  it('normalizes and deduplicates default tags', () => {
-    expect(normalizeDefaultTags(' Mobile, priority, mobile,  Release ')).toEqual([
-      'mobile',
-      'priority',
-      'release',
-    ]);
+  it('preserves UI haptics settings', () => {
+    useAppPreferences.getState().setHaptics(false);
+    expect(useAppPreferences.getState().hapticsEnabled).toBe(false);
   });
 
-  it('drops empty tags and caps the list at 50', () => {
-    const input = Array.from({ length: 60 }, (_, index) => `tag-${index}`).join(',');
-    expect(normalizeDefaultTags(`, , ${input}`).length).toBe(50);
-  });
+  it('ignores obsolete Cloud and connection settings in persisted state', async () => {
+    const AsyncStorage = jest.requireMock('@react-native-async-storage/async-storage') as {
+      setItem: (key: string, value: string) => Promise<void>;
+    };
+    await AsyncStorage.setItem(
+      'devinx-prefs',
+      JSON.stringify({
+        state: {
+          connectionMode: 'both',
+          defaultTags: ['private'],
+          pollingMode: 'fast',
+          hapticsEnabled: false,
+        },
+        version: 3,
+      }),
+    );
 
-  it('normalizes unknown persisted connection modes to Cloud', () => {
-    expect(normalizeConnectionMode('computer')).toBe('computer');
-    expect(normalizeConnectionMode('both')).toBe('both');
-    expect(normalizeConnectionMode('unexpected')).toBe('cloud');
-  });
+    await useAppPreferences.persist.rehydrate();
 
-  it.each([
-    ['cloud', true, false, true],
-    ['cloud', false, true, false],
-    ['computer', false, true, true],
-    ['computer', true, false, false],
-    ['both', true, true, true],
-    ['both', true, false, false],
-  ] as const)(
-    'evaluates %s connection readiness without weakening either requirement',
-    (mode, cloud, computer, expected) => {
-      expect(isConnectionModeConfigured(mode, cloud, computer)).toBe(expected);
-    },
-  );
-
-  it('disables Cloud requests in Computer-only mode even when credentials remain stored', () => {
-    expect(shouldEnableCloudRequests('computer', true, true)).toBe(false);
-    expect(shouldEnableCloudRequests('cloud', true, true)).toBe(true);
-    expect(shouldEnableCloudRequests('both', true, true)).toBe(true);
-    expect(shouldEnableCloudRequests('cloud', true, false)).toBe(false);
-  });
-
-  it('enables Computer requests only in Computer and combined modes', () => {
-    expect(connectionModeUsesComputer('cloud')).toBe(false);
-    expect(connectionModeUsesComputer('computer')).toBe(true);
-    expect(connectionModeUsesComputer('both')).toBe(true);
-  });
-
-  it('keeps cloud users configured after their final combined-mode computer is removed', () => {
-    expect(connectionModeAfterComputerRefresh('both', true, 0)).toBe('cloud');
-    expect(connectionModeAfterComputerRefresh('both', true, 1)).toBe('both');
-    expect(connectionModeAfterComputerRefresh('computer', true, 0)).toBe('computer');
-    expect(connectionModeAfterComputerRefresh('both', false, 0)).toBe('both');
-  });
-
-  it('resets all persisted user-scoped preferences on disconnect', () => {
-    useAppPreferences.setState({
-      defaultTags: ['private'],
-      pinnedSessionIds: ['session-1'],
-      watchedSessionIds: ['session-2'],
-      composerTemplates: [{ id: 'template-1', name: 'Draft', prompt: 'private prompt' }],
-      connectionMode: 'both',
-    });
-
-    useAppPreferences.getState().resetUserScopedData();
-
-    expect(useAppPreferences.getState()).toMatchObject({
-      defaultTags: [],
-      pinnedSessionIds: [],
-      watchedSessionIds: [],
-      composerTemplates: [],
-      connectionMode: 'cloud',
-    });
+    expect(useAppPreferences.getState().hapticsEnabled).toBe(false);
+    expect(useAppPreferences.getState()).not.toHaveProperty('connectionMode');
+    expect(useAppPreferences.getState()).not.toHaveProperty('defaultTags');
+    expect(useAppPreferences.getState()).not.toHaveProperty('pollingMode');
   });
 });

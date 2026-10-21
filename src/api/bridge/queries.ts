@@ -22,7 +22,6 @@ import {
   type ComputerPermissionAnswer,
 } from '@auth/computerBridge';
 import type { PairedComputerSummary } from '@auth/pairedComputers';
-import { connectionModeUsesComputer } from '@lib/connections';
 
 const MAXIMUM_PAGES_PER_COMPUTER = 5;
 export const COMPUTER_SESSIONS_REFRESH_INTERVAL_MS = 30_000;
@@ -244,8 +243,8 @@ export async function loadComputerSessionWithRecovery(
 
 export function useComputerSessions() {
   const queryClient = useQueryClient();
-  const { mode, computers } = useConnections();
-  const enabled = connectionModeUsesComputer(mode) && computers.length > 0;
+  const { computers } = useConnections();
+  const enabled = computers.length > 0;
   const queryKey = computerSessionsQueryKey(computers);
 
   return useQuery({

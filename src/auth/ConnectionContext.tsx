@@ -8,15 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import {
-  connectionModeAfterComputerRefresh,
-  connectionModeUsesCloud,
-  isConnectionModeConfigured,
-  type ConnectionMode,
-} from '@lib/connections';
-import { useAppPreferences } from '@store/preferences';
-
-import { useAuth } from './AuthContext';
+import { wipeLegacyCloudCredentials } from './keychain';
 import {
   clearPairedComputers,
   loadPairedComputerSummaries,
@@ -24,12 +16,9 @@ import {
 } from './pairedComputers';
 
 interface ConnectionContextValue {
-  mode: ConnectionMode;
   isLoading: boolean;
   isConfigured: boolean;
-  hasCloudConnection: boolean;
   hasComputerConnection: boolean;
-  usesCloud: boolean;
   computers: PairedComputerSummary[];
   connectionError: string | null;
   refreshComputers: () => Promise<void>;
@@ -39,10 +28,6 @@ interface ConnectionContextValue {
 const ConnectionContext = createContext<ConnectionContextValue | null>(null);
 
 export function ConnectionProvider({ children }: { children: ReactNode }) {
-  const { hasCloudCredentials, isLoading: isAuthLoading, disconnect } = useAuth();
-  const mode = useAppPreferences((state) => state.connectionMode);
-  const hasHydrated = useAppPreferences((state) => state.hasHydrated);
-  const setConnectionMode = useAppPreferences((state) => state.setConnectionMode);
   const [computers, setComputers] = useState<PairedComputerSummary[]>([]);
   const [isComputerLoading, setIsComputerLoading] = useState(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -51,12 +36,6 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
     setIsComputerLoading(true);
     try {
       const nextComputers = await loadPairedComputerSummaries();
-      const nextMode = connectionModeAfterComputerRefresh(
-        mode,
-        hasCloudCredentials,
-        nextComputers.length,
-      );
-      if (nextMode !== mode) setConnectionMode(nextMode);
       setComputers(nextComputers);
       setConnectionError(null);
     } catch {
@@ -65,55 +44,41 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsComputerLoading(false);
     }
-  }, [hasCloudCredentials, mode, setConnectionMode]);
+  }, []);
 
   useEffect(() => {
+    wipeLegacyCloudCredentials().catch(() => {});
     refreshComputers().catch(() => {});
   }, [refreshComputers]);
 
   const disconnectAll = useCallback(async () => {
-    const [cloudResult, computerResult] = await Promise.allSettled([
-      disconnect(),
+    const [computerResult, legacyCredentialsResult] = await Promise.allSettled([
       clearPairedComputers(),
+      wipeLegacyCloudCredentials(),
     ]);
     if (computerResult.status === 'fulfilled') setComputers([]);
-    if (cloudResult.status === 'fulfilled' && computerResult.status === 'fulfilled') {
-      setConnectionMode('cloud');
+    if (
+      legacyCredentialsResult.status === 'fulfilled' &&
+      computerResult.status === 'fulfilled'
+    ) {
       setConnectionError(null);
       return;
     }
     throw new Error('Secure connection wipe did not complete');
-  }, [disconnect, setConnectionMode]);
+  }, []);
 
   const value = useMemo<ConnectionContextValue>(() => {
     const hasComputerConnection = computers.length > 0;
     return {
-      mode,
-      isLoading: isAuthLoading || isComputerLoading || !hasHydrated,
-      isConfigured: isConnectionModeConfigured(
-        mode,
-        hasCloudCredentials,
-        hasComputerConnection,
-      ),
-      hasCloudConnection: hasCloudCredentials,
+      isLoading: isComputerLoading,
+      isConfigured: hasComputerConnection,
       hasComputerConnection,
-      usesCloud: connectionModeUsesCloud(mode),
       computers,
       connectionError,
       refreshComputers,
       disconnectAll,
     };
-  }, [
-    mode,
-    isAuthLoading,
-    isComputerLoading,
-    hasHydrated,
-    hasCloudCredentials,
-    computers,
-    connectionError,
-    refreshComputers,
-    disconnectAll,
-  ]);
+  }, [isComputerLoading, computers, connectionError, refreshComputers, disconnectAll]);
 
   return <ConnectionContext.Provider value={value}>{children}</ConnectionContext.Provider>;
 }

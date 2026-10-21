@@ -36,7 +36,7 @@ describe('Connector assisted setup', () => {
     expect(CONNECTOR_SETUP_PROMPT).toContain('stop and tell me');
     expect(CONNECTOR_SETUP_PROMPT).toContain('Do not clone or build the source');
     expect(CONNECTOR_SETUP_PROMPT).toContain('Tailscale supplies only the private network route');
-    expect(CONNECTOR_SETUP_PROMPT).toContain('Cloud-only DevinX use does not require Connector');
+    expect(CONNECTOR_SETUP_PROMPT).not.toContain('Cloud-only');
     expect(CONNECTOR_SETUP_PROMPT).toContain(
       'A Tailscale IP, server URL, or password cannot replace a compatible service',
     );

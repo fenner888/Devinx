@@ -1,55 +1,38 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const repositoryRoot = resolve(__dirname, '../..');
+const repositoryRoot = resolve(__dirname, '..', '..');
+const readSource = (path: string) => readFileSync(resolve(repositoryRoot, path), 'utf8');
 
-describe('release onboarding', () => {
-  it('keeps connection claims truthful and unavailable auth modes out of the default UI', () => {
-    const welcome = readFileSync(resolve(repositoryRoot, 'src/app/(onboarding)/index.tsx'), 'utf8');
-    const features = readFileSync(
-      resolve(repositoryRoot, 'src/app/(onboarding)/features.tsx'),
-      'utf8',
-    );
-    const connections = readFileSync(
-      resolve(repositoryRoot, 'src/app/(onboarding)/connections.tsx'),
-      'utf8',
-    );
-    const credentials = readFileSync(
-      resolve(repositoryRoot, 'src/app/(onboarding)/credentials.tsx'),
-      'utf8',
-    );
-    const computer = readFileSync(
-      resolve(repositoryRoot, 'src/app/(onboarding)/computer.tsx'),
-      'utf8',
-    );
+describe('Local-only onboarding', () => {
+  it('starts with the approved copy and three-step progress', () => {
+    const welcome = readSource('src/app/(onboarding)/index.tsx');
 
-    expect(welcome).toContain('Run Devin from anywhere.');
-    expect(welcome).toContain('{branding.disclaimer}');
-    expect(welcome).toContain("WORDMARK_DARK from '../../../assets/wordmark.png'");
-    expect(welcome).toContain("WORDMARK_LIGHT from '../../../assets/wordmark-light.png'");
-    expect(welcome).not.toContain('companionStageGlow');
-    expect(welcome).not.toContain('companionStageLine');
-    expect(welcome).not.toContain("APP_ICON from '../../../assets/icon.png'");
-    expect(features).toContain('Cloud or Local');
+    expect(welcome).toContain('Your Mac&apos;s coding agent, in your pocket.');
+    expect(welcome).toContain(
+      'Start, follow and steer Devin for Terminal sessions on your Mac from your iPhone.',
+    );
+    expect(welcome).toContain('Local only');
+    expect(welcome).toContain('On-device voice');
+    expect(welcome).toContain('total={3}');
+  });
+
+  it('routes Features directly to Mac pairing and omits Cloud onboarding routes', () => {
+    const features = readSource('src/app/(onboarding)/features.tsx');
+    const computer = readSource('src/app/(onboarding)/computer.tsx');
+
+    expect(features).toContain("router.push('/(onboarding)/computer')");
+    expect(features).toContain('Create and steer sessions');
+    expect(features).toContain('Answer approvals and questions');
+    expect(features).toContain('Speak detailed prompts');
     expect(features).toContain('Keep credentials private');
-    expect(features).not.toContain('Manage files');
-    expect(connections).toContain('Choose where Devin runs');
-    expect(connections).toContain('Tailscale provides the private network route');
-    expect(connections).toContain('DevinX Connector provides authorized');
-    expect(credentials).not.toContain('Personal token');
-    expect(credentials).not.toContain('Personal access token');
-    expect(credentials).toContain("connectionMode === 'both'");
-    expect(credentials).toContain('STEP 1 OF 2');
-    expect(credentials).toContain('Connect Cloud & continue');
-    expect(computer).toContain("mode === 'both'");
-    expect(computer).toContain('STEP 2 OF 2');
-    expect(computer).toContain('Pair a local device');
-    expect(computer).toContain('Devin Cloud is connected.');
-    expect(computer).toContain('Send assisted setup prompt');
-    expect(computer).toContain('Tailscale alone does not expose Devin sessions');
-    expect(computer).toContain('CONNECTOR_SETUP_PROMPT');
-    expect(computer).toContain('CONNECTOR_RELEASE_PAGE');
-    expect(computer).toContain('Remove from this iPhone');
-    expect(computer).toContain('inactive device record');
+    expect(features).toContain(
+      'Your Devin sign-in stays on your Mac. This app keeps only its pairing key in iOS Keychain.',
+    );
+    expect(computer).toContain('total={3}');
+    expect(computer).not.toMatch(/connectionMode|mode === ['"]both|\/credentials/);
+    for (const route of ['connections.tsx', 'credentials.tsx', 'validate.tsx']) {
+      expect(existsSync(resolve(repositoryRoot, 'src/app/(onboarding)', route))).toBe(false);
+    }
   });
 });

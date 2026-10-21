@@ -1,52 +1,6 @@
-import type { SessionResponse } from '../../src/api/devin/types';
-import {
-  activityForCloudSession,
-  activityForComputerSession,
-} from '../../src/pets/devin/activity';
+import { activityForComputerSession } from '../../src/pets/devin/activity';
 
-function session(overrides: Partial<SessionResponse> = {}): SessionResponse {
-  return {
-    acus_consumed: 0,
-    category: null,
-    child_session_ids: null,
-    created_at: 1,
-    is_archived: false,
-    org_id: 'org-1',
-    origin: 'api',
-    parent_session_id: null,
-    playbook_id: null,
-    pull_requests: [],
-    service_user_id: null,
-    session_id: 'session-1',
-    status: 'running',
-    status_detail: 'working',
-    tags: [],
-    title: 'Test session',
-    updated_at: 2,
-    url: 'https://app.devin.ai/sessions/session-1',
-    ...overrides,
-  };
-}
-
-describe('Devin live activity', () => {
-  it('uses real cloud status reasons to choose an editing pose', () => {
-    expect(
-      activityForCloudSession(
-        session({ latest_status_contents: { enum: 'working', reason: 'Editing src/session.ts' } }),
-        'working',
-        false,
-      ),
-    ).toEqual({ state: 'working', message: 'Devin working', travel: true });
-  });
-
-  it('shows optimistic message reading before cloud status polling catches up', () => {
-    expect(activityForCloudSession(session(), 'working', true)).toEqual({
-      state: 'thinking',
-      message: 'Devin working',
-      travel: true,
-    });
-  });
-
+describe('Local live activity', () => {
   it('maps sanitized computer tool activity to the matching companion pose', () => {
     expect(
       activityForComputerSession(
@@ -72,13 +26,4 @@ describe('Devin live activity', () => {
     });
   });
 
-  it('does not show a generic bubble for passive cloud states', () => {
-    expect(
-      activityForCloudSession(
-        session({ status: 'suspended', status_detail: 'inactivity' }),
-        'sleeping',
-        false,
-      ),
-    ).toEqual({ state: 'sleeping', message: undefined, travel: false });
-  });
 });

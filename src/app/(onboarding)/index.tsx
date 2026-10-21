@@ -30,17 +30,16 @@ export default function WelcomeScreen() {
           </View>
 
           <Text className="text-text-hi-strong text-text28 font-semibold mt-2">
-            Run Devin from anywhere.
+            Your Mac&apos;s coding agent, in your pocket.
           </Text>
           <Text className="text-text-mid text-text16 leading-6 mt-3">
-            Start and steer cloud sessions, or securely pair a local device you control—all from your
-            iPhone.
+            Start, follow and steer Devin for Terminal sessions on your Mac from your iPhone.
           </Text>
 
           <View className="flex-row flex-wrap gap-2 mt-5">
             <View className="flex-row items-center rounded-chip bg-tint-blue px-3 py-2">
               <View className="w-2 h-2 rounded-dot bg-finished mr-2" />
-              <Text className="text-text-mid text-text12">Cloud + Local</Text>
+              <Text className="text-text-mid text-text12">Local only</Text>
             </View>
             <View className="flex-row items-center rounded-chip bg-tint-purple px-3 py-2">
               <View className="w-2 h-2 rounded-dot bg-merged mr-2" />
@@ -55,7 +54,7 @@ export default function WelcomeScreen() {
             className="min-h-14 bg-brand rounded-button items-center justify-center mt-5"
             onPress={() => router.push('/(onboarding)/features')}
             accessibilityRole="button"
-            accessibilityLabel="Get started with DevinX"
+            accessibilityLabel={`Get started with ${branding.name}`}
           >
             <Text className="text-text-always-white text-text16 font-semibold">Get started</Text>
           </Pressable>

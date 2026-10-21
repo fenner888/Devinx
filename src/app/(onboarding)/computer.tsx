@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 
 import { useConnections } from '@auth/ConnectionContext';
 import {
@@ -33,7 +33,8 @@ import {
   isQrScannerAvailable,
   requestQrScannerPermission,
 } from '@auth/deviceSigning';
-import { DevinXQrScanner } from '@components/connections/DevinXQrScanner';
+import { OtterinQrScanner } from '@components/connections/DevinXQrScanner';
+import { OnboardingProgress } from '@components/onboarding/OnboardingProgress';
 import {
   ComputerPermissionsSheet,
   type ComputerGrants,
@@ -51,7 +52,6 @@ import {
   isConnectorUpdateRequired,
   MINIMUM_SUPPORTED_CONNECTOR_VERSION,
 } from '@lib/connectorVersion';
-import { useAppPreferences } from '@store/preferences';
 import { useTheme } from '@theme/index';
 
 const STEPS = [
@@ -126,16 +126,16 @@ function pairingFailureMessage(error: unknown, stage: ComputerPairingStatus | nu
       ? (error as { code?: unknown }).code
       : undefined;
   if (code === 'pairing_version_incompatible') {
-    return 'This pairing code uses a different connection version. Update DevinX on this iPhone and DevinX Connector on your local device, then scan again.';
+    return 'This pairing code uses a different connection version. Update Otterin on this iPhone and DevinX Connector on your local device, then scan again.';
   }
   if (code === 'pairing_code_expired') {
     return 'This pairing code expired. Generate a new code in DevinX Connector and scan it promptly. Check that both devices use automatic date and time.';
   }
   if (code === 'pairing_code_invalid') {
-    return 'This is not a supported DevinX pairing code. Scan the code shown inside DevinX Connector.';
+    return 'This is not a supported Otterin pairing code. Scan the code shown inside DevinX Connector.';
   }
   if (code === 'ERR_PINNED_HTTPS_NETWORK') {
-    return 'DevinX could not reach DevinX Connector. Confirm Tailscale is connected on this iPhone and local device, then generate a new code.';
+    return 'Otterin could not reach DevinX Connector. Confirm Tailscale is connected on this iPhone and local device, then generate a new code.';
   }
   if (code === 'unavailable' && stage === 'submitting') {
     return 'The signed request could not reach DevinX Connector through Tailscale.';
@@ -148,7 +148,7 @@ function pairingFailureMessage(error: unknown, stage: ComputerPairingStatus | nu
     code === 'ERR_PINNED_HTTPS_INVALID_RESPONSE' ||
     code === 'ERR_PINNED_HTTPS_RESPONSE_TOO_LARGE'
   ) {
-    return 'DevinX and DevinX Connector are not using a compatible secure connection. Update both and try again.';
+    return 'Otterin and DevinX Connector are not using a compatible secure connection. Update both and try again.';
   }
   if (stage === 'checking_bridge_identity') {
     return 'This iPhone could not verify the Connector identity in the pairing code.';
@@ -167,12 +167,10 @@ function pairingFailureMessage(error: unknown, stage: ComputerPairingStatus | nu
 
 export default function ComputerConnectionScreen() {
   const router = useRouter();
+  const inOnboarding = useSegments()[0] === '(onboarding)';
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
   const { computers = [], refreshComputers } = useConnections();
-  const mode = useAppPreferences((state) => state.connectionMode);
-  const setConnectionMode = useAppPreferences((state) => state.setConnectionMode);
-  const isCombinedSetup = mode === 'both';
   const [computerName, setComputerName] = useState(DEFAULT_COMPUTER_NAME);
   const [nameEdited, setNameEdited] = useState(false);
   const [phase, setPhase] = useState<ScreenPhase>('intro');
@@ -234,12 +232,6 @@ export default function ComputerConnectionScreen() {
     router.back();
   }
 
-  function useCloudInstead() {
-    abortRef.current?.abort();
-    setConnectionMode('cloud');
-    router.replace('/(onboarding)/credentials');
-  }
-
   function confirmDisconnect(bridgeId: string, computerLabel: string) {
     Alert.alert(
       `Disconnect ${computerLabel}?`,
@@ -260,7 +252,7 @@ export default function ComputerConnectionScreen() {
                 ) {
                   Alert.alert(
                     'Local device unavailable',
-                    'DevinX cannot revoke this iPhone on the local device while Connector is offline. You can retry later, or remove the pairing key from this iPhone now. The inactive device record will remain until you revoke it in DevinX Connector.',
+                    'Otterin cannot revoke this iPhone on the local device while Connector is offline. You can retry later, or remove the pairing key from this iPhone now. The inactive device record will remain until you revoke it in DevinX Connector.',
                     [
                       { text: 'Cancel', style: 'cancel' },
                       {
@@ -325,7 +317,7 @@ export default function ComputerConnectionScreen() {
       setPhase('scanning');
     } catch {
       if (!mountedRef.current) return;
-      resetForRetry('QR scanning requires the current DevinX iPhone build.');
+      resetForRetry('QR scanning requires the current Otterin iPhone build.');
     }
   }
 
@@ -349,7 +341,6 @@ export default function ComputerConnectionScreen() {
       if (!mountedRef.current || controller.signal.aborted) return;
       setPhase('success');
       setPairingStatus('complete');
-      if (mode === 'cloud') setConnectionMode('both');
       await refreshComputers();
       if (mountedRef.current && !controller.signal.aborted) router.replace('/(main)');
     } catch (pairingError) {
@@ -365,7 +356,7 @@ export default function ComputerConnectionScreen() {
   function handleScannerError(code: string) {
     const message =
       code === 'invalid_code'
-        ? 'That QR code is not a valid DevinX pairing code.'
+        ? 'That QR code is not a valid Otterin pairing code.'
         : 'The camera could not scan a pairing code. Try again.';
     resetForRetry(message);
   }
@@ -406,7 +397,7 @@ export default function ComputerConnectionScreen() {
           </View>
 
           <View className="w-full aspect-square rounded-card overflow-hidden bg-surface2 border border-border">
-            <DevinXQrScanner
+            <OtterinQrScanner
               active={phase === 'scanning'}
               style={styles.scanner}
               onCode={completePairing}
@@ -443,21 +434,17 @@ export default function ComputerConnectionScreen() {
             <Ionicons name="chevron-back" size={18} color={tokens.textMid.hex} />
           </Pressable>
 
+          {inOnboarding && <OnboardingProgress current={3} total={3} />}
+
           <View className="w-14 h-14 rounded-card bg-tint-blue items-center justify-center mb-5">
             <Ionicons name="desktop-outline" size={27} color={tokens.brandText.hex} />
           </View>
-          {isCombinedSetup && (
-            <Text className="text-brand-text text-text12 font-semibold tracking-wider mb-3">
-              STEP 2 OF 2
-            </Text>
-          )}
           <Text className="text-text-hi text-text24 font-semibold mb-2">
-            {isCombinedSetup ? 'Pair a local device' : 'Connect locally'}
+            Pair a Mac
           </Text>
           <Text className="text-text-mid text-text14 leading-5 mb-7">
-            {isCombinedSetup
-              ? 'Devin Cloud is connected. Tailscale provides the private route to your local device; Connector provides authorized local session access.'
-              : 'Tailscale provides the private route to your local device. Connector provides authorized local session access; your Devin credentials stay there.'}
+            Tailscale provides the private route to your Mac. Connector provides authorized local
+            session access; your Devin sign-in stays there.
           </Text>
 
           {phase === 'pairing' || phase === 'success' ? (
@@ -649,7 +636,7 @@ export default function ComputerConnectionScreen() {
                   </Text>
                   <Text className="text-text-mid text-text12 leading-4 mt-1">
                     Tailscale alone does not expose Devin sessions. Send a guarded setup prompt to
-                    install the signed local service that connects DevinX to Devin for Terminal.
+                    install the signed local service that connects Otterin to Devin for Terminal.
                   </Text>
                 </View>
               </View>
@@ -724,7 +711,7 @@ export default function ComputerConnectionScreen() {
                     />
                     <Text className="text-brand-text text-text12 leading-4 ml-2 flex-1">
                       Tailscale supplies the private network. Connector supplies the local Devin
-                      service, and DevinX verifies the local device and this iPhone for every
+                      service, and Otterin verifies the local device and this iPhone for every
                       request.
                     </Text>
                   </View>
@@ -757,18 +744,6 @@ export default function ComputerConnectionScreen() {
             )}
           </View>
 
-          {mode === 'computer' && phase === 'intro' && (
-            <Pressable
-              className="border border-border rounded-button px-buttonPrimaryX py-buttonPrimaryY mt-3"
-              onPress={useCloudInstead}
-              accessibilityRole="button"
-              accessibilityLabel="Connect Devin Cloud instead"
-            >
-              <Text className="text-text-hi text-text14 font-medium text-center">
-                Connect Devin Cloud instead
-              </Text>
-            </Pressable>
-          )}
         </ScrollView>
       </KeyboardAvoidingView>
       {selectedComputer && (

@@ -5,22 +5,9 @@ export default function MainGroup() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="sessions" />
-      <Stack.Screen name="automations" />
-      <Stack.Screen name="security-work" />
       <Stack.Screen name="settings" />
-      <Stack.Screen name="connections" />
-      <Stack.Screen name="repositories" />
-      <Stack.Screen name="wiki" />
       <Stack.Screen name="computer" />
-      <Stack.Screen name="session/[id]" />
       <Stack.Screen name="computer-session/[bridgeId]/[id]" />
-      <Stack.Screen name="compose" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="usage" />
-      <Stack.Screen name="analytics" />
-      <Stack.Screen name="knowledge" />
-      <Stack.Screen name="playbooks" />
-      <Stack.Screen name="secrets" />
-      <Stack.Screen name="review" />
       <Stack.Screen name="privacy" />
     </Stack>
   );

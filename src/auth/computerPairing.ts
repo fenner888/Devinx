@@ -244,7 +244,7 @@ export class ComputerPairingOfferError extends Error {
       code === 'pairing_code_expired'
         ? 'The pairing code has expired or has an invalid clock'
         : code === 'pairing_version_incompatible'
-          ? 'The pairing code requires a compatible DevinX and Connector version'
+          ? 'The pairing code requires compatible Otterin and DevinX Connector versions'
           : 'The pairing code is invalid',
     );
   }
@@ -406,7 +406,7 @@ async function performComputerPairing(
       ? offer.computerName
       : options.computerName,
   );
-  const deviceName = deviceNameSchema.parse(options.deviceName ?? 'DevinX iPhone');
+  const deviceName = deviceNameSchema.parse(options.deviceName ?? 'Otterin iPhone');
   notify(options, 'checking_bridge_identity');
   if ((await fingerprintPublicKeySpki(offer.bridgePublicKeySpki)) !== offer.bridgeKeyFingerprint) {
     throw new Error('The pairing code has an invalid bridge identity');

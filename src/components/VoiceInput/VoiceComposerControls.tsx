@@ -172,7 +172,7 @@ export function VoiceComposerStatus({ voice }: { voice: VoiceComposerController 
                 <Text className="mt-1 text-text-mid text-text12">
                   {voice.scribePreview?.kind === 'foundationModel'
                     ? 'Structured privately with Apple Intelligence on this device.'
-                    : 'Organized with DevinX’s private on-device template.'}{' '}
+                    : 'Organized with Otterin’s private on-device template.'}{' '}
                   Nothing is sent until you approve and submit it.
                 </Text>
               </View>

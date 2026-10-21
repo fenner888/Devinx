@@ -33,11 +33,10 @@ const mockPairComputer = jest.fn(
 );
 const mockGetPermission = jest.fn(async () => 'authorized');
 const mockRequestPermission = jest.fn(async () => 'authorized');
-const mockSetConnectionMode = jest.fn();
-let mockConnectionMode = 'computer';
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, back: mockBack }),
+  useSegments: () => ['(onboarding)'],
 }));
 
 jest.mock('react-native-safe-area-context', () => {
@@ -76,7 +75,7 @@ jest.mock('../../src/api/bridge/presentation', () => ({
 
 jest.mock('../../src/components/connections/DevinXQrScanner', () => {
   return {
-    DevinXQrScanner: ({ onCode }: { onCode: (payload: string) => void }) =>
+    OtterinQrScanner: ({ onCode }: { onCode: (payload: string) => void }) =>
       mockReact.createElement(
         mockPressable,
         { testID: 'qr-scanner', onPress: () => onCode('{"pairing":"offer"}') },
@@ -84,11 +83,6 @@ jest.mock('../../src/components/connections/DevinXQrScanner', () => {
       ),
   };
 });
-
-jest.mock('../../src/store/preferences', () => ({
-  useAppPreferences: (selector: (state: unknown) => unknown) =>
-    selector({ connectionMode: mockConnectionMode, setConnectionMode: mockSetConnectionMode }),
-}));
 
 jest.mock('../../src/theme/index', () => ({
   useTheme: () => ({
@@ -115,7 +109,6 @@ import {
 describe('Computer connection onboarding', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnectionMode = 'computer';
     mockComputers = [];
     mockGetComputerBridgeVersion.mockResolvedValue({ kind: 'supported', version: '0.1.2' });
     mockGetPermission.mockResolvedValue('authorized');
@@ -125,7 +118,7 @@ describe('Computer connection onboarding', () => {
   it('shows the real pairing instructions and starts the scanner after permission', async () => {
     const screen = render(<ComputerConnectionScreen />);
 
-    expect(screen.getByText('Connect locally')).toBeTruthy();
+    expect(screen.getByText('Pair a Mac')).toBeTruthy();
     expect(screen.getByText('Name this computer')).toBeTruthy();
     expect(screen.getByText('Open Tailscale setup guide')).toBeTruthy();
     expect(screen.getByText('Set up DevinX Connector')).toBeTruthy();
@@ -154,14 +147,11 @@ describe('Computer connection onboarding', () => {
     expect(screen.getByLabelText('Scan DevinX Connector pairing code')).toBeTruthy();
   });
 
-  it('identifies computer pairing as the second step of combined setup', () => {
-    mockConnectionMode = 'both';
+  it('shows local pairing without a Cloud alternative', () => {
     const screen = render(<ComputerConnectionScreen />);
 
-    expect(screen.getByText('STEP 2 OF 2')).toBeTruthy();
-    expect(screen.getByText('Pair a local device')).toBeTruthy();
-    expect(screen.getByText(/Devin Cloud is connected/)).toBeTruthy();
-    expect(screen.queryByText('Connect your Mac')).toBeNull();
+    expect(screen.getByText('Pair a Mac')).toBeTruthy();
+    expect(screen.queryByText(/Devin Cloud|Connect Devin Cloud/)).toBeNull();
   });
 
   it('shows an official update action for a legacy Connector', async () => {
@@ -284,7 +274,7 @@ describe('Computer connection onboarding', () => {
   it.each([
     ['pairing_version_incompatible', /different connection version/],
     ['pairing_code_expired', /pairing code expired/],
-    ['pairing_code_invalid', /not a supported DevinX pairing code/],
+    ['pairing_code_invalid', /not a supported Otterin pairing code/],
   ])('shows specific recovery guidance for %s and permits another scan', async (code, message) => {
     mockPairComputer.mockRejectedValueOnce({ code });
     const screen = render(<ComputerConnectionScreen />);

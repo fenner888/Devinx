@@ -17,13 +17,13 @@ interface NativeScannerProps extends ViewProps {
 
 const NativeScanner = requireNativeViewManager<NativeScannerProps>('DevinXDeviceCrypto');
 
-export interface DevinXQrScannerProps extends ViewProps {
+export interface OtterinQrScannerProps extends ViewProps {
   active: boolean;
   onCode: (payload: string) => void;
   onError: (code: ErrorEvent['code']) => void;
 }
 
-export function DevinXQrScanner({ active, onCode, onError, ...viewProps }: DevinXQrScannerProps) {
+export function OtterinQrScanner({ active, onCode, onError, ...viewProps }: OtterinQrScannerProps) {
   return (
     <NativeScanner
       {...viewProps}

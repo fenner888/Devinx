@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "DevinX",
+    "name": "Otterin",
     "slug": "devinx",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -13,9 +13,9 @@
       "buildNumber": "84",
       "infoPlist": {
         "NSFileProtection": "NSFileProtectionComplete",
-        "NSCameraUsageDescription": "Allow DevinX to scan a pairing code shown by DevinX Connector.",
-        "NSMicrophoneUsageDescription": "DevinX uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded.",
-        "NSLocalNetworkUsageDescription": "Allow DevinX to connect securely to a local device you approve in DevinX Connector.",
+        "NSCameraUsageDescription": "Allow Otterin to scan a pairing code shown by DevinX Connector.",
+        "NSMicrophoneUsageDescription": "Otterin uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded.",
+        "NSLocalNetworkUsageDescription": "Allow Otterin to connect securely to a local device you approve in DevinX Connector.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
           "NSExceptionDomains": {
@@ -69,23 +69,15 @@
           }
         }
       ],
-      "expo-web-browser",
       "expo-video",
       [
         "expo-audio",
         {
-          "microphonePermission": "DevinX uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded."
+          "microphonePermission": "Otterin uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded."
         }
       ],
       "expo-asset",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow DevinX to attach photos and videos to Devin sessions.",
-          "cameraPermission": "Allow DevinX to scan a pairing code shown by DevinX Connector.",
-          "microphonePermission": false
-        }
-      ]
+      "expo-asset"
     ],
     "experiments": {
       "tsconfigPaths": true
