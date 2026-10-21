@@ -4,19 +4,19 @@ export const CONNECTOR_RELEASE_PAGE = branding.links.connectorReleases;
 export const WINDOWS_CONNECTOR_STORE_PAGE = branding.links.windowsConnectorStore;
 
 export const CONNECTOR_UPDATE_NOTICE =
-  'Updating DevinX on your iPhone does not update DevinX Connector on your local device.';
+  'Updating Otterin on your iPhone does not update DevinX Connector on your local device.';
 export const MAC_CONNECTOR_UPDATE_STEPS =
   'On your Mac: download the latest official DMG. Choose Quit DevinX Connector from its menu-bar menu, open the DMG, drag DevinX Connector into Applications and choose Replace. Reopen Connector. Closing its window alone does not quit it. Your pairing is kept.';
 export const WINDOWS_CONNECTOR_UPDATE_STEPS =
   'On your Windows PC: open DevinX Connector in Microsoft Store, install any available update, then reopen Connector. Your pairing is kept.';
 
-export const CONNECTOR_SETUP_PROMPT = `Set up DevinX Connector on this local device so I can securely connect the DevinX iPhone app to supported local Devin sessions through Tailscale.
+export const CONNECTOR_SETUP_PROMPT = `Set up DevinX Connector on this local device so I can securely connect the Otterin iPhone app to supported local Devin sessions through Tailscale.
 
-Before downloading anything, explain that Tailscale supplies only the private network route. DevinX Connector is the trusted local service that communicates with a supported local Devin ACP capability, authenticates this iPhone, and enforces its permissions. A Tailscale IP, server URL, or password cannot replace a compatible service running on this local device. Cloud-only DevinX use does not require Connector.
+Before downloading anything, explain that Tailscale supplies only the private network route. DevinX Connector is the trusted local service that communicates with a supported local Devin ACP capability, authenticates this iPhone, and enforces its permissions. A Tailscale IP, server URL, or password cannot replace a compatible service running on this local device.
 
 Detect whether this local device is running macOS or Windows.
 
-On macOS, open the official DevinX release page at ${CONNECTOR_RELEASE_PAGE}. Download Connector only when that page provides the signed Apple-silicon DMG plus its adjacent SHA-256 checksum. Verify the checksum, require a Developer ID Application signature, confirm Apple notarization, and require Gatekeeper acceptance.
+On macOS, open the official DevinX Connector release page at ${CONNECTOR_RELEASE_PAGE}. Download Connector only when that page provides the signed Apple-silicon DMG plus its adjacent SHA-256 checksum. Verify the checksum, require a Developer ID Application signature, confirm Apple notarization, and require Gatekeeper acceptance.
 
 If Connector is already installed, explain the update steps: ${CONNECTOR_UPDATE_NOTICE} ${MAC_CONNECTOR_UPDATE_STEPS} ${WINDOWS_CONNECTOR_UPDATE_STEPS} Follow only the steps for the detected operating system. Do not uninstall Connector or erase its pairing data to update it.
 
@@ -30,7 +30,7 @@ Confirm that Tailscale is installed and connected on this local device. If it is
 
 Install DevinX Connector for the signed-in user and open it. On macOS, install it in /Applications. On Windows, use only the Microsoft Store package and do not create an administrator service. Do not run it as root or Administrator, bind it to 0.0.0.0, expose a public listener, install a public tunnel, or weaken its QR pairing and per-device authorization. Do not enable launch at login without showing me the Connector's visible setting and receiving my approval.
 
-Verify that Connector reports an active private Tailscale connection and detects a supported local Devin ACP capability. Then tell me to return to DevinX on my iPhone, name this local device, and tap Scan pairing code.
+Verify that Connector reports an active private Tailscale connection and detects a supported local Devin ACP capability. Then tell me to return to Otterin on my iPhone, name this local device, and tap Scan pairing code.
 
 After I scan the code, leave device approval and every read, steering, or session-creation grant to the Connector UI on this local device. Do not approve any permission on my behalf. Once pairing is complete, explain that I may close the window while Connector remains available from its macOS menu-bar icon or Windows notification-area icon.
 

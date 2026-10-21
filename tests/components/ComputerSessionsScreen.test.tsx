@@ -29,23 +29,12 @@ jest.mock('@lib/haptics', () => ({
   hapticMedium: jest.fn(),
   hapticWarning: jest.fn(),
 }));
-jest.mock('@store/preferences', () => ({
-  useAppPreferences: (selector: (state: unknown) => unknown) =>
-    selector({ pinnedSessionIds: [], togglePin: jest.fn() }),
-}));
 jest.mock('@auth/ConnectionContext', () => ({
-  useConnections: () => ({ mode: 'computer' }),
-}));
-jest.mock('@api/devin/queries', () => ({
-  useSessions: () => ({
-    data: undefined,
-    isLoading: false,
-    error: null,
-    refetch: jest.fn(),
-    isRefetching: false,
+  useConnections: () => ({
+    computers: [{ bridgeId: 'bridge_1234567890', computerName: 'Studio Mac' }],
+    connectionError: null,
+    refreshComputers: jest.fn(async () => undefined),
   }),
-  useArchiveSession: () => ({ mutate: jest.fn() }),
-  useTerminateSession: () => ({ mutate: jest.fn() }),
 }));
 jest.mock('@api/bridge/queries', () => ({
   COMPUTER_SESSIONS_REFRESH_INTERVAL_MS: 30_000,
@@ -123,7 +112,7 @@ describe('Computer-only sessions screen', () => {
       </ThemeProvider>,
     );
 
-    expect(emptyScreen.getByText('No sessions yet')).toBeTruthy();
+    expect(emptyScreen.getByText('No local sessions yet')).toBeTruthy();
     expect(
       emptyScreen.getByText('Local list updated just now · refreshes every 30s'),
     ).toBeTruthy();
@@ -159,7 +148,7 @@ describe('Computer-only sessions screen', () => {
 
     fireEvent.changeText(screen.getByPlaceholderText('Search sessions…'), 'no-match');
 
-    expect(screen.getByText('No sessions match your search.')).toBeTruthy();
+    expect(screen.getByText('No matching sessions')).toBeTruthy();
   });
 
   it('shows the blocked empty state when all local computers are non-ready', () => {
@@ -211,7 +200,7 @@ describe('Computer-only sessions screen', () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByText('No sessions yet')).toBeTruthy();
+    expect(screen.getByText('No local sessions yet')).toBeTruthy();
     expect(screen.queryByText('Local sessions unavailable')).toBeNull();
   });
 });

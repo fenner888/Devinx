@@ -11,7 +11,7 @@ const FEATURES: ReadonlyArray<{
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   detail: string;
-  tone: 'blue' | 'green' | 'purple' | 'orange';
+  tone: 'blue' | 'green' | 'purple';
 }> = [
   {
     icon: 'chatbubble-ellipses-outline',
@@ -20,9 +20,9 @@ const FEATURES: ReadonlyArray<{
     tone: 'blue',
   },
   {
-    icon: 'git-compare-outline',
-    title: 'Cloud or Local',
-    detail: 'Use Devin Cloud, pair a local device you control, or keep both together.',
+    icon: 'checkmark-circle-outline',
+    title: 'Answer approvals and questions',
+    detail: 'Review access requests and reply to Devin’s questions from your iPhone.',
     tone: 'green',
   },
   {
@@ -32,15 +32,10 @@ const FEATURES: ReadonlyArray<{
     tone: 'purple',
   },
   {
-    icon: 'shield-checkmark-outline',
-    title: 'Inspect Security Work',
-    detail: 'Open genuine Code Scan sessions and review their coordinated agent work.',
-    tone: 'orange',
-  },
-  {
     icon: 'lock-closed-outline',
     title: 'Keep credentials private',
-    detail: 'Cloud keys stay in iOS Keychain; local Devin credentials stay on your device.',
+    detail:
+      'Your Devin sign-in stays on your Mac. This app keeps only its pairing key in iOS Keychain.',
     tone: 'blue',
   },
 ];
@@ -49,14 +44,12 @@ const TONE_CLASS: Record<(typeof FEATURES)[number]['tone'], string> = {
   blue: 'bg-tint-blue',
   green: 'bg-tint-green',
   purple: 'bg-tint-purple',
-  orange: 'bg-tint-orange',
 };
 
-const TONE_COLOR: Record<(typeof FEATURES)[number]['tone'], 'brandText' | 'finished' | 'merged' | 'blocked'> = {
+const TONE_COLOR: Record<(typeof FEATURES)[number]['tone'], 'brandText' | 'finished' | 'merged'> = {
   blue: 'brandText',
   green: 'finished',
   purple: 'merged',
-  orange: 'blocked',
 };
 
 export default function OnboardingFeaturesScreen() {
@@ -104,9 +97,9 @@ export default function OnboardingFeaturesScreen() {
           <OnboardingProgress current={2} total={3} />
           <Pressable
             className="min-h-14 bg-brand rounded-button items-center justify-center mt-5"
-            onPress={() => router.push('/(onboarding)/connections')}
+            onPress={() => router.push('/(onboarding)/computer')}
             accessibilityRole="button"
-            accessibilityLabel="Continue to connection choice"
+            accessibilityLabel="Continue to pair a Mac"
           >
             <Text className="text-text-always-white text-text16 font-semibold">Continue</Text>
           </Pressable>

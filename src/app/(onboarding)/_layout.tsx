@@ -1,5 +1,5 @@
 /**
- * Onboarding layout — welcome → connection choice → provider-specific setup.
+ * Onboarding layout — welcome → features → Mac pairing.
  */
 import { Stack } from 'expo-router';
 
@@ -8,9 +8,6 @@ export default function OnboardingLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="features" />
-      <Stack.Screen name="connections" />
-      <Stack.Screen name="credentials" />
-      <Stack.Screen name="validate" />
       <Stack.Screen name="computer" />
     </Stack>
   );

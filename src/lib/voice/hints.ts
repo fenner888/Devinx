@@ -1,6 +1,6 @@
 const STATIC_DEVELOPER_VOCABULARY = [
   'Devin',
-  'DevinX',
+  'Otterin',
   'TypeScript',
   'JavaScript',
   'React Native',

@@ -1,5 +1,5 @@
 /**
- * DevinX design tokens — extracted from app.devin.ai + cognition.com on
+ * Otterin design tokens — extracted from app.devin.ai + cognition.com on
  * 2026-07-07. See /specs/design-tokens.md for the full audit and
  * /specs/reference-ui/ for screenshots.
  *

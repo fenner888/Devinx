@@ -16,7 +16,7 @@ import { NavMenu } from '../../src/components/NavMenu';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
 
 describe('NavMenu', () => {
-  it('exposes session-based Security Work without restoring the enterprise scan destination', () => {
+  it('shows only Home, Sessions, Your Mac, and Settings destinations', () => {
     const onClose = jest.fn();
     const screen = render(
       <ThemeProvider>
@@ -24,10 +24,23 @@ describe('NavMenu', () => {
       </ThemeProvider>,
     );
 
-    expect(screen.queryByLabelText('Security')).toBeNull();
-    fireEvent.press(screen.getByLabelText('Security Work'));
+    for (const item of ['New session', 'Sessions', 'Your Mac', 'Settings']) {
+      expect(screen.getByLabelText(item)).toBeTruthy();
+    }
+    expect(screen.getByLabelText('Otterin')).toBeTruthy();
+    for (const removedItem of [
+      'Analytics',
+      'Automations',
+      'Knowledge',
+      'Repositories',
+      'Security Work',
+      'Integrations & MCP',
+    ]) {
+      expect(screen.queryByLabelText(removedItem)).toBeNull();
+    }
 
+    fireEvent.press(screen.getByLabelText('New session'));
     expect(onClose).toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith('/(main)/security-work');
+    expect(mockPush).toHaveBeenCalledWith('/(main)');
   });
 });

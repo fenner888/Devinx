@@ -38,7 +38,7 @@ describe('voice privacy gates', () => {
       expo: { ios: { infoPlist: Record<string, unknown> } };
     };
     expect(appConfig.expo.ios.infoPlist.NSMicrophoneUsageDescription).toBe(
-      'DevinX uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded.',
+      'Otterin uses the microphone to transcribe your voice into session prompts. Audio is processed entirely on your device and never uploaded.',
     );
   });
 });

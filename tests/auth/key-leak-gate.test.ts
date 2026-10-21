@@ -6,7 +6,7 @@
  * We scan /src for:
  *  - `cog_` followed by 8+ alphanumerics (a real key, not the prefix constant)
  *  - variable names like `apiKey` / `api_key` / `token` / `secret` / `password`
- *    OUTSIDE /src/auth, /src/lib/branding.ts, /src/lib/diagnostics.ts, /src/api/devin/schemas.ts
+ *    OUTSIDE /src/auth, /src/lib/branding.ts, /src/lib/diagnostics.ts
  */
 
 import * as fs from 'fs';
@@ -17,10 +17,6 @@ const ALLOWED = [
   '/auth/',
   '/lib/branding.ts',
   '/lib/diagnostics.ts',
-  '/api/devin/schemas.ts',
-  '/api/devin/types.ts',
-  '/store/preferences.ts', // composerTemplates mention "secret" in comments only
-  '/app/(onboarding)/', // onboarding screens handle user-entered credentials
 ];
 
 function walk(dir: string, out: string[] = []): string[] {

@@ -6,15 +6,14 @@ import { branding } from '../../src/lib/branding';
 
 describe('branding (§1.4)', () => {
   it('exposes the product name', () => {
-    expect(branding.name).toBe('DevinX');
+    expect(branding.name).toBe('Otterin');
   });
 
-  it('has the unofficial-client disclaimer', () => {
-    expect(branding.subtitle).toContain('Unofficial');
-    expect(branding.subtitle.length).toBeLessThanOrEqual(30);
-    expect(branding.disclaimer).toContain('independent');
-    expect(branding.disclaimer).toContain('Not affiliated with');
-    expect(branding.disclaimer).toContain('Cognition AI');
+  it('has the approved subtitle and independent-companion disclaimer', () => {
+    expect(branding.subtitle).toBe('Local coding sessions, mobile');
+    expect(branding.disclaimer).toBe(
+      'Otterin is an independent, unofficial companion app for Devin for Terminal. Not affiliated with, endorsed by, or a product of Cognition AI.',
+    );
   });
 
   it('has the devinx:// deep link scheme', () => {
@@ -22,26 +21,7 @@ describe('branding (§1.4)', () => {
     expect(branding.linkPrefix).toBe('devinx://');
   });
 
-  it('recognizes both server-issued organization ID forms', () => {
-    expect(branding.orgIdPrefix).toBe('org-');
-    expect(branding.orgIdPrefixes).toEqual(['org-', 'org_']);
-  });
-
-  it('has fallback names for Apple rejection', () => {
-    expect(branding.fallbackNames).toContain('Cockpit');
-    expect(branding.fallbackNames).toContain('Dispatch');
-    expect(branding.fallbackNames).toContain('Overwatch');
-  });
-
-  it('links Cloud onboarding to the current Devin service-user guide', () => {
-    expect(branding.links.devinApp).toBe('https://app.devin.ai');
-    expect(branding.links.createServiceUser).toBe(
-      'https://docs.devin.ai/api-reference/authentication',
-    );
-    expect(branding.links.createServiceUser).not.toContain('/api-reference/api-keys');
-  });
-
-  it('keychain keys match spec §9 exactly', () => {
+  it('retains legacy Cloud key names only for cleanup', () => {
     expect(branding.keychain.apiKey).toBe('devin_api_key');
     expect(branding.keychain.orgId).toBe('devin_org_id');
     expect(branding.keychain.attributionUserId).toBe('attribution_user_id');

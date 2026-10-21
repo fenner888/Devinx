@@ -1,4 +1,4 @@
-# Releasing DevinX
+# Releasing Otterin and DevinX Connector
 
 This document separates verified release evidence from work that still requires a physical device, Apple credentials, or explicit release approval. Never publish publicly or submit App Review from these instructions without the owner's approval.
 
@@ -32,7 +32,7 @@ Using the TestFlight build intended for release:
 
 1. Pair through Tailscale with DevinX Connector.
 2. On the Mac, grant **Read session content** and **Send messages** only to the test iPhone.
-3. Verify Computer-only, Cloud-only, and Cloud + Computer modes.
+3. Verify Local Home workspaces/models, Local session history, and single- and multi-Mac pairing.
 4. Open a computer session, load bounded history, send a harmless prompt, and verify refreshed history.
 5. Confirm the keyboard dismisses after send and the Devin companion starts and stops cleanly.
 6. Remove the Mac from the iPhone and verify the Mac device grant is revoked; repeat with Mac-side revoke.
@@ -84,31 +84,31 @@ Push notifications are not implemented in v1. The app does not request notificat
 
 ## App Store metadata draft
 
-**Name:** DevinX
+**Name:** Otterin
 
-**Subtitle:** Unofficial mission control for Devin sessions
+**Subtitle:** Local coding sessions, mobile
 
-**Keywords:** Devin,developer,AI,coding,sessions,monitor,cloud,engineering,workflow
+**Keywords:** Devin,developer,AI,coding,sessions,local,Mac,voice,engineering
 
-**Promotional text:** Monitor, steer, and start Devin Cloud sessions from your phone.
+**Promotional text:** Start, follow and steer Devin for Terminal sessions on your Mac from your iPhone.
 
 **Description:**
 
-> DevinX is a mobile mission-control client for the Devin API. Monitor active cloud sessions, surface work that needs your input, send follow-up messages, review pull requests and insights, create sessions with repository and attachment context, and track usage from your phone. You can also pair a Mac you control through Tailscale to view and explicitly steer authorized local Devin sessions.
+> Start and steer local Devin for Terminal sessions from your iPhone. Pair with DevinX Connector on your Mac over Tailscale to review approved session history, follow live updates, send prompts, and answer approvals and questions. Speak detailed prompts with on-device voice.
 >
-> Cloud credentials stay in the device Keychain. Computer credentials remain on the paired devices, and DevinX operates no relay for normal session traffic.
+> Your Devin sign-in stays on your Mac. Otterin keeps only its pairing key in iOS Keychain and sends approved session requests directly to your paired Mac.
 >
-> DevinX is an independent, unofficial client for the Devin API. Not affiliated with, endorsed by, or a product of Cognition AI.
+> Otterin is an independent, unofficial companion app for Devin for Terminal. Not affiliated with, endorsed by, or a product of Cognition AI.
 
 **Review notes:**
 
-> This app requires either an existing Devin account with a user-provided credential, a paired DevinX Connector, or both. Credentials are entered or paired at runtime and stored in the iOS Keychain. A test credential and any Connector review steps must be supplied privately in App Store Connect review notes; never commit credentials to the repository.
+> This app requires a Mac running Devin for Terminal and DevinX Connector. Pair the review iPhone by scanning a short-lived QR code and approving it in Connector on the Mac. Connector permissions are granted by the reviewer on the Mac. No Devin sign-in credential is entered or stored in Otterin.
 
 **Privacy labels draft:**
 
-- User Content: used only for app functionality; sent to the selected Devin API or explicitly paired computer
-- Identifiers: organization/account identifiers and a paired-device identifier used for app functionality
-- Diagnostics: none collected by DevinX in the current release
+- User Content: used only for app functionality; sent only to the explicitly paired Mac when approved
+- Identifiers: the Expo EAS Update installation token used for app functionality
+- Diagnostics: none collected by Otterin in the current release
 - Tracking: no
 - Data sale: no
 
@@ -121,4 +121,4 @@ The final privacy labels must be checked against the exact production configurat
 
 ## Intentionally web-owned or deferred
 
-Personal profile and integration settings, billing/invoices, self-serve quota and balance controls, organization defaults, repository-index mutations, snapshot/environment mutation, Skills & Rules management, member administration, and API-key provisioning remain outside DevinX. The precise supported and deferred boundaries are maintained in `specs/033-cloud-local-settings-parity.md`; do not infer support from a visible Devin Web control.
+Cloud sessions, Cloud authentication, integrations, repository management, usage and billing, and other Cloud controls are outside Otterin; Devin's official app covers Cloud workflows. Otterin is limited to sessions on a Mac explicitly paired through DevinX Connector.

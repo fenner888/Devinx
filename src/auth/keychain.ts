@@ -1,6 +1,6 @@
 /**
  * Keychain access — the ONLY module that imports expo-secure-store (spec §8.1, §10.1).
- * Stores Cloud credentials plus the encrypted-at-rest paired-computer registry.
+ * Stores the encrypted-at-rest paired-computer registry and removes legacy Cloud credentials.
  * Accessibility: WHEN_UNLOCKED_THIS_DEVICE_ONLY (spec §10.1) — not in iCloud/backup.
  */
 
@@ -24,7 +24,7 @@ export async function deleteSecret(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(key);
 }
 
-export async function wipeCloudSecrets(): Promise<void> {
+export async function wipeLegacyCloudCredentials(): Promise<void> {
   const keys = [
     branding.keychain.apiKey,
     branding.keychain.orgId,
@@ -32,48 +32,4 @@ export async function wipeCloudSecrets(): Promise<void> {
     branding.keychain.authKind,
   ];
   await Promise.all(keys.map((key) => deleteSecret(key)));
-}
-
-/**
- * Wipe ALL Keychain entries for DevinX (spec §10.5).
- * Called on disconnect. The §10.5 gate test asserts this leaves nothing.
- */
-export async function wipeAllSecrets(): Promise<void> {
-  const keys = Object.values(branding.keychain);
-  await Promise.all(keys.map((key) => deleteSecret(key)));
-}
-
-/**
- * Check if any credentials are stored (used to decide onboarding vs main).
- */
-export async function hasCredentials(): Promise<boolean> {
-  const apiKey = await getSecret(branding.keychain.apiKey);
-  return apiKey !== null && apiKey.length > 0;
-}
-
-/**
- * Load all credentials at once (lazy, called on app foreground).
- * Returns null if not authenticated.
- */
-export interface StoredCredentials {
-  apiKey: string;
-  orgId: string;
-  attributionUserId: string | null;
-  authKind: 'service_user' | 'pat';
-}
-
-export async function loadCredentials(): Promise<StoredCredentials | null> {
-  const [apiKey, orgId, attributionUserId, authKind] = await Promise.all([
-    getSecret(branding.keychain.apiKey),
-    getSecret(branding.keychain.orgId),
-    getSecret(branding.keychain.attributionUserId),
-    getSecret(branding.keychain.authKind),
-  ]);
-  if (!apiKey) return null;
-  return {
-    apiKey,
-    orgId: orgId ?? '',
-    attributionUserId: attributionUserId ?? null,
-    authKind: (authKind as 'service_user' | 'pat') ?? 'service_user',
-  };
 }

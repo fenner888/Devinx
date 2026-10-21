@@ -34,7 +34,6 @@ const mockPairComputer = jest.fn(
 );
 const mockGetPermission = jest.fn(async () => 'authorized');
 const mockRequestPermission = jest.fn(async () => 'authorized');
-const mockSetConnectionMode = jest.fn();
 let mockComputers: Array<{
   bridgeId: string;
   computerName: string;
@@ -51,6 +50,7 @@ let mockComputers: Array<{
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, back: mockBack }),
+  useSegments: () => ['(main)'],
 }));
 jest.mock('react-native-safe-area-context', () => {
   const actual = jest.requireActual('react-native-safe-area-context');
@@ -89,16 +89,12 @@ jest.mock('@api/bridge/presentation', () => ({
   useComputerGrants: () => undefined,
 }));
 jest.mock('@components/connections/DevinXQrScanner', () => ({
-  DevinXQrScanner: ({ onCode }: { onCode: (payload: string) => void }) =>
+  OtterinQrScanner: ({ onCode }: { onCode: (payload: string) => void }) =>
     mockReact.createElement(
       mockPressable,
       { testID: 'qr-scanner', onPress: () => onCode('{"pairing":"offer"}') },
       mockReact.createElement(mockText, null, 'Camera preview'),
     ),
-}));
-jest.mock('@store/preferences', () => ({
-  useAppPreferences: (selector: (state: unknown) => unknown) =>
-    selector({ connectionMode: 'computer', setConnectionMode: mockSetConnectionMode }),
 }));
 jest.mock('@theme/index', () => ({
   useTheme: () => ({
@@ -151,7 +147,7 @@ describe('Phase 15 local-device pairing screen', () => {
     expect(screen.getByLabelText('Send prompts not allowed')).toBeTruthy();
     expect(screen.getByLabelText('Start sessions not allowed')).toBeTruthy();
     expect(screen.getByLabelText('Disconnect Studio Mac')).toBeTruthy();
-    expect(screen.getByLabelText('Connect Devin Cloud instead')).toBeTruthy();
+    expect(screen.queryByLabelText(/Devin Cloud/)).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Permissions for Studio Mac'));
 

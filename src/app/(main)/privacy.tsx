@@ -6,14 +6,9 @@ import { useTheme } from '@theme/index';
 
 const rows = [
   {
-    title: 'Devin API requests',
-    detail:
-      'Credentials, prompts, attachments, and session actions go directly from this device to api.devin.ai over TLS.',
-  },
-  {
     title: 'On-device storage',
     detail:
-      'Credentials stay in the system Keychain. Compose drafts, prompt templates, session context, and the read cache stay on this device and are wiped when you disconnect. Your appearance choice may remain.',
+      'Paired-device keys stay in the system Keychain. Compose drafts, session context, and the read cache stay on this device and are removed when you wipe local data. Your appearance choice may remain.',
   },
   {
     title: 'Voice dictation and Scribe',
@@ -33,22 +28,22 @@ const rows = [
   {
     title: 'Local sessions',
     detail:
-      'Only after you pair and approve an iPhone, DevinX can request minimized Devin session data directly from your local device over Tailscale. Metadata is the default; message text requires a separate read grant. Local files, tool payloads, thoughts, and credentials are not returned.',
+      'After you pair and approve an iPhone, Otterin can request minimized Devin session data directly from your Mac over Tailscale. Metadata is the default; message text requires a separate read grant. Local files, tool payloads, thoughts, and credentials are not returned.',
   },
   {
     title: 'Tailscale and private networks',
     detail:
-      'If you choose Tailscale, it supplies private network reachability between your devices. DevinX still authenticates every bridge request, and no DevinX-operated relay receives the session.',
+      'If you choose Tailscale, it supplies private network reachability between your devices. Otterin still authenticates every bridge request, and no Otterin-operated relay receives the session.',
   },
   {
     title: 'App delivery',
     detail:
-      'The installed app may contact Expo over TLS to check for compatible DevinX updates. Expo may receive the device operating system, project ID, normal network metadata, and a randomized installation token. This release does not register your iPhone for remote push notifications.',
+      'The installed app may contact Expo over TLS to check for compatible Otterin updates. Expo may receive the device operating system, project ID, normal network metadata, and a randomized installation token. This release does not register your iPhone for remote push notifications.',
   },
   {
     title: 'Your controls and deletion',
     detail:
-      'Disconnecting removes DevinX credentials, drafts, saved session context, and cached data from this iPhone. Revoking the iPhone in DevinX Connector ends its local-device access. Cloud-session retention remains controlled by Cognition and your Devin account.',
+      'Wiping local data removes paired-Mac keys, drafts, saved session context, and cached data from this iPhone. Revoking the iPhone in DevinX Connector ends its local-device access.',
   },
 ] as const;
 
@@ -73,8 +68,8 @@ export default function PrivacyScreen() {
           What data leaves your device?
         </Text>
         <Text className="text-text-mid text-text14 leading-5 mb-5">
-          DevinX does not relay session content through its own backend. Cloud actions go directly
-          to Cognition's Devin API; approved local-session requests go directly to your paired local device.
+          Otterin does not relay session content through its own backend. Approved local-session
+          requests go directly to your paired Mac.
         </Text>
         <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-5">
           {rows.map((row, index) => (
@@ -93,18 +88,9 @@ export default function PrivacyScreen() {
             Linking.openURL('https://github.com/fenner888/Devinx/blob/main/PRIVACY.md')
           }
           accessibilityRole="link"
-          accessibilityLabel="Open the full DevinX privacy policy"
+          accessibilityLabel="Open the full Otterin privacy policy"
         >
           <Text className="text-brand-text text-text14 font-medium">Full privacy policy</Text>
-          <Ionicons name="open-outline" size={14} color={tokens.brandText.hex} />
-        </Pressable>
-        <Pressable
-          className="mt-3 flex-row items-center justify-center rounded-button bg-tint-secondary py-3"
-          onPress={() => Linking.openURL('https://docs.devin.ai/api-reference/v3/overview')}
-          accessibilityRole="link"
-          accessibilityLabel="Open Devin API privacy documentation"
-        >
-          <Text className="text-brand-text text-text14 font-medium">Devin API documentation</Text>
           <Ionicons name="open-outline" size={14} color={tokens.brandText.hex} />
         </Pressable>
       </ScrollView>

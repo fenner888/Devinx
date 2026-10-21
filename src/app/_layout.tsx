@@ -16,8 +16,6 @@ import {
 } from '@tanstack/react-query';
 import NetInfo from '@react-native-community/netinfo';
 import { ThemeProvider, useTheme, loadThemePreference } from '@theme/index';
-import { shouldRetryQuery } from '@api/devin/client';
-import { AuthProvider } from '@auth/AuthContext';
 import { ConnectionProvider, useConnections } from '@auth/ConnectionContext';
 import { ErrorBoundary } from '@components/ErrorBoundary';
 import { PrivacyShield } from '@components/PrivacyShield';
@@ -41,10 +39,7 @@ if (Platform.OS !== 'web') {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // The API client already retries transient failures internally —
-      // shouldRetryQuery adds at most ONE query-layer attempt and never
-      // retries deterministic failures (auth/permission/404/schema).
-      retry: shouldRetryQuery,
+      retry: 1,
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30000),
       staleTime: 30_000,
       gcTime: 5 * 60_000,
@@ -96,13 +91,11 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <ErrorBoundary>
           <ThemeProvider>
-            <AuthProvider>
-              <ConnectionProvider>
-                <InitialRoute />
-                <ThemedStack />
-                <PrivacyShield />
-              </ConnectionProvider>
-            </AuthProvider>
+            <ConnectionProvider>
+              <InitialRoute />
+              <ThemedStack />
+              <PrivacyShield />
+            </ConnectionProvider>
           </ThemeProvider>
         </ErrorBoundary>
       </QueryClientProvider>

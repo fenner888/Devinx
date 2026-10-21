@@ -39,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <Text className="font-mono text-failed text-text14 mb-4">{'X_X'}</Text>
             <Text className="text-text-hi text-text17 text-center mb-2">Something went wrong</Text>
             <Text className="text-text-mid text-text13 text-center mb-6">
-              The app encountered an unexpected error. Close and reopen DevinX if retrying does
+              The app encountered an unexpected error. Close and reopen Otterin if retrying does
               not help.
             </Text>
             <Pressable
