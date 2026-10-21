@@ -305,7 +305,7 @@ describe('authenticated Desktop Bridge service', () => {
   it('returns the authenticated Connector version without changing the health contract', async () => {
     await expect(service().handle(envelope('bridge.version', {}), context())).resolves.toEqual({
       status: 200,
-      body: { version: '0.1.13' },
+      body: { version: '0.1.14' },
     });
   });
 
@@ -516,6 +516,117 @@ describe('authenticated Desktop Bridge service', () => {
     );
     expect(result.status).toBe(200);
     expect((result.body as { models: unknown[] }).models).toHaveLength(385);
+  });
+
+  it('fits 816 model variants while retaining every model ID in catalog order', async () => {
+    const models = Array.from({ length: 816 }, (_, index) => ({
+      id: `model-${index}`,
+      name: `Model ${index}`,
+      description: 'd'.repeat(400),
+      costSummary: 'c'.repeat(180),
+      recent: index === 814 || index === 815,
+      recommended: index === 0,
+    }));
+    adapter.createOptions.models = models;
+    adapter.createOptions.defaultModelId = 'model-0';
+
+    const result = await service().handle(
+      envelope('session.create_options', {}, ['session:metadata:read']),
+      context(),
+    );
+
+    expect(result.status).toBe(200);
+    const responseBody = result.body as {
+      models: Array<{ id: string; description?: string; recommended: boolean }>;
+      defaultModelId: string | null;
+    };
+    const serializedBytes = Buffer.byteLength(JSON.stringify(result.body), 'utf8');
+    process.stdout.write(`816-model serialized response: ${serializedBytes} bytes\n`);
+    expect(serializedBytes).toBeLessThanOrEqual(192 * 1024);
+    expect(responseBody.models.map((model) => model.id)).toEqual(
+      models.map((model) => model.id),
+    );
+    expect(responseBody.models.every((model) => model.description === undefined)).toBe(true);
+    expect(responseBody.models.find((model) => model.id === responseBody.defaultModelId))
+      .toMatchObject({ recommended: true });
+  });
+
+  it('fits 1000 long-named models while preserving priority models and catalog order', async () => {
+    const recentIds = new Set(['model-900', 'model-999']);
+    const models = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `model-${index}`,
+      name: 'm'.repeat(160),
+      description: 'd'.repeat(160),
+      costSummary: 'c'.repeat(200),
+      recent: recentIds.has(`model-${index}`),
+      recommended: index === 0,
+    }));
+    adapter.createOptions.models = models;
+    adapter.createOptions.defaultModelId = 'model-0';
+
+    const result = await service().handle(
+      envelope('session.create_options', {}, ['session:metadata:read']),
+      context(),
+    );
+
+    expect(result.status).toBe(200);
+    const responseBody = result.body as {
+      models: Array<{ id: string; recent: boolean; recommended: boolean }>;
+      defaultModelId: string | null;
+    };
+    const serializedBytes = Buffer.byteLength(JSON.stringify(result.body), 'utf8');
+    expect(serializedBytes).toBeLessThanOrEqual(192 * 1024);
+    const keptIds = new Set(responseBody.models.map((model) => model.id));
+    expect(responseBody.models.map((model) => model.id)).toEqual(
+      models.filter((model) => keptIds.has(model.id)).map((model) => model.id),
+    );
+    expect(responseBody.models.find((model) => model.id === 'model-0'))
+      .toMatchObject({ recommended: true });
+    expect(responseBody.models.filter((model) => model.recent).map((model) => model.id)).toEqual([
+      'model-900',
+      'model-999',
+    ]);
+    const allNonPriorityIds = models
+      .filter((model) => !model.recent && !model.recommended)
+      .map((model) => model.id);
+    const keptNonPriorityIds = responseBody.models
+      .filter((model) => !model.recent && !model.recommended)
+      .map((model) => model.id);
+    expect(keptNonPriorityIds).toEqual(
+      allNonPriorityIds.slice(0, keptNonPriorityIds.length),
+    );
+  });
+
+  it('trims trailing recent models when the priority catalog alone exceeds the budget', async () => {
+    const models = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `model-${index}`,
+      name: 'm'.repeat(160),
+      description: 'd'.repeat(160),
+      costSummary: 'c'.repeat(200),
+      recent: index < 990,
+      recommended: index === 0,
+    }));
+    adapter.createOptions.models = models;
+    adapter.createOptions.defaultModelId = 'model-0';
+
+    const result = await service().handle(
+      envelope('session.create_options', {}, ['session:metadata:read']),
+      context(),
+    );
+
+    expect(result.status).toBe(200);
+    const responseBody = result.body as {
+      models: Array<{ id: string; recent: boolean; recommended: boolean }>;
+      defaultModelId: string | null;
+    };
+    expect(Buffer.byteLength(JSON.stringify(result.body), 'utf8')).toBeLessThanOrEqual(192 * 1024);
+    expect(responseBody.models[0]?.id).toBe('model-0');
+    expect(responseBody.models[0]?.recommended).toBe(true);
+    expect(responseBody.models.length).toBeLessThan(models.length);
+    expect(responseBody.models.map((model) => model.id)).toEqual(
+      models.slice(0, responseBody.models.length).map((model) => model.id),
+    );
+    expect(responseBody.models.every((model) => model.recent || model.recommended)).toBe(true);
   });
 
   it('keeps workspace discovery and default-model creation usable without a model catalog', async () => {

@@ -52,6 +52,62 @@ import type { WorkspaceHandleRegistry } from './workspace-handles';
 const MAX_LOCAL_SESSION_RESPONSE_BYTES = 192 * 1024;
 const MAX_TOTAL_ACTIVITY_DETAIL_BYTES = 160 * 1024;
 
+const sessionCreateOptionsResponseSchema = z
+  .object({
+    workspaces: z
+      .array(
+        z
+          .object({
+            id: z.string().regex(/^workspace_[A-Za-z0-9_-]{43}$/),
+            name: z.string().min(1).max(160),
+          })
+          .strict(),
+      )
+      .max(100),
+    models: z
+      .array(
+        z
+          .object({
+            id: modelIdSchema,
+            name: z.string().min(1).max(160),
+            description: z.string().min(1).max(500).optional(),
+            supportsImages: z.boolean().optional(),
+            badge: z.enum(['new', 'free_promo']).optional(),
+            costTier: z.enum(['low', 'medium', 'high', 'free']).optional(),
+            costSummary: z.string().min(1).max(200).optional(),
+            recent: z.boolean(),
+            recommended: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(1_000),
+    defaultModelId: modelIdSchema.nullable(),
+    catalogSource: z.enum(['live', 'recent']),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const modelIds = value.models.map((model) => model.id);
+    if (new Set(modelIds).size !== modelIds.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['models'],
+        message: 'Model IDs must be unique',
+      });
+    }
+    if (
+      value.defaultModelId !== null &&
+      !value.models.some((model) => model.id === value.defaultModelId && model.recommended)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['defaultModelId'],
+        message: 'Default model must be present and recommended',
+      });
+    }
+  });
+
+type SessionCreateOptionsResponse = z.infer<typeof sessionCreateOptionsResponseSchema>;
+
 const localSessionActivityKindSchema = z.enum([
   'thinking',
   'reading',
@@ -471,6 +527,97 @@ function workspaceDisplayNames(workspaces: Array<{ path: string }>): string[] {
 
 function serializedBytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value), 'utf8');
+}
+
+function fitCreateOptionsResponse(
+  body: SessionCreateOptionsResponse,
+): SessionCreateOptionsResponse {
+  if (serializedBytes(body) <= MAX_LOCAL_SESSION_RESPONSE_BYTES) return body;
+
+  const isDefault = (model: SessionCreateOptionsResponse['models'][number]) =>
+    model.id === body.defaultModelId;
+  const isPriority = (model: SessionCreateOptionsResponse['models'][number]) =>
+    model.recommended || model.recent || isDefault(model);
+  const withModels = (models: SessionCreateOptionsResponse['models']) => ({ ...body, models });
+  const withoutDescription = (model: SessionCreateOptionsResponse['models'][number]) => {
+    const copy = { ...model };
+    delete copy.description;
+    return copy;
+  };
+
+  let response = withModels(
+    body.models.map((model) => (isPriority(model) ? model : withoutDescription(model))),
+  );
+  if (serializedBytes(response) <= MAX_LOCAL_SESSION_RESPONSE_BYTES) return response;
+
+  response = withModels(response.models.map(withoutDescription));
+  if (serializedBytes(response) <= MAX_LOCAL_SESSION_RESPONSE_BYTES) return response;
+
+  response = withModels(
+    response.models.map((model) => {
+      if (isPriority(model)) return model;
+      const copy = { ...model };
+      delete copy.costSummary;
+      return copy;
+    }),
+  );
+  if (serializedBytes(response) <= MAX_LOCAL_SESSION_RESPONSE_BYTES) return response;
+
+  const nonPriorityCount = response.models.filter((model) => !isPriority(model)).length;
+  const modelsWithNonPriorityLimit = (limit: number) => {
+    let included = 0;
+    return response.models.filter((model) => {
+      if (isPriority(model)) return true;
+      if (included >= limit) return false;
+      included += 1;
+      return true;
+    });
+  };
+
+  let minimumNonPriority = 0;
+  let maximumNonPriority = nonPriorityCount;
+  let fitted: SessionCreateOptionsResponse | null = null;
+  while (minimumNonPriority <= maximumNonPriority) {
+    const count = Math.floor((minimumNonPriority + maximumNonPriority) / 2);
+    const candidate = withModels(modelsWithNonPriorityLimit(count));
+    if (serializedBytes(candidate) <= MAX_LOCAL_SESSION_RESPONSE_BYTES) {
+      fitted = candidate;
+      minimumNonPriority = count + 1;
+    } else {
+      maximumNonPriority = count - 1;
+    }
+  }
+  if (fitted) return fitted;
+
+  response = withModels(modelsWithNonPriorityLimit(0));
+  const defaultModels = response.models.filter(isDefault);
+  const recentModels = response.models.filter((model) => model.recent && !isDefault(model));
+  const modelsWithRecentLimit = (limit: number) => {
+    let included = 0;
+    return response.models.filter((model) => {
+      if (isDefault(model)) return true;
+      if (!model.recent || included >= limit) return false;
+      included += 1;
+      return true;
+    });
+  };
+
+  let minimumRecent = 0;
+  let maximumRecent = recentModels.length;
+  let fittedRecent: SessionCreateOptionsResponse | null = null;
+  while (minimumRecent <= maximumRecent) {
+    const count = Math.floor((minimumRecent + maximumRecent) / 2);
+    const candidate = withModels(modelsWithRecentLimit(count));
+    if (serializedBytes(candidate) <= MAX_LOCAL_SESSION_RESPONSE_BYTES) {
+      fittedRecent = candidate;
+      minimumRecent = count + 1;
+    } else {
+      maximumRecent = count - 1;
+    }
+  }
+  if (fittedRecent) return fittedRecent;
+
+  return withModels(defaultModels);
 }
 
 function remapActivitySequences(
@@ -1164,86 +1311,34 @@ export class BridgeService {
     try {
       const options = await this.dependencies.sessions.listCreateOptions(body.refresh === true);
       const workspaceNames = workspaceDisplayNames(options.workspaces);
+      const response = sessionCreateOptionsResponseSchema.parse({
+        workspaces: options.workspaces.map((workspace, index) => ({
+          id: this.dependencies.workspaceHandles.register(workspace.path, now),
+          name: workspaceNames[index] ?? 'Workspace',
+        })),
+        models: options.models.map((model) => ({
+          id: model.id,
+          name: cleanDisplayText(model.name ?? modelDisplayName(model.id), 160, 'Default'),
+          ...(model.description
+            ? { description: cleanDisplayText(model.description, 500, 'Model option') }
+            : {}),
+          ...(typeof model.supportsImages === 'boolean'
+            ? { supportsImages: model.supportsImages }
+            : {}),
+          ...(model.badge ? { badge: model.badge } : {}),
+          ...(model.costTier ? { costTier: model.costTier } : {}),
+          ...(model.costSummary
+            ? { costSummary: cleanDisplayText(model.costSummary, 200, 'Cost') }
+            : {}),
+          recent: model.recent === true,
+          recommended: model.recommended === true,
+        })),
+        defaultModelId: options.defaultModelId ?? null,
+        catalogSource: options.catalogSource ?? 'recent',
+      });
       return {
         status: 200,
-        body: z
-          .object({
-            workspaces: z
-              .array(
-                z
-                  .object({
-                    id: z.string().regex(/^workspace_[A-Za-z0-9_-]{43}$/),
-                    name: z.string().min(1).max(160),
-                  })
-                  .strict(),
-              )
-              .max(100),
-            models: z
-              .array(
-                z
-                  .object({
-                    id: modelIdSchema,
-                    name: z.string().min(1).max(160),
-                    description: z.string().min(1).max(500).optional(),
-                    supportsImages: z.boolean().optional(),
-                    badge: z.enum(['new', 'free_promo']).optional(),
-                    costTier: z.enum(['low', 'medium', 'high', 'free']).optional(),
-                    costSummary: z.string().min(1).max(200).optional(),
-                    recent: z.boolean(),
-                    recommended: z.boolean(),
-                  })
-                  .strict(),
-              )
-              .max(1_000),
-            defaultModelId: modelIdSchema.nullable(),
-            catalogSource: z.enum(['live', 'recent']),
-          })
-          .strict()
-          .superRefine((value, context) => {
-            const modelIds = value.models.map((model) => model.id);
-            if (new Set(modelIds).size !== modelIds.length) {
-              context.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['models'],
-                message: 'Model IDs must be unique',
-              });
-            }
-            if (
-              value.defaultModelId !== null &&
-              !value.models.some((model) => model.id === value.defaultModelId && model.recommended)
-            ) {
-              context.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['defaultModelId'],
-                message: 'Default model must be present and recommended',
-              });
-            }
-          })
-          .parse({
-            workspaces: options.workspaces.map((workspace, index) => ({
-              id: this.dependencies.workspaceHandles.register(workspace.path, now),
-              name: workspaceNames[index] ?? 'Workspace',
-            })),
-            models: options.models.map((model) => ({
-              id: model.id,
-              name: cleanDisplayText(model.name ?? modelDisplayName(model.id), 160, 'Default'),
-              ...(model.description
-                ? { description: cleanDisplayText(model.description, 500, 'Model option') }
-                : {}),
-              ...(typeof model.supportsImages === 'boolean'
-                ? { supportsImages: model.supportsImages }
-                : {}),
-              ...(model.badge ? { badge: model.badge } : {}),
-              ...(model.costTier ? { costTier: model.costTier } : {}),
-              ...(model.costSummary
-                ? { costSummary: cleanDisplayText(model.costSummary, 200, 'Cost') }
-                : {}),
-              recent: model.recent === true,
-              recommended: model.recommended === true,
-            })),
-            defaultModelId: options.defaultModelId ?? null,
-            catalogSource: options.catalogSource ?? 'recent',
-          }),
+        body: fitCreateOptionsResponse(response),
       };
     } catch {
       return { status: 503, body: { error: 'temporarily_unavailable' } };

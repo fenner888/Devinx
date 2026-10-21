@@ -32,7 +32,7 @@ export const MODEL_FAMILY_MARK_ASSETS: Partial<
 > = {
   claude: { source: claude, scale: 0.86 },
   glm: { source: zai, scale: 0.88, tintWithTheme: true },
-  swe: { source: cognition, scale: 0.78 },
+  swe: { source: cognition, scale: 0.78, tintWithTheme: true },
   gpt: { source: openai, scale: 0.68, tintWithTheme: true },
   gemini: { source: gemini, scale: 0.82 },
   deepseek: { source: deepseek, scale: 0.88 },
