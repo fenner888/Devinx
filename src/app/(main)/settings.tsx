@@ -36,6 +36,9 @@ export default function SettingsScreen() {
   const setHaptics = useAppPreferences((state) => state.setHaptics);
   const pollingMode = useAppPreferences((state) => state.pollingMode);
   const setPollingMode = useAppPreferences((state) => state.setPollingMode);
+  const refreshIntervals = localRefreshIntervals(pollingMode);
+  const sessionListInterval = formatRefreshInterval(refreshIntervals.sessionList);
+  const activityInterval = formatRefreshInterval(refreshIntervals.activity);
   const [wipeError, setWipeError] = useState<string | null>(null);
 
   function handleWipe() {
@@ -181,12 +184,8 @@ export default function SettingsScreen() {
               ))}
             </View>
             <Text className="mt-2 text-text-low text-text12">
-              Session list checks every{' '}
-              {formatRefreshInterval(localRefreshIntervals(pollingMode).sessionList)}.
-            </Text>
-            <Text className="mt-1 text-text-low text-text12">
-              How often the session list checks your Mac. Open sessions update every{' '}
-              {formatRefreshInterval(localRefreshIntervals(pollingMode).activity)}.
+              Session list checks your Mac every {sessionListInterval}. Open sessions update every{' '}
+              {activityInterval}.
             </Text>
           </View>
         </View>

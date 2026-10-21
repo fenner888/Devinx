@@ -507,6 +507,7 @@ export default function HomeScreen() {
                       <Pressable
                         className="h-10 w-10 items-center justify-center rounded-full"
                         onPress={toggleAutoApprove}
+                        hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}
                         accessibilityRole="button"
                         accessibilityLabel={
                           autoApproveEnabled ? 'Auto-approve on' : 'Auto-approve off'
@@ -524,6 +525,7 @@ export default function HomeScreen() {
                       className={`w-10 h-10 rounded-full items-center justify-center ${canUseComposer && prompt.trim() ? 'bg-brand' : 'bg-tint-secondary'}`}
                       onPress={handleSend}
                       disabled={!canUseComposer || !prompt.trim() || composerPending}
+                      hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}
                       accessibilityRole="button"
                       accessibilityLabel="Start local session"
                     >
