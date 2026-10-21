@@ -589,7 +589,7 @@ private struct ConnectorView: View {
                     Image(systemName: model.status.symbol)
                         .font(.system(size: 34, weight: .semibold))
                         .foregroundStyle(statusColor)
-                    Text("DevinX Connector")
+                    Text("Otterin Connector")
                         .font(.system(size: 28, weight: .semibold))
                     Text(model.status.label)
                         .foregroundStyle(.secondary)
@@ -623,7 +623,7 @@ private struct ConnectorView: View {
                                 model.checkForUpdate()
                             }
                             .disabled(model.isCheckingUpdate)
-                            .accessibilityLabel("Check for DevinX Connector updates")
+                            .accessibilityLabel("Check for Otterin Connector updates")
                         }
                         if let message = model.updateCheckMessage {
                             Text(message).font(.caption).foregroundStyle(.secondary)
@@ -639,13 +639,13 @@ private struct ConnectorView: View {
                                 .foregroundStyle(.blue)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Update available").font(.headline)
-                                Text("This update does not install automatically. Download the DMG, choose Quit DevinX Connector from the menu-bar menu, then drag the app into Applications and choose Replace. Reopen Connector. Your pairing is kept.")
+                                Text("This update does not install automatically. Download the DMG, choose Quit Otterin Connector from the menu-bar menu, then drag Otterin Connector into Applications and choose Replace. Reopen Otterin Connector. Your pairing is kept.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Text("Closing this window does not quit Connector. Updating the iPhone app does not update Connector.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text("\(update.tagName) is available from the official DevinX release page.")
+                                Text("\(update.tagName) is available from the official Otterin release page.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -684,8 +684,8 @@ private struct ConnectorView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 360, height: 360)
-                            .accessibilityLabel("DevinX iPhone pairing QR code")
-                        Text("On iPhone: DevinX → Settings → Local → Scan pairing code")
+                            .accessibilityLabel("Otterin iPhone pairing QR code")
+                        Text("On iPhone: Otterin → Your Mac → Pair a Mac → Scan pairing code")
                             .font(.callout)
                             .multilineTextAlignment(.center)
                         Text("The code refreshes automatically and is valid only for this local device.")
@@ -764,13 +764,13 @@ private struct ConnectorView: View {
                     }
                 }
 
-                Toggle("Open DevinX Connector when I log in", isOn: Binding(
+                Toggle("Open Otterin Connector when I log in", isOn: Binding(
                     get: { model.launchAtLogin },
                     set: { model.setLaunchAtLogin($0) }
                 ))
                 .toggleStyle(.switch)
 
-                Text("You can close this window. DevinX Connector keeps running from the menu bar until you choose Quit.")
+                Text("You can close this window. Otterin Connector keeps running from the menu bar until you choose Quit.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -779,12 +779,12 @@ private struct ConnectorView: View {
                     .font(.caption2.monospaced())
                     .foregroundStyle(.tertiary)
 
-                Button("Uninstall DevinX Connector", role: .destructive) {
+                Button("Uninstall Otterin Connector", role: .destructive) {
                     model.showingUninstallConfirmation = true
                 }
                 .disabled(model.status == .uninstalling)
                 .alert(
-                    "Uninstall DevinX Connector?",
+                    "Uninstall Otterin Connector?",
                     isPresented: $model.showingUninstallConfirmation
                 ) {
                     Button("Cancel", role: .cancel) {}
@@ -795,7 +795,7 @@ private struct ConnectorView: View {
                     )
                 }
 
-                Text("DevinX is an independent client and is not affiliated with Cognition AI.")
+                Text("Otterin is an independent, unofficial client and is not affiliated with Cognition AI.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
@@ -837,7 +837,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         let content = ConnectorView(model: model)
         let hostingController = NSHostingController(rootView: content)
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "DevinX Connector"
+        window.title = "Otterin Connector"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.styleMask.insert(.fullSizeContentView)
@@ -871,7 +871,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(
             systemSymbolName: "shippingbox.fill",
-            accessibilityDescription: "DevinX Connector"
+            accessibilityDescription: "Otterin Connector"
         )
         let menu = NSMenu()
         let statusMenuItem = NSMenuItem(title: model.status.label, action: nil, keyEquivalent: "")
@@ -879,13 +879,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         menu.addItem(statusMenuItem)
         menu.addItem(.separator())
         menu.addItem(
-            withTitle: "Open DevinX Connector",
+            withTitle: "Open Otterin Connector",
             action: #selector(openConnectorWindow),
             keyEquivalent: ""
         ).target = self
         menu.addItem(.separator())
         menu.addItem(
-            withTitle: "Quit DevinX Connector",
+            withTitle: "Quit Otterin Connector",
             action: #selector(quitConnector),
             keyEquivalent: "q"
         ).target = self

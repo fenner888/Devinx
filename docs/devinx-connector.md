@@ -1,15 +1,15 @@
-# DevinX Connector
+# Otterin Connector
 
-DevinX Connector is the optional local companion for users who want the DevinX iPhone app to access supported sessions on a computer they control. Cloud-only users do not install it.
+Otterin Connector is the optional local companion for users who want the Otterin iPhone app to access supported sessions on a computer they control. Cloud-only users do not install it.
 
 ## Why Tailscale is not enough by itself
 
 Local mode needs two different layers:
 
 1. **Tailscale supplies the private network route.** It lets the iPhone reach the computer over an encrypted tailnet.
-2. **DevinX Connector supplies the trusted local service.** It listens on that private route, communicates with a supported local Devin ACP capability, stores its identity and grants in platform-protected storage, authenticates each paired iPhone, and enforces separate read, steering, and session-creation permissions.
+2. **Otterin Connector supplies the trusted local service.** It listens on that private route, communicates with a supported local Devin ACP capability, stores its identity and grants in platform-protected storage, authenticates each paired iPhone, and enforces separate read, steering, and session-creation permissions.
 
-Tailscale does not start or provide that local service. Entering a Tailscale IP, server URL, or password would work only if compatible server software were already installed and running at that address. DevinX uses QR pairing instead of a shared password so each phone has its own cryptographic identity, permissions, and revocation path.
+Tailscale does not start or provide that local service. Entering a Tailscale IP, server URL, or password would work only if compatible server software were already installed and running at that address. Otterin uses QR pairing instead of a shared password so each phone has its own cryptographic identity, permissions, and revocation path.
 
 The separate Connector application is the current supported way to install and operate the required local bridge. A future supported desktop client could embed the same bridge, but local-computer access would still require that bridge function. Cloud-only users bypass this architecture and need neither Tailscale nor Connector.
 
@@ -17,15 +17,15 @@ The separate Connector application is the current supported way to install and o
 
 1. Choose the trusted package for the computer:
     - Apple-silicon macOS: download the signed DMG and checksum from the
-      [official DevinX release page](https://github.com/fenner888/Devinx/releases/latest).
+      [official Otterin Connector release page](https://github.com/fenner888/Devinx/releases/latest).
     - Windows 11 x64: install only
-      [DevinX Connector from Microsoft Store](https://apps.microsoft.com/detail/9N52Z3FVMFH8).
+      [Otterin Connector Microsoft Store listing](https://apps.microsoft.com/detail/9N52Z3FVMFH8).
       The package must be published by **DevinX Tools** with Store ID
       `9N52Z3FVMFH8`.
     Linux and Intel Mac packages remain unavailable.
-2. Install and open **DevinX Connector**.
+2. Install and open **Otterin Connector**.
 3. Connect the computer and iPhone to the same Tailscale network, then confirm that the connector shows Tailscale and Devin for Terminal.
-4. In the iPhone app, open **Settings → Local devices → Add local device → Scan pairing code**.
+4. In the iPhone app, open **Your Mac → Scan pairing code**.
 5. Scan the short-lived QR shown by the connector.
 6. Confirm the requesting iPhone name and choose its permissions on the computer.
 
@@ -41,8 +41,8 @@ npm run connector:build:macos
 
 Generated artifacts are ignored under `artifacts/connector/` so Expo OTA exports cannot delete the desktop bundle:
 
-- `DevinX Connector.app`
-- `DevinX-Connector-<version>-macos-<architecture>.dmg`
+- `Otterin Connector.app`
+- `Otterin-Connector-0.1.15-macos-<architecture>.dmg`
 - the matching `.sha256` file
 
 The local development build is ad-hoc signed. It is suitable for development and real-device validation on the build Mac, but it is not a public release. Public artifacts require a Developer ID signature, hardened runtime verification, notarization, stapling, provenance, and clean-machine Gatekeeper validation.
@@ -53,7 +53,7 @@ The macOS v1 update path is an explicit signed-DMG replacement. Connector checks
 official GitHub release feed and shows **Update available** when it validates a newer release tag
 and official release URL. The user still chooses when to open the release page, quit Connector,
 open the newer signed DMG, and replace the existing app in Applications. The stable Developer ID
-identity preserves Connector's Keychain access across legitimate replacements. DevinX never
+identity preserves Connector's Keychain access across legitimate replacements. Otterin never
 silently downloads or executes Connector updates.
 
 The iPhone app also performs an authenticated version handshake with each paired Connector. An old
@@ -72,9 +72,9 @@ inherits a stale `PATH`. Session operations remain unavailable until ACP is read
 requires a new QR pairing.
 
 Connector 0.1.5 extended the authenticated live local model catalog with the CLI's bounded display
-metadata. When Devin supplies a relative cost tier, DevinX shows the matching three-segment cost
+metadata. When Devin supplies a relative cost tier, Otterin shows the matching three-segment cost
 indicator; models explicitly marked free show a **Free** label. These are availability hints from
-the user's installed Devin CLI, not prices calculated or guessed by DevinX. Unknown or omitted
+the user's installed Devin CLI, not prices calculated or guessed by Otterin. Unknown or omitted
 metadata remains neutral and never blocks the catalog.
 
 Connector 0.1.4 introduced reliable catalog refresh by reading the installed CLI's account-scoped,
@@ -92,7 +92,7 @@ and paired-device grants, so a normal replacement does not require a new QR pair
 reconnection, or iPhone setup. New Local-mode installs receive 0.1.7 from the same official
 latest-release page. Cloud-only users do not install or update Connector.
 
-To remove the Connector, choose **Uninstall DevinX Connector** in the native app and confirm. The
+To remove the Connector, choose **Uninstall Otterin Connector** in the native app and confirm. The
 Connector stops its private listener before deleting its own Keychain identity and paired-iPhone
 permissions, unregisters launch at login, moves itself to Trash, and quits. Reinstalling requires a
 fresh QR pairing. If macOS cannot move a read-only or managed app bundle, the app reports that local
@@ -118,7 +118,7 @@ npm run connector:build:macos
 npm run connector:notarize:macos
 ```
 
-The builder checksum-verifies the pinned Node.js Foundation archive, then re-signs its runtime with the selected identity and only the JIT entitlement required by this fixed workload. It explicitly rejects `get-task-allow`, dynamic-loader, executable-page-protection, and library-validation exceptions. Public builds sign every DevinX-owned executable from the inside out with the stable Developer ID identity, seal the app with hardened runtime and a secure timestamp, and sign the DMG. Local ad-hoc builds preserve the Keychain helper's compiler identity so rebuilding does not silently invalidate access to existing development pairings. The notarization command fails closed unless the selected identity is a valid Developer ID Application certificate and the named `notarytool` profile works.
+The builder checksum-verifies the pinned Node.js Foundation archive, then re-signs its runtime with the selected identity and only the JIT entitlement required by this fixed workload. It explicitly rejects `get-task-allow`, dynamic-loader, executable-page-protection, and library-validation exceptions. Public builds sign every Otterin-owned executable from the inside out with the stable Developer ID identity, seal the app with hardened runtime and a secure timestamp, and sign the DMG. Local ad-hoc builds preserve the Keychain helper's compiler identity so rebuilding does not silently invalidate access to existing development pairings. The notarization command fails closed unless the selected identity is a valid Developer ID Application certificate and the named `notarytool` profile works.
 
 The release workflow submits the app ZIP first, requires an accepted response with an issue-free notary log, staples and Gatekeeper-checks the app, rebuilds the DMG around that stapled app, signs and verifies the DMG, submits it separately, staples it, and writes a final checksum plus `notarization-audit.json`. It does not use deprecated `altool` or accept ad-hoc/Apple Development identities.
 

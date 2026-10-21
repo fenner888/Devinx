@@ -24,7 +24,7 @@ The current release does not register the iPhone for remote push notifications a
 
 ## Paired-computer access
 
-When you explicitly pair a computer, Otterin can connect directly to DevinX Connector running on a computer you control. Pairing requires a short-lived QR code, explicit approval on the computer, and a unique iPhone signing key. Subsequent requests are signed, authenticated, replay-protected, rate-limited, input-validated, and authorized by the computer.
+When you explicitly pair a computer, Otterin can connect directly to Otterin Connector running on a computer you control. Pairing requires a short-lived QR code, explicit approval on the computer, and a unique iPhone signing key. Subsequent requests are signed, authenticated, replay-protected, rate-limited, input-validated, and authorized by the computer.
 
 The default grant exposes minimized session metadata. Separate per-device permissions can allow bounded user/Devin message history, sending text to a previously discovered session, and creating a session from a Connector-issued opaque workspace handle with an approved live model. Reading, sending, and creating are independent and can be removed separately. The Connector does not return raw local session identifiers, full filesystem paths, other directories, agent thoughts, tool inputs or outputs, commands, local files, API credentials, or unknown ACP metadata.
 
@@ -38,7 +38,7 @@ The installed app may contact Expo over encrypted TLS to check for a compatible 
 
 ## Your controls and deletion
 
-Disconnecting a computer from Otterin removes its pairing key from the iPhone. Wipe all local data to clear cached session data as well. You can revoke an iPhone from DevinX Connector to end that device's access to the Mac. Removing local Otterin data does not delete sessions or account data stored on your Mac.
+Disconnecting a computer from Otterin removes its pairing key from the iPhone. Wipe all local data to clear cached session data as well. You can revoke an iPhone from Otterin Connector to end that device's access to the Mac. Removing local Otterin data does not delete sessions or account data stored on your Mac.
 
 Camera access is requested only when you choose to scan a Connector QR code. You can deny or later revoke that permission in iOS Settings. Otterin does not capture a photo or video while scanning a Connector QR code.
 

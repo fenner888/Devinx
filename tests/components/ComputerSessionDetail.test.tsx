@@ -352,7 +352,7 @@ describe('Computer session detail', () => {
     expect(screen.queryByText('Devin needs your input')).toBeNull();
     expect(
       screen.getByText(
-        'Update DevinX Connector on this local device to answer structured Devin questions from your iPhone.',
+        'Update Otterin Connector on this local device to answer structured Devin questions from your iPhone.',
       ),
     ).toBeTruthy();
   });

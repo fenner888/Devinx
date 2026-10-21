@@ -9,6 +9,7 @@ namespace DevinX.Connector.WindowsInstaller;
 internal static class Program
 {
     private const string ProductName = "DevinX Connector";
+    private const string ApplicationDisplayName = "Otterin Connector";
     private const string ProductVersion = "0.1.0";
     private const string PayloadResourceName = "DevinXConnectorPayload.zip";
     private const string ApplicationExecutableName = "DevinX Connector.exe";
@@ -69,7 +70,7 @@ internal static class Program
             if (options.UninstallFinal)
             {
                 UninstallFinal();
-                return Succeed(options.Quiet, "DevinX Connector was removed from this Windows account.");
+                return Succeed(options.Quiet, "Otterin Connector was removed from this Windows account.");
             }
             if (options.Uninstall)
             {
@@ -79,23 +80,23 @@ internal static class Program
             if (!options.Quiet)
             {
                 var choice = MessageBox.Show(
-                    "Install DevinX Connector for this Windows account?\n\n"
+                    "Install Otterin Connector for this Windows account?\n\n"
                     + "Connector runs only when you open it or enable its visible launch-at-sign-in setting. "
                     + "It does not install an Administrator service.",
-                    "Install DevinX Connector",
+                    ApplicationDisplayName,
                     MessageBoxButtons.OKCancel,
                     MessageBoxIcon.Information);
                 if (choice != DialogResult.OK) return 0;
             }
 
             Install(options.NoLaunch);
-            return Succeed(options.Quiet, "DevinX Connector is installed and ready to open.");
+            return Succeed(options.Quiet, "Otterin Connector is installed and ready to open.");
         }
         catch
         {
             return Fail(
                 options.Quiet,
-                "DevinX Connector could not be installed safely. No credentials were requested or changed.");
+                "Otterin Connector could not be installed safely. No credentials were requested or changed.");
         }
     }
 
@@ -281,7 +282,7 @@ internal static class Program
     private static void RegisterUninstaller()
     {
         using var key = Registry.CurrentUser.CreateSubKey(UninstallRegistryPath, writable: true);
-        key.SetValue("DisplayName", ProductName);
+        key.SetValue("DisplayName", ApplicationDisplayName);
         key.SetValue("DisplayVersion", ProductVersion);
         key.SetValue("Publisher", "DevinX");
         key.SetValue("InstallLocation", InstallRoot);
@@ -298,7 +299,7 @@ internal static class Program
         var shortcut = (IShellLinkW)new ShellLink();
         shortcut.SetPath(Path.Combine(InstallRoot, ApplicationExecutableName));
         shortcut.SetWorkingDirectory(InstallRoot);
-        shortcut.SetDescription("Open DevinX Connector");
+        shortcut.SetDescription("Open Otterin Connector");
         shortcut.SetIconLocation(Path.Combine(InstallRoot, ApplicationExecutableName), 0);
         ((IPersistFile)shortcut).Save(StartMenuShortcut, remember: false);
         Marshal.FinalReleaseComObject(shortcut);
@@ -409,13 +410,13 @@ internal static class Program
 
     private static int Succeed(bool quiet, string message)
     {
-        if (!quiet) MessageBox.Show(message, ProductName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        if (!quiet) MessageBox.Show(message, ApplicationDisplayName, MessageBoxButtons.OK, MessageBoxIcon.Information);
         return 0;
     }
 
     private static int Fail(bool quiet, string message)
     {
-        if (!quiet) MessageBox.Show(message, ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        if (!quiet) MessageBox.Show(message, ApplicationDisplayName, MessageBoxButtons.OK, MessageBoxIcon.Error);
         return 1;
     }
 

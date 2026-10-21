@@ -59,13 +59,13 @@ function localOptionsFailureCopy(error: unknown): { title: string; message: stri
   if (code === 'permission_denied' || code === 'authorization_failed' || code === 'not_paired') {
     return {
       title: 'Connector permission required',
-      message: 'Open DevinX Connector locally and enable Create new sessions for this iPhone.',
+      message: 'Open Otterin Connector locally and enable Create new sessions for this iPhone.',
     };
   }
   return {
     title: 'Local options unavailable',
     message:
-      'DevinX Connector could not load workspaces and models. Confirm Connector and Devin for Terminal are ready, then try again.',
+      'Otterin Connector could not load workspaces and models. Confirm Connector and Devin for Terminal are ready, then try again.',
   };
 }
 
@@ -412,7 +412,7 @@ export default function HomeScreen() {
             >
               <Ionicons name="lock-closed-outline" size={18} color={tokens.textMid.hex} />
               <Text className="mx-3 flex-1 text-text-mid text-text13 leading-5">
-                {`This device can view sessions but can't start them — change permissions in DevinX Connector on ${computer?.computerName ?? 'your Mac'}`}
+                {`This device can view sessions but can't start them — change permissions in Otterin Connector on ${computer?.computerName ?? 'your Mac'}`}
               </Text>
               <Ionicons name="chevron-forward" size={15} color={tokens.textLow.hex} />
             </Pressable>

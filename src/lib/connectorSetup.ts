@@ -4,33 +4,33 @@ export const CONNECTOR_RELEASE_PAGE = branding.links.connectorReleases;
 export const WINDOWS_CONNECTOR_STORE_PAGE = branding.links.windowsConnectorStore;
 
 export const CONNECTOR_UPDATE_NOTICE =
-  'Updating Otterin on your iPhone does not update DevinX Connector on your local device.';
+  'Updating Otterin on your iPhone does not update Otterin Connector on your local device.';
 export const MAC_CONNECTOR_UPDATE_STEPS =
-  'On your Mac: download the latest official DMG. Choose Quit DevinX Connector from its menu-bar menu, open the DMG, drag DevinX Connector into Applications and choose Replace. Reopen Connector. Closing its window alone does not quit it. Your pairing is kept.';
+  'On your Mac: download the latest official DMG. Choose Quit Otterin Connector from its menu-bar menu, open the DMG, drag Otterin Connector into Applications and choose Replace. Reopen Otterin Connector. Closing its window alone does not quit it. Your pairing is kept.';
 export const WINDOWS_CONNECTOR_UPDATE_STEPS =
-  'On your Windows PC: open DevinX Connector in Microsoft Store, install any available update, then reopen Connector. Your pairing is kept.';
+  'On your Windows PC: open the official Microsoft Store listing, install any available update, then reopen Otterin Connector. Your pairing is kept.';
 
-export const CONNECTOR_SETUP_PROMPT = `Set up DevinX Connector on this local device so I can securely connect the Otterin iPhone app to supported local Devin sessions through Tailscale.
+export const CONNECTOR_SETUP_PROMPT = `Set up Otterin Connector on this local device so I can securely connect the Otterin iPhone app to supported local Devin sessions through Tailscale.
 
-Before downloading anything, explain that Tailscale supplies only the private network route. DevinX Connector is the trusted local service that communicates with a supported local Devin ACP capability, authenticates this iPhone, and enforces its permissions. A Tailscale IP, server URL, or password cannot replace a compatible service running on this local device.
+Before downloading anything, explain that Tailscale supplies only the private network route. Otterin Connector is the trusted local service that communicates with a supported local Devin ACP capability, authenticates this iPhone, and enforces its permissions. A Tailscale IP, server URL, or password cannot replace a compatible service running on this local device.
 
 Detect whether this local device is running macOS or Windows.
 
-On macOS, open the official DevinX Connector release page at ${CONNECTOR_RELEASE_PAGE}. Download Connector only when that page provides the signed Apple-silicon DMG plus its adjacent SHA-256 checksum. Verify the checksum, require a Developer ID Application signature, confirm Apple notarization, and require Gatekeeper acceptance.
+On macOS, open the official Otterin Connector release page at ${CONNECTOR_RELEASE_PAGE}. Download Connector only when that page provides the signed Apple-silicon DMG plus its adjacent SHA-256 checksum. Verify the checksum, require a Developer ID Application signature, confirm Apple notarization, and require Gatekeeper acceptance.
 
 If Connector is already installed, explain the update steps: ${CONNECTOR_UPDATE_NOTICE} ${MAC_CONNECTOR_UPDATE_STEPS} ${WINDOWS_CONNECTOR_UPDATE_STEPS} Follow only the steps for the detected operating system. Do not uninstall Connector or erase its pairing data to update it.
 
-On Windows 11 x64, open the official Microsoft Store listing at ${WINDOWS_CONNECTOR_STORE_PAGE}. Install only the Store package named DevinX Connector, published by DevinX Tools, with Store ID 9N52Z3FVMFH8. After installation, confirm that Get-AppxPackage reports package identity DevinXTools.DevinXConnector, publisher CN=43D84E24-857C-4C40-9DAA-1A6983913CD9, and package family DevinXTools.DevinXConnector_ydtgrt4yd5wrc. Do not download, sideload, or execute an unsigned CI MSIX, EXE, or ZIP.
+On Windows 11 x64, open the official Microsoft Store listing at ${WINDOWS_CONNECTOR_STORE_PAGE}. Install only the verified Store package linked there, published by DevinX Tools, with Store ID 9N52Z3FVMFH8. After installation, confirm that Get-AppxPackage reports package identity DevinXTools.DevinXConnector, publisher CN=43D84E24-857C-4C40-9DAA-1A6983913CD9, and package family DevinXTools.DevinXConnector_ydtgrt4yd5wrc. Do not download, sideload, or execute an unsigned CI MSIX, EXE, or ZIP.
 
-If the required official distribution is unavailable for this platform, or any identity, signature, checksum, notarization, or Gatekeeper check applicable to it fails, stop and tell me that DevinX Connector cannot be safely installed. Do not clone or build the source, install a guessed package, use an unofficial repository or mirror, or substitute a similarly named application.
+If the required official distribution is unavailable for this platform, or any identity, signature, checksum, notarization, or Gatekeeper check applicable to it fails, stop and tell me that Otterin Connector cannot be safely installed. Do not clone or build the source, install a guessed package, use an unofficial repository or mirror, or substitute a similarly named application.
 
 Confirm that an official local Devin installation exposes the ACP capability required by Connector. You may locate its executable, but do not read, copy, print, log, or modify its credentials. If the required ACP capability is unavailable on this operating system, stop instead of claiming local sessions will work.
 
 Confirm that Tailscale is installed and connected on this local device. If it is missing, use only Tailscale's official installation guidance for the detected operating system. If authentication is required, open the official interactive login and let me complete it. Never request, generate, print, or persist a reusable Tailscale authentication key.
 
-Install DevinX Connector for the signed-in user and open it. On macOS, install it in /Applications. On Windows, use only the Microsoft Store package and do not create an administrator service. Do not run it as root or Administrator, bind it to 0.0.0.0, expose a public listener, install a public tunnel, or weaken its QR pairing and per-device authorization. Do not enable launch at login without showing me the Connector's visible setting and receiving my approval.
+Install Otterin Connector for the signed-in user and open it. On macOS, install it in /Applications. On Windows, use only the Microsoft Store package and do not create an administrator service. Do not run it as root or Administrator, bind it to 0.0.0.0, expose a public listener, install a public tunnel, or weaken its QR pairing and per-device authorization. Do not enable launch at login without showing me the Connector's visible setting and receiving my approval.
 
-Verify that Connector reports an active private Tailscale connection and detects a supported local Devin ACP capability. Then tell me to return to Otterin on my iPhone, name this local device, and tap Scan pairing code.
+Verify that Connector reports an active private Tailscale connection and detects a supported local Devin ACP capability. Then tell me to open Otterin on my iPhone and choose **Your Mac → Scan pairing code**.
 
 After I scan the code, leave device approval and every read, steering, or session-creation grant to the Connector UI on this local device. Do not approve any permission on my behalf. Once pairing is complete, explain that I may close the window while Connector remains available from its macOS menu-bar icon or Windows notification-area icon.
 

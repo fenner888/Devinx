@@ -69,12 +69,12 @@ export function ComputerPermissionsSheet(props: {
             </View>
           ))}
           <Text className="mt-3 text-text-mid text-text13 leading-5">
-            Permissions are managed in DevinX Connector on {computerName}. Open it and change
+            Permissions are managed in Otterin Connector on {computerName}. Open it and change
             what this iPhone is allowed to do — you don't need to pair again.
           </Text>
           {source === 'pairing' && (
             <Text className="mt-2 text-text-low text-text12 leading-4">
-              Shown as granted when this iPhone was paired. Update DevinX Connector to see its
+              Shown as granted when this iPhone was paired. Update Otterin Connector to see its
               current permissions.
             </Text>
           )}

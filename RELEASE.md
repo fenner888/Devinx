@@ -1,4 +1,4 @@
-# Releasing Otterin and DevinX Connector
+# Releasing Otterin and Otterin Connector
 
 This document separates verified release evidence from work that still requires a physical device, Apple credentials, or explicit release approval. Never publish publicly or submit App Review from these instructions without the owner's approval.
 
@@ -22,7 +22,7 @@ npx expo export --platform ios --output-dir /tmp/devinx-production-export
 npm audit --json
 ```
 
-Use the pinned Node version from `.nvmrc` (`24.18.0`). It matches the checksum-verified runtime packaged with DevinX Connector and supports the built-in read-only SQLite API used for local history. Other odd-numbered or unsupported Node releases can produce dependency engine warnings even when the checks happen to pass.
+Use the pinned Node version from `.nvmrc` (`24.18.0`). It matches the checksum-verified runtime packaged with Otterin Connector and supports the built-in read-only SQLite API used for local history. Other odd-numbered or unsupported Node releases can produce dependency engine warnings even when the checks happen to pass.
 
 Record results in `docs/release-readiness.md`. Review every dependency finding instead of applying a breaking `npm audit fix --force`. Before a public release, also complete the authorization matrix, secret scan, dead-code review, privacy-label review, and physical-device checklist.
 
@@ -30,7 +30,7 @@ Record results in `docs/release-readiness.md`. Review every dependency finding i
 
 Using the TestFlight build intended for release:
 
-1. Pair through Tailscale with DevinX Connector.
+1. Pair through Tailscale with Otterin Connector.
 2. On the Mac, grant **Read session content** and **Send messages** only to the test iPhone.
 3. Verify Local Home workspaces/models, Local session history, and single- and multi-Mac pairing.
 4. Open a computer session, load bounded history, send a harmless prompt, and verify refreshed history.
@@ -41,6 +41,9 @@ Using the TestFlight build intended for release:
 Do not use production credentials or a destructive prompt for this checkpoint.
 
 ## macOS Connector distribution
+
+Connector 0.1.15 artifacts are `Otterin Connector.app` and
+`Otterin-Connector-0.1.15-macos-${architecture}.dmg`.
 
 The July 14, 2026 Apple-silicon Connector candidate is signed with **Developer ID Application: Mark
 Fenner (Q7H78WYTAR)**, accepted by Apple's notarization service, stapled, and accepted by Gatekeeper.
@@ -94,7 +97,7 @@ Push notifications are not implemented in v1. The app does not request notificat
 
 **Description:**
 
-> Start and steer local Devin for Terminal sessions from your iPhone. Pair with DevinX Connector on your Mac over Tailscale to review approved session history, follow live updates, send prompts, and answer approvals and questions. Speak detailed prompts with on-device voice.
+> Start and steer local Devin for Terminal sessions from your iPhone. Pair with Otterin Connector on your Mac over Tailscale to review approved session history, follow live updates, send prompts, and answer approvals and questions. Speak detailed prompts with on-device voice.
 >
 > Your Devin sign-in stays on your Mac. Otterin keeps only its pairing key in iOS Keychain and sends approved session requests directly to your paired Mac.
 >
@@ -102,7 +105,7 @@ Push notifications are not implemented in v1. The app does not request notificat
 
 **Review notes:**
 
-> This app requires a Mac running Devin for Terminal and DevinX Connector. Pair the review iPhone by scanning a short-lived QR code and approving it in Connector on the Mac. Connector permissions are granted by the reviewer on the Mac. No Devin sign-in credential is entered or stored in Otterin.
+> This app requires a Mac running Devin for Terminal and Otterin Connector. Pair the review iPhone by scanning a short-lived QR code and approving it in Connector on the Mac. Connector permissions are granted by the reviewer on the Mac. No Devin sign-in credential is entered or stored in Otterin.
 
 **Privacy labels draft:**
 
@@ -121,4 +124,4 @@ The final privacy labels must be checked against the exact production configurat
 
 ## Intentionally web-owned or deferred
 
-Cloud sessions, Cloud authentication, integrations, repository management, usage and billing, and other Cloud controls are outside Otterin; Devin's official app covers Cloud workflows. Otterin is limited to sessions on a Mac explicitly paired through DevinX Connector.
+Cloud sessions, Cloud authentication, integrations, repository management, usage and billing, and other Cloud controls are outside Otterin; Devin's official app covers Cloud workflows. Otterin is limited to sessions on a Mac explicitly paired through Otterin Connector.

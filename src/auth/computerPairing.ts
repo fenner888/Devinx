@@ -244,7 +244,7 @@ export class ComputerPairingOfferError extends Error {
       code === 'pairing_code_expired'
         ? 'The pairing code has expired or has an invalid clock'
         : code === 'pairing_version_incompatible'
-          ? 'The pairing code requires compatible Otterin and DevinX Connector versions'
+          ? 'The pairing code requires compatible Otterin and Otterin Connector versions'
           : 'The pairing code is invalid',
     );
   }

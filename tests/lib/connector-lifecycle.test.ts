@@ -30,8 +30,8 @@ describe('macOS Connector lifecycle', () => {
     );
     expect(connectorSource).toContain('window.isReleasedWhenClosed = false');
     expect(connectorSource).toContain('NSStatusBar.system.statusItem');
-    expect(connectorSource).toContain('Open DevinX Connector');
-    expect(connectorSource).toContain('Quit DevinX Connector');
+    expect(connectorSource).toContain('Open Otterin Connector');
+    expect(connectorSource).toContain('Quit Otterin Connector');
     expect(connectorSource).toContain('NSApplication.shared.setActivationPolicy(.accessory)');
   });
 
@@ -67,7 +67,9 @@ describe('macOS Connector lifecycle', () => {
     expect(connectorSource).toMatch(/func runtimeDidTerminate[^{]+\{\s*clearPairingCode\(\)/);
     expect(connectorSource).toMatch(/case "pairing_offer":[\s\S]*?pendingPairingId = nil/);
     expect(connectorSource).toContain('pairingCodeLifetime.consumeExpiry(now: Date())');
-    expect(connectorSource).toContain('Settings → Local → Scan pairing code');
+    expect(connectorSource).toContain(
+      'On iPhone: Otterin → Your Mac → Pair a Mac → Scan pairing code',
+    );
     expect(connectorSource).not.toContain('Settings → Computers');
   });
 });

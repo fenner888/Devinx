@@ -1,13 +1,14 @@
-# DevinX Connector for Windows — physical test checklist
+# Otterin Connector for Windows — physical test checklist
 
 Status: required acceptance evidence for the Windows 11 x64 public test track.
 
 ## Use only the verified Store package
 
-Install [DevinX Connector from Microsoft Store](https://apps.microsoft.com/detail/9N52Z3FVMFH8).
+Install [Otterin Connector from Microsoft Store](https://apps.microsoft.com/detail/9N52Z3FVMFH8).
 Confirm all of the following before pairing:
 
-- product name: **DevinX Connector**
+- in-app product name: **Otterin Connector**
+- Microsoft Store listing name: **DevinX Connector** (reserved Store identity)
 - publisher: **DevinX Tools**
 - Store ID: `9N52Z3FVMFH8`
 - version: `0.1.7.0` or newer
@@ -22,7 +23,7 @@ pairing QR, device credential, Devin credential, Tailscale key, or unredacted di
 - Confirm `devin --version` works in a normal, non-administrator terminal for the signed-in user.
 - Install Tailscale on the Windows PC and iPhone, sign both into the same tailnet, and leave
   Tailscale connected.
-- Install the current DevinX TestFlight build on the iPhone.
+- Install the current Otterin TestFlight build on the iPhone.
 
 Record the Windows build, Connector version, Devin CLI version, and iPhone build before testing.
 
@@ -39,12 +40,12 @@ Record the Windows build, Connector version, Devin CLI version, and iPhone build
 - Quit and reopen Connector twice. Confirm the pairing code continues to render and no manual
   runtime installation or administrator prompt appears.
 - Close the window and confirm Connector remains available from the notification-area icon.
-- Choose **Quit DevinX Connector** and confirm the listener stops.
+- Choose **Quit Otterin Connector** and confirm the listener stops.
 
 ### 2. Pairing and permission separation
 
 - Reopen Connector and generate a fresh code.
-- In DevinX, open **Settings → Local devices → Add local device** and scan the code.
+- In Otterin, open **Your Mac → Scan pairing code**.
 - Deny one pairing request and confirm the phone receives a recoverable failure.
 - Generate a new code, approve the named iPhone, and grant read access only.
 - Confirm session titles/history load but sending and creating remain unavailable.
@@ -66,7 +67,7 @@ Record the Windows build, Connector version, Devin CLI version, and iPhone build
 - Trigger an `AskUserQuestion` request, answer it on the iPhone, and confirm the local session
   continues.
 - Change or refresh the model catalog and confirm a failed refresh preserves the prior valid list.
-- Lock a session from another client and confirm DevinX reports a recoverable in-use state rather
+- Lock a session from another client and confirm Otterin reports a recoverable in-use state rather
   than duplicating work.
 
 ### 4. Connectivity and recovery

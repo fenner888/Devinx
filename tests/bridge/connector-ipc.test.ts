@@ -43,7 +43,7 @@ function controllerPlatform(): ConnectorPlatformAdapter {
   };
 }
 
-describe('DevinX Connector platform and IPC boundary', () => {
+describe('Otterin Connector platform and IPC boundary', () => {
   it('requires an active Tailscale address without a LAN fallback', () => {
     expect(
       selectPreferredConnectorAddress([

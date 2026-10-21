@@ -21,9 +21,9 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '..', '..');
 const outputRoot = resolve(repositoryRoot, 'artifacts', 'connector');
 const architecture = arch() === 'arm64' ? 'arm64' : arch() === 'x64' ? 'x64' : null;
-const appName = 'DevinX Connector.app';
+const appName = 'Otterin Connector.app';
 const appRoot = resolve(outputRoot, appName);
-const dmgPath = resolve(outputRoot, `DevinX-Connector-0.1.14-macos-${architecture}.dmg`);
+const dmgPath = resolve(outputRoot, `Otterin-Connector-0.1.15-macos-${architecture}.dmg`);
 const checksumPath = `${dmgPath}.sha256`;
 const auditPath = resolve(outputRoot, 'verification-audit.json');
 const expectedLicense = readFileSync(resolve(repositoryRoot, 'LICENSE'), 'utf8');
@@ -101,8 +101,14 @@ function validateApp(app) {
   if (plistValue(app, 'CFBundleIdentifier') !== 'com.devinx.connector') {
     throw new Error('Unexpected Connector bundle identifier');
   }
-  if (plistValue(app, 'CFBundleShortVersionString') !== '0.1.14') {
+  if (plistValue(app, 'CFBundleShortVersionString') !== '0.1.15') {
     throw new Error('Unexpected Connector marketing version');
+  }
+  if (
+    plistValue(app, 'CFBundleDisplayName') !== 'Otterin Connector' ||
+    plistValue(app, 'CFBundleName') !== 'Otterin Connector'
+  ) {
+    throw new Error('Unexpected Connector display name');
   }
   if (plistValue(app, 'LSMinimumSystemVersion') !== '13.0') {
     throw new Error('Unexpected Connector minimum macOS version');

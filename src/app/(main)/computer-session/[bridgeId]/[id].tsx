@@ -113,7 +113,7 @@ function publicErrorMessage(error: unknown): string {
   if (error.code === 'rate_limited') {
     return 'The paired local device is busy. Wait a moment and try again.';
   }
-  return 'Open DevinX Connector and confirm the secure local connection is available.';
+  return 'Open Otterin Connector and confirm the secure local connection is available.';
 }
 
 export function promptErrorMessage(error: unknown): string {
@@ -133,7 +133,7 @@ export function promptErrorMessage(error: unknown): string {
     return 'Too many requests were sent. Wait a moment and try again.';
   }
   if (error.code === 'unavailable') {
-    return 'DevinX Connector is temporarily unavailable. Confirm it is running on your local device.';
+    return 'Otterin Connector is temporarily unavailable. Confirm it is running on your local device.';
   }
   return 'The message could not be sent. Try again.';
 }
@@ -841,7 +841,7 @@ export default function ComputerSessionDetailScreen() {
                   <View className="mb-4 flex-row items-start rounded-card border border-border-subtle bg-surface1 px-3 py-3">
                     <Ionicons name="download-outline" size={16} color={tokens.brandText.hex} />
                     <Text className="ml-2 flex-1 text-text-mid text-text12 leading-4">
-                      Update DevinX Connector on this local device to answer structured Devin questions from
+                      Update Otterin Connector on this local device to answer structured Devin questions from
                       your iPhone.
                     </Text>
                   </View>
