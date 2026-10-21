@@ -19,6 +19,26 @@ import {
   type PairedComputerSummary,
 } from '../../src/auth/pairedComputers';
 
+const ORIGINAL_DEV = Reflect.get(globalThis, '__DEV__') as unknown;
+const ORIGINAL_FIXTURE_ENV = process.env.EXPO_PUBLIC_SCREENSHOT_FIXTURES;
+
+function restoreFixtureEnvironment() {
+  if (ORIGINAL_DEV === undefined) {
+    Reflect.deleteProperty(globalThis, '__DEV__');
+  } else {
+    Object.defineProperty(globalThis, '__DEV__', {
+      configurable: true,
+      value: Boolean(ORIGINAL_DEV),
+      writable: true,
+    });
+  }
+  if (ORIGINAL_FIXTURE_ENV === undefined) {
+    delete process.env.EXPO_PUBLIC_SCREENSHOT_FIXTURES;
+  } else {
+    process.env.EXPO_PUBLIC_SCREENSHOT_FIXTURES = ORIGINAL_FIXTURE_ENV;
+  }
+}
+
 function ConnectionProbe() {
   const { isConfigured, isLoading, disconnectAll } = useConnections();
   return (
@@ -83,5 +103,34 @@ describe('ConnectionProvider', () => {
       </ConnectionProvider>,
     );
     await waitFor(() => expect(pairedScreen.getByTestId('configured').props.children).toBe('true'));
+  });
+
+  it('opens with the fixture paired Mac after the launch refresh', async () => {
+    Object.defineProperty(globalThis, '__DEV__', {
+      configurable: true,
+      value: true,
+      writable: true,
+    });
+    process.env.EXPO_PUBLIC_SCREENSHOT_FIXTURES = '1';
+    jest.mocked(loadPairedComputerSummaries).mockResolvedValue([
+      {
+        bridgeId: 'fixture_studio_mac_0001',
+        computerName: 'Studio Mac',
+        pairedAt: 0,
+        permissions: ['bridge:health', 'session:create'],
+        transportKind: 'tailscale_vpn',
+      },
+    ]);
+
+    const screen = render(
+      <ConnectionProvider>
+        <ConnectionProbe />
+      </ConnectionProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading').props.children).toBe('false'));
+    expect(screen.getByTestId('configured').props.children).toBe('true');
+    expect(wipeLegacyCloudCredentials).toHaveBeenCalledTimes(1);
+    restoreFixtureEnvironment();
   });
 });

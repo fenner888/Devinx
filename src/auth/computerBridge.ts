@@ -13,6 +13,12 @@ import {
   storePairedComputers,
   type PairedComputerCredential,
 } from './pairedComputers';
+import {
+  createScreenshotFixtureData,
+  isScreenshotFixtureMode,
+  SCREENSHOT_FIXTURE_BRIDGE_ID,
+  SCREENSHOT_FIXTURE_SESSION_IDS,
+} from './screenshotFixtures';
 
 const BRIDGE_PROTOCOL_VERSION = 2 as const;
 const REQUEST_LIFETIME_MS = 15_000;
@@ -89,7 +95,7 @@ const bridgeFeaturesBodySchema = z
   .strict();
 const bridgePlatformBodySchema = z.object({}).strict();
 const bridgeVersionBodySchema = z.object({}).strict();
-const computerBridgeFeaturesSchema = z
+export const computerBridgeFeaturesSchema = z
   .object({
     sessionElicitation: z.boolean(),
     activityTimeline: z.boolean().optional(),
@@ -102,11 +108,11 @@ const computerGrantsSchema = z
     sendPrompts: z.boolean(),
     startSessions: z.boolean(),
   });
-const computerBridgePresentationSchema = z.object({
+export const computerBridgePresentationSchema = z.object({
   messageTimestamps: z.boolean(),
   grants: computerGrantsSchema.strict(),
 }).passthrough();
-const computerBridgePlatformSchema = z
+export const computerBridgePlatformSchema = z
   .object({ platform: z.enum(['macos', 'windows', 'linux']) })
   .strict();
 export const computerBridgeVersionSchema = z
@@ -185,7 +191,7 @@ export const computerActivityEntrySchema = z
     endedAt: z.number().int().nonnegative().optional(),
   })
   .strict();
-const computerSessionActivitySchema = z
+export const computerSessionActivitySchema = z
   .object({
     active: z.boolean(),
     kind: computerSessionActivityKindSchema,
@@ -227,7 +233,7 @@ const elicitationValueSchema = z.union([
   z.boolean(),
   z.array(z.string().max(500)).max(100),
 ]);
-const computerSessionElicitationSchema = z
+export const computerSessionElicitationSchema = z
   .object({
     interaction: z
       .object({
@@ -295,10 +301,10 @@ const sessionElicitationResponseBodySchema = z.union([
     })
     .strict(),
 ]);
-const sessionElicitationResponseSchema = z.object({ accepted: z.literal(true) }).strict();
+export const sessionElicitationResponseSchema = z.object({ accepted: z.literal(true) }).strict();
 const sessionPermissionBodySchema = z.object({ sessionId: localSessionIdSchema }).strict();
 const sessionPermissionDecisionSchema = z.enum(['allow_once', 'allow_session', 'reject_once']);
-const computerSessionPermissionSchema = z
+export const computerSessionPermissionSchema = z
   .object({
     permission: z
       .object({
@@ -324,7 +330,7 @@ const sessionPermissionResponseBodySchema = z
     decision: sessionPermissionDecisionSchema,
   })
   .strict();
-const sessionPermissionResponseSchema = z.object({ accepted: z.literal(true) }).strict();
+export const sessionPermissionResponseSchema = z.object({ accepted: z.literal(true) }).strict();
 const sessionPromptBodySchema = z
   .object({
     sessionId: localSessionIdSchema,
@@ -332,7 +338,7 @@ const sessionPromptBodySchema = z
     modelId: modelIdSchema.optional(),
   })
   .strict();
-const sessionPromptResponseSchema = z
+export const sessionPromptResponseSchema = z
   .object({ accepted: z.literal(true), sessionId: localSessionIdSchema.optional() })
   .strict();
 const sessionCreateOptionsBodySchema = z
@@ -340,7 +346,7 @@ const sessionCreateOptionsBodySchema = z
     refresh: z.boolean().optional(),
   })
   .strict();
-const sessionCreateOptionsResponseSchema = z
+export const sessionCreateOptionsResponseSchema = z
   .object({
     workspaces: z
       .array(z.object({ id: workspaceIdSchema, name: z.string().min(1).max(160) }).strict())
@@ -377,7 +383,7 @@ const sessionCreateBodySchema = z
     text: z.string().trim().min(1).max(10_000),
   })
   .strict();
-const sessionCreateResponseSchema = z
+export const sessionCreateResponseSchema = z
   .object({ accepted: z.literal(true), sessionId: localSessionIdSchema })
   .strict();
 
@@ -1138,9 +1144,144 @@ function connectionForCredential(credential: PairedComputerCredential): Computer
   };
 }
 
+function requireScreenshotFixtureBridge(bridgeId: string): void {
+  opaqueIdSchema.parse(bridgeId);
+  if (bridgeId !== SCREENSHOT_FIXTURE_BRIDGE_ID) {
+    throw new ComputerBridgeError('This local device is not paired.', 'not_paired');
+  }
+}
+
+function connectionForScreenshotFixture(bridgeId: string): ComputerBridgeConnection {
+  requireScreenshotFixtureBridge(bridgeId);
+  return {
+    bridgeId,
+    getHealth: async () =>
+      computerBridgeHealthSchema.parse(createScreenshotFixtureData().health),
+    getFeatures: async () =>
+      computerBridgeFeaturesSchema.parse(createScreenshotFixtureData().features),
+    getVersion: async () => {
+      const { version } = computerBridgeVersionSchema.parse(
+        createScreenshotFixtureData().version,
+      );
+      return { kind: 'supported', version };
+    },
+    listSessions: async (input = {}) => {
+      const body = sessionListBodySchema.parse(input);
+      const fixture = createScreenshotFixtureData();
+      return computerSessionPageSchema.parse(
+        body.cursor ? { sessions: [] } : fixture.sessionPage,
+      );
+    },
+    loadSession: async (sessionId) => {
+      const parsedSessionId = localSessionIdSchema.parse(sessionId);
+      const fixture = createScreenshotFixtureData();
+      const loaded = fixture.loadedSessions[parsedSessionId];
+      if (loaded) return computerLoadedSessionSchema.parse(loaded);
+
+      const page = computerSessionPageSchema.parse(fixture.sessionPage);
+      const summary = page.sessions.find(({ id }) => id === parsedSessionId);
+      if (!summary) {
+        throw new ComputerBridgeError(
+          'The paired local device returned an invalid session identifier.',
+          'invalid_request',
+        );
+      }
+      return computerLoadedSessionSchema.parse({
+        session: {
+          id: parsedSessionId,
+          origin: 'computer',
+          workspaceName: summary.workspaceName,
+          ...(summary.model ? { model: summary.model } : {}),
+        },
+        messages: [
+          {
+            sequence: 1,
+            source: 'devin',
+            text: `${summary.title ?? summary.workspaceName} is complete.`,
+            createdAt: Date.parse(summary.updatedAt ?? new Date().toISOString()),
+          },
+        ],
+        truncated: false,
+      });
+    },
+    getSessionActivity: async (sessionId) => {
+      const parsedSessionId = localSessionIdSchema.parse(sessionId);
+      const fixture = createScreenshotFixtureData();
+      return computerSessionActivitySchema.parse(
+        fixture.sessionActivities[parsedSessionId] ?? {
+          active: false,
+          kind: 'responding',
+          label: 'Completed',
+          updatedAt: Date.now(),
+        },
+      );
+    },
+    getSessionElicitation: async (sessionId) => {
+      const parsedSessionId = localSessionIdSchema.parse(sessionId);
+      const fixture = createScreenshotFixtureData();
+      return computerSessionElicitationSchema.parse({
+        interaction:
+          parsedSessionId === SCREENSHOT_FIXTURE_SESSION_IDS.question
+            ? fixture.elicitation.interaction
+            : null,
+      });
+    },
+    respondToSessionElicitation: async (input) => {
+      sessionElicitationResponseBodySchema.parse(input);
+      sessionElicitationResponseSchema.parse(
+        createScreenshotFixtureData().mutationResponses.accepted,
+      );
+    },
+    getSessionPermission: async (sessionId) => {
+      const parsedSessionId = localSessionIdSchema.parse(sessionId);
+      const fixture = createScreenshotFixtureData();
+      return computerSessionPermissionSchema.parse({
+        permission:
+          parsedSessionId === SCREENSHOT_FIXTURE_SESSION_IDS.permission
+            ? fixture.permission.permission
+            : null,
+      }).permission;
+    },
+    respondToSessionPermission: async (input) => {
+      sessionPermissionResponseBodySchema.parse(input);
+      sessionPermissionResponseSchema.parse(
+        createScreenshotFixtureData().mutationResponses.accepted,
+      );
+    },
+    promptSession: async (sessionId, text, modelId) => {
+      const body = sessionPromptBodySchema.parse({
+        sessionId,
+        text,
+        ...(modelId ? { modelId } : {}),
+      });
+      const response = sessionPromptResponseSchema.parse({
+        ...createScreenshotFixtureData().mutationResponses.prompt,
+        sessionId: body.sessionId,
+      });
+      return response.sessionId ? { sessionId: response.sessionId } : undefined;
+    },
+    getCreateOptions: async (refresh = false) => {
+      sessionCreateOptionsBodySchema.parse(refresh ? { refresh: true } : {});
+      return sessionCreateOptionsResponseSchema.parse(
+        createScreenshotFixtureData().createOptions,
+      );
+    },
+    createSession: async (input) => {
+      sessionCreateBodySchema.parse(input);
+      const response = sessionCreateResponseSchema.parse(
+        createScreenshotFixtureData().mutationResponses.created,
+      );
+      return { sessionId: response.sessionId };
+    },
+  };
+}
+
 export async function verifyComputerBridgeCredential(
   credentialInput: PairedComputerCredential,
 ): Promise<ComputerBridgeHealth> {
+  if (isScreenshotFixtureMode()) {
+    return computerBridgeHealthSchema.parse(createScreenshotFixtureData().health);
+  }
   return requestHealth(credentialInput);
 }
 
@@ -1148,6 +1289,13 @@ export async function openComputerBridges(
   bridgeIdsInput: string[],
 ): Promise<Map<string, ComputerBridgeConnection>> {
   const bridgeIds = bridgeIdListSchema.parse(bridgeIdsInput);
+  if (isScreenshotFixtureMode()) {
+    const connections = new Map<string, ComputerBridgeConnection>();
+    for (const bridgeId of bridgeIds) {
+      connections.set(bridgeId, connectionForScreenshotFixture(bridgeId));
+    }
+    return connections;
+  }
   const computers = await validatedComputerRegistry();
   const credentials = new Map(computers.map((computer) => [computer.bridgeId, computer]));
   const connections = new Map<string, ComputerBridgeConnection>();
@@ -1182,6 +1330,12 @@ export async function getComputerBridgeFeatures(bridgeId: string): Promise<Compu
 export async function getComputerBridgePresentation(
   bridgeId: string,
 ): Promise<ComputerBridgePresentation | null> {
+  if (isScreenshotFixtureMode()) {
+    requireScreenshotFixtureBridge(bridgeId);
+    return computerBridgePresentationSchema.parse(
+      createScreenshotFixtureData().presentation,
+    );
+  }
   if (bridgePresentationRejected.has(bridgeId)) return null;
   const computers = await validatedComputerRegistry();
   const credential = computers.find((computer) => computer.bridgeId === bridgeId);
@@ -1223,6 +1377,12 @@ export async function getComputerBridgeVersion(
 export async function getComputerBridgePlatform(
   bridgeId: string,
 ): Promise<ComputerBridgePlatform | 'unknown'> {
+  if (isScreenshotFixtureMode()) {
+    requireScreenshotFixtureBridge(bridgeId);
+    return computerBridgePlatformSchema.parse(
+      createScreenshotFixtureData().platform,
+    ).platform;
+  }
   const computers = await validatedComputerRegistry();
   const credential = computers.find((computer) => computer.bridgeId === bridgeId);
   if (!credential || credential.transportSecurity !== 'tailscale_wireguard') {
@@ -1309,6 +1469,7 @@ export async function createComputerSession(
 
 export async function disconnectComputer(bridgeIdInput: string): Promise<void> {
   const bridgeId = opaqueIdSchema.parse(bridgeIdInput);
+  if (isScreenshotFixtureMode()) return;
   const computers = await validatedComputerRegistry();
   const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
   if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {
@@ -1330,6 +1491,7 @@ export async function disconnectComputer(bridgeIdInput: string): Promise<void> {
 
 export async function removeComputerFromThisIPhone(bridgeIdInput: string): Promise<void> {
   const bridgeId = opaqueIdSchema.parse(bridgeIdInput);
+  if (isScreenshotFixtureMode()) return;
   const computers = await validatedComputerRegistry();
   const computer = computers.find((candidate) => candidate.bridgeId === bridgeId);
   if (!computer || computer.transportSecurity !== 'tailscale_wireguard') {

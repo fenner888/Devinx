@@ -4,6 +4,10 @@ import { branding } from '@lib/branding';
 
 import { deleteSecret, getSecret, storeSecret } from './keychain';
 import {
+  createScreenshotFixtureData,
+  isScreenshotFixtureMode,
+} from './screenshotFixtures';
+import {
   deleteAllDeviceIdentities,
   hasDeviceIdentity,
   isDeviceCryptoAvailable,
@@ -129,6 +133,9 @@ export interface PairedComputerSummary {
 }
 
 export async function loadPairedComputers(): Promise<PairedComputerCredential[]> {
+  if (isScreenshotFixtureMode()) {
+    return pairedComputerListSchema.parse(createScreenshotFixtureData().pairedComputers);
+  }
   const stored = await getSecret(branding.keychain.pairedComputers);
   if (!stored) return [];
   let parsed: unknown;
@@ -161,6 +168,18 @@ export async function loadPairedComputers(): Promise<PairedComputerCredential[]>
 }
 
 export async function loadPairedComputerSummaries(): Promise<PairedComputerSummary[]> {
+  if (isScreenshotFixtureMode()) {
+    const computers = pairedComputerListSchema.parse(createScreenshotFixtureData().pairedComputers);
+    return computers
+      .filter((computer) => computer.transportSecurity === 'tailscale_wireguard')
+      .map(({ bridgeId, computerName, pairedAt, permissions, endpoint }) => ({
+        bridgeId,
+        computerName,
+        pairedAt,
+        permissions: [...permissions],
+        transportKind: computerTransportKind(endpoint),
+      }));
+  }
   const computers = await loadPairedComputers();
   return computers
     .filter((computer) => computer.transportSecurity === 'tailscale_wireguard')

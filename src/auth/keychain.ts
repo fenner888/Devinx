@@ -7,6 +7,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { branding } from '@lib/branding';
 
+import { isScreenshotFixtureMode } from './screenshotFixtures';
+
 const OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   requireAuthentication: false,
@@ -25,6 +27,7 @@ export async function deleteSecret(key: string): Promise<void> {
 }
 
 export async function wipeLegacyCloudCredentials(): Promise<void> {
+  if (isScreenshotFixtureMode()) return;
   const keys = [
     branding.keychain.apiKey,
     branding.keychain.orgId,
