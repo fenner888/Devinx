@@ -101,7 +101,9 @@ into the returned `messages` array (clamped to `messages.length`).
 
 ## SQLite mapping
 
-Same read-only transaction as the minimized history load (schema v16/17):
+Same read-only transaction as the minimized history load (schema v16–19):
+
+Schemas 18/19 add auxiliary tool-call metadata and an FTS5 search table with triggers; neither changes the queried session or message-node columns.
 
 - The recursive main-chain walk additionally pulls the full `chat_message`
   JSON; assistant nodes are deduplicated by `message_id` (the CLI persists
@@ -112,7 +114,7 @@ Same read-only transaction as the minimized history load (schema v16/17):
   else `metadata.extensions['chisel/tool_call_content'][id]`, else a
   synthesized `{title, kind, rawInput}` from name + arguments.
 - `tool_call_state` is an **optional table** (present in reviewed schemas
-  16/17, absent from minimal fixtures); when missing, the extension/synthesized
+  16–19, absent from minimal fixtures); when missing, the extension/synthesized
   fallbacks are used.
 - `role:'tool'` nodes resolve calls: `chisel/tool_result_meta.success===false`
   → `failed`, else `completed`; node `content` becomes the output text;
