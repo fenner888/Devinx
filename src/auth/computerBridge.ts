@@ -23,6 +23,8 @@ import {
 const BRIDGE_PROTOCOL_VERSION = 2 as const;
 const REQUEST_LIFETIME_MS = 15_000;
 const BRIDGE_FEATURES_CACHE_TTL_MS = 60_000;
+// The Mac can grant these after pairing, so the Connector remains authoritative.
+const MAC_ENFORCED_GRANTS = new Set(['session:prompt:send', 'session:create']);
 
 const opaqueIdSchema = z
   .string()
@@ -712,9 +714,7 @@ async function requestComputer(
 ): Promise<{ body: Record<string, unknown>; credential: PairedComputerCredential }> {
   const requiredPermission = permissionByMethod[method];
   if (
-    method !== 'session.prompt' &&
-    method !== 'session.elicitation.respond' &&
-    method !== 'session.create' &&
+    !MAC_ENFORCED_GRANTS.has(requiredPermission) &&
     !credential.permissions.includes(requiredPermission)
   ) {
     throw new ComputerBridgeError(
