@@ -211,7 +211,7 @@ describe('screenshot fixture mode', () => {
     });
     await expect(getComputerBridgeVersion(SCREENSHOT_FIXTURE_BRIDGE_ID)).resolves.toEqual({
       kind: 'supported',
-      version: '0.1.16',
+      version: '0.1.17',
     });
     await expect(getComputerBridgePlatform(SCREENSHOT_FIXTURE_BRIDGE_ID)).resolves.toBe('macos');
     await expect(listComputerSessions(SCREENSHOT_FIXTURE_BRIDGE_ID)).resolves.toMatchObject({

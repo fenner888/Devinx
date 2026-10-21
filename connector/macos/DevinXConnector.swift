@@ -197,9 +197,13 @@ private final class ConnectorModel: ObservableObject {
 
     nonisolated private static func isOfficialReleaseUrl(_ value: String) -> Bool {
         guard let components = URLComponents(string: value) else { return false }
+        let officialReleasePathPrefixes = [
+            "/fenner888/Devinx/releases/",
+            "/fenner888/Otterin/releases/",
+        ]
         return components.scheme == "https" &&
             components.host == "github.com" &&
-            components.path.hasPrefix("/fenner888/Devinx/releases/") &&
+            officialReleasePathPrefixes.contains { components.path.hasPrefix($0) } &&
             components.user == nil &&
             components.password == nil &&
             components.query == nil &&
@@ -289,6 +293,12 @@ private final class ConnectorModel: ObservableObject {
 
     func revokeDevice(_ device: ConnectorDevice) {
         send(["version": ipcVersion, "type": "revoke_device", "deviceId": device.deviceId])
+    }
+
+    func revokeDevices(_ devices: [ConnectorDevice]) {
+        for device in devices {
+            revokeDevice(device)
+        }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -581,6 +591,7 @@ private struct StatusRow: View {
 
 private struct ConnectorView: View {
     @ObservedObject var model: ConnectorModel
+    @State private var showingOlderDevicesConfirmation = false
 
     var body: some View {
         ScrollView {
@@ -704,15 +715,46 @@ private struct ConnectorView: View {
                 }
 
                 if !model.devices.isEmpty {
+                    let activeDevices = model.devices.filter { $0.status == "active" }
+                    let keep = activeDevices.first
+                    let older = Array(activeDevices.dropFirst())
+
                     GroupBox("Paired iPhones") {
                         VStack(spacing: 0) {
+                            if !older.isEmpty, let keep = keep {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack(alignment: .top, spacing: 8) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .foregroundStyle(.orange)
+                                        Text("\(older.count) older iPhone\(older.count == 1 ? "" : "s") can still connect to this Mac. Revoke any you no longer use.")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Button("Revoke older iPhones…", role: .destructive) {
+                                        showingOlderDevicesConfirmation = true
+                                    }
+                                    .confirmationDialog(
+                                        "Revoke \(older.count) older iPhone\(older.count == 1 ? "" : "s")?",
+                                        isPresented: $showingOlderDevicesConfirmation,
+                                        titleVisibility: .visible
+                                    ) {
+                                        Button("Revoke \(older.count)", role: .destructive) {
+                                            model.revokeDevices(older)
+                                        }
+                                        Button("Cancel", role: .cancel) {}
+                                    } message: {
+                                        Text("Only \(keep.deviceName), paired \(Date(timeIntervalSince1970: keep.pairedAt / 1_000).formatted(date: .abbreviated, time: .shortened)), stays connected. Revoked iPhones must pair again.")
+                                    }
+                                }
+                                .padding(12)
+                                Divider()
+                            }
                             ForEach(model.devices) { device in
                                 VStack(alignment: .leading, spacing: 10) {
                                     HStack {
                                         Label(device.deviceName, systemImage: "iphone")
                                             .font(.headline)
                                         Spacer()
-                                        if device.id == model.devices.first?.id {
+                                        if device.id == keep?.id {
                                             Text("Most recent")
                                                 .font(.caption)
                                                 .foregroundStyle(.blue)
