@@ -49,6 +49,8 @@ export const ACTIVITY_LIMITS = {
   title: 200,
 } as const;
 
+const DEVIN_CANCEL_MARKER = 'Canceled due to user interrupt';
+
 const activityPathSchema = z
   .string()
   .min(1)
@@ -361,9 +363,14 @@ export class ActivityLog {
   private detailBytes = 0;
   private overflowed = false;
   private readonly implicitTimestamps: boolean;
+  private cancelRequested = false;
 
   constructor(options: ActivityLogOptions = {}) {
     this.implicitTimestamps = options.implicitTimestamps ?? true;
+  }
+
+  markCancelRequested(): void {
+    this.cancelRequested = true;
   }
 
   private effectiveAt(at?: number): number | undefined {
@@ -644,18 +651,25 @@ export class ActivityLog {
     }
 
     const status = activityStatusFromAcp(parsed.status);
+    const finalStatus =
+      status === 'failed' &&
+      (this.cancelRequested || texts.some((text) => text.includes(DEVIN_CANCEL_MARKER)))
+        ? 'interrupted'
+        : status;
     const entry: ActivityEntry = {
       id: toolEntryId(parsed.toolCallId),
       afterSequence: sequence,
       kind: 'tool',
       toolKind,
-      status: status === 'unknown' ? 'running' : status,
+      status: finalStatus === 'unknown' ? 'running' : finalStatus,
       title: cleanActivityTitle(parsed.title, 'Tool call'),
       ...(paths.size > 0 ? { paths: [...paths].slice(0, ACTIVITY_LIMITS.paths) } : {}),
       ...(detail ? { detail } : {}),
       truncated,
       ...(at !== undefined ? { startedAt: at } : {}),
-      ...((status === 'completed' || status === 'failed') &&
+      ...((finalStatus === 'completed' ||
+        finalStatus === 'failed' ||
+        finalStatus === 'interrupted') &&
       this.effectiveAt(at) !== undefined
         ? { endedAt: this.effectiveAt(at) }
         : {}),
@@ -672,7 +686,6 @@ export class ActivityLog {
     if (entry.status === 'timed_out') return;
     const parsed = toolUpdateInputSchema.parse(input);
     const status = activityStatusFromAcp(parsed.status);
-    if (status !== 'unknown') entry.status = status;
     const texts: string[] = [];
     for (const item of parsed.content ?? []) {
       const wrapper = wrapperContentSchema.safeParse(item);
@@ -699,6 +712,12 @@ export class ActivityLog {
     if (typeof exitCode === 'number' && Number.isInteger(exitCode)) {
       texts.push(`\nExit code: ${exitCode}`);
     }
+    const finalStatus =
+      status === 'failed' &&
+      (this.cancelRequested || texts.some((text) => text.includes(DEVIN_CANCEL_MARKER)))
+        ? 'interrupted'
+        : status;
+    if (finalStatus !== 'unknown') entry.status = finalStatus;
     if (texts.length > 0) {
       const addition = cleanDetailText(texts.join('\n'));
       if (!entry.detail) {

@@ -131,6 +131,80 @@ describe('ActivityLog', () => {
     });
   });
 
+  it('marks a failed tool interrupted after a cancellation request', () => {
+    const log = new ActivityLog();
+    log.beginTool(0, toolCall({ toolCallId: 'call_cancelled' }), CWD, 10);
+    log.markCancelRequested();
+    log.updateTool(
+      'call_cancelled',
+      {
+        status: 'failed',
+        content: [{ type: 'content', content: { type: 'text', text: 'Stopped by user' } }],
+      },
+      20,
+    );
+
+    expect(log.entryForToolCall('call_cancelled')).toMatchObject({
+      status: 'interrupted',
+      endedAt: 20,
+    });
+  });
+
+  it('keeps an ordinary failed tool failed without a cancellation request', () => {
+    const log = new ActivityLog();
+    log.beginTool(0, toolCall({ toolCallId: 'call_failed' }), CWD);
+    log.updateTool('call_failed', {
+      status: 'failed',
+      content: [{ type: 'content', content: { type: 'text', text: 'Command exited 1' } }],
+    });
+
+    expect(log.entryForToolCall('call_failed')?.status).toBe('failed');
+  });
+
+  it('marks a failed tool interrupted when its text has the cancel marker', () => {
+    const log = new ActivityLog();
+    log.beginTool(0, toolCall({ toolCallId: 'call_marker' }), CWD);
+    log.updateTool('call_marker', {
+      status: 'failed',
+      rawOutput: 'Canceled due to user interrupt',
+    });
+
+    expect(log.entryForToolCall('call_marker')?.status).toBe('interrupted');
+  });
+
+  it('keeps completed tools completed after a cancellation request', () => {
+    const log = new ActivityLog();
+    log.beginTool(0, toolCall({ toolCallId: 'call_completed' }), CWD);
+    log.markCancelRequested();
+    log.updateTool('call_completed', { status: 'completed' });
+
+    expect(log.entryForToolCall('call_completed')?.status).toBe('completed');
+  });
+
+  it('marks failed replayed tool calls interrupted when their content has the cancel marker', () => {
+    const log = new ActivityLog();
+    log.beginTool(
+      0,
+      toolCall({
+        toolCallId: 'call_replay_cancelled',
+        status: 'failed',
+        content: [
+          {
+            type: 'content',
+            content: { type: 'text', text: 'Canceled due to user interrupt' },
+          },
+        ],
+      }),
+      CWD,
+      30,
+    );
+
+    expect(log.entryForToolCall('call_replay_cancelled')).toMatchObject({
+      status: 'interrupted',
+      endedAt: 30,
+    });
+  });
+
   it('derives the tool kind from the inference name when kind is absent', () => {
     const log = new ActivityLog();
     log.beginTool(
