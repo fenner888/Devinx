@@ -46,7 +46,7 @@ export default function SettingsScreen() {
       {
         title: 'Wipe local data?',
         message:
-          'This removes paired-Mac keys and cached session data from this iPhone. Your sessions on your Mac are not affected.',
+          'This removes paired-computer keys and cached session data from this iPhone. Your local sessions are not affected.',
         confirmLabel: 'Wipe all',
         destructive: true,
       },
@@ -101,8 +101,8 @@ export default function SettingsScreen() {
               </Text>
               <Text className="text-text-low text-text12 mt-0.5">
                 {hasComputerConnection
-                  ? `${computers.length} paired ${computers.length === 1 ? `Mac · ${computerTransportLabel(computers[0]!.transportKind)}` : 'Macs'}`
-                  : 'No paired Macs'}
+                  ? `${computers.length} paired ${computers.length === 1 ? `computer · ${computerTransportLabel(computers[0]!.transportKind)}` : 'computers'}`
+                  : 'No paired computers'}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={tokens.textLow.hex} />
@@ -184,8 +184,8 @@ export default function SettingsScreen() {
               ))}
             </View>
             <Text className="mt-2 text-text-low text-text12">
-              Session list checks your Mac every {sessionListInterval}. Open sessions update every{' '}
-              {activityInterval}.
+              Session lists check for paired computers every {sessionListInterval}. Open sessions
+              update every {activityInterval}.
             </Text>
           </View>
         </View>

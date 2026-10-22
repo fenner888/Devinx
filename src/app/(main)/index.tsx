@@ -245,7 +245,10 @@ export default function HomeScreen() {
 
   function openLocalPicker(kind: 'workspace' | 'model') {
     if (localOptions.isLoading) {
-      Alert.alert('Loading local options', 'Otterin is checking the approved options on your Mac.');
+      Alert.alert(
+        'Loading local options',
+        `Otterin is checking the approved options on ${computer?.computerName ?? 'your computer'}.`,
+      );
       return;
     }
     if (!localOptions.data) {
@@ -257,7 +260,7 @@ export default function HomeScreen() {
       if (localOptions.data.workspaces.length === 0) {
         Alert.alert(
           'No local workspaces yet',
-          'Start or resume a Devin session in a workspace on your Mac, then try again.',
+          `Start or resume a Devin session in a workspace on ${computer?.computerName ?? 'your computer'}, then try again.`,
         );
         return;
       }
@@ -352,7 +355,7 @@ export default function HomeScreen() {
           hapticError();
           setComposerError(
             error instanceof ComputerBridgeError && error.code === 'auto_approve_unavailable'
-              ? "Auto-approve isn't allowed on this Mac (organization policy). Your message wasn't sent."
+              ? `Auto-approve isn't allowed on ${computer.computerName} (organization policy). Your message wasn't sent.`
               : error instanceof Error
                 ? error.message
                 : 'The local session could not be created.',
@@ -404,7 +407,11 @@ export default function HomeScreen() {
                 className={`w-1.5 h-1.5 rounded-full mr-1.5 ${localIsReady ? 'bg-finished' : 'bg-text-low'}`}
               />
               <Text className="text-text-low text-text11 font-medium uppercase tracking-widest">
-                {localIsReady ? 'Local ready' : computer ? 'Checking your Mac' : 'Pair a Mac to begin'}
+                {localIsReady
+                  ? 'Local ready'
+                  : computer
+                    ? `Checking ${computer.computerName || 'your computer'}`
+                    : 'Pair a computer to begin'}
               </Text>
             </View>
             {connectionError ? (
@@ -416,9 +423,11 @@ export default function HomeScreen() {
                 className="mt-1"
                 onPress={() => router.push('/(main)/computer')}
                 accessibilityRole="button"
-                accessibilityLabel="Pair a Mac"
+                accessibilityLabel="Pair a computer"
               >
-                <Text className="text-brand-text text-text12">Pair your Mac in Your Mac settings</Text>
+                <Text className="text-brand-text text-text12">
+                  Pair your computer from Your computer in the menu
+                </Text>
               </Pressable>
             )}
           </View>
@@ -441,7 +450,7 @@ export default function HomeScreen() {
             >
               <Ionicons name="lock-closed-outline" size={18} color={tokens.textMid.hex} />
               <Text className="mx-3 flex-1 text-text-mid text-text13 leading-5">
-                {`This device can view sessions but can't start them — change permissions in Otterin Connector on ${computer?.computerName ?? 'your Mac'}`}
+                {`This device can view sessions but can't start them — change permissions in Otterin Connector on ${computer?.computerName ?? 'your computer'}`}
               </Text>
               <Ionicons name="chevron-forward" size={15} color={tokens.textLow.hex} />
             </Pressable>
@@ -555,11 +564,11 @@ export default function HomeScreen() {
                   onPress={() => computers.length > 1 && setPicker('computer')}
                   disabled={computers.length <= 1}
                   accessibilityRole="button"
-                  accessibilityLabel={`Mac: ${computer?.computerName ?? 'Select Mac'}`}
+                  accessibilityLabel={`Computer: ${computer?.computerName ?? 'Select computer'}`}
                 >
                   <Ionicons name="desktop-outline" size={14} color={tokens.textLow.hex} />
                   <Text className="text-text-mid text-text12 ml-1.5" numberOfLines={1}>
-                    {computer?.computerName ?? 'Select Mac'}
+                    {computer?.computerName ?? 'Select computer'}
                   </Text>
                   {computers.length > 1 && (
                     <Ionicons name="chevron-down" size={12} color={tokens.textLow.hex} />
@@ -618,7 +627,7 @@ export default function HomeScreen() {
               <View className="flex-1 pr-3">
                 <Text className="text-text-hi text-text17 font-medium">
                   {picker === 'computer'
-                    ? 'Choose a Mac'
+                    ? 'Choose a computer'
                     : picker === 'workspace'
                       ? 'Choose a workspace'
                       : picker === 'model'
@@ -627,11 +636,11 @@ export default function HomeScreen() {
                 </Text>
                 <Text className="mt-1 text-text-low text-text12">
                   {picker === 'computer'
-                    ? 'Select a paired Mac for this session'
+                    ? 'Select a paired computer for this session'
                     : picker === 'workspace'
                       ? 'Choose a workspace approved in Devin for Terminal'
                       : picker === 'model'
-                        ? 'Models available on your Mac'
+                        ? `Models available on ${computer?.computerName ?? 'your computer'}`
                         : 'Choose a reasoning and speed option'}
                 </Text>
               </View>

@@ -75,7 +75,7 @@ describe('release privacy configuration', () => {
       'utf8',
     );
 
-    expect(privacyScreen).toContain('directly from your Mac over Tailscale');
+    expect(privacyScreen).toContain('directly from your computer over Tailscale');
     expect(privacyScreen).toContain('Paired-device keys stay in the system Keychain');
     expect(privacyScreen).not.toContain('prompt templates');
     expect(privacyScreen).not.toMatch(/Devin Cloud|Devin API|api\.devin\.ai|official Devin MCP/i);
@@ -87,7 +87,7 @@ describe('release privacy configuration', () => {
       'utf8',
     );
 
-    expect(privacyScreen).toContain('directly from your Mac over Tailscale');
+    expect(privacyScreen).toContain('directly from your computer over Tailscale');
     expect(privacyScreen).toContain('contact Expo over TLS');
     expect(privacyScreen).toContain('randomized installation token');
     expect(privacyScreen).toContain('does not register your iPhone for remote push notifications');
