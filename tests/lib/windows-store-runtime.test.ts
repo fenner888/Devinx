@@ -60,4 +60,20 @@ describe('Windows Store runtime staging', () => {
     expect(verifier).toContain('Verification modified the real Connector state');
     expect(windowsDpapi).not.toContain('DEVINX_DPAPI_STATE_ROOT');
   });
+
+  it('keeps paired-iPhone card layout free of docked children', () => {
+    const createDeviceCardStart = program.indexOf(
+      'private FlowLayoutPanel CreateDeviceCard(',
+    );
+    const saveSelectedPermissionsStart = program.indexOf(
+      'private async Task SaveSelectedPermissionsAsync(',
+      createDeviceCardStart,
+    );
+
+    expect(createDeviceCardStart).toBeGreaterThanOrEqual(0);
+    expect(saveSelectedPermissionsStart).toBeGreaterThan(createDeviceCardStart);
+    expect(
+      program.slice(createDeviceCardStart, saveSelectedPermissionsStart),
+    ).not.toContain('DockStyle');
+  });
 });
