@@ -696,7 +696,7 @@ private struct ConnectorView: View {
                             .scaledToFit()
                             .frame(width: 360, height: 360)
                             .accessibilityLabel("Otterin iPhone pairing QR code")
-                        Text("On iPhone: Otterin → Your Mac → Pair a Mac → Scan pairing code")
+                        Text("On iPhone: Otterin → Your computer → Pair a computer → Scan pairing code")
                             .font(.callout)
                             .multilineTextAlignment(.center)
                         Text("The code refreshes automatically and is valid only for this local device.")

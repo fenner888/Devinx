@@ -30,7 +30,7 @@ Confirm that Tailscale is installed and connected on this local device. If it is
 
 Install Otterin Connector for the signed-in user and open it. On macOS, install it in /Applications. On Windows, use only the Microsoft Store package and do not create an administrator service. Do not run it as root or Administrator, bind it to 0.0.0.0, expose a public listener, install a public tunnel, or weaken its QR pairing and per-device authorization. Do not enable launch at login without showing me the Connector's visible setting and receiving my approval.
 
-Verify that Connector reports an active private Tailscale connection and detects a supported local Devin ACP capability. Then tell me to open Otterin on my iPhone and choose **Your Mac → Scan pairing code**.
+Verify that Connector reports an active private Tailscale connection and detects a supported local Devin ACP capability. Then tell me to open Otterin on my iPhone and choose **Your computer → Scan pairing code**.
 
 After I scan the code, leave device approval and every read, steering, or session-creation grant to the Connector UI on this local device. Do not approve any permission on my behalf. Once pairing is complete, explain that I may close the window while Connector remains available from its macOS menu-bar icon or Windows notification-area icon.
 

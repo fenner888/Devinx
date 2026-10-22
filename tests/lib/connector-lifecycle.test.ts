@@ -119,7 +119,7 @@ describe('macOS Connector lifecycle', () => {
     expect(connectorSource).toMatch(/case "pairing_offer":[\s\S]*?pendingPairingId = nil/);
     expect(connectorSource).toContain('pairingCodeLifetime.consumeExpiry(now: Date())');
     expect(connectorSource).toContain(
-      'On iPhone: Otterin → Your Mac → Pair a Mac → Scan pairing code',
+      'On iPhone: Otterin → Your computer → Pair a computer → Scan pairing code',
     );
     expect(connectorSource).not.toContain('Settings → Computers');
   });

@@ -127,7 +127,7 @@ Connector is optional. Cloud-only users do not install it.
 2. Verify the checksum published with that release.
 3. Open the DMG and move **Otterin Connector** to Applications.
 4. Open Connector and confirm it detects both Tailscale and Devin for Terminal.
-5. In Otterin, open **Your Mac → Scan pairing code**.
+5. In Otterin, open **Your computer → Scan pairing code**.
 6. Scan the short-lived code and approve the named iPhone plus its requested permissions on the Mac.
 
 The iPhone onboarding also includes a guarded assisted-setup prompt for an AI assistant on the Mac.

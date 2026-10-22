@@ -46,7 +46,7 @@ Record the Windows build, Connector version, Devin CLI version, and iPhone build
 ### 2. Pairing and permission separation
 
 - Reopen Connector and generate a fresh code.
-- In Otterin, open **Your Mac → Scan pairing code**.
+- In Otterin, open **Your computer → Scan pairing code**.
 - Deny one pairing request and confirm the phone receives a recoverable failure.
 - Generate a new code, approve the named iPhone, and grant read access only.
 - Confirm session titles/history load but sending and creating remain unavailable.

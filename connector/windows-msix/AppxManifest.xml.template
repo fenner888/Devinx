@@ -33,7 +33,7 @@
       uap10:TrustLevel="mediumIL">
       <uap:VisualElements
         DisplayName="DevinX Connector"
-        Description="Securely connect DevinX on iPhone to Devin running on this Windows PC."
+        Description="Securely connect Otterin on iPhone to Devin running on this Windows PC."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png" />
