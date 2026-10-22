@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
   ActivityIndicator,
   Alert,
   Keyboard,
@@ -266,10 +267,13 @@ export default function ComputerSessionDetailScreen() {
     bridgeId?: string | string[];
     id?: string | string[];
     continuing?: string | string[];
+    started?: string | string[];
   }>();
   const bridgeId = singleParameter(parameters.bridgeId);
   const sessionId = singleParameter(parameters.id);
   const continuationPending = singleParameter(parameters.continuing) === '1';
+  const startedPending = singleParameter(parameters.started) === '1';
+  const steeringPending = continuationPending || startedPending;
   const router = useRouter();
   const { tokens } = useTheme();
   const pollingMode = useAppPreferences((state) => state.pollingMode);
@@ -286,7 +290,7 @@ export default function ComputerSessionDetailScreen() {
   const [draft, setDraft] = useState('');
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
-  const [steeringActive, setSteeringActive] = useState(continuationPending);
+  const [steeringActive, setSteeringActive] = useState(steeringPending);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showVariantPicker, setShowVariantPicker] = useState(false);
@@ -312,6 +316,7 @@ export default function ComputerSessionDetailScreen() {
     mayReadContent && presentation.settled,
     { timestamps: presentation.data?.messageTimestamps === true },
   );
+  const refetchHistory = query.refetch;
   const queryClient = useQueryClient();
   const currentBoard = queryClient.getQueryData<ComputerSessionBoard>(
     computerSessionsQueryKey(computers),
@@ -380,6 +385,7 @@ export default function ComputerSessionDetailScreen() {
     bridgeFeatures.data?.sessionElicitation === false;
   const answerElicitation = useRespondComputerSessionElicitation(bridgeId, sessionId);
   const sessionBusy = Boolean(sessionActivity.data?.active);
+  const previousSessionBusy = useRef(sessionBusy);
   const composerOverlayHeight = canPrompt && mayReadContent ? Math.max(composerHeight, 160) : 0;
   const interactionDockVisible = Boolean(
     activeElicitation || mayApprove || terminalQuestionPresent || answeredSummary,
@@ -435,7 +441,25 @@ export default function ComputerSessionDetailScreen() {
   }, [interactionKey]);
 
   useEffect(() => {
-    if (!continuationPending || !mayReadContent || continuationRefreshStarted.current) return;
+    if (!mayReadContent || !sessionBusy || steeringActive) return;
+    const refreshInterval = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        refetchHistory().catch(() => {});
+      }
+    }, historyRefreshIntervalMs);
+    return () => clearInterval(refreshInterval);
+  }, [historyRefreshIntervalMs, mayReadContent, refetchHistory, sessionBusy, steeringActive]);
+
+  useEffect(() => {
+    const wasSessionBusy = previousSessionBusy.current;
+    previousSessionBusy.current = sessionBusy;
+    if (wasSessionBusy && !sessionBusy && !steeringActive) {
+      refetchHistory().catch(() => {});
+    }
+  }, [refetchHistory, sessionBusy, steeringActive]);
+
+  useEffect(() => {
+    if (!steeringPending || !mayReadContent || continuationRefreshStarted.current) return;
     continuationRefreshStarted.current = true;
     const generation = refreshGeneration.current + 1;
     refreshGeneration.current = generation;
@@ -459,7 +483,7 @@ export default function ComputerSessionDetailScreen() {
       );
     };
     refreshTimer.current = setTimeout(() => refreshUntilComplete(0), historyRefreshIntervalMs);
-  }, [continuationPending, historyRefreshIntervalMs, mayReadContent, query]);
+  }, [steeringPending, historyRefreshIntervalMs, mayReadContent, query]);
 
   useEffect(
     () => () => {

@@ -1,16 +1,33 @@
 import React from 'react';
-import { Keyboard } from 'react-native';
-import { fireEvent, render } from '@testing-library/react-native';
+import { AppState, Keyboard } from 'react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import type { QueryClient } from '@tanstack/react-query';
 
 const mockMutate = jest.fn();
-const mockRefetch = jest.fn(async () => {});
 const mockCompanionProps = jest.fn();
 const mockAnswerMutate = jest.fn();
 const mockRefreshComputerCreateOptions = jest.fn(async () => undefined);
 const mockReact = React;
+type MockHistoryMessage = {
+  sequence: number;
+  source: 'user' | 'devin';
+  text: string;
+};
+type MockSessionDetailData = {
+  session: {
+    id: string;
+    origin: 'computer';
+    workspaceName: string | undefined;
+    model: { id: string; name: string };
+  };
+  messages: MockHistoryMessage[];
+  activity?: Array<Record<string, unknown>>;
+  truncated: false;
+};
 let mockQueryClient: QueryClient;
 let mockSessionWorkspaceName: string | undefined = 'DevinX';
+let mockSessionMessages: MockHistoryMessage[] = [];
+let mockRouteParameters: { started?: string; continuing?: string } = {};
 let mockPromptError: Error | null = null;
 let mockSessionElicitationSupported = true;
 let mockSessionActivity:
@@ -40,6 +57,24 @@ let mockInteraction: {
   }>;
   createdAt: number;
 } | null = null;
+let mockSetSessionDetail: ((data: MockSessionDetailData) => void) | null = null;
+
+const mockCreateSessionDetailData = (): MockSessionDetailData => ({
+  session: {
+    id: `local_${'L'.repeat(43)}`,
+    origin: 'computer',
+    workspaceName: mockSessionWorkspaceName,
+    model: { id: 'swe-1.7-high', name: 'SWE-1.7 High' },
+  },
+  messages: mockSessionMessages.map((message) => ({ ...message })),
+  ...(mockLoadedActivity ? { activity: mockLoadedActivity } : {}),
+  truncated: false,
+});
+const mockRefetch = jest.fn(async () => {
+  const data = mockCreateSessionDetailData();
+  mockSetSessionDetail?.(data);
+  return { data };
+});
 
 jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),
@@ -66,6 +101,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({
     bridgeId: 'bridge_1234567890',
     id: `local_${'L'.repeat(43)}`,
+    ...mockRouteParameters,
   }),
   useRouter: () => ({ back: jest.fn() }),
 }));
@@ -100,26 +136,17 @@ jest.mock('../../src/api/bridge/queries', () => ({
       },
     },
   }),
-  useComputerSessionDetail: () => ({
-    data: {
-      session: {
-        id: `local_${'L'.repeat(43)}`,
-        origin: 'computer',
-        workspaceName: mockSessionWorkspaceName,
-        model: { id: 'swe-1.7-high', name: 'SWE-1.7 High' },
-      },
-      messages: [
-        { sequence: 1, source: 'user', text: 'Do the tasks.' },
-        { sequence: 2, source: 'devin', text: 'Ready.' },
-      ],
-      ...(mockLoadedActivity ? { activity: mockLoadedActivity } : {}),
-      truncated: false,
-    },
-    isLoading: false,
-    isRefetching: false,
-    error: null,
-    refetch: mockRefetch,
-  }),
+  useComputerSessionDetail: () => {
+    const [data, setData] = mockReact.useState(mockCreateSessionDetailData);
+    mockSetSessionDetail = setData;
+    return {
+      data,
+      isLoading: false,
+      isRefetching: false,
+      error: null,
+      refetch: mockRefetch,
+    };
+  },
   useComputerSessionActivity: () => ({ data: mockSessionActivity }),
   useComputerSessionElicitation: () => ({ data: { interaction: mockInteraction } }),
   useRespondComputerSessionElicitation: () => ({
@@ -181,9 +208,13 @@ jest.mock('../../src/components/pets', () => ({
   },
 }));
 
-jest.mock('../../src/components/DevinMarkdown', () => ({
-  DevinMarkdown: ({ children }: { children: React.ReactNode }) => children,
-}));
+jest.mock('../../src/components/DevinMarkdown', () => {
+  const { Text: NativeText } = jest.requireActual('react-native') as typeof import('react-native');
+  return {
+    DevinMarkdown: ({ children }: { children: React.ReactNode }) =>
+      mockReact.createElement(NativeText, null, children),
+  };
+});
 
 jest.mock('../../src/theme/index', () => ({
   useTheme: () => ({
@@ -211,21 +242,132 @@ import ComputerSessionDetailScreen, {
   promptErrorMessage,
 } from '../../src/app/(main)/computer-session/[bridgeId]/[id]';
 import { ComputerBridgeError } from '../../src/auth/computerBridge';
+import { localRefreshIntervals } from '../../src/lib/polling';
+import { useAppPreferences } from '../../src/store/preferences';
 
 describe('Computer session detail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    AppState.currentState = 'active';
     const { QueryClient } = jest.requireActual('@tanstack/react-query') as {
       QueryClient: new () => QueryClient;
     };
     mockQueryClient = new QueryClient();
     mockSessionWorkspaceName = 'DevinX';
+    mockSessionMessages = [
+      { sequence: 1, source: 'user', text: 'Do the tasks.' },
+      { sequence: 2, source: 'devin', text: 'Ready.' },
+    ];
+    mockSetSessionDetail = null;
+    mockRouteParameters = {};
     mockPromptError = null;
     mockSessionElicitationSupported = true;
     mockSessionActivity = undefined;
     mockInteraction = null;
     mockActivityTimeline = undefined;
     mockLoadedActivity = undefined;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('polls and renders new Devin history while activity is active and not steering', async () => {
+    jest.useFakeTimers();
+    mockSessionActivity = {
+      active: true,
+      kind: 'responding',
+      label: 'Working on your task',
+      updatedAt: Date.now(),
+    };
+    const screen = render(<ComputerSessionDetailScreen />);
+    expect(screen.queryByText('The refreshed result is ready.')).toBeNull();
+
+    mockSessionMessages = [
+      ...mockSessionMessages,
+      { sequence: 3, source: 'devin', text: 'The refreshed result is ready.' },
+    ];
+    const historyInterval = localRefreshIntervals(
+      useAppPreferences.getState().pollingMode,
+    ).history;
+    await act(async () => {
+      jest.advanceTimersByTime(historyInterval);
+      await Promise.resolve();
+    });
+
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('The refreshed result is ready.')).toBeTruthy();
+  });
+
+  it('refetches history once when activity changes from active to inactive', async () => {
+    jest.useFakeTimers();
+    mockSessionActivity = {
+      active: true,
+      kind: 'thinking',
+      label: 'Working on your task',
+      updatedAt: Date.now(),
+    };
+    const screen = render(<ComputerSessionDetailScreen />);
+    mockSessionActivity = {
+      active: false,
+      kind: 'thinking',
+      label: 'Completed',
+      updatedAt: Date.now(),
+    };
+    await act(async () => {
+      screen.rerender(<ComputerSessionDetailScreen />);
+      await Promise.resolve();
+    });
+
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      jest.advanceTimersByTime(
+        localRefreshIntervals(useAppPreferences.getState().pollingMode).history * 2,
+      );
+      await Promise.resolve();
+    });
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not poll history while activity is inactive', () => {
+    jest.useFakeTimers();
+    mockSessionActivity = {
+      active: false,
+      kind: 'thinking',
+      label: 'Completed',
+      updatedAt: Date.now(),
+    };
+    render(<ComputerSessionDetailScreen />);
+    act(() => {
+      jest.advanceTimersByTime(
+        localRefreshIntervals(useAppPreferences.getState().pollingMode).history * 2,
+      );
+    });
+
+    expect(mockRefetch).not.toHaveBeenCalled();
+  });
+
+  it('refreshes a newly started session without showing the continuation banner', async () => {
+    jest.useFakeTimers();
+    mockRouteParameters = { started: '1' };
+    const screen = render(<ComputerSessionDetailScreen />);
+
+    expect(screen.queryByText(/Continued|Continuing/)).toBeNull();
+    await act(async () => {
+      jest.advanceTimersByTime(
+        localRefreshIntervals(useAppPreferences.getState().pollingMode).history,
+      );
+      await Promise.resolve();
+    });
+
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the continuation banner for continuing sessions', () => {
+    mockRouteParameters = { continuing: '1' };
+    const screen = render(<ComputerSessionDetailScreen />);
+
+    expect(screen.getByText(/Continuing in a new local session while/)).toBeTruthy();
   });
 
   it('uses the cached list title with the workspace as a subtitle', () => {

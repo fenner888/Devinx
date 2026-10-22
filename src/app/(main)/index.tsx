@@ -346,7 +346,7 @@ export default function HomeScreen() {
             setAutoApproveSession(computer.bridgeId, sessionId, true);
           }
           setPrompt('');
-          router.push(`/computer-session/${computer.bridgeId}/${sessionId}?continuing=1`);
+          router.push(`/computer-session/${computer.bridgeId}/${sessionId}?started=1`);
         },
         onError: (error) => {
           hapticError();
