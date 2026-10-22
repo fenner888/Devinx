@@ -11,6 +11,7 @@ Confirm all of the following before pairing:
 - Microsoft Store listing name: **DevinX Connector** (reserved Store identity)
 - publisher: **DevinX Tools**
 - Store ID: `9N52Z3FVMFH8`
+- package family: `DevinXTools.DevinXConnector_vdtqrt4vd5wrc`
 - version: `0.1.7.0` or newer
 - device: Windows 11 x64, build `10.0.22000` or newer
 

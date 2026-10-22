@@ -29,7 +29,7 @@ Before presenting a Connector download or assisted-install action, DevinX and it
 3. The user downloads and explicitly approves the trusted connector for the computer's operating
    system. The Windows Store package must report identity `DevinXTools.DevinXConnector`,
    publisher `CN=43D84E24-857C-4C40-9DAA-1A6983913CD9`, and package family
-   `DevinXTools.DevinXConnector_ydtgrt4yd5wrc`. iPhone never claims it can silently install or
+   `DevinXTools.DevinXConnector_vdtqrt4vd5wrc`. iPhone never claims it can silently install or
    remotely launch an unpaired computer application.
 4. The connector detects Devin for Terminal and an active Tailscale IPv4 address without reading Devin credentials.
 5. Tailscale is the only v1 connection path. The connector fails closed when no active `100.64.0.0/10` address exists and never falls back to LAN.

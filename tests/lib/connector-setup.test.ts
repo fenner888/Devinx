@@ -29,7 +29,7 @@ describe('Connector assisted setup', () => {
     expect(CONNECTOR_SETUP_PROMPT).toContain('notarization');
     expect(CONNECTOR_SETUP_PROMPT).toContain('DevinXTools.DevinXConnector');
     expect(CONNECTOR_SETUP_PROMPT).toContain('CN=43D84E24-857C-4C40-9DAA-1A6983913CD9');
-    expect(CONNECTOR_SETUP_PROMPT).toContain('DevinXTools.DevinXConnector_ydtgrt4yd5wrc');
+    expect(CONNECTOR_SETUP_PROMPT).toContain('DevinXTools.DevinXConnector_vdtqrt4vd5wrc');
     expect(CONNECTOR_SETUP_PROMPT).toContain('Microsoft Store package');
     expect(CONNECTOR_SETUP_PROMPT).toContain('unsigned CI');
     expect(CONNECTOR_SETUP_PROMPT).toContain('SHA-256');
