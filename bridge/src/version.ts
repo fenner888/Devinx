@@ -1,1 +1,1 @@
-export const CONNECTOR_VERSION = '0.1.17' as const;
+export const CONNECTOR_VERSION = '0.1.18' as const;

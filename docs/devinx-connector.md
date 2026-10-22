@@ -42,7 +42,7 @@ npm run connector:build:macos
 Generated artifacts are ignored under `artifacts/connector/` so Expo OTA exports cannot delete the desktop bundle:
 
 - `Otterin Connector.app`
-- `Otterin-Connector-0.1.17-macos-<architecture>.dmg`
+- `Otterin-Connector-0.1.18-macos-<architecture>.dmg`
 - the matching `.sha256` file
 
 The local development build is ad-hoc signed. It is suitable for development and real-device validation on the build Mac, but it is not a public release. Public artifacts require a Developer ID signature, hardened runtime verification, notarization, stapling, provenance, and clean-machine Gatekeeper validation.
