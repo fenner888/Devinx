@@ -35,6 +35,13 @@ type ScreenshotFixtureDemoAction = {
   cancelledAt?: number;
 };
 
+type ScreenshotFixtureCreatedSession = {
+  workspaceId: string;
+  modelId?: string | null;
+  text: string;
+  createdAt: number;
+};
+
 export type ScreenshotFixtureDemoActivity = {
   active: boolean;
   kind: 'responding';
@@ -58,12 +65,14 @@ const elicitationResponses = new Map<
 >();
 const demoActions = new Map<string, ScreenshotFixtureDemoAction[]>();
 const cancelledAtBySession = new Map<string, number>();
+let createdSession: ScreenshotFixtureCreatedSession | null = null;
 
 export function resetScreenshotFixtureDemoState(): void {
   permissionResponses.clear();
   elicitationResponses.clear();
   demoActions.clear();
   cancelledAtBySession.clear();
+  createdSession = null;
 }
 
 function appendDemoAction(sessionId: string, action: ScreenshotFixtureDemoAction): void {
@@ -71,6 +80,21 @@ function appendDemoAction(sessionId: string, action: ScreenshotFixtureDemoAction
   actions.push(action);
   demoActions.set(sessionId, actions);
   cancelledAtBySession.delete(sessionId);
+}
+
+export function recordScreenshotFixtureCreatedSession(
+  input: ScreenshotFixtureCreatedSession,
+): void {
+  createdSession = input;
+  appendDemoAction(SCREENSHOT_FIXTURE_SESSION_IDS.created, {
+    startedAt: input.createdAt,
+    userMessage: input.text,
+    assistantReply: 'Added a 7-day forecast view to the home screen. The forecast tests pass.',
+  });
+}
+
+export function getScreenshotFixtureCreatedSession(): ScreenshotFixtureCreatedSession | null {
+  return createdSession;
 }
 
 export function recordScreenshotFixturePermissionResponse(

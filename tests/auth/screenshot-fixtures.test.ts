@@ -489,6 +489,63 @@ describe('screenshot fixture mode', () => {
     );
   });
 
+  it('loads and lists a newly created fixture session with its prompt and reply', async () => {
+    setFixtureMode(true);
+    const sessionId = SCREENSHOT_FIXTURE_SESSION_IDS.created;
+    const prompt = 'Add a 7-day forecast view to the home screen.';
+    const createOptions = await getComputerCreateOptions(SCREENSHOT_FIXTURE_BRIDGE_ID);
+
+    await expect(
+      createComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, {
+        workspaceId: createOptions.workspaces[0]!.id,
+        modelId: createOptions.defaultModelId,
+        text: prompt,
+      }),
+    ).resolves.toEqual({ sessionId });
+
+    const loaded = await loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId);
+    expect(loaded.messages).toEqual([
+      expect.objectContaining({
+        sequence: 1,
+        source: 'user',
+        text: prompt,
+        createdAt: FIXTURE_NOW,
+      }),
+    ]);
+    await expect(getComputerSessionActivity(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({ active: true, label: 'Working on your task' });
+
+    const page = computerSessionPageSchema.parse(
+      await listComputerSessions(SCREENSHOT_FIXTURE_BRIDGE_ID),
+    );
+    expect(page.sessions[0]).toMatchObject({
+      id: sessionId,
+      origin: 'computer',
+      workspaceName: 'weather-app',
+      hasTitle: true,
+      title: prompt,
+      model: { id: createOptions.defaultModelId },
+      activity: { active: true, kind: 'responding', updatedAt: FIXTURE_NOW },
+    });
+
+    setFixtureNow(FIXTURE_NOW + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS);
+    const completed = await loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId);
+    expect(completed.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'devin',
+          text: 'Added a 7-day forecast view to the home screen. The forecast tests pass.',
+          createdAt: FIXTURE_NOW + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS,
+        }),
+      ]),
+    );
+    await expect(getComputerSessionActivity(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({ active: false, label: statusLabels.completed });
+
+    resetScreenshotFixtureDemoState();
+    await expect(loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).rejects.toThrow();
+  });
+
   it('keeps a prompt message but drops its pending reply when cancelled', async () => {
     setFixtureMode(true);
     const sessionId = SCREENSHOT_FIXTURE_SESSION_IDS.working;

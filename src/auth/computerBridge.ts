@@ -17,12 +17,14 @@ import {
 import {
   createScreenshotFixtureData,
   getScreenshotFixtureDemoActivity,
+  getScreenshotFixtureCreatedSession,
   getScreenshotFixtureDemoMessages,
   hasScreenshotFixtureElicitationResponse,
   hasScreenshotFixturePermissionResponse,
   isScreenshotFixtureSessionCancelled,
   isScreenshotFixtureMode,
   recordScreenshotFixtureCancellation,
+  recordScreenshotFixtureCreatedSession,
   recordScreenshotFixtureElicitationResponse,
   recordScreenshotFixturePermissionResponse,
   recordScreenshotFixturePrompt,
@@ -1202,6 +1204,27 @@ function requireScreenshotFixtureBridge(bridgeId: string): void {
 
 function connectionForScreenshotFixture(bridgeId: string): ComputerBridgeConnection {
   requireScreenshotFixtureBridge(bridgeId);
+  const createdSessionDetails = () => {
+    const createdSession = getScreenshotFixtureCreatedSession();
+    if (!createdSession) return null;
+
+    const createOptions = sessionCreateOptionsResponseSchema.parse(
+      createScreenshotFixtureData().createOptions,
+    );
+    const workspace = createOptions.workspaces.find(
+      ({ id }) => id === createdSession.workspaceId,
+    );
+    const model =
+      createOptions.models.find(({ id }) => id === createdSession.modelId) ??
+      createOptions.models.find(({ id }) => id === createOptions.defaultModelId);
+
+    return {
+      createdSession,
+      workspaceName: workspace?.name ?? 'weather-app',
+      ...(model ? { model } : {}),
+    };
+  };
+
   return {
     bridgeId,
     getHealth: async () =>
@@ -1218,26 +1241,48 @@ function connectionForScreenshotFixture(bridgeId: string): ComputerBridgeConnect
       const body = sessionListBodySchema.parse(input);
       const now = Date.now();
       const fixture = createScreenshotFixtureData(now);
-      return computerSessionPageSchema.parse(
-        body.cursor
-          ? { sessions: [] }
-          : {
-              sessions: fixture.sessionPage.sessions.map((session) => {
-                const activity = getScreenshotFixtureDemoActivity(session.id, now);
-                return activity
-                  ? {
-                      ...session,
-                      updatedAt: new Date(activity.updatedAt).toISOString(),
-                      activity: {
-                        active: activity.active,
-                        kind: activity.kind,
-                        updatedAt: activity.updatedAt,
-                      },
-                    }
-                  : session;
-              }),
+      const sessions: unknown[] = body.cursor
+        ? []
+        : fixture.sessionPage.sessions.map((session) => {
+            const activity = getScreenshotFixtureDemoActivity(session.id, now);
+            return activity
+              ? {
+                  ...session,
+                  updatedAt: new Date(activity.updatedAt).toISOString(),
+                  activity: {
+                    active: activity.active,
+                    kind: activity.kind,
+                    updatedAt: activity.updatedAt,
+                  },
+                }
+              : session;
+          });
+      if (!body.cursor) {
+        const created = createdSessionDetails();
+        const activity = created
+          ? getScreenshotFixtureDemoActivity(
+              SCREENSHOT_FIXTURE_SESSION_IDS.created,
+              now,
+            )
+          : null;
+        if (created && activity) {
+          sessions.unshift({
+            id: SCREENSHOT_FIXTURE_SESSION_IDS.created,
+            origin: 'computer',
+            workspaceName: created.workspaceName,
+            hasTitle: true,
+            title: created.createdSession.text.slice(0, 60),
+            updatedAt: new Date(activity.updatedAt).toISOString(),
+            ...(created.model ? { model: created.model } : {}),
+            activity: {
+              active: activity.active,
+              kind: activity.kind,
+              updatedAt: activity.updatedAt,
             },
-      );
+          });
+        }
+      }
+      return computerSessionPageSchema.parse({ sessions });
     },
     loadSession: async (sessionId) => {
       const parsedSessionId = localSessionIdSchema.parse(sessionId);
@@ -1246,6 +1291,21 @@ function connectionForScreenshotFixture(bridgeId: string): ComputerBridgeConnect
       let loaded = fixture.loadedSessions[parsedSessionId] as
         | ({ [key: string]: unknown } & { messages: Array<Record<string, unknown>> })
         | undefined;
+      if (!loaded && parsedSessionId === SCREENSHOT_FIXTURE_SESSION_IDS.created) {
+        const created = createdSessionDetails();
+        if (created) {
+          loaded = {
+            session: {
+              id: parsedSessionId,
+              origin: 'computer',
+              workspaceName: created.workspaceName,
+              ...(created.model ? { model: created.model } : {}),
+            },
+            messages: [],
+            truncated: false,
+          };
+        }
+      }
       if (!loaded) {
         const page = computerSessionPageSchema.parse(fixture.sessionPage);
         const summary = page.sessions.find(({ id }) => id === parsedSessionId);
@@ -1379,7 +1439,13 @@ function connectionForScreenshotFixture(bridgeId: string): ComputerBridgeConnect
       );
     },
     createSession: async (input) => {
-      sessionCreateBodySchema.parse(input);
+      const body = sessionCreateBodySchema.parse(input);
+      recordScreenshotFixtureCreatedSession({
+        workspaceId: body.workspaceId,
+        modelId: body.modelId,
+        text: body.text,
+        createdAt: Date.now(),
+      });
       const response = sessionCreateResponseSchema.parse(
         createScreenshotFixtureData().mutationResponses.created,
       );
