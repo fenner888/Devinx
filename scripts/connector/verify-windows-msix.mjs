@@ -5,9 +5,10 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import {
@@ -61,6 +62,35 @@ function runWithEnvironment(executable, args, environment) {
   if (result.error || result.status !== 0) {
     const detail = `${result.stderr ?? ''}${result.stdout ?? ''}`.trim();
     throw new Error(`${basename(executable)} failed${detail ? `: ${detail}` : ''}`);
+  }
+}
+
+function connectorStateMetadata(path) {
+  if (!existsSync(path)) return { exists: false };
+  const { size, mtimeMs } = statSync(path);
+  return { exists: true, size, mtimeMs };
+}
+
+function snapshotRealConnectorState() {
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!localAppData) return null;
+  const path = join(localAppData, 'DevinX', 'Connector', 'bridge-state-v1.dpapi');
+  return { path, ...connectorStateMetadata(path) };
+}
+
+function assertRealConnectorStateUnchanged(before) {
+  if (!before) return;
+  let after;
+  try {
+    after = connectorStateMetadata(before.path);
+  } catch {
+    throw new Error('Verification modified the real Connector state');
+  }
+  if (
+    before.exists !== after.exists ||
+    (before.exists && (before.size !== after.size || before.mtimeMs !== after.mtimeMs))
+  ) {
+    throw new Error('Verification modified the real Connector state');
   }
 }
 
@@ -138,24 +168,35 @@ if (process.env.DEVINX_REQUIRE_MSIX_ARTIFACT === '1' || existsSync(msixPath)) {
     }
     const runtimeStageRoot = mkdtempSync(resolve(tmpdir(), 'devinx-store-runtime-'));
     try {
-      runWithEnvironment(
-        resolve(unpackRoot, 'DevinXConnector.exe'),
-        ['--verify-runtime-launch'],
-        { DEVINX_RUNTIME_STAGE_ROOT: runtimeStageRoot },
-      );
-      const stagedExecutables = [
-        'runtime/node.exe',
-        'windows-dpapi-helper.exe',
-      ];
-      const versionDirectories = readdirSync(resolve(runtimeStageRoot, 'Runtime'))
-        .filter((entry) => /^[a-f0-9]{64}$/i.test(entry));
-      if (versionDirectories.length !== 1) {
-        throw new Error('Store runtime staging did not create exactly one verified version');
-      }
-      for (const relativePath of stagedExecutables) {
-        if (!existsSync(resolve(runtimeStageRoot, 'Runtime', versionDirectories[0], relativePath))) {
-          throw new Error(`Store runtime staging is missing ${relativePath}`);
+      const isolatedLocalAppData = resolve(runtimeStageRoot, 'LocalAppData');
+      const isolatedDpapiStateRoot = resolve(runtimeStageRoot, 'DpapiState');
+      const realStateBefore = snapshotRealConnectorState();
+      try {
+        runWithEnvironment(
+          resolve(unpackRoot, 'DevinXConnector.exe'),
+          ['--verify-runtime-launch'],
+          {
+            DEVINX_RUNTIME_STAGE_ROOT: runtimeStageRoot,
+            LOCALAPPDATA: isolatedLocalAppData,
+            DEVINX_DPAPI_STATE_ROOT: isolatedDpapiStateRoot,
+          },
+        );
+        const stagedExecutables = [
+          'runtime/node.exe',
+          'windows-dpapi-helper.exe',
+        ];
+        const versionDirectories = readdirSync(resolve(runtimeStageRoot, 'Runtime'))
+          .filter((entry) => /^[a-f0-9]{64}$/i.test(entry));
+        if (versionDirectories.length !== 1) {
+          throw new Error('Store runtime staging did not create exactly one verified version');
         }
+        for (const relativePath of stagedExecutables) {
+          if (!existsSync(resolve(runtimeStageRoot, 'Runtime', versionDirectories[0], relativePath))) {
+            throw new Error(`Store runtime staging is missing ${relativePath}`);
+          }
+        }
+      } finally {
+        assertRealConnectorStateUnchanged(realStateBefore);
       }
     } finally {
       rmSync(runtimeStageRoot, { recursive: true, force: true });

@@ -11,18 +11,34 @@ internal static class Program
     private const int ItemNotFoundExitCode = 44;
     private const int MaximumSecretBytes = 1024 * 1024;
     private const uint CryptProtectUiForbidden = 0x1;
+    private const string StateRootEnvironmentVariable = "DEVINX_DPAPI_STATE_ROOT";
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("com.devinx.connector.bridge-state-v1");
 
-    private static string StatePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "DevinX",
-        "Connector",
-        "bridge-state-v1.dpapi");
+    private static string StatePath
+    {
+        get
+        {
+            var stateRoot = Environment.GetEnvironmentVariable(StateRootEnvironmentVariable);
+            return string.IsNullOrEmpty(stateRoot)
+                ? Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "DevinX",
+                    "Connector",
+                    "bridge-state-v1.dpapi")
+                : Path.Combine(Path.GetFullPath(stateRoot), "bridge-state-v1.dpapi");
+        }
+    }
 
     [STAThread]
     private static int Main(string[] args)
     {
         if (!OperatingSystem.IsWindows() || args.Length != 1)
+        {
+            return 2;
+        }
+
+        var stateRoot = Environment.GetEnvironmentVariable(StateRootEnvironmentVariable);
+        if (!string.IsNullOrEmpty(stateRoot) && !Path.IsPathFullyQualified(stateRoot))
         {
             return 2;
         }

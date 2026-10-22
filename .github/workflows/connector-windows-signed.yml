@@ -20,7 +20,12 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.302'
+          dotnet-version: '10.0.401'
+
+      - name: Show .NET SDKs
+        run: |
+          dotnet --list-sdks
+          dotnet --version
 
       - name: Install JavaScript dependencies
         run: npm ci --legacy-peer-deps

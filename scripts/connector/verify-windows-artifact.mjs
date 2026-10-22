@@ -1,7 +1,7 @@
 import { createHash, createPrivateKey, X509Certificate } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { verifyWindowsSignature } from './windows-authenticode.mjs';
@@ -40,6 +40,35 @@ function requirePath(path, label) {
 
 function sha256(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function connectorStateMetadata(path) {
+  if (!existsSync(path)) return { exists: false };
+  const { size, mtimeMs } = statSync(path);
+  return { exists: true, size, mtimeMs };
+}
+
+function snapshotRealConnectorState() {
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!localAppData) return null;
+  const path = join(localAppData, 'DevinX', 'Connector', 'bridge-state-v1.dpapi');
+  return { path, ...connectorStateMetadata(path) };
+}
+
+function assertRealConnectorStateUnchanged(before) {
+  if (!before) return;
+  let after;
+  try {
+    after = connectorStateMetadata(before.path);
+  } catch {
+    throw new Error('Verification modified the real Connector state');
+  }
+  if (
+    before.exists !== after.exists ||
+    (before.exists && (before.size !== after.size || before.mtimeMs !== after.mtimeMs))
+  ) {
+    throw new Error('Verification modified the real Connector state');
+  }
 }
 
 if (process.platform !== 'win32') {
@@ -95,51 +124,61 @@ try {
   }
 
   const isolatedLocalAppData = resolve(temporaryRoot, 'LocalAppData');
+  const isolatedDpapiStateRoot = resolve(temporaryRoot, 'DpapiState');
   const helper = resolve(packageRoot, 'Resources', 'windows-dpapi-helper.exe');
   const secret = `connector-verification-${Date.now()}`;
-  const environment = { ...process.env, LOCALAPPDATA: isolatedLocalAppData };
-  const generatedTls = JSON.parse(run(helper, ['generate-tls'], { env: environment }));
-  const generatedCertificate = new X509Certificate(generatedTls.certificatePem);
-  const generatedPrivateKey = createPrivateKey(generatedTls.privateKeyPem);
-  if (
-    generatedPrivateKey.asymmetricKeyType !== 'rsa' ||
-    generatedPrivateKey.asymmetricKeyDetails?.modulusLength !== 2048 ||
-    !generatedCertificate.checkPrivateKey(generatedPrivateKey) ||
-    generatedCertificate.ca ||
-    generatedCertificate.subject !== generatedCertificate.issuer ||
-    !generatedCertificate.verify(generatedCertificate.publicKey) ||
-    !Number.isSafeInteger(generatedTls.createdAt)
-  ) {
-    throw new Error('Windows native TLS identity generation failed cryptographic verification');
-  }
-  run(helper, ['set'], { input: secret, env: environment });
-  const restored = run(helper, ['get'], { env: environment }).trimEnd();
-  if (restored !== secret) throw new Error('DPAPI protected-state round trip failed');
-  run(helper, ['delete'], { env: environment });
-  const deleted = spawnSync(helper, ['get'], {
-    cwd: repositoryRoot,
-    encoding: 'utf8',
-    env: environment,
-    shell: false,
-  });
-  if (deleted.status !== 44) throw new Error('DPAPI protected-state deletion failed');
+  const environment = {
+    ...process.env,
+    LOCALAPPDATA: isolatedLocalAppData,
+    DEVINX_DPAPI_STATE_ROOT: isolatedDpapiStateRoot,
+  };
+  const realStateBefore = snapshotRealConnectorState();
+  try {
+    const generatedTls = JSON.parse(run(helper, ['generate-tls'], { env: environment }));
+    const generatedCertificate = new X509Certificate(generatedTls.certificatePem);
+    const generatedPrivateKey = createPrivateKey(generatedTls.privateKeyPem);
+    if (
+      generatedPrivateKey.asymmetricKeyType !== 'rsa' ||
+      generatedPrivateKey.asymmetricKeyDetails?.modulusLength !== 2048 ||
+      !generatedCertificate.checkPrivateKey(generatedPrivateKey) ||
+      generatedCertificate.ca ||
+      generatedCertificate.subject !== generatedCertificate.issuer ||
+      !generatedCertificate.verify(generatedCertificate.publicKey) ||
+      !Number.isSafeInteger(generatedTls.createdAt)
+    ) {
+      throw new Error('Windows native TLS identity generation failed cryptographic verification');
+    }
+    run(helper, ['set'], { input: secret, env: environment });
+    const restored = run(helper, ['get'], { env: environment }).trimEnd();
+    if (restored !== secret) throw new Error('DPAPI protected-state round trip failed');
+    run(helper, ['delete'], { env: environment });
+    const deleted = spawnSync(helper, ['get'], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      env: environment,
+      shell: false,
+    });
+    if (deleted.status !== 44) throw new Error('DPAPI protected-state deletion failed');
 
-  const oversized = spawnSync(helper, ['set'], {
-    cwd: repositoryRoot,
-    input: 'x'.repeat(1024 * 1024 + 1),
-    encoding: 'utf8',
-    env: environment,
-    shell: false,
-  });
-  if (oversized.status === 0) throw new Error('DPAPI helper accepted an oversized plaintext');
-  const invalidOperation = spawnSync(helper, ['export'], {
-    cwd: repositoryRoot,
-    encoding: 'utf8',
-    env: environment,
-    shell: false,
-  });
-  if (invalidOperation.status !== 2)
-    throw new Error('DPAPI helper accepted an unsupported operation');
+    const oversized = spawnSync(helper, ['set'], {
+      cwd: repositoryRoot,
+      input: 'x'.repeat(1024 * 1024 + 1),
+      encoding: 'utf8',
+      env: environment,
+      shell: false,
+    });
+    if (oversized.status === 0) throw new Error('DPAPI helper accepted an oversized plaintext');
+    const invalidOperation = spawnSync(helper, ['export'], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      env: environment,
+      shell: false,
+    });
+    if (invalidOperation.status !== 2)
+      throw new Error('DPAPI helper accepted an unsupported operation');
+  } finally {
+    assertRealConnectorStateUnchanged(realStateBefore);
+  }
 
   const installerEnvironment = {
     ...process.env,

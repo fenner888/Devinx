@@ -202,7 +202,7 @@ export class ConnectorController {
     while (newline >= 0) {
       const lineBuffer = this.inputBuffer.subarray(0, newline);
       const remaining = Buffer.from(this.inputBuffer.subarray(newline + 1));
-      const line = lineBuffer.toString('utf8').replace(/\r$/, '');
+      const line = lineBuffer.toString('utf8').replace(/^\uFEFF/, '').replace(/\r$/, '');
       this.inputBuffer.fill(0);
       this.inputBuffer = remaining;
       if (line.length > 0) this.enqueueCommand(line);

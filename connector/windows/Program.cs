@@ -312,25 +312,13 @@ internal sealed class ConnectorForm : Form
         Margin = new Padding(0, 18, 0, 8),
         Visible = false,
     };
-    private readonly DataGridView devicesGrid = new()
-    {
-        AllowUserToAddRows = false,
-        AllowUserToDeleteRows = false,
-        AutoGenerateColumns = false,
-        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-        MultiSelect = false,
-        RowHeadersVisible = false,
-        Height = 220,
-        Visible = false,
-    };
-    private readonly FlowLayoutPanel deviceActions = new()
+    private readonly FlowLayoutPanel devicesList = new()
     {
         AutoSize = true,
-        FlowDirection = FlowDirection.LeftToRight,
+        FlowDirection = FlowDirection.TopDown,
+        WrapContents = false,
         Visible = false,
     };
-    private readonly Button savePermissionsButton = new() { Text = "Save permissions", AutoSize = true };
-    private readonly Button revokeButton = new() { Text = "Revoke selected iPhone", AutoSize = true };
     private readonly Button releasesButton = new() { Text = "Open Microsoft Store", AutoSize = true };
     private readonly Button helpButton = new() { Text = "Setup and uninstall help", AutoSize = true };
     private readonly NotifyIcon trayIcon = new() { Text = "Otterin Connector", Visible = true };
@@ -338,6 +326,8 @@ internal sealed class ConnectorForm : Form
     private Process? runtime;
     private bool exiting;
     private bool launchAtLoginInitializing = true;
+    private bool buildingDeviceCards;
+    private bool showingPairedNotice;
 
     public ConnectorForm()
     {
@@ -347,12 +337,6 @@ internal sealed class ConnectorForm : Form
         MinimumSize = new Size(560, 700);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10);
-
-        devicesGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Name", HeaderText = "Paired iPhone", ReadOnly = true });
-        devicesGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Paired", HeaderText = "Paired", ReadOnly = true });
-        devicesGrid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Read", HeaderText = "Read history" });
-        devicesGrid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Send", HeaderText = "Send messages" });
-        devicesGrid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Create", HeaderText = "Create sessions" });
 
         var heading = new Label
         {
@@ -369,8 +353,6 @@ internal sealed class ConnectorForm : Form
             ForeColor = Color.DimGray,
             Margin = new Padding(0, 0, 0, 18),
         };
-        deviceActions.Controls.Add(savePermissionsButton);
-        deviceActions.Controls.Add(revokeButton);
         var supportActions = new FlowLayoutPanel
         {
             AutoSize = true,
@@ -395,15 +377,18 @@ internal sealed class ConnectorForm : Form
         content.Controls.Add(qrImage);
         content.Controls.Add(regenerateButton);
         content.Controls.Add(devicesTitle);
-        content.Controls.Add(devicesGrid);
-        content.Controls.Add(deviceActions);
+        content.Controls.Add(devicesList);
         content.Controls.Add(launchAtLogin);
         content.Controls.Add(supportActions);
         Controls.Add(content);
 
-        regenerateButton.Click += async (_, _) => await SendCommandAsync(new { version = 1, type = "regenerate" });
-        savePermissionsButton.Click += async (_, _) => await SaveSelectedPermissionsAsync();
-        revokeButton.Click += async (_, _) => await RevokeSelectedDeviceAsync();
+        regenerateButton.Click += async (_, _) =>
+        {
+            showingPairedNotice = false;
+            qrImage.Visible = true;
+            regenerateButton.Text = "Generate new code";
+            await SendCommandAsync(new { version = 1, type = "regenerate" });
+        };
         releasesButton.Click += (_, _) => OpenOfficialPage(ReleasePage);
         helpButton.Click += (_, _) => OpenOfficialPage(SetupGuide);
         launchAtLogin.CheckedChanged += async (_, _) => await HandleLaunchAtLoginChangedAsync();
@@ -440,8 +425,8 @@ internal sealed class ConnectorForm : Form
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
-                    StandardInputEncoding = Encoding.UTF8,
-                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardInputEncoding = new UTF8Encoding(false),
+                    StandardOutputEncoding = new UTF8Encoding(false),
                 },
                 EnableRaisingEvents = true,
             };
@@ -504,12 +489,29 @@ internal sealed class ConnectorForm : Form
                 ReviewPairing(connectorEvent);
                 break;
             case "pairing_complete":
-                SetStatus("iPhone paired", "Review its permissions below.");
+                showingPairedNotice = true;
+                qrImage.Visible = false;
+                SetStatus(
+                    "iPhone paired",
+                    "Turn on what it may do below. To pair another iPhone, click Show pairing code.");
+                regenerateButton.Text = "Show pairing code";
+                MessageBox.Show(
+                    this,
+                    "Your iPhone is paired. Next, turn on what it may do under Paired iPhones: View sessions, Send prompts and Start sessions.",
+                    "iPhone paired",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 break;
             case "devices":
                 RenderDevices(connectorEvent.Devices ?? []);
                 break;
             case "error":
+                if (connectorEvent.Code == "pairing_expired")
+                {
+                    showingPairedNotice = false;
+                    qrImage.Visible = true;
+                    regenerateButton.Text = "Generate new code";
+                }
                 SetStatus("Needs attention", ErrorCopy(connectorEvent.Code));
                 break;
         }
@@ -522,11 +524,14 @@ internal sealed class ConnectorForm : Form
             var replacement = QrCodeRenderer.Render(payload);
             var prior = qrImage.Image;
             qrImage.Image = replacement;
-            qrImage.Visible = true;
+            qrImage.Visible = !showingPairedNotice;
             qrImage.Invalidate();
             qrImage.Update();
             prior?.Dispose();
-            SetStatus("Ready to connect", "Scan this pairing code with DevinX on your iPhone.");
+            if (!showingPairedNotice)
+            {
+                SetStatus("Ready to connect", "Scan this pairing code with Otterin on your iPhone.");
+            }
         }
         catch (Exception)
         {
@@ -555,43 +560,158 @@ internal sealed class ConnectorForm : Form
 
     private void RenderDevices(IReadOnlyList<ConnectorDevice> devices)
     {
-        devicesGrid.Rows.Clear();
-        foreach (var device in devices.OrderByDescending(item => item.PairedAt))
+        buildingDeviceCards = true;
+        devicesList.SuspendLayout();
+        try
         {
-            var index = devicesGrid.Rows.Add(
-                device.DeviceName,
-                DateTimeOffset.FromUnixTimeMilliseconds(device.PairedAt).LocalDateTime.ToString("g"),
-                device.AllowSessionContent,
-                device.AllowSessionPrompt,
-                device.AllowSessionCreate);
-            devicesGrid.Rows[index].Tag = device.DeviceId;
-            devicesGrid.Rows[index].ReadOnly = device.Status != "active";
+            foreach (Control oldCard in devicesList.Controls.Cast<Control>().ToArray())
+            {
+                devicesList.Controls.Remove(oldCard);
+                oldCard.Dispose();
+            }
+            foreach (var device in devices.OrderByDescending(item => item.PairedAt))
+            {
+                devicesList.Controls.Add(CreateDeviceCard(device));
+            }
         }
+        finally
+        {
+            devicesList.ResumeLayout();
+            buildingDeviceCards = false;
+        }
+
         var hasDevices = devices.Count > 0;
         devicesTitle.Visible = hasDevices;
-        devicesGrid.Visible = hasDevices;
-        deviceActions.Visible = hasDevices;
+        devicesList.Visible = hasDevices;
     }
 
-    private async Task SaveSelectedPermissionsAsync()
+    private Panel CreateDeviceCard(ConnectorDevice device)
     {
-        var row = devicesGrid.CurrentRow;
-        if (row?.Tag is not string deviceId) return;
+        var isActive = device.Status == "active";
+        var card = new Panel
+        {
+            Width = 520,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BorderStyle = BorderStyle.FixedSingle,
+            Padding = new Padding(10),
+            Margin = new Padding(0, 0, 0, 10),
+        };
+        var cardContent = new FlowLayoutPanel
+        {
+            Width = 498,
+            MaximumSize = new Size(498, 0),
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            Margin = Padding.Empty,
+            Dock = DockStyle.Top,
+        };
+        var nameLabel = new Label
+        {
+            Text = device.DeviceName,
+            AutoSize = true,
+            MaximumSize = new Size(500, 0),
+            Font = new Font("Segoe UI", 12, FontStyle.Bold),
+            Margin = new Padding(0, 0, 0, 4),
+        };
+        var pairedLabel = new Label
+        {
+            Text = $"Paired {DateTimeOffset.FromUnixTimeMilliseconds(device.PairedAt).LocalDateTime.ToString("g")}",
+            AutoSize = true,
+            ForeColor = Color.DimGray,
+            Margin = Padding.Empty,
+        };
+        var viewSessions = new CheckBox
+        {
+            Text = "View sessions",
+            AutoSize = true,
+            Checked = device.AllowSessionContent,
+            Enabled = isActive,
+            Margin = new Padding(0, 4, 0, 0),
+        };
+        var sendPrompts = new CheckBox
+        {
+            Text = "Send prompts",
+            AutoSize = true,
+            Checked = device.AllowSessionPrompt,
+            Enabled = isActive,
+            Margin = new Padding(0, 4, 0, 0),
+        };
+        var startSessions = new CheckBox
+        {
+            Text = "Start sessions",
+            AutoSize = true,
+            Checked = device.AllowSessionCreate,
+            Enabled = isActive,
+            Margin = new Padding(0, 4, 0, 0),
+        };
+
+        cardContent.Controls.Add(nameLabel);
+        cardContent.Controls.Add(pairedLabel);
+        if (!isActive)
+        {
+            cardContent.Controls.Add(new Label
+            {
+                Text = "Revoked",
+                AutoSize = true,
+                ForeColor = Color.DimGray,
+                Margin = new Padding(0, 2, 0, 0),
+            });
+        }
+        cardContent.Controls.Add(viewSessions);
+        cardContent.Controls.Add(sendPrompts);
+        cardContent.Controls.Add(startSessions);
+
+        if (isActive)
+        {
+            EventHandler savePermissions = async (_, _) =>
+            {
+                if (buildingDeviceCards) return;
+                await SaveSelectedPermissionsAsync(
+                    device.DeviceId,
+                    viewSessions.Checked,
+                    sendPrompts.Checked,
+                    startSessions.Checked);
+            };
+            viewSessions.CheckedChanged += savePermissions;
+            sendPrompts.CheckedChanged += savePermissions;
+            startSessions.CheckedChanged += savePermissions;
+
+            var revokeButton = new Button
+            {
+                Text = "Revoke this iPhone",
+                AutoSize = true,
+                Margin = new Padding(0, 8, 0, 0),
+            };
+            revokeButton.Click += async (_, _) => await RevokeSelectedDeviceAsync(device.DeviceId);
+            cardContent.Controls.Add(revokeButton);
+        }
+
+        card.Controls.Add(cardContent);
+        return card;
+    }
+
+    private async Task SaveSelectedPermissionsAsync(
+        string deviceId,
+        bool allowSessionContent,
+        bool allowSessionPrompt,
+        bool allowSessionCreate)
+    {
         await SendCommandAsync(new
         {
             version = 1,
             type = "update_device",
             deviceId,
-            allowSessionContent = Convert.ToBoolean(row.Cells["Read"].Value),
-            allowSessionPrompt = Convert.ToBoolean(row.Cells["Send"].Value),
-            allowSessionCreate = Convert.ToBoolean(row.Cells["Create"].Value),
+            allowSessionContent,
+            allowSessionPrompt,
+            allowSessionCreate,
         });
     }
 
-    private async Task RevokeSelectedDeviceAsync()
+    private async Task RevokeSelectedDeviceAsync(string deviceId)
     {
-        var row = devicesGrid.CurrentRow;
-        if (row?.Tag is not string deviceId) return;
         if (MessageBox.Show(this, "Revoke this iPhone?", "Confirm revocation", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
         await SendCommandAsync(new { version = 1, type = "revoke_device", deviceId });
     }

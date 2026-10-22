@@ -299,6 +299,50 @@ describe('Otterin Connector platform and IPC boundary', () => {
     expect(Buffer.concat(chunks).toString('utf8')).toContain('"type":"reset_complete"');
   });
 
+  it('accepts a UTF-8 BOM before a Connector command', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const chunks: Buffer[] = [];
+    output.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+    const resetPersistentState = jest.fn<Promise<void>, []>().mockImplementation(async () => {});
+    const runner = {
+      start: async () => ({
+        endpoint: 'http://100.90.80.70:45831/',
+        pairingOfferExpiresAt: Date.now() + 60_000,
+        sessionDiscoveryEnabled: false,
+        transportKind: 'tailscale_vpn' as const,
+      }),
+      pendingReviews: () => [],
+      showPairingOffer: () => Date.now() + 60_000,
+      recoverSessionDiscovery: async () => false,
+      pairedDevices: () => [],
+      resetPersistentState,
+      stop: async () => {},
+    } as unknown as DesktopBridgeRunner;
+    const controller = new ConnectorController({
+      input,
+      output,
+      platform: controllerPlatform(),
+      pollIntervalMs: 1,
+      createRunner: () => runner,
+    });
+
+    const running = controller.run();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    input.write(
+      Buffer.concat([
+        Buffer.from('\uFEFF', 'utf8'),
+        Buffer.from(`${JSON.stringify({ version: CONNECTOR_IPC_VERSION, type: 'reset' })}\n`),
+      ]),
+    );
+    await running;
+
+    expect(resetPersistentState).toHaveBeenCalledTimes(1);
+    const encoded = Buffer.concat(chunks).toString('utf8');
+    expect(encoded).toContain('"type":"reset_complete"');
+    expect(encoded).not.toContain('"code":"command_invalid"');
+  });
+
   it('fails closed when protected Connector state cannot be removed', async () => {
     const input = new PassThrough();
     const output = new PassThrough();
