@@ -50,9 +50,6 @@ jobs:
           DEVINX_REQUIRE_MSIX_ARTIFACT: '1'
         run: npm run connector:verify:windows:store
 
-      - name: Audit JavaScript dependencies
-        run: npm run audit
-
       - name: Upload non-release verification artifact
         uses: actions/upload-artifact@v6
         with:
@@ -73,3 +70,6 @@ jobs:
             artifacts/connector/windows/DevinX-Connector-*-windows-x64.msix
             artifacts/connector/windows/DevinX-Connector-*-windows-x64.msix.sha256
           if-no-files-found: error
+
+      - name: Audit JavaScript dependencies
+        run: npm run audit
