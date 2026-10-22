@@ -752,6 +752,80 @@ if (request.method === 'initialize') {
     }
   });
 
+  it('marks failed tool activity interrupted after cancelling the active prompt', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-stop', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  globalThis.promptRequestId = request.id;
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', method: 'session/update', params: {
+      sessionId: 'session-stop',
+      update: { sessionUpdate: 'tool_call', toolCallId: 'stopped-tool', title: 'Run command',
+        kind: 'execute', status: 'in_progress' }
+    }
+  }) + '\\n');
+} else if (request.method === 'session/cancel') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', method: 'session/update', params: {
+      sessionId: 'session-stop',
+      update: { sessionUpdate: 'tool_call_update', toolCallId: 'stopped-tool', status: 'failed',
+        content: [{ type: 'content', content: { type: 'text', text: 'Stopped by user' } }] }
+    }
+  }) + '\\n');
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: globalThis.promptRequestId, result: { stopReason: 'cancelled' }
+  }) + '\\n');
+}`);
+    const client = new AcpSessionClient({
+      executablePath,
+      requestTimeoutMs: 1_000,
+      promptTimeoutMs: 2_000,
+    });
+
+    try {
+      await client.start();
+      await client.listSessions();
+      await client.loadSession('session-stop');
+      await client.promptSession('session-stop', 'Use a tool.');
+      let turn = client.getSessionTurn('session-stop');
+      for (
+        let attempt = 0;
+        attempt < 20 && !turn?.activity.some((entry) => entry.status === 'running');
+        attempt += 1
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        turn = client.getSessionTurn('session-stop');
+      }
+      expect(turn?.activity).toEqual(
+        expect.arrayContaining([expect.objectContaining({ status: 'running' })]),
+      );
+
+      client.cancelSession('session-stop');
+      for (
+        let attempt = 0;
+        attempt < 20 && !turn?.activity.some((entry) => entry.status === 'interrupted');
+        attempt += 1
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        turn = client.getSessionTurn('session-stop');
+      }
+      expect(turn?.activity).toEqual(
+        expect.arrayContaining([expect.objectContaining({ status: 'interrupted' })]),
+      );
+    } finally {
+      await client.stop();
+    }
+  });
+
   it('applies an exact loaded-session model before prompting and rejects stale IDs', async () => {
     const executablePath = fakeCli(`
 if (request.method === 'initialize') {

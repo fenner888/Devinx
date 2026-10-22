@@ -1950,6 +1950,9 @@ export class AcpSessionClient {
     }
     this.clearPendingPermission(sessionId, true);
     this.clearPendingElicitation(sessionId, true);
+    if (this.activeTurn?.sessionId === sessionId) {
+      this.activeTurn.activity.markCancelRequested();
+    }
     child.stdin.write(
       `${JSON.stringify({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId } })}\n`,
     );
