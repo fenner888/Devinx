@@ -249,7 +249,7 @@ The maintained parity inventory is in
 - A configured Expo/EAS development environment
 
 ```bash
-git clone https://github.com/fenner888/Otterin.git
+git clone https://github.com/fenner888/Otterin.git Devinx
 cd Devinx
 npm ci --legacy-peer-deps
 npm run ci
