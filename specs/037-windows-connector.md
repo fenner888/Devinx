@@ -112,7 +112,7 @@ The Store identity is public packaging metadata, not a secret:
 - publisher: `CN=43D84E24-857C-4C40-9DAA-1A6983913CD9`
 - publisher display name: `DevinX Tools`
 - Store ID: `9N52Z3FVMFH8`
-- package family: `DevinXTools.DevinXConnector_ydtgrt4yd5wrc`
+- package family: `DevinXTools.DevinXConnector_vdtqrt4vd5wrc`
 - default package language: `en-US`
 
 The Store container is also an execution boundary. Some Windows Store installations allow the

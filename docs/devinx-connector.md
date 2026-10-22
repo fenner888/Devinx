@@ -158,7 +158,7 @@ unsigned upload MSIX must never be sideloaded or offered as a direct download. T
 - publisher: `CN=43D84E24-857C-4C40-9DAA-1A6983913CD9`
 - publisher display name: `DevinX Tools`
 - Store ID: `9N52Z3FVMFH8`
-- package family: `DevinXTools.DevinXConnector_ydtgrt4yd5wrc`
+- package family: `DevinXTools.DevinXConnector_vdtqrt4vd5wrc`
 
 The Store package declares an opt-in Windows startup task. Connector uses the packaged
 `Windows.ApplicationModel.StartupTask` API and respects a task disabled by the user in Windows

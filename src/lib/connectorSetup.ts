@@ -20,7 +20,7 @@ On macOS, open the official Otterin Connector release page at ${CONNECTOR_RELEAS
 
 If Connector is already installed, explain the update steps: ${CONNECTOR_UPDATE_NOTICE} ${MAC_CONNECTOR_UPDATE_STEPS} ${WINDOWS_CONNECTOR_UPDATE_STEPS} Follow only the steps for the detected operating system. Do not uninstall Connector or erase its pairing data to update it.
 
-On Windows 11 x64, open the official Microsoft Store listing at ${WINDOWS_CONNECTOR_STORE_PAGE}. Install only the verified Store package linked there, published by DevinX Tools, with Store ID 9N52Z3FVMFH8. After installation, confirm that Get-AppxPackage reports package identity DevinXTools.DevinXConnector, publisher CN=43D84E24-857C-4C40-9DAA-1A6983913CD9, and package family DevinXTools.DevinXConnector_ydtgrt4yd5wrc. Do not download, sideload, or execute an unsigned CI MSIX, EXE, or ZIP.
+On Windows 11 x64, open the official Microsoft Store listing at ${WINDOWS_CONNECTOR_STORE_PAGE}. Install only the verified Store package linked there, published by DevinX Tools, with Store ID 9N52Z3FVMFH8. After installation, confirm that Get-AppxPackage reports package identity DevinXTools.DevinXConnector, publisher CN=43D84E24-857C-4C40-9DAA-1A6983913CD9, and package family DevinXTools.DevinXConnector_vdtqrt4vd5wrc. Do not download, sideload, or execute an unsigned CI MSIX, EXE, or ZIP.
 
 If the required official distribution is unavailable for this platform, or any identity, signature, checksum, notarization, or Gatekeeper check applicable to it fails, stop and tell me that Otterin Connector cannot be safely installed. Do not clone or build the source, install a guessed package, use an unofficial repository or mirror, or substitute a similarly named application.
 
