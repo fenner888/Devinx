@@ -440,8 +440,8 @@ internal sealed class ConnectorForm : Form
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
-                    StandardInputEncoding = Encoding.UTF8,
-                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardInputEncoding = new UTF8Encoding(false),
+                    StandardOutputEncoding = new UTF8Encoding(false),
                 },
                 EnableRaisingEvents = true,
             };
@@ -526,7 +526,7 @@ internal sealed class ConnectorForm : Form
             qrImage.Invalidate();
             qrImage.Update();
             prior?.Dispose();
-            SetStatus("Ready to connect", "Scan this pairing code with DevinX on your iPhone.");
+            SetStatus("Ready to connect", "Scan this pairing code with Otterin on your iPhone.");
         }
         catch (Exception)
         {
