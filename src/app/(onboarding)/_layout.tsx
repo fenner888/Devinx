@@ -1,5 +1,5 @@
 /**
- * Onboarding layout — welcome → features → Mac pairing.
+ * Onboarding layout — welcome → features → computer pairing.
  */
 import { Stack } from 'expo-router';
 

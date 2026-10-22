@@ -25,7 +25,7 @@ The separate Connector application is the current supported way to install and o
     Linux and Intel Mac packages remain unavailable.
 2. Install and open **Otterin Connector**.
 3. Connect the computer and iPhone to the same Tailscale network, then confirm that the connector shows Tailscale and Devin for Terminal.
-4. In the iPhone app, open **Your Mac → Scan pairing code**.
+4. In the iPhone app, open **Your computer → Scan pairing code**.
 5. Scan the short-lived QR shown by the connector.
 6. Confirm the requesting iPhone name and choose its permissions on the computer.
 
