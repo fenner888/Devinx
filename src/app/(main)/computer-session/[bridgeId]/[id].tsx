@@ -120,7 +120,7 @@ function publicErrorMessage(error: unknown): string {
   return 'Open Otterin Connector and confirm the secure local connection is available.';
 }
 
-export function promptErrorMessage(error: unknown): string {
+export function promptErrorMessage(error: unknown, computerName?: string): string {
   if (!(error instanceof ComputerBridgeError)) {
     return 'The message could not be sent. Try again.';
   }
@@ -140,7 +140,7 @@ export function promptErrorMessage(error: unknown): string {
     return 'Otterin Connector is temporarily unavailable. Confirm it is running on your local device.';
   }
   if (error.code === 'auto_approve_unavailable') {
-    return "Auto-approve isn't allowed on this Mac (organization policy). Your message wasn't sent.";
+    return `Auto-approve isn't allowed on ${computerName ?? 'your computer'} (organization policy). Your message wasn't sent.`;
   }
   return 'The message could not be sent. Try again.';
 }
@@ -398,7 +398,8 @@ export default function ComputerSessionDetailScreen() {
         ? `terminal:${JSON.stringify(terminalQuestions)}`
         : null;
   const previousInteractionKey = useRef<string | null>(null);
-  const terminalHint = `Answer in Terminal on ${computer?.computerName ?? 'your Mac'}`;
+  const computerName = computer?.computerName ?? 'your computer';
+  const terminalHint = `Answer in Terminal on ${computerName}`;
   const localOptions = useComputerCreateOptions(bridgeId, canPrompt && Boolean(computer));
   const localModels = useMemo(() => localOptions.data?.models ?? [], [localOptions.data?.models]);
   const modelFamilies = useMemo(() => groupComputerModels(localModels), [localModels]);
@@ -420,7 +421,7 @@ export default function ComputerSessionDetailScreen() {
       repositories: query.data?.session.workspaceName ? [query.data.session.workspaceName] : [],
     },
     scribeContext: {
-      destination: computer?.computerName ?? 'Paired local device',
+      destination: computerName,
       repository: query.data?.session.workspaceName,
     },
   });
@@ -614,7 +615,7 @@ export default function ComputerSessionDetailScreen() {
       onError: (error) => {
         setCancelError(
           error instanceof ComputerBridgeError && error.code === 'conflict'
-            ? 'This turn was started in Terminal on your Mac. Stop it there.'
+            ? `This turn was started in Terminal on ${computerName}. Stop it there.`
             : "Couldn't stop the turn. Try again.",
         );
       },
@@ -700,7 +701,7 @@ export default function ComputerSessionDetailScreen() {
           <View className="mt-0.5 flex-row items-center">
             <Ionicons name="desktop-outline" size={12} color={tokens.brandText.hex} />
             <Text className="ml-1.5 text-brand-text text-text12" numberOfLines={1}>
-              {computer?.computerName ?? 'Paired local device'}
+              {computerName}
             </Text>
             {(activityIndicatorKind || awaitingInteraction) && (
               <>
@@ -977,7 +978,7 @@ export default function ComputerSessionDetailScreen() {
                     <View className="mb-2" key={`${index}-${question.question}`}>
                       <ComputerTerminalQuestionCard
                         question={question}
-                        computerName={computer?.computerName ?? 'your Mac'}
+                        computerName={computerName}
                       />
                     </View>
                   ))
@@ -1000,7 +1001,7 @@ export default function ComputerSessionDetailScreen() {
               )}
               {prompt.error && (
                 <Text className="mb-2 text-failed text-text12">
-                  {promptErrorMessage(prompt.error)}
+                  {promptErrorMessage(prompt.error, computerName)}
                 </Text>
               )}
               <View
@@ -1139,7 +1140,7 @@ export default function ComputerSessionDetailScreen() {
                 <View className="mr-4 flex-row items-center">
                   <Ionicons name="desktop-outline" size={14} color={tokens.textLow.hex} />
                   <Text className="ml-1.5 text-text-low text-text12" numberOfLines={1}>
-                    {computer?.computerName ?? 'Paired local device'}
+                    {computerName}
                   </Text>
                 </View>
                 <View

@@ -35,7 +35,7 @@ const FEATURES: ReadonlyArray<{
     icon: 'lock-closed-outline',
     title: 'Keep credentials private',
     detail:
-      'Your Devin sign-in stays on your Mac. This app keeps only its pairing key in iOS Keychain.',
+      'Your Devin sign-in stays on your computer. This app keeps only its pairing key in iOS Keychain.',
     tone: 'blue',
   },
 ];
@@ -99,7 +99,7 @@ export default function OnboardingFeaturesScreen() {
             className="min-h-14 bg-brand rounded-button items-center justify-center mt-5"
             onPress={() => router.push('/(onboarding)/computer')}
             accessibilityRole="button"
-            accessibilityLabel="Continue to pair a Mac"
+            accessibilityLabel="Continue to pair a computer"
           >
             <Text className="text-text-always-white text-text16 font-semibold">Continue</Text>
           </Pressable>

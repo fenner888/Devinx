@@ -22,7 +22,7 @@ sessions. Use the menu button in the upper-left to navigate:
 - **Sessions:** open the menu and choose **Sessions**.
 - **Question:** from Sessions, open **Fix login redirect loop**.
 - **Permission:** from Sessions, open **Write tests for recipe search**.
-- **Your Mac:** open the menu and choose **Your Mac**.
+- **Your computer:** open the menu and choose **Your computer**.
 
 Capture each screen with:
 

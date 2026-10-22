@@ -149,7 +149,7 @@ export default function SessionsScreen() {
                     : search.trim()
                       ? 'No matching sessions'
                       : computers.length === 0
-                        ? 'Pair a Mac to see local sessions'
+                        ? 'Pair a computer to see local sessions'
                         : 'No local sessions yet'}
                 </Text>
                 <Text className="mt-2 text-center text-text-mid text-text13 leading-5">
@@ -158,8 +158,8 @@ export default function SessionsScreen() {
                     : search.trim()
                       ? 'Try a different search.'
                       : computers.length === 0
-                        ? 'Pair your Mac from Your Mac in the menu.'
-                        : 'Start or resume a Devin for Terminal session on your Mac.'}
+                        ? 'Use Your computer in the menu to pair a computer.'
+                        : `Start or resume a Devin for Terminal session on ${computers[0]?.computerName ?? 'your computer'}.`}
                 </Text>
               </>
             )}

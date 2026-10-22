@@ -28,7 +28,7 @@ const rows = [
   {
     title: 'Local sessions',
     detail:
-      'After you pair and approve an iPhone, Otterin can request minimized Devin session data directly from your Mac over Tailscale. Metadata is the default; message text requires a separate read grant. Local files, tool payloads, thoughts, and credentials are not returned.',
+      'After you pair and approve an iPhone, Otterin can request minimized Devin session data directly from your computer over Tailscale. Metadata is the default; message text requires a separate read grant. Local files, tool payloads, thoughts, and credentials are not returned.',
   },
   {
     title: 'Tailscale and private networks',
@@ -43,7 +43,7 @@ const rows = [
   {
     title: 'Your controls and deletion',
     detail:
-      'Wiping local data removes paired-Mac keys, drafts, saved session context, and cached data from this iPhone. Revoking the iPhone in Otterin Connector ends its local-device access.',
+      'Wiping local data removes paired-computer keys, drafts, saved session context, and cached data from this iPhone. Revoking the iPhone in Otterin Connector ends its local-device access.',
   },
 ] as const;
 
@@ -69,7 +69,7 @@ export default function PrivacyScreen() {
         </Text>
         <Text className="text-text-mid text-text14 leading-5 mb-5">
           Otterin does not relay session content through its own backend. Approved local-session
-          requests go directly to your paired Mac.
+          requests go directly to your paired computer.
         </Text>
         <View className="bg-surface1 rounded-card border border-border-subtle overflow-hidden mb-5">
           {rows.map((row, index) => (

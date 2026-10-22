@@ -72,13 +72,15 @@ describe('Local-only Settings', () => {
     }
     fireEvent.press(screen.getByLabelText('Fast refresh speed'));
     expect(
-      screen.getByText('Session list checks your Mac every 15s. Open sessions update every 1s.'),
+      screen.getByText(
+        'Session lists check for paired computers every 15s. Open sessions update every 1s.',
+      ),
     ).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Wipe all local data'));
     expect(confirmAction).toHaveBeenCalledWith(
       expect.objectContaining({
         message:
-          'This removes paired-Mac keys and cached session data from this iPhone. Your sessions on your Mac are not affected.',
+          'This removes paired-computer keys and cached session data from this iPhone. Your local sessions are not affected.',
       }),
       expect.any(Function),
     );

@@ -45,10 +45,11 @@ export default function WelcomeScreen() {
           </View>
 
           <Text className="text-text-hi-strong text-text28 font-semibold mt-2">
-            Your Mac&apos;s coding agent, in your pocket.
+            Your coding agent, in your pocket.
           </Text>
           <Text className="text-text-mid text-text16 leading-6 mt-3">
-            Start, follow and steer local Devin sessions on your Mac from your iPhone.
+            Start, follow and steer local Devin sessions on your Mac or Windows PC from your
+            iPhone.
           </Text>
 
           <View className="flex-row flex-wrap gap-2 mt-5">

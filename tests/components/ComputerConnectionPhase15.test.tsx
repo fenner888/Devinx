@@ -198,11 +198,11 @@ describe('Phase 15 local-device pairing screen', () => {
     );
   });
 
-  it('defaults the computer name to My Mac and uses the Connector name when untouched', async () => {
+  it('defaults the computer name to My computer and uses the Connector name when untouched', async () => {
     const screen = render(<ComputerConnectionScreen />);
 
     expect(screen.getByText('Name this computer')).toBeTruthy();
-    expect(screen.getByDisplayValue('My Mac')).toBeTruthy();
+    expect(screen.getByDisplayValue('My computer')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Scan Otterin Connector pairing code'));
     await waitFor(() => expect(screen.getByTestId('qr-scanner')).toBeTruthy());
     fireEvent.press(screen.getByTestId('qr-scanner'));
@@ -211,7 +211,7 @@ describe('Phase 15 local-device pairing screen', () => {
       expect(mockPairComputer).toHaveBeenCalledWith(
         '{"pairing":"offer"}',
         expect.objectContaining({
-          computerName: 'My Mac',
+          computerName: 'My computer',
           useConnectorComputerName: true,
         }),
       ),

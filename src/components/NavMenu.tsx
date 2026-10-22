@@ -36,7 +36,7 @@ export function NavMenu({
   const primary: NavItem[] = [
     { icon: 'add', label: 'New session', route: '/(main)' },
     { icon: 'chatbubbles-outline', label: 'Sessions', route: '/(main)/sessions' },
-    { icon: 'desktop-outline', label: 'Your Mac', route: '/(main)/computer' },
+    { icon: 'desktop-outline', label: 'Your computer', route: '/(main)/computer' },
   ];
 
   function go(route: Href) {

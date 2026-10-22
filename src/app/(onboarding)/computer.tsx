@@ -61,7 +61,7 @@ const STEPS = [
 ];
 
 const TAILSCALE_IOS_GUIDE = 'https://tailscale.com/docs/install/ios';
-const DEFAULT_COMPUTER_NAME = 'My Mac';
+const DEFAULT_COMPUTER_NAME = 'My computer';
 
 const STATUS_COPY: Record<ComputerPairingStatus, string> = {
   validating: 'Checking the pairing code…',
@@ -440,10 +440,10 @@ export default function ComputerConnectionScreen() {
             <Ionicons name="desktop-outline" size={27} color={tokens.brandText.hex} />
           </View>
           <Text className="text-text-hi text-text24 font-semibold mb-2">
-            Pair a Mac
+            Pair a computer
           </Text>
           <Text className="text-text-mid text-text14 leading-5 mb-7">
-            Tailscale provides the private route to your Mac. Connector provides authorized local
+            Tailscale provides the private route to your computer. Connector provides authorized local
             session access; your Devin sign-in stays there.
           </Text>
 

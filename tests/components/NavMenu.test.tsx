@@ -16,7 +16,7 @@ import { NavMenu } from '../../src/components/NavMenu';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
 
 describe('NavMenu', () => {
-  it('shows only Home, Sessions, Your Mac, and Settings destinations', () => {
+  it('shows only Home, Sessions, Your computer, and Settings destinations', () => {
     const onClose = jest.fn();
     const screen = render(
       <ThemeProvider>
@@ -24,7 +24,7 @@ describe('NavMenu', () => {
       </ThemeProvider>,
     );
 
-    for (const item of ['New session', 'Sessions', 'Your Mac', 'Settings']) {
+    for (const item of ['New session', 'Sessions', 'Your computer', 'Settings']) {
       expect(screen.getByLabelText(item)).toBeTruthy();
     }
     expect(screen.getByLabelText('Otterin')).toBeTruthy();

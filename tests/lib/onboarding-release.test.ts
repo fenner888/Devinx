@@ -8,9 +8,9 @@ describe('Local-only onboarding', () => {
   it('starts with the approved copy and three-step progress', () => {
     const welcome = readSource('src/app/(onboarding)/index.tsx');
 
-    expect(welcome).toContain('Your Mac&apos;s coding agent, in your pocket.');
-    expect(welcome).toContain(
-      'Start, follow and steer local Devin sessions on your Mac from your iPhone.',
+    expect(welcome).toContain('Your coding agent, in your pocket.');
+    expect(welcome).toMatch(
+      /Start, follow and steer local Devin sessions on your Mac or Windows PC from your\s+iPhone\./,
     );
     expect(welcome).toContain('Local only');
     expect(welcome).toContain('On-device voice');
@@ -27,7 +27,7 @@ describe('Local-only onboarding', () => {
     expect(features).toContain('Speak detailed prompts');
     expect(features).toContain('Keep credentials private');
     expect(features).toContain(
-      'Your Devin sign-in stays on your Mac. This app keeps only its pairing key in iOS Keychain.',
+      'Your Devin sign-in stays on your computer. This app keeps only its pairing key in iOS Keychain.',
     );
     expect(computer).toContain('total={3}');
     expect(computer).not.toMatch(/connectionMode|mode === ['"]both|\/credentials/);

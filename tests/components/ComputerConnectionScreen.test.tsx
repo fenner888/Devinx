@@ -118,7 +118,7 @@ describe('Computer connection onboarding', () => {
   it('shows the real pairing instructions and starts the scanner after permission', async () => {
     const screen = render(<ComputerConnectionScreen />);
 
-    expect(screen.getByText('Pair a Mac')).toBeTruthy();
+    expect(screen.getByText('Pair a computer')).toBeTruthy();
     expect(screen.getByText('Name this computer')).toBeTruthy();
     expect(screen.getByText('Open Tailscale setup guide')).toBeTruthy();
     expect(screen.getByText('Set up Otterin Connector')).toBeTruthy();
@@ -150,7 +150,7 @@ describe('Computer connection onboarding', () => {
   it('shows local pairing without a Cloud alternative', () => {
     const screen = render(<ComputerConnectionScreen />);
 
-    expect(screen.getByText('Pair a Mac')).toBeTruthy();
+    expect(screen.getByText('Pair a computer')).toBeTruthy();
     expect(screen.queryByText(/Devin Cloud|Connect Devin Cloud/)).toBeNull();
   });
 
@@ -235,7 +235,7 @@ describe('Computer connection onboarding', () => {
     await waitFor(() => expect(mockPairComputer).toHaveBeenCalledTimes(1));
     expect(mockPairComputer).toHaveBeenCalledWith(
       '{"pairing":"offer"}',
-      expect.objectContaining({ computerName: 'My Mac', signal: expect.any(Object) }),
+      expect.objectContaining({ computerName: 'My computer', signal: expect.any(Object) }),
     );
     await waitFor(() => expect(mockRefreshComputers).toHaveBeenCalledTimes(1));
     expect(mockReplace).toHaveBeenCalledWith('/(main)');
