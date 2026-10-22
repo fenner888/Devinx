@@ -23,6 +23,207 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
+export const SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS = 4_000;
+
+type ScreenshotFixturePermissionDecision = 'allow_once' | 'allow_session' | 'reject_once';
+type ScreenshotFixtureElicitationAction = 'accept' | 'decline' | 'cancel';
+
+type ScreenshotFixtureDemoAction = {
+  startedAt: number;
+  userMessage?: string;
+  assistantReply: string;
+  cancelledAt?: number;
+};
+
+type ScreenshotFixtureCreatedSession = {
+  workspaceId: string;
+  modelId?: string | null;
+  text: string;
+  createdAt: number;
+};
+
+export type ScreenshotFixtureDemoActivity = {
+  active: boolean;
+  kind: 'responding';
+  state: 'working' | 'completed' | 'interrupted';
+  updatedAt: number;
+};
+
+export type ScreenshotFixtureDemoMessage = {
+  source: 'user' | 'devin';
+  text: string;
+  createdAt: number;
+};
+
+const permissionResponses = new Map<
+  string,
+  { respondedAt: number; decision: ScreenshotFixturePermissionDecision }
+>();
+const elicitationResponses = new Map<
+  string,
+  { respondedAt: number; action: ScreenshotFixtureElicitationAction }
+>();
+const demoActions = new Map<string, ScreenshotFixtureDemoAction[]>();
+const cancelledAtBySession = new Map<string, number>();
+let createdSession: ScreenshotFixtureCreatedSession | null = null;
+
+export function resetScreenshotFixtureDemoState(): void {
+  permissionResponses.clear();
+  elicitationResponses.clear();
+  demoActions.clear();
+  cancelledAtBySession.clear();
+  createdSession = null;
+}
+
+function appendDemoAction(sessionId: string, action: ScreenshotFixtureDemoAction): void {
+  const actions = demoActions.get(sessionId) ?? [];
+  actions.push(action);
+  demoActions.set(sessionId, actions);
+  cancelledAtBySession.delete(sessionId);
+}
+
+export function recordScreenshotFixtureCreatedSession(
+  input: ScreenshotFixtureCreatedSession,
+): void {
+  createdSession = input;
+  appendDemoAction(SCREENSHOT_FIXTURE_SESSION_IDS.created, {
+    startedAt: input.createdAt,
+    userMessage: input.text,
+    assistantReply: 'Added a 7-day forecast view to the home screen. The forecast tests pass.',
+  });
+}
+
+export function getScreenshotFixtureCreatedSession(): ScreenshotFixtureCreatedSession | null {
+  return createdSession;
+}
+
+export function recordScreenshotFixturePermissionResponse(
+  sessionId: string,
+  decision: ScreenshotFixturePermissionDecision,
+  respondedAt: number,
+): void {
+  permissionResponses.set(sessionId, { respondedAt, decision });
+  appendDemoAction(sessionId, {
+    startedAt: respondedAt,
+    assistantReply:
+      decision === 'reject_once'
+        ? "OK, I won't run that. Want me to try something else?"
+        : 'Ran the recipe search tests: 14 passed, 0 failed.',
+  });
+}
+
+export function recordScreenshotFixtureElicitationResponse(
+  sessionId: string,
+  action: ScreenshotFixtureElicitationAction,
+  respondedAt: number,
+): void {
+  elicitationResponses.set(sessionId, { respondedAt, action });
+  appendDemoAction(sessionId, {
+    startedAt: respondedAt,
+    assistantReply:
+      action === 'accept'
+        ? 'I kept the redirect and finished the login checks.'
+        : 'Okay, I left the login route unchanged.',
+  });
+}
+
+export function recordScreenshotFixturePrompt(
+  sessionId: string,
+  text: string,
+  startedAt: number,
+): void {
+  appendDemoAction(sessionId, {
+    startedAt,
+    userMessage: text,
+    assistantReply: 'Done. I updated the forecast card and the tests still pass.',
+  });
+}
+
+export function recordScreenshotFixtureCancellation(
+  sessionId: string,
+  cancelledAt: number,
+): void {
+  cancelledAtBySession.set(sessionId, cancelledAt);
+  for (const action of demoActions.get(sessionId) ?? []) {
+    if (
+      action.cancelledAt === undefined &&
+      cancelledAt < action.startedAt + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS
+    ) {
+      action.cancelledAt = cancelledAt;
+    }
+  }
+}
+
+export function hasScreenshotFixturePermissionResponse(sessionId: string): boolean {
+  return permissionResponses.has(sessionId);
+}
+
+export function hasScreenshotFixtureElicitationResponse(sessionId: string): boolean {
+  return elicitationResponses.has(sessionId);
+}
+
+export function isScreenshotFixtureSessionCancelled(sessionId: string): boolean {
+  return cancelledAtBySession.has(sessionId);
+}
+
+export function getScreenshotFixtureDemoActivity(
+  sessionId: string,
+  now = Date.now(),
+): ScreenshotFixtureDemoActivity | null {
+  const cancelledAt = cancelledAtBySession.get(sessionId);
+  if (cancelledAt !== undefined) {
+    return { active: false, kind: 'responding', state: 'interrupted', updatedAt: cancelledAt };
+  }
+
+  const actions = demoActions.get(sessionId);
+  const action = actions?.[actions.length - 1];
+  if (!action) return null;
+
+  if (action.cancelledAt !== undefined) {
+    return {
+      active: false,
+      kind: 'responding',
+      state: 'interrupted',
+      updatedAt: action.cancelledAt,
+    };
+  }
+
+  const completed = now >= action.startedAt + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS;
+  return {
+    active: !completed,
+    kind: 'responding',
+    state: completed ? 'completed' : 'working',
+    updatedAt: action.startedAt,
+  };
+}
+
+export function getScreenshotFixtureDemoMessages(
+  sessionId: string,
+  now = Date.now(),
+): ScreenshotFixtureDemoMessage[] {
+  const messages: ScreenshotFixtureDemoMessage[] = [];
+  for (const action of demoActions.get(sessionId) ?? []) {
+    if (action.userMessage !== undefined) {
+      messages.push({
+        source: 'user',
+        text: action.userMessage,
+        createdAt: action.startedAt,
+      });
+    }
+    if (
+      action.cancelledAt === undefined &&
+      now >= action.startedAt + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS
+    ) {
+      messages.push({
+        source: 'devin',
+        text: action.assistantReply,
+        createdAt: action.startedAt + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS,
+      });
+    }
+  }
+  return messages;
+}
+
 export function isScreenshotFixtureMode(): boolean {
   return __DEV__ && process.env.EXPO_PUBLIC_SCREENSHOT_FIXTURES === '1';
 }
