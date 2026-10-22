@@ -413,6 +413,11 @@ export class RecoverableSessionDiscoveryAdapter implements SessionDiscoveryAdapt
         // provide this specific session without exposing its private error.
       }
     }
+    const snapshot = this.current.getActiveTurnSnapshot?.(input);
+    if (snapshot) {
+      const toolCallIds = this.current.getTimedOutToolCallIds?.(input);
+      return toolCallIds?.size ? markLoadedSessionTimeouts(snapshot, toolCallIds) : snapshot;
+    }
     const loaded = await this.current.loadSession(input);
     this.acpLoadedSessionIds.add(input);
     await this.current.releaseSessionOwnership?.(input);
