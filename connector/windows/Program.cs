@@ -585,34 +585,26 @@ internal sealed class ConnectorForm : Form
         devicesList.Visible = hasDevices;
     }
 
-    private Panel CreateDeviceCard(ConnectorDevice device)
+    private FlowLayoutPanel CreateDeviceCard(ConnectorDevice device)
     {
         var isActive = device.Status == "active";
-        var card = new Panel
+        var card = new FlowLayoutPanel
         {
-            Width = 520,
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             BorderStyle = BorderStyle.FixedSingle,
-            Padding = new Padding(10),
-            Margin = new Padding(0, 0, 0, 10),
-        };
-        var cardContent = new FlowLayoutPanel
-        {
-            Width = 498,
-            MaximumSize = new Size(498, 0),
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
-            Margin = Padding.Empty,
-            Dock = DockStyle.Top,
+            Padding = new Padding(10),
+            Margin = new Padding(0, 0, 0, 10),
+            MinimumSize = new Size(480, 0),
+            MaximumSize = new Size(480, 0),
         };
         var nameLabel = new Label
         {
             Text = device.DeviceName,
             AutoSize = true,
-            MaximumSize = new Size(500, 0),
+            MaximumSize = new Size(458, 0),
             Font = new Font("Segoe UI", 12, FontStyle.Bold),
             Margin = new Padding(0, 0, 0, 4),
         };
@@ -648,11 +640,11 @@ internal sealed class ConnectorForm : Form
             Margin = new Padding(0, 4, 0, 0),
         };
 
-        cardContent.Controls.Add(nameLabel);
-        cardContent.Controls.Add(pairedLabel);
+        card.Controls.Add(nameLabel);
+        card.Controls.Add(pairedLabel);
         if (!isActive)
         {
-            cardContent.Controls.Add(new Label
+            card.Controls.Add(new Label
             {
                 Text = "Revoked",
                 AutoSize = true,
@@ -660,9 +652,9 @@ internal sealed class ConnectorForm : Form
                 Margin = new Padding(0, 2, 0, 0),
             });
         }
-        cardContent.Controls.Add(viewSessions);
-        cardContent.Controls.Add(sendPrompts);
-        cardContent.Controls.Add(startSessions);
+        card.Controls.Add(viewSessions);
+        card.Controls.Add(sendPrompts);
+        card.Controls.Add(startSessions);
 
         if (isActive)
         {
@@ -686,10 +678,9 @@ internal sealed class ConnectorForm : Form
                 Margin = new Padding(0, 8, 0, 0),
             };
             revokeButton.Click += async (_, _) => await RevokeSelectedDeviceAsync(device.DeviceId);
-            cardContent.Controls.Add(revokeButton);
+            card.Controls.Add(revokeButton);
         }
 
-        card.Controls.Add(cardContent);
         return card;
     }
 
