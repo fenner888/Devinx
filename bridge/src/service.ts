@@ -388,6 +388,7 @@ export interface SessionDiscoveryAdapter {
   listSessions(input?: unknown): Promise<AcpSessionPage>;
   isSessionLoadSupported(): boolean;
   loadSession(sessionId: string): Promise<AcpLoadedSession>;
+  getActiveTurnSnapshot?(sessionId: string): AcpLoadedSession | null;
   getTimedOutToolCallIds?(sessionId: string): ReadonlySet<string>;
   isSessionActivitySupported?(): boolean;
   getSessionActivity?(sessionId: string): Promise<AcpSessionActivity | null>;

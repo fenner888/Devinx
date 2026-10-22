@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import {
   AcpAutoApproveUnavailableError,
+  AcpBusyError,
   acpWorkingDirectory,
   AcpSessionClient,
   isAcpSessionInUseError,
@@ -946,6 +947,95 @@ if (request.method === 'initialize') {
       );
     } finally {
       await new Promise((resolve) => setTimeout(resolve, 20));
+      await client.stop();
+    }
+  });
+
+  it('serves an active snapshot for a newly created session while load remains busy', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {}, close: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/new') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessionId: 'session-active-new'
+  } }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  globalThis.promptId = request.id;
+} else if (request.method === 'session/cancel') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: globalThis.promptId, result: { stopReason: 'cancelled' }
+  }) + '\\n');
+} else if (request.method === 'session/close') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {} }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    try {
+      await client.start();
+      const sessionId = await client.createSession('/tmp/project', null, 'Count to 30');
+      await expect(client.loadSession(sessionId)).rejects.toBeInstanceOf(AcpBusyError);
+      expect(client.getActiveTurnSnapshot(sessionId)).toMatchObject({
+        sessionId,
+        cwd: '/tmp/project',
+        messages: [{ source: 'user', text: 'Count to 30' }],
+      });
+      expect(client.getActiveTurnSnapshot('another-session')).toBeNull();
+      client.cancelSession(sessionId);
+      for (let attempt = 0; attempt < 20 && client.getActiveTurnSnapshot(sessionId); attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(client.getActiveTurnSnapshot(sessionId)).toBeNull();
+    } finally {
+      await client.stop();
+    }
+  });
+
+  it('includes loaded replay messages in an active prompt snapshot', async () => {
+    const executablePath = fakeCli(`
+if (request.method === 'initialize') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { list: {}, close: {} } }
+  } }) + '\\n');
+} else if (request.method === 'session/list') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {
+    sessions: [{ sessionId: 'session-active-loaded', cwd: '/tmp/project' }]
+  } }) + '\\n');
+} else if (request.method === 'session/load') {
+  for (const [sessionUpdate, text] of [
+    ['user_message_chunk', 'Earlier question'],
+    ['agent_message_chunk', 'Earlier answer']
+  ]) process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', method: 'session/update', params: {
+      sessionId: 'session-active-loaded',
+      update: { sessionUpdate, content: { type: 'text', text } }
+    }
+  }) + '\\n');
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: null }) + '\\n');
+} else if (request.method === 'session/prompt') {
+  globalThis.promptId = request.id;
+} else if (request.method === 'session/cancel') {
+  process.stdout.write(JSON.stringify({
+    jsonrpc: '2.0', id: globalThis.promptId, result: { stopReason: 'cancelled' }
+  }) + '\\n');
+} else if (request.method === 'session/close') {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {} }) + '\\n');
+}`);
+    const client = new AcpSessionClient({ executablePath, requestTimeoutMs: 1_000 });
+
+    try {
+      await client.start();
+      await client.listSessions();
+      await client.loadSession('session-active-loaded');
+      await client.promptSession('session-active-loaded', 'next');
+      expect(client.getActiveTurnSnapshot('session-active-loaded')?.messages).toEqual([
+        { source: 'user', text: 'Earlier question' },
+        { source: 'devin', text: 'Earlier answer' },
+        { source: 'user', text: 'next' },
+      ]);
+      client.cancelSession('session-active-loaded');
+    } finally {
       await client.stop();
     }
   });

@@ -820,6 +820,7 @@ interface ReplayCollector {
 interface ActiveTurn {
   sessionId: string;
   startedAt: number;
+  promptText: string;
   reply: string;
   replyTruncated: boolean;
   activity: ActivityLog;
@@ -1242,6 +1243,7 @@ export class AcpSessionClient {
   private canCloseSessions = false;
   private readonly listedSessions = new Map<string, CachedSessionMetadata>();
   private readonly loadedSessions = new Set<string>();
+  private readonly lastLoadedMessages = new Map<string, AcpHistoryMessage[]>();
   private readonly sessionModes = new Map<string, AcpSessionModeState>();
   private activeLoad: ReplayCollector | null = null;
   private activePromptSessionId: string | null = null;
@@ -1409,6 +1411,41 @@ export class AcpSessionClient {
       replyTruncated: turn.replyTruncated,
       activity: turn.activity.list(),
     };
+  }
+
+  getActiveTurnSnapshot(sessionIdInput: unknown): AcpLoadedSession | null {
+    const parsedSessionId = sessionIdSchema.safeParse(sessionIdInput);
+    if (!parsedSessionId.success) return null;
+    const sessionId = parsedSessionId.data;
+    const activeTurn = this.activeTurn;
+    const metadata = this.listedSessions.get(sessionId);
+    if (
+      this.activePromptSessionId !== sessionId ||
+      !metadata ||
+      activeTurn?.sessionId !== sessionId
+    ) {
+      return null;
+    }
+
+    const messages = (this.lastLoadedMessages.get(sessionId) ?? []).map((message) => ({
+      ...message,
+    }));
+    const messageTimes: Array<number | undefined> = messages.map(() => undefined);
+    if (activeTurn.promptText) {
+      messages.push({ source: 'user', text: activeTurn.promptText });
+      messageTimes.push(activeTurn.startedAt);
+    }
+    const loaded = attachActivity(
+      {
+        sessionId,
+        cwd: metadata.cwd,
+        messages,
+        truncated: false,
+        modelId: this.sessionModelSelectors.get(sessionId)?.catalog.defaultModelId,
+      },
+      [],
+    );
+    return attachMessageTimes(loaded, messageTimes);
   }
 
   getPendingElicitation(sessionIdInput: unknown): AcpPendingElicitation | null {
@@ -1628,11 +1665,13 @@ export class AcpSessionClient {
       // and mark still-running tools interrupted.
       collector.activity.finishTurn(collector.lastAt);
       this.loadedSessions.add(sessionId);
+      const messages = collector.messages.map(({ source, text }) => ({ source, text }));
+      this.cacheLastLoadedMessages(sessionId, messages);
       const loaded = attachActivity(
         {
           sessionId,
           cwd: metadata.cwd,
-          messages: collector.messages.map(({ source, text }) => ({ source, text })),
+          messages,
           truncated: collector.truncated || collector.activity.truncated,
           modelId: this.sessionModelSelectors.get(sessionId)?.catalog.defaultModelId,
         },
@@ -1697,6 +1736,7 @@ export class AcpSessionClient {
       }
       this.listedSessions.set(created.sessionId, { cwd });
       this.loadedSessions.add(created.sessionId);
+      this.cacheLastLoadedMessages(created.sessionId, []);
       const selector = parseAcpModelSelector(created.configOptions);
       if (selector) {
         this.modelCatalog = selector.catalog;
@@ -1769,6 +1809,7 @@ export class AcpSessionClient {
       }
       this.listedSessions.set(created.sessionId, { cwd });
       this.loadedSessions.add(created.sessionId);
+      this.cacheLastLoadedMessages(created.sessionId, []);
       this.startPrompt(created.sessionId, [{ type: 'text', text }]);
       return created.sessionId;
     } finally {
@@ -1802,6 +1843,9 @@ export class AcpSessionClient {
       }
     }
     const listedSessions = [...this.listedSessions.entries()];
+    const lastLoadedMessages = [...this.lastLoadedMessages.entries()].map(
+      ([id, messages]) => [id, messages.map((message) => ({ ...message }))] as const,
+    );
     const modelCatalog = this.modelCatalog ? cloneModelCatalog(this.modelCatalog) : null;
     const finishedTurn = this.activeTurn?.sessionId === sessionId ? this.activeTurn : null;
     const timedOutToolCalls = new Map(
@@ -1814,6 +1858,9 @@ export class AcpSessionClient {
     }
     for (const [listedSessionId, metadata] of listedSessions) {
       this.listedSessions.set(listedSessionId, { ...metadata });
+    }
+    for (const [id, messages] of lastLoadedMessages) {
+      this.lastLoadedMessages.set(id, messages);
     }
     this.modelCatalog = modelCatalog;
     if (finishedTurn && !this.activeTurn && !this.activePromptSessionId) {
@@ -1912,12 +1959,22 @@ export class AcpSessionClient {
     if (this.activeLoad || this.activePromptSessionId) {
       throw new AcpBusyError();
     }
+    const promptText = prompt
+      .flatMap((item) => {
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) return [];
+        const promptItem = item as Record<string, unknown>;
+        return promptItem.type === 'text' && typeof promptItem.text === 'string'
+          ? [promptItem.text]
+          : [];
+      })
+      .join('');
     this.activePromptSessionId = sessionId;
     this.latestQuestionToolCallId = null;
     this.timedOutToolCallId = null;
     this.activeTurn = {
       sessionId,
       startedAt: Date.now(),
+      promptText,
       reply: '',
       replyTruncated: false,
       activity: new ActivityLog(),
@@ -1939,6 +1996,19 @@ export class AcpSessionClient {
       () => this.finishPrompt(sessionId),
       () => this.finishPrompt(sessionId),
     );
+  }
+
+  private cacheLastLoadedMessages(sessionId: string, messages: AcpHistoryMessage[]): void {
+    this.lastLoadedMessages.delete(sessionId);
+    this.lastLoadedMessages.set(
+      sessionId,
+      messages.map((message) => ({ ...message })),
+    );
+    while (this.lastLoadedMessages.size > MAX_CACHED_SESSIONS) {
+      const oldestSessionId = this.lastLoadedMessages.keys().next().value;
+      if (oldestSessionId === undefined) break;
+      this.lastLoadedMessages.delete(oldestSessionId);
+    }
   }
 
   private async finishPrompt(sessionId: string): Promise<void> {
@@ -1975,6 +2045,7 @@ export class AcpSessionClient {
     this.loadedSessions.clear();
     this.sessionModes.clear();
     this.sessionModelSelectors.clear();
+    this.lastLoadedMessages.clear();
     this.activeLoad = null;
     this.activePromptSessionId = null;
     this.latestQuestionToolCallId = null;

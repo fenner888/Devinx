@@ -440,6 +440,78 @@ describe('Desktop Bridge development runner', () => {
     expect(releaseSessionOwnership).toHaveBeenCalledWith('session-readable');
   });
 
+  it('serves an active-turn snapshot without loading or releasing ACP ownership', async () => {
+    const loaded = {
+      sessionId: 'session-active',
+      cwd: '/tmp/project',
+      messages: [{ source: 'user' as const, text: 'Run this.' }],
+      truncated: false,
+    };
+    const loadSession = jest.fn(async () => {
+      throw new Error('ACP load must not be called');
+    });
+    const releaseSessionOwnership = jest.fn<Promise<void>, [string]>().mockResolvedValue();
+    const cancelSession = jest.fn();
+    const getActiveTurnSnapshot = jest.fn((sessionId: string) =>
+      sessionId === 'session-active' ? loaded : null,
+    );
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace({
+      isSessionListSupported: () => true,
+      listSessions: async () => ({
+        sessions: [{ sessionId: 'session-active', cwd: '/tmp/project' }],
+      }),
+      isSessionLoadSupported: () => true,
+      loadSession,
+      getActiveTurnSnapshot,
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
+      isSessionCancelSupported: () => true,
+      cancelSession,
+      releaseSessionOwnership,
+    });
+
+    await expect(adapter.loadSession('session-active')).resolves.toMatchObject(loaded);
+    expect(loadSession).not.toHaveBeenCalled();
+    expect(releaseSessionOwnership).not.toHaveBeenCalled();
+    await adapter.cancelSession('session-active');
+    expect(cancelSession).toHaveBeenCalledWith('session-active');
+  });
+
+  it('prefers successful history loads without consulting active ACP snapshots', async () => {
+    const getActiveTurnSnapshot = jest.fn(() => null);
+    const adapter = new RecoverableSessionDiscoveryAdapter();
+    adapter.replace({
+      isSessionListSupported: () => true,
+      listSessions: async () => ({
+        sessions: [{ sessionId: 'session-history', cwd: '/tmp/project' }],
+      }),
+      isSessionLoadSupported: () => true,
+      loadSession: async () => {
+        throw new Error('ACP load must not be called');
+      },
+      getActiveTurnSnapshot,
+      isSessionPromptSupported: () => true,
+      promptSession: async () => {},
+    });
+    adapter.setHistory({
+      start: async () => {},
+      stop: async () => {},
+      isSessionLoadSupported: () => true,
+      loadSession: async () => ({
+        sessionId: 'session-history',
+        cwd: '/tmp/project',
+        messages: [],
+        truncated: false,
+      }),
+    });
+
+    await expect(adapter.loadSession('session-history')).resolves.toMatchObject({
+      sessionId: 'session-history',
+    });
+    expect(getActiveTurnSnapshot).not.toHaveBeenCalled();
+  });
+
   it('serves SQLite liveness from session.activity when ACP reports inactive', async () => {
     const adapter = new RecoverableSessionDiscoveryAdapter();
     adapter.replace({
