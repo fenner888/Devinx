@@ -10,8 +10,8 @@ This is a review draft only. Do not publish it or submit App Review without expl
 - Subtitle: `Unofficial client for Devin` (27 characters; App Store limit 30)
 - Primary category: Developer Tools
 - Secondary category: Productivity
-- Privacy policy: `https://github.com/fenner888/Devinx/blob/main/PRIVACY.md`
-- Support: `https://github.com/fenner888/Devinx/issues`
+- Privacy policy: `https://github.com/fenner888/Otterin/blob/main/PRIVACY.md`
+- Support: `https://github.com/fenner888/Otterin/issues`
 - Keywords: `Devin,developer,cloud,coding,session,agent,repository,workflow,terminal,productivity`
 
 ## Description

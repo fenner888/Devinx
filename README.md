@@ -15,13 +15,13 @@
 <p align="center">
   <a href="https://testflight.apple.com/join/KBD25apN"><strong>Join the TestFlight beta</strong></a>
   ·
-  <a href="https://github.com/fenner888/Devinx/releases/latest"><strong>Download Otterin Connector</strong></a>
+  <a href="https://github.com/fenner888/Otterin/releases/latest"><strong>Download Otterin Connector</strong></a>
   ·
   <a href="docs/devinx-connector.md"><strong>Local setup guide</strong></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/fenner888/Devinx/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fenner888/Devinx/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/fenner888/Otterin/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fenner888/Otterin/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <a href="https://testflight.apple.com/join/KBD25apN"><img alt="TestFlight Build 89" src="https://img.shields.io/badge/TestFlight-0.1.0%20(89)-0D96F6?logo=apple"></a>
 </p>
@@ -38,7 +38,7 @@
 | -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------- |
 | **Otterin for iPhone**           | `0.1.0 (82)`        | Testing in Team (Expo) and [Otterin Early Access](https://testflight.apple.com/join/KBD25apN)       |
 | **Public App Store version**     | `1.0`               | Submitted to Apple and waiting for App Review · manual release after approval                     |
-| **Otterin Connector for macOS**  | `0.1.17`            | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Devinx/releases/latest) |
+| **Otterin Connector for macOS**  | `0.1.17`            | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Otterin/releases/latest) |
 | **Otterin Connector for Windows** | `0.1.7.0` live; `0.1.8.0` in certification | Windows 11 x64 compatibility update submitted to Microsoft; Store listing retains its reserved DevinX Connector name |
 
 TestFlight access does not include a Devin account or shared Devin data. Each tester connects their
@@ -123,7 +123,7 @@ Connector is optional. Cloud-only users do not install it.
 ### Setup
 
 1. Download the signed DMG and checksum from the
-   [latest official Otterin Connector release](https://github.com/fenner888/Devinx/releases/latest).
+   [latest official Otterin Connector release](https://github.com/fenner888/Otterin/releases/latest).
 2. Verify the checksum published with that release.
 3. Open the DMG and move **Otterin Connector** to Applications.
 4. Open Connector and confirm it detects both Tailscale and Devin for Terminal.
@@ -210,7 +210,7 @@ tunnel, analytics SDK, or silent updater.
 Read the complete [Privacy Policy](PRIVACY.md), [Security Policy](SECURITY.md),
 [Authorization Matrix](docs/authorization-matrix.md), and
 [latest dependency audit](docs/dependency-audit-2026-07-15.md). Report vulnerabilities through
-[GitHub's private vulnerability reporting](https://github.com/fenner888/Devinx/security/advisories/new),
+[GitHub's private vulnerability reporting](https://github.com/fenner888/Otterin/security/advisories/new),
 never through a public issue containing sensitive details.
 
 ## Honest capability boundaries
@@ -249,7 +249,7 @@ The maintained parity inventory is in
 - A configured Expo/EAS development environment
 
 ```bash
-git clone https://github.com/fenner888/Devinx.git
+git clone https://github.com/fenner888/Otterin.git Devinx
 cd Devinx
 npm ci --legacy-peer-deps
 npm run ci
@@ -330,10 +330,10 @@ private session content, repository secrets, or exploit details.
 
 ## Support
 
-- [Open a bug or feature request](https://github.com/fenner888/Devinx/issues)
-- [Report a vulnerability privately](https://github.com/fenner888/Devinx/security/advisories/new)
+- [Open a bug or feature request](https://github.com/fenner888/Otterin/issues)
+- [Report a vulnerability privately](https://github.com/fenner888/Otterin/security/advisories/new)
 - [Read the privacy policy](PRIVACY.md)
-- [View Otterin releases](https://github.com/fenner888/Devinx/releases)
+- [View Otterin releases](https://github.com/fenner888/Otterin/releases)
 
 ## License and trademarks
 

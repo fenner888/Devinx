@@ -17,7 +17,7 @@ The separate Connector application is the current supported way to install and o
 
 1. Choose the trusted package for the computer:
     - Apple-silicon macOS: download the signed DMG and checksum from the
-      [official Otterin Connector release page](https://github.com/fenner888/Devinx/releases/latest).
+      [official Otterin Connector release page](https://github.com/fenner888/Otterin/releases/latest).
     - Windows 11 x64: install only
       [Otterin Connector Microsoft Store listing](https://apps.microsoft.com/detail/9N52Z3FVMFH8).
       The package must be published by **DevinX Tools** with Store ID

@@ -21,7 +21,7 @@ describe('Connector assisted setup', () => {
     );
   });
   it('uses only the official guarded release path', () => {
-    expect(CONNECTOR_RELEASE_PAGE).toBe('https://github.com/fenner888/Devinx/releases/latest');
+    expect(CONNECTOR_RELEASE_PAGE).toBe('https://github.com/fenner888/Otterin/releases/latest');
     expect(CONNECTOR_SETUP_PROMPT).toContain(CONNECTOR_RELEASE_PAGE);
     expect(WINDOWS_CONNECTOR_STORE_PAGE).toBe('https://apps.microsoft.com/detail/9N52Z3FVMFH8');
     expect(CONNECTOR_SETUP_PROMPT).toContain(WINDOWS_CONNECTOR_STORE_PAGE);
