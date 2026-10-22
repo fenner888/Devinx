@@ -228,7 +228,7 @@ export default function SettingsScreen() {
             </Pressable>
             <Pressable
               className="mb-2"
-              onPress={() => Linking.openURL('https://github.com/fenner888/Devinx')}
+              onPress={() => Linking.openURL('https://github.com/fenner888/Otterin')}
               accessibilityRole="link"
               accessibilityLabel="Open-source licenses"
             >

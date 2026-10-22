@@ -117,8 +117,8 @@ Push notifications are not implemented in v1. The app does not request notificat
 
 **Required URLs:**
 
-- Support: `https://github.com/fenner888/Devinx/issues`
-- Privacy policy: `https://github.com/fenner888/Devinx/blob/main/PRIVACY.md`
+- Support: `https://github.com/fenner888/Otterin/issues`
+- Privacy policy: `https://github.com/fenner888/Otterin/blob/main/PRIVACY.md`
 
 The final privacy labels must be checked against the exact production configuration in App Store Connect.
 

@@ -48,4 +48,4 @@ Otterin does not sell personal data, use data for advertising, or track users ac
 
 ## Contact
 
-For support or privacy questions, open an issue at `https://github.com/fenner888/Devinx/issues`.
+For support or privacy questions, open an issue at `https://github.com/fenner888/Otterin/issues`.

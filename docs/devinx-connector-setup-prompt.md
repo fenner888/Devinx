@@ -1,6 +1,6 @@
 # AI-assisted Otterin Connector setup prompt
 
-This is the primary assisted installation guide presented by Otterin after a user chooses **Local**. macOS uses the notarized release at <https://github.com/fenner888/Devinx/releases/latest>. Windows 11 x64 uses the reserved Microsoft Store listing at <https://apps.microsoft.com/detail/9N52Z3FVMFH8>. The prompt must stop safely unless the platform's official distribution and trust checks are available.
+This is the primary assisted installation guide presented by Otterin after a user chooses **Local**. macOS uses the notarized release at <https://github.com/fenner888/Otterin/releases/latest>. Windows 11 x64 uses the reserved Microsoft Store listing at <https://apps.microsoft.com/detail/9N52Z3FVMFH8>. The prompt must stop safely unless the platform's official distribution and trust checks are available.
 
 For Local access, Tailscale provides only the private network route; Otterin Connector is the required trusted local service that communicates with a supported local Devin ACP capability and authenticates each iPhone. A Tailscale IP or password is not a replacement for a compatible service running on the local device.
 
@@ -10,7 +10,7 @@ For Local access, Tailscale provides only the private network route; Otterin Con
 >
 > Detect whether this computer is macOS or Windows.
 >
-> On macOS, open https://github.com/fenner888/Devinx/releases/latest. Download Connector only when that page provides the signed Apple-silicon DMG plus its adjacent SHA-256 checksum. Verify the checksum, require a Developer ID Application signature, Apple notarization, and Gatekeeper acceptance.
+> On macOS, open https://github.com/fenner888/Otterin/releases/latest. Download Connector only when that page provides the signed Apple-silicon DMG plus its adjacent SHA-256 checksum. Verify the checksum, require a Developer ID Application signature, Apple notarization, and Gatekeeper acceptance.
 >
 > On Windows 11 x64, open https://apps.microsoft.com/detail/9N52Z3FVMFH8. The Microsoft Store listing retains the reserved DevinX Connector name; install only that verified listing, published by DevinX Tools, with Store ID 9N52Z3FVMFH8. After installation, confirm that Get-AppxPackage reports identity DevinXTools.DevinXConnector, publisher CN=43D84E24-857C-4C40-9DAA-1A6983913CD9, and package family DevinXTools.DevinXConnector_ydtgrt4yd5wrc. Do not download, sideload, or execute an unsigned CI MSIX, EXE, or ZIP.
 >

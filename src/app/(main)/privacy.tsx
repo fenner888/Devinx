@@ -85,7 +85,7 @@ export default function PrivacyScreen() {
         <Pressable
           className="flex-row items-center justify-center rounded-button bg-tint-secondary py-3"
           onPress={() =>
-            Linking.openURL('https://github.com/fenner888/Devinx/blob/main/PRIVACY.md')
+            Linking.openURL('https://github.com/fenner888/Otterin/blob/main/PRIVACY.md')
           }
           accessibilityRole="link"
           accessibilityLabel="Open the full Otterin privacy policy"

@@ -31,7 +31,7 @@ export const branding = {
   links: {
     docs: 'https://docs.devin.ai',
     status: 'https://status.devin.ai',
-    connectorReleases: 'https://github.com/fenner888/Devinx/releases/latest',
+    connectorReleases: 'https://github.com/fenner888/Otterin/releases/latest',
     windowsConnectorStore: 'https://apps.microsoft.com/detail/9N52Z3FVMFH8',
   },
 } as const;

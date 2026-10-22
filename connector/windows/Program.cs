@@ -292,7 +292,7 @@ internal sealed class ConnectorForm : Form
     private const string StartupValueName = "DevinX Connector";
     private const string ReleasePage = "https://apps.microsoft.com/detail/9N52Z3FVMFH8";
     private const string SetupGuide =
-        "https://github.com/fenner888/Devinx/blob/main/docs/devinx-connector.md";
+        "https://github.com/fenner888/Otterin/blob/main/docs/devinx-connector.md";
     private readonly Label statusLabel = new() { AutoSize = true, Font = new Font("Segoe UI", 18, FontStyle.Bold) };
     private readonly Label detailLabel = new() { AutoSize = true, ForeColor = Color.DimGray };
     private readonly PictureBox qrImage = new()
