@@ -172,36 +172,34 @@ if (process.env.DEVINX_REQUIRE_MSIX_ARTIFACT === '1' || existsSync(msixPath)) {
       const isolatedDpapiStateRoot = resolve(runtimeStageRoot, 'DpapiState');
       const realStateBefore = snapshotRealConnectorState();
       try {
-        try {
-          runWithEnvironment(
-            resolve(unpackRoot, 'DevinXConnector.exe'),
-            ['--verify-runtime-launch'],
-            {
-              DEVINX_RUNTIME_STAGE_ROOT: runtimeStageRoot,
-              LOCALAPPDATA: isolatedLocalAppData,
-              DEVINX_DPAPI_STATE_ROOT: isolatedDpapiStateRoot,
-            },
-          );
-          const stagedExecutables = [
-            'runtime/node.exe',
-            'windows-dpapi-helper.exe',
-          ];
-          const versionDirectories = readdirSync(resolve(runtimeStageRoot, 'Runtime'))
-            .filter((entry) => /^[a-f0-9]{64}$/i.test(entry));
-          if (versionDirectories.length !== 1) {
-            throw new Error('Store runtime staging did not create exactly one verified version');
+        runWithEnvironment(
+          resolve(unpackRoot, 'DevinXConnector.exe'),
+          ['--verify-runtime-launch'],
+          {
+            DEVINX_RUNTIME_STAGE_ROOT: runtimeStageRoot,
+            LOCALAPPDATA: isolatedLocalAppData,
+            DEVINX_DPAPI_STATE_ROOT: isolatedDpapiStateRoot,
+          },
+        );
+        const stagedExecutables = [
+          'runtime/node.exe',
+          'windows-dpapi-helper.exe',
+        ];
+        const versionDirectories = readdirSync(resolve(runtimeStageRoot, 'Runtime'))
+          .filter((entry) => /^[a-f0-9]{64}$/i.test(entry));
+        if (versionDirectories.length !== 1) {
+          throw new Error('Store runtime staging did not create exactly one verified version');
+        }
+        for (const relativePath of stagedExecutables) {
+          if (!existsSync(resolve(runtimeStageRoot, 'Runtime', versionDirectories[0], relativePath))) {
+            throw new Error(`Store runtime staging is missing ${relativePath}`);
           }
-          for (const relativePath of stagedExecutables) {
-            if (!existsSync(resolve(runtimeStageRoot, 'Runtime', versionDirectories[0], relativePath))) {
-              throw new Error(`Store runtime staging is missing ${relativePath}`);
-            }
-          }
-        } finally {
-          assertRealConnectorStateUnchanged(realStateBefore);
         }
       } finally {
-        rmSync(runtimeStageRoot, { recursive: true, force: true });
+        assertRealConnectorStateUnchanged(realStateBefore);
       }
+    } finally {
+      rmSync(runtimeStageRoot, { recursive: true, force: true });
     }
   } finally {
     rmSync(unpackRoot, { recursive: true, force: true });
