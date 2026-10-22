@@ -29,6 +29,7 @@ jest.mock('../../src/auth/deviceSigning', () => ({
 }));
 
 import {
+  cancelComputerSession,
   computerActivityEntrySchema,
   computerBridgeFeaturesSchema,
   computerBridgeHealthSchema,
@@ -74,13 +75,17 @@ import {
 import {
   createScreenshotFixtureData,
   isScreenshotFixtureMode,
+  resetScreenshotFixtureDemoState,
   SCREENSHOT_FIXTURE_BRIDGE_ID,
+  SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS,
   SCREENSHOT_FIXTURE_SESSION_IDS,
 } from '../../src/auth/screenshotFixtures';
+import { statusLabels } from '../../src/theme/tokens';
 
 const FIXTURE_NOW = 1_800_000_000_000;
 const ORIGINAL_DEV = Reflect.get(globalThis, '__DEV__') as unknown;
 const ORIGINAL_FIXTURE_ENV = process.env.EXPO_PUBLIC_SCREENSHOT_FIXTURES;
+let setFixtureNow: (now: number) => void;
 
 function setDevMode(enabled: boolean) {
   Object.defineProperty(globalThis, '__DEV__', {
@@ -116,11 +121,16 @@ describe('screenshot fixture mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetSecret.mockResolvedValue(null);
-    jest.spyOn(Date, 'now').mockReturnValue(FIXTURE_NOW);
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(FIXTURE_NOW);
+    setFixtureNow = (now) => {
+      nowSpy.mockReturnValue(now);
+    };
+    resetScreenshotFixtureDemoState();
     setFixtureMode(false);
   });
 
   afterEach(() => {
+    resetScreenshotFixtureDemoState();
     jest.restoreAllMocks();
     restoreFixtureEnvironment();
   });
@@ -305,5 +315,201 @@ describe('screenshot fixture mode', () => {
 
     expect(mockGetSecret).toHaveBeenCalledTimes(1);
     expect(mockPostPinnedBridgeJson).not.toHaveBeenCalled();
+  });
+
+  it('clears an allowed permission and shows a completed reply after four seconds', async () => {
+    setFixtureMode(true);
+    const sessionId = SCREENSHOT_FIXTURE_SESSION_IDS.permission;
+
+    await expect(getComputerSessionPermission(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({ id: expect.stringMatching(/^permission_/) });
+    await respondToComputerSessionPermission(SCREENSHOT_FIXTURE_BRIDGE_ID, {
+      sessionId,
+      permissionId: `permission_${'B'.repeat(43)}`,
+      decision: 'allow_once',
+    });
+
+    await expect(getComputerSessionPermission(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves.toBeNull();
+    await expect(getComputerSessionActivity(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({
+        active: true,
+        kind: 'responding',
+        label: 'Working on your task',
+        updatedAt: FIXTURE_NOW,
+      });
+    await expect(loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .not.toMatchObject({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            text: 'Ran the recipe search tests: 14 passed, 0 failed.',
+          }),
+        ]),
+      });
+
+    setFixtureNow(FIXTURE_NOW + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS - 1);
+    await expect(getComputerSessionActivity(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({ active: true });
+
+    setFixtureNow(FIXTURE_NOW + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS);
+    await expect(getComputerSessionActivity(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({ active: false, label: statusLabels.completed });
+    const loaded = await loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId);
+    expect(loaded.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sequence: 3,
+          source: 'devin',
+          text: 'Ran the recipe search tests: 14 passed, 0 failed.',
+          createdAt: FIXTURE_NOW + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS,
+        }),
+      ]),
+    );
+    expect(
+      (await loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).messages.filter(
+        ({ text }) => text === 'Ran the recipe search tests: 14 passed, 0 failed.',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('shows the denial reply after a permission is rejected', async () => {
+    setFixtureMode(true);
+    const sessionId = SCREENSHOT_FIXTURE_SESSION_IDS.permission;
+
+    await respondToComputerSessionPermission(SCREENSHOT_FIXTURE_BRIDGE_ID, {
+      sessionId,
+      permissionId: `permission_${'B'.repeat(43)}`,
+      decision: 'reject_once',
+    });
+    setFixtureNow(FIXTURE_NOW + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS);
+
+    const loaded = await loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId);
+    expect(loaded.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'devin',
+          text: "OK, I won't run that. Want me to try something else?",
+        }),
+      ]),
+    );
+  });
+
+  it('clears an answered elicitation and completes a reply after four seconds', async () => {
+    setFixtureMode(true);
+    const sessionId = SCREENSHOT_FIXTURE_SESSION_IDS.question;
+
+    await respondToComputerSessionElicitation(SCREENSHOT_FIXTURE_BRIDGE_ID, {
+      sessionId,
+      interactionId: `interaction_${'A'.repeat(43)}`,
+      action: 'accept',
+      content: { route_behavior: 'keep_redirect' },
+    });
+    await expect(getComputerSessionElicitation(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({ interaction: null });
+    await expect(getComputerSessionActivity(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({ active: true, kind: 'responding', label: 'Working on your task' });
+
+    setFixtureNow(FIXTURE_NOW + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS);
+    const loaded = await loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId);
+    expect(loaded.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'devin',
+          text: 'I kept the redirect and finished the login checks.',
+        }),
+      ]),
+    );
+  });
+
+  it('marks a cancelled session interrupted without adding a simulated reply', async () => {
+    setFixtureMode(true);
+    const sessionId = SCREENSHOT_FIXTURE_SESSION_IDS.working;
+
+    await cancelComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId);
+
+    await expect(getComputerSessionActivity(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({
+        active: false,
+        label: statusLabels.interrupted,
+        updatedAt: FIXTURE_NOW,
+      });
+    await expect(listComputerSessions(SCREENSHOT_FIXTURE_BRIDGE_ID)).resolves.toMatchObject({
+      sessions: expect.arrayContaining([
+        expect.objectContaining({
+          id: sessionId,
+          activity: expect.objectContaining({ active: false }),
+        }),
+      ]),
+    });
+    const loaded = await loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId);
+    expect(loaded.messages).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: 'Done. I updated the forecast card and the tests still pass.',
+        }),
+      ]),
+    );
+  });
+
+  it('adds a prompt immediately and its assistant reply after four seconds', async () => {
+    setFixtureMode(true);
+    const sessionId = SCREENSHOT_FIXTURE_SESSION_IDS.working;
+    const prompt = 'Update the forecast card for the demo.';
+
+    await expect(
+      promptComputerSession(
+        SCREENSHOT_FIXTURE_BRIDGE_ID,
+        sessionId,
+        prompt,
+        'claude-sonnet-4.5',
+      ),
+    ).resolves.toMatchObject({ sessionId });
+    await expect(loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            source: 'user',
+            text: prompt,
+            createdAt: FIXTURE_NOW,
+          }),
+        ]),
+      });
+    await expect(getComputerSessionActivity(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({ active: true, label: 'Working on your task' });
+
+    setFixtureNow(FIXTURE_NOW + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS);
+    const loaded = await loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId);
+    expect(loaded.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'devin',
+          text: 'Done. I updated the forecast card and the tests still pass.',
+          createdAt: FIXTURE_NOW + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS,
+        }),
+      ]),
+    );
+  });
+
+  it('keeps a prompt message but drops its pending reply when cancelled', async () => {
+    setFixtureMode(true);
+    const sessionId = SCREENSHOT_FIXTURE_SESSION_IDS.working;
+    const prompt = 'Make one more demo adjustment.';
+
+    await promptComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId, prompt);
+    await cancelComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId);
+    setFixtureNow(FIXTURE_NOW + SCREENSHOT_FIXTURE_DEMO_REPLY_DELAY_MS);
+
+    const loaded = await loadComputerSession(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId);
+    expect(loaded.messages).toEqual(
+      expect.arrayContaining([expect.objectContaining({ source: 'user', text: prompt })]),
+    );
+    expect(loaded.messages).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: 'Done. I updated the forecast card and the tests still pass.',
+        }),
+      ]),
+    );
+    await expect(getComputerSessionActivity(SCREENSHOT_FIXTURE_BRIDGE_ID, sessionId)).resolves
+      .toMatchObject({ active: false, label: statusLabels.interrupted });
   });
 });

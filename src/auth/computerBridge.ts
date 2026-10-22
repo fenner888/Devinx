@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { statusLabels } from '@theme/tokens';
 import { canonicalJson } from './canonicalJson';
 import {
   createRequestIdentity,
@@ -15,7 +16,16 @@ import {
 } from './pairedComputers';
 import {
   createScreenshotFixtureData,
+  getScreenshotFixtureDemoActivity,
+  getScreenshotFixtureDemoMessages,
+  hasScreenshotFixtureElicitationResponse,
+  hasScreenshotFixturePermissionResponse,
+  isScreenshotFixtureSessionCancelled,
   isScreenshotFixtureMode,
+  recordScreenshotFixtureCancellation,
+  recordScreenshotFixtureElicitationResponse,
+  recordScreenshotFixturePermissionResponse,
+  recordScreenshotFixturePrompt,
   SCREENSHOT_FIXTURE_BRIDGE_ID,
   SCREENSHOT_FIXTURE_SESSION_IDS,
 } from './screenshotFixtures';
@@ -1206,46 +1216,95 @@ function connectionForScreenshotFixture(bridgeId: string): ComputerBridgeConnect
     },
     listSessions: async (input = {}) => {
       const body = sessionListBodySchema.parse(input);
-      const fixture = createScreenshotFixtureData();
+      const now = Date.now();
+      const fixture = createScreenshotFixtureData(now);
       return computerSessionPageSchema.parse(
-        body.cursor ? { sessions: [] } : fixture.sessionPage,
+        body.cursor
+          ? { sessions: [] }
+          : {
+              sessions: fixture.sessionPage.sessions.map((session) => {
+                const activity = getScreenshotFixtureDemoActivity(session.id, now);
+                return activity
+                  ? {
+                      ...session,
+                      updatedAt: new Date(activity.updatedAt).toISOString(),
+                      activity: {
+                        active: activity.active,
+                        kind: activity.kind,
+                        updatedAt: activity.updatedAt,
+                      },
+                    }
+                  : session;
+              }),
+            },
       );
     },
     loadSession: async (sessionId) => {
       const parsedSessionId = localSessionIdSchema.parse(sessionId);
-      const fixture = createScreenshotFixtureData();
-      const loaded = fixture.loadedSessions[parsedSessionId];
-      if (loaded) return computerLoadedSessionSchema.parse(loaded);
-
-      const page = computerSessionPageSchema.parse(fixture.sessionPage);
-      const summary = page.sessions.find(({ id }) => id === parsedSessionId);
-      if (!summary) {
-        throw new ComputerBridgeError(
-          'The paired local device returned an invalid session identifier.',
-          'invalid_request',
-        );
-      }
-      return computerLoadedSessionSchema.parse({
-        session: {
-          id: parsedSessionId,
-          origin: 'computer',
-          workspaceName: summary.workspaceName,
-          ...(summary.model ? { model: summary.model } : {}),
-        },
-        messages: [
-          {
-            sequence: 1,
-            source: 'devin',
-            text: `${summary.title ?? summary.workspaceName} is complete.`,
-            createdAt: Date.parse(summary.updatedAt ?? new Date().toISOString()),
+      const now = Date.now();
+      const fixture = createScreenshotFixtureData(now);
+      let loaded = fixture.loadedSessions[parsedSessionId] as
+        | ({ [key: string]: unknown } & { messages: Array<Record<string, unknown>> })
+        | undefined;
+      if (!loaded) {
+        const page = computerSessionPageSchema.parse(fixture.sessionPage);
+        const summary = page.sessions.find(({ id }) => id === parsedSessionId);
+        if (!summary) {
+          throw new ComputerBridgeError(
+            'The paired local device returned an invalid session identifier.',
+            'invalid_request',
+          );
+        }
+        loaded = {
+          session: {
+            id: parsedSessionId,
+            origin: 'computer',
+            workspaceName: summary.workspaceName,
+            ...(summary.model ? { model: summary.model } : {}),
           },
-        ],
-        truncated: false,
-      });
+          messages: [
+            {
+              sequence: 1,
+              source: 'devin',
+              text: `${summary.title ?? summary.workspaceName} is complete.`,
+              createdAt: Date.parse(summary.updatedAt ?? new Date().toISOString()),
+            },
+          ],
+          truncated: false,
+        };
+      }
+      const demoMessages = getScreenshotFixtureDemoMessages(parsedSessionId, now);
+      if (demoMessages.length > 0) {
+        const messages = (loaded as { messages: Array<Record<string, unknown>> }).messages;
+        loaded = {
+          ...loaded,
+          messages: [...messages, ...demoMessages].map((message, sequence) => ({
+            ...message,
+            sequence: sequence + 1,
+          })),
+        };
+      }
+      return computerLoadedSessionSchema.parse(loaded);
     },
     getSessionActivity: async (sessionId) => {
       const parsedSessionId = localSessionIdSchema.parse(sessionId);
-      const fixture = createScreenshotFixtureData();
+      const now = Date.now();
+      const fixture = createScreenshotFixtureData(now);
+      const demoActivity = getScreenshotFixtureDemoActivity(parsedSessionId, now);
+      if (demoActivity) {
+        const label =
+          demoActivity.state === 'working'
+            ? 'Working on your task'
+            : demoActivity.state === 'interrupted'
+              ? statusLabels.interrupted
+              : statusLabels.completed;
+        return computerSessionActivitySchema.parse({
+          active: demoActivity.active,
+          kind: demoActivity.kind,
+          label,
+          updatedAt: demoActivity.updatedAt,
+        });
+      }
       return computerSessionActivitySchema.parse(
         fixture.sessionActivities[parsedSessionId] ?? {
           active: false,
@@ -1260,13 +1319,16 @@ function connectionForScreenshotFixture(bridgeId: string): ComputerBridgeConnect
       const fixture = createScreenshotFixtureData();
       return computerSessionElicitationSchema.parse({
         interaction:
-          parsedSessionId === SCREENSHOT_FIXTURE_SESSION_IDS.question
+          parsedSessionId === SCREENSHOT_FIXTURE_SESSION_IDS.question &&
+          !hasScreenshotFixtureElicitationResponse(parsedSessionId) &&
+          !isScreenshotFixtureSessionCancelled(parsedSessionId)
             ? fixture.elicitation.interaction
             : null,
       });
     },
     respondToSessionElicitation: async (input) => {
-      sessionElicitationResponseBodySchema.parse(input);
+      const body = sessionElicitationResponseBodySchema.parse(input);
+      recordScreenshotFixtureElicitationResponse(body.sessionId, body.action, Date.now());
       sessionElicitationResponseSchema.parse(
         createScreenshotFixtureData().mutationResponses.accepted,
       );
@@ -1276,19 +1338,23 @@ function connectionForScreenshotFixture(bridgeId: string): ComputerBridgeConnect
       const fixture = createScreenshotFixtureData();
       return computerSessionPermissionSchema.parse({
         permission:
-          parsedSessionId === SCREENSHOT_FIXTURE_SESSION_IDS.permission
+          parsedSessionId === SCREENSHOT_FIXTURE_SESSION_IDS.permission &&
+          !hasScreenshotFixturePermissionResponse(parsedSessionId) &&
+          !isScreenshotFixtureSessionCancelled(parsedSessionId)
             ? fixture.permission.permission
             : null,
       }).permission;
     },
     respondToSessionPermission: async (input) => {
-      sessionPermissionResponseBodySchema.parse(input);
+      const body = sessionPermissionResponseBodySchema.parse(input);
+      recordScreenshotFixturePermissionResponse(body.sessionId, body.decision, Date.now());
       sessionPermissionResponseSchema.parse(
         createScreenshotFixtureData().mutationResponses.accepted,
       );
     },
     cancelSession: async (sessionId) => {
-      sessionCancelBodySchema.parse({ sessionId });
+      const body = sessionCancelBodySchema.parse({ sessionId });
+      recordScreenshotFixtureCancellation(body.sessionId, Date.now());
       sessionCancelResponseSchema.parse({ cancelled: true });
     },
     promptSession: async (sessionId, text, modelId, autoApprove) => {
@@ -1298,10 +1364,12 @@ function connectionForScreenshotFixture(bridgeId: string): ComputerBridgeConnect
         ...(modelId ? { modelId } : {}),
         ...(autoApprove !== undefined ? { autoApprove } : {}),
       });
+      const startedAt = Date.now();
       const response = sessionPromptResponseSchema.parse({
         ...createScreenshotFixtureData().mutationResponses.prompt,
         sessionId: body.sessionId,
       });
+      recordScreenshotFixturePrompt(body.sessionId, body.text, startedAt);
       return response.sessionId ? { sessionId: response.sessionId } : undefined;
     },
     getCreateOptions: async (refresh = false) => {
