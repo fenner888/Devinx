@@ -597,14 +597,14 @@ internal sealed class ConnectorForm : Form
             WrapContents = false,
             Padding = new Padding(10),
             Margin = new Padding(0, 0, 0, 10),
-            MinimumSize = new Size(500, 0),
-            MaximumSize = new Size(500, 0),
+            MinimumSize = new Size(480, 0),
+            MaximumSize = new Size(480, 0),
         };
         var nameLabel = new Label
         {
             Text = device.DeviceName,
             AutoSize = true,
-            MaximumSize = new Size(478, 0),
+            MaximumSize = new Size(458, 0),
             Font = new Font("Segoe UI", 12, FontStyle.Bold),
             Margin = new Padding(0, 0, 0, 4),
         };
