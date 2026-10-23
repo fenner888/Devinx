@@ -39,7 +39,7 @@
 | **Otterin for iPhone**           | `0.1.0 (82)`        | Testing in Team (Expo) and [Otterin Early Access](https://testflight.apple.com/join/KBD25apN)       |
 | **Public App Store version**     | `1.0`               | Submitted to Apple and waiting for App Review · manual release after approval                     |
 | **Otterin Connector for macOS**  | `0.1.18`            | [Signed and notarized Apple-silicon release](https://github.com/fenner888/Otterin/releases/latest) |
-| **Otterin Connector for Windows** | `0.1.8.0` live; `0.1.9.0` next update | Windows 11 x64 compatibility update submitted to Microsoft; Store listing retains its reserved DevinX Connector name |
+| **Otterin Connector for Windows** | `0.1.9.0` in certification; `0.1.10.0` next update | Windows 11 x64 compatibility update submitted to Microsoft; 0.1.10.0 shows Otterin Connector as the installed app name |
 
 TestFlight access does not include a Devin account or shared Devin data. Each tester connects their
 own Devin organization, pairs a local device they control, or uses both.

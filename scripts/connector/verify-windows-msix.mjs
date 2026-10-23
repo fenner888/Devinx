@@ -102,6 +102,7 @@ for (const [expected, label] of [
   [`Version="${identity.version}"`, 'four-part package version'],
   [`ProcessorArchitecture="${identity.architecture}"`, 'x64 architecture'],
   [`<PublisherDisplayName>${identity.publisherDisplayName}</PublisherDisplayName>`, 'publisher name'],
+  ['<DisplayName>Otterin Connector</DisplayName>', 'installed app name'],
   [`<Resource Language="${identity.defaultLanguage}" />`, 'default package language'],
   ['Name="Windows.Desktop"', 'Windows Desktop target'],
   ['Executable="DevinXConnector.exe"', 'normalized packaged executable'],

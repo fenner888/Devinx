@@ -12,7 +12,7 @@
     Version="{{VERSION}}"
     ProcessorArchitecture="{{ARCHITECTURE}}" />
   <Properties>
-    <DisplayName>DevinX Connector</DisplayName>
+    <DisplayName>Otterin Connector</DisplayName>
     <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -32,7 +32,7 @@
       uap10:RuntimeBehavior="win32App"
       uap10:TrustLevel="mediumIL">
       <uap:VisualElements
-        DisplayName="DevinX Connector"
+        DisplayName="Otterin Connector"
         Description="Securely connect Otterin on iPhone to Devin running on this Windows PC."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
@@ -45,7 +45,7 @@
           <desktop:StartupTask
             TaskId="DevinXConnectorStartup"
             Enabled="false"
-            DisplayName="DevinX Connector" />
+            DisplayName="Otterin Connector" />
         </desktop:Extension>
       </Extensions>
     </Application>
